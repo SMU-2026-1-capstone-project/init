@@ -18,13 +18,9 @@
 | expo-media-library | 로컬 미디어 접근 | `npx expo install expo-media-library` |
 | expo-image-picker | 영상 파일 선택 | `npx expo install expo-image-picker` |
 
-### 자세 감지 (MediaPipe)
-| 패키지 | 용도 | 설치 명령어 |
-|--------|------|-----------|
-| react-native-mediapipe | MediaPipe 네이티브 바인딩 | `npm install react-native-mediapipe` |
-| @tensorflow/tfjs | TensorFlow.js 코어 (대안) | `npm install @tensorflow/tfjs` |
-| @tensorflow/tfjs-react-native | TF.js RN 바인딩 (대안) | `npm install @tensorflow/tfjs-react-native` |
-| @tensorflow-models/pose-detection | 포즈 감지 모델 (대안) | `npm install @tensorflow-models/pose-detection` |
+### 자세 감지
+> MediaPipe는 **ai-server (Python)**에서 실행됩니다.
+> 프론트엔드에서는 AI Server API를 호출하여 결과를 받습니다.
 
 ### 음성 안내
 | 패키지 | 용도 | 설치 명령어 |
@@ -85,6 +81,22 @@
 
 ---
 
+## AI Server (Python / FastAPI)
+
+### 핵심 의존성 (requirements.txt)
+| 패키지 | 용도 |
+|--------|------|
+| fastapi | REST API 프레임워크 |
+| uvicorn | ASGI 서버 |
+| pydantic / pydantic-settings | 데이터 검증 및 환경 설정 |
+| mediapipe | Google MediaPipe 포즈 감지 (33개 관절) |
+| opencv-python-headless | 이미지/영상 처리 |
+| numpy | 수치 계산 |
+| dtaidistance | DTW(Dynamic Time Warping) 알고리즘 (C 바인딩) |
+| python-multipart | 파일 업로드 지원 |
+
+---
+
 ## 일괄 설치 스크립트
 
 ### Frontend 전체 설치
@@ -101,8 +113,15 @@ npx expo install expo-camera expo-av expo-media-library expo-image-picker \
 # npm 패키지
 npm install axios zustand @tanstack/react-query \
   react-native-calendars react-native-chart-kit \
-  react-native-youtube-iframe react-native-webview \
-  react-native-mediapipe
+  react-native-youtube-iframe react-native-webview
+```
+
+### AI Server 설치
+```bash
+cd ai-server
+python -m venv venv
+source venv/Scripts/activate  # Windows
+pip install -r requirements.txt
 ```
 
 ### Backend 의존성

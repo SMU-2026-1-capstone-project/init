@@ -64,6 +64,25 @@ services:
       mysql:
         condition: service_healthy
 
+  # Python AI 서버 (MediaPipe + DTW)
+  ai-server:
+    build:
+      context: ./ai-server
+      dockerfile: Dockerfile
+    container_name: shadowfit-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: "false"
+      POSE_MODEL_COMPLEXITY: 1
+      BACKEND_URL: http://backend:8080/api/v1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   mysql_data:
     driver: local
@@ -110,7 +129,22 @@ docker compose stop mysql
 docker compose down -v
 ```
 
-### 전체 배포 (Backend + MySQL)
+### AI 서버 관련
+```bash
+# AI 서버만 실행
+docker compose up -d ai-server
+
+# AI 서버 로그 확인
+docker logs shadowfit-ai
+
+# AI 서버 헬스체크
+curl http://localhost:8000/health
+
+# Swagger API 문서
+# http://localhost:8000/docs
+```
+
+### 전체 배포 (Backend + AI Server + MySQL)
 ```bash
 # 전체 빌드 & 실행
 docker compose up -d --build
@@ -137,9 +171,10 @@ docker compose build --no-cache backend
 ## 개발 시 권장 구성
 - **MySQL**: Docker 컨테이너로 실행 (항상)
 - **Spring Boot**: 로컬에서 `./gradlew bootRun` (핫 리로딩 지원)
+- **AI Server**: 로컬에서 `uvicorn app.main:app --reload --port 8000`
 - **React Native**: 로컬에서 `npx expo start`
 
-이렇게 하면 백엔드 코드 변경 시 빠른 반영이 가능하면서도,
+이렇게 하면 코드 변경 시 빠른 반영이 가능하면서도,
 MySQL은 Docker로 깔끔하게 관리할 수 있습니다.
 
 ## application.yml Docker 연동 설정

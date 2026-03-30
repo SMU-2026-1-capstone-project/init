@@ -43,6 +43,24 @@ services:
       mysql:
         condition: service_healthy
 
+  ai-server:
+    build:
+      context: ./ai-server
+      dockerfile: Dockerfile
+    container_name: shadowfit-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: "false"
+      POSE_MODEL_COMPLEXITY: 1
+      BACKEND_URL: http://backend:8080/api/v1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   mysql_data:
     driver: local

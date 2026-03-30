@@ -18,26 +18,27 @@
 
 ## 1. 우리 프로젝트의 구조 이해하기
 
-ShadowFit은 크게 **3개의 프로그램**이 동시에 돌아갑니다:
+ShadowFit은 크게 **4개의 프로그램**이 동시에 돌아갑니다:
 
 ```
-[사용자의 휴대폰/에뮬레이터]          [내 컴퓨터]              [내 컴퓨터]
-┌─────────────────────┐    HTTP    ┌──────────────┐        ┌────────────┐
-│   Frontend          │ ◄──────► │   Backend     │ ◄────► │  Database   │
-│   (React Native)    │  요청/응답  │ (Spring Boot) │  저장/조회 │  (MySQL)    │
-│                     │           │               │        │             │
-│ - 화면 표시          │           │ - 데이터 처리   │        │ - 데이터 저장 │
-│ - 카메라 촬영        │           │ - 로그인 처리   │        │ - 회원 정보   │
-│ - 자세 분석          │           │ - API 제공     │        │ - 운동 기록   │
-└─────────────────────┘           └──────────────┘        └────────────┘
+[사용자의 휴대폰/에뮬레이터]          [내 컴퓨터]              [내 컴퓨터]         [내 컴퓨터]
+┌─────────────────────┐    HTTP    ┌──────────────┐        ┌────────────┐     ┌─────────────┐
+│   Frontend          │ ◄──────► │   Backend     │ ◄────► │  Database   │     │  AI Server   │
+│   (React Native)    │  요청/응답  │ (Spring Boot) │  저장/조회 │  (MySQL)    │     │  (FastAPI)   │
+│                     │           │               │        │             │     │              │
+│ - 화면 표시          │           │ - 데이터 처리   │        │ - 데이터 저장 │     │ - 자세 분석   │
+│ - 카메라 촬영        │  ◄──────────────────────────────────────────────────► │ - 싱크로율    │
+│ - TTS 음성 안내      │  프레임 전송    │ - 로그인 처리   │        │ - 회원 정보   │     │ - 영상 전처리 │
+└─────────────────────┘           └──────────────┘        └────────────┘     └─────────────┘
 ```
 
 쉽게 비유하면:
 - **Frontend** = 식당의 홀 (손님이 보는 메뉴판, 주문서)
 - **Backend** = 식당의 주방 (주문을 받아서 요리하는 곳)
+- **AI Server** = 식당의 품질 관리사 (음식 맛을 분석하는 전문가)
 - **Database** = 식당의 냉장고 (재료를 보관하는 곳)
 
-이 3개를 모두 켜야 앱이 정상 작동합니다.
+이 4개를 모두 켜야 앱이 정상 작동합니다.
 
 ---
 
@@ -129,7 +130,20 @@ docker compose version     # Docker Compose version v2.x.x
 > 3. 컴퓨터 재시작
 > 4. Docker Desktop 다시 실행
 
-### 3-4. 설치 확인 체크리스트
+### 3-4. Python 설치 (AI Server용)
+
+Python은 AI 서버(MediaPipe 포즈 감지, DTW 싱크로율 계산)를 실행하기 위해 필요합니다.
+
+1. https://www.python.org/downloads/ 에서 **Python 3.12** 다운로드 후 설치
+2. 설치할 때 **"Add Python to PATH"** 체크 필수!
+
+설치 후 확인:
+```bash
+python --version    # Python 3.12.x 이 나와야 함
+pip --version       # pip 24.x 이상이면 OK
+```
+
+### 3-5. 설치 확인 체크리스트
 
 모든 설치가 끝나면, 터미널에서 아래 명령어를 하나씩 실행해보세요:
 
@@ -137,11 +151,12 @@ docker compose version     # Docker Compose version v2.x.x
 java --version          # openjdk 21.x.x 이 나와야 함
 node --version          # v18 이상이 나와야 함
 npm --version           # 9 이상이 나와야 함
+python --version        # Python 3.12.x 이 나와야 함
 docker --version        # Docker version이 나와야 함
 docker compose version  # Docker Compose version이 나와야 함
 ```
 
-**5개 모두 정상이면** 다음 단계로 진행합니다.
+**6개 모두 정상이면** 다음 단계로 진행합니다.
 
 ---
 
@@ -211,7 +226,32 @@ cd backend
 >
 > **Windows에서 안 되면?** `gradlew.bat build -x test` 사용
 
-### 4-4. 초기 세팅 요약 (복사-붙여넣기용)
+### 4-4. AI Server 라이브러리 설치
+
+```bash
+cd ai-server
+
+# 가상환경 생성 (최초 1회)
+python -m venv venv
+
+# 가상환경 활성화
+# Windows (Git Bash)
+source venv/Scripts/activate
+# Windows (PowerShell)
+# .\venv\Scripts\Activate.ps1
+
+# 의존성 설치
+pip install -r requirements.txt
+```
+
+이 명령어가 하는 일:
+1. `venv/` 가상환경을 만듦 → 프로젝트 전용 Python 패키지 공간
+2. `requirements.txt`를 읽음 → "mediapipe, fastapi, dtaidistance... 이런 라이브러리가 필요하구나"
+3. 라이브러리를 `venv/` 안에 다운로드
+
+> **가상환경이란?** Python 패키지를 프로젝트별로 분리 관리하는 도구입니다. Node.js의 `node_modules/`와 비슷합니다.
+
+### 4-5. 초기 세팅 요약 (복사-붙여넣기용)
 
 ```bash
 # 프로젝트 폴더로 이동
@@ -225,17 +265,23 @@ npm install
 cd ../backend
 ./gradlew build -x test
 
+# AI Server 라이브러리 설치
+cd ../ai-server
+python -m venv venv
+source venv/Scripts/activate
+pip install -r requirements.txt
+
 # 프로젝트 루트로 돌아가기
 cd ..
 ```
 
-이 과정은 **최초 1회만** 하면 됩니다. 이후에는 `git pull` 후 `package.json` 또는 `build.gradle`이 변경되었을 때만 다시 하면 됩니다.
+이 과정은 **최초 1회만** 하면 됩니다. 이후에는 `git pull` 후 `package.json`, `build.gradle`, 또는 `requirements.txt`가 변경되었을 때만 다시 하면 됩니다.
 
 ---
 
 ## 5. 프로젝트 실행하기
 
-**반드시 아래 순서대로** 실행해야 합니다. (MySQL → Backend → Frontend)
+**반드시 아래 순서대로** 실행해야 합니다. (MySQL → Backend → AI Server → Frontend)
 
 ### 5-1단계: Docker Desktop 실행
 
@@ -300,7 +346,7 @@ cd "c:/최지호/상명대학교/4학년 1학기/캡스톤 디자인/shadowfit/b
   '  |____| .__|_| |_|_| |_\__, | / / / /
  =========|_|==============|___/=/_/_/_/
 
- :: Spring Boot ::                (v4.0.4)
+ :: Spring Boot ::                (v4.0.5)
 
 ...Started ShadowfitApplication in X.XX seconds...
 ```
@@ -309,7 +355,34 @@ cd "c:/최지호/상명대학교/4학년 1학기/캡스톤 디자인/shadowfit/b
 
 > **주의:** 이 터미널은 닫지 마세요! 닫으면 서버도 꺼집니다. 그대로 두고 새 터미널을 열어서 프론트엔드를 실행합니다.
 
-### 5-4단계: React Native 프론트엔드 실행
+### 5-4단계: Python AI 서버 실행
+
+**새 터미널**을 하나 더 열고:
+
+```bash
+# ai-server 폴더로 이동
+cd "c:/최지호/상명대학교/4학년 1학기/캡스톤디자인/shadowfit/ai-server"
+
+# 가상환경 활성화
+source venv/Scripts/activate
+
+# AI 서버 실행
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+실행이 성공하면 터미널에 아래 메시지가 나옵니다:
+```
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+```
+
+**Swagger API 문서:** http://localhost:8000/docs 에서 AI 서버 API를 확인할 수 있습니다.
+
+> **`--reload`는?** 코드 변경 시 자동으로 서버를 재시작하는 옵션입니다. 개발할 때 편리합니다.
+>
+> **주의:** 이 터미널도 닫지 마세요! 닫으면 AI 서버도 꺼집니다.
+
+### 5-5단계: React Native 프론트엔드 실행
 
 **새 터미널**을 하나 더 열고:
 
@@ -377,6 +450,13 @@ docker exec -it shadowfit-mysql mysql -u shadowfit -pshadowfit -e "SHOW DATABASE
 
 Expo Go 앱 또는 웹 브라우저에서 앱 화면이 뜨면 정상입니다.
 
+### 6-4. AI Server 확인
+
+웹 브라우저를 열고 아래 주소로 접속:
+
+- **헬스체크**: http://localhost:8000/health → `{"status":"ok"}` 응답
+- **Swagger UI** (API 문서): http://localhost:8000/docs
+
 ### 전체 실행 상태 요약
 
 | 구성요소 | 확인 방법 | 정상일 때 |
@@ -384,6 +464,7 @@ Expo Go 앱 또는 웹 브라우저에서 앱 화면이 뜨면 정상입니다.
 | Docker Desktop | 트레이 아이콘 | 초록색 고래 아이콘 |
 | MySQL | `docker compose ps` | `healthy` 상태 |
 | Backend | http://localhost:8080/swagger-ui.html | Swagger 페이지 열림 |
+| AI Server | http://localhost:8000/health | `{"status":"ok"}` 응답 |
 | Frontend | Expo 터미널 | QR 코드 표시됨 |
 
 ---
@@ -475,10 +556,13 @@ sudo sysctl -p
 ### 8-1. Frontend 종료
 - Expo가 실행 중인 터미널에서 `Ctrl + C`
 
-### 8-2. Backend 종료
+### 8-2. AI Server 종료
+- uvicorn이 실행 중인 터미널에서 `Ctrl + C`
+
+### 8-3. Backend 종료
 - Spring Boot가 실행 중인 터미널에서 `Ctrl + C`
 
-### 8-3. MySQL 종료
+### 8-4. MySQL 종료
 ```bash
 cd "c:/최지호/상명대학교/4학년 1학기/캡스톤 디자인/shadowfit"
 
@@ -507,9 +591,14 @@ docker compose up -d mysql
 cd backend
 ./gradlew bootRun
 
-# 3. Frontend 시작 (새 터미널)
+# 3. AI Server 시작 (새 터미널)
+cd ai-server
+source venv/Scripts/activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# 4. Frontend 시작 (새 터미널)
 cd frontend
 npx expo start
 ```
 
-세 프로그램을 모두 실행하면, Expo Go 앱이나 웹 브라우저에서 ShadowFit 앱을 테스트할 수 있습니다.
+네 프로그램을 모두 실행하면, Expo Go 앱이나 웹 브라우저에서 ShadowFit 앱을 테스트할 수 있습니다.

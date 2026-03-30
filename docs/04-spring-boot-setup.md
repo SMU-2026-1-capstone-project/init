@@ -64,7 +64,7 @@ spring init --dependencies=web,data-jpa,mysql,security,lombok,devtools,validatio
 ```groovy
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.4'
+    id 'org.springframework.boot' version '4.0.5'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 

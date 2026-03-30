@@ -50,6 +50,20 @@ backend/.settings/
 backend/.springBeans
 backend/.sts4-cache
 
+# ==================== AI Server (Python / FastAPI) ====================
+ai-server/venv/
+ai-server/.venv/
+ai-server/__pycache__/
+ai-server/**/__pycache__/
+ai-server/*.pyc
+ai-server/**/*.pyc
+ai-server/*.egg-info/
+ai-server/dist/
+ai-server/build/
+ai-server/.mypy_cache/
+ai-server/.pytest_cache/
+ai-server/.ruff_cache/
+
 # ==================== Java ====================
 *.class
 *.jar
@@ -75,5 +89,9 @@ mysql_data/
 *.pem
 *.mobileprovision
 
-# ==================== Claude Code ====================
+# ==================== Claude Code / Skills ====================
 .claude/
+
+# ==================== 루트 생성 파일 ====================
+/package-lock.json
+/skills-lock.json

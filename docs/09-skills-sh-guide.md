@@ -38,10 +38,16 @@ npx skills add sivaprasadreddy/sivalabs-agent-skills
 npx skills add kousen/claude-code-training
 ```
 
+### FastAPI / Python (AI Server)
+```bash
+# FastAPI 공식 스킬 (FastAPI 프로젝트에서 제공)
+npx skills add fastapi/fastapi --skill fastapi
+```
+
 ### API 설계
 ```bash
 # REST API 설계 원칙 (REST, GraphQL, Auth, OpenAPI)
-npx skills add supercent-io/skills-template --skill api-design
+npx skills add wshobson/agents --skill api-design-principles
 ```
 
 ### MySQL / 데이터베이스
@@ -63,13 +69,14 @@ npx skills add anthropics/skills --skill frontend-design
 npx skills add anthropics/skills --skill webapp-testing
 npx skills add callstackincubator/agent-skills
 npx skills add sivaprasadreddy/sivalabs-agent-skills
-npx skills add supercent-io/skills-template --skill api-design
+npx skills add wshobson/agents --skill api-design-principles
+npx skills add fastapi/fastapi --skill fastapi
 npx skills add planetscale/database-skills --skill mysql
 ```
 
 ## 사용 팁
 1. 프로젝트 루트에서 설치해야 해당 프로젝트에 적용됨
-2. 스킬은 `.claude/` 또는 `.cursorrules` 등 에이전트 설정 디렉토리에 저장됨
+2. 스킬은 `.agents/skills/` 디렉토리에 저장되고 `.claude/skills/`에 심볼릭 링크됨
 3. 팀원 모두 동일한 스킬을 설치하면 일관된 코드 품질 유지 가능
 4. `npx skills list`로 설치된 스킬 확인 가능
 
