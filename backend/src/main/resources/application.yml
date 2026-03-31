@@ -13,7 +13,7 @@ spring:
       on-profile: dev
 
   datasource:
-    url: jdbc:mysql://localhost:3306/shadowfit?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    url: jdbc:mysql://localhost:${DB_PORT:3308}/shadowfit?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: shadowfit
     password: ${DB_PASSWORD:shadowfit}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -47,7 +47,7 @@ spring:
       on-profile: prod
 
   datasource:
-    url: jdbc:mysql://${DB_HOST:mysql}:3306/shadowfit?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    url: jdbc:mysql://${DB_HOST:mysql}:3306/shadowfit?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME:shadowfit}
     password: ${DB_PASSWORD}
 

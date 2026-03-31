@@ -6,13 +6,13 @@ services:
     container_name: shadowfit-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: shadowfit
+      MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: shadowfit
       MYSQL_USER: shadowfit
       MYSQL_PASSWORD: shadowfit
       TZ: Asia/Seoul
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     command: >

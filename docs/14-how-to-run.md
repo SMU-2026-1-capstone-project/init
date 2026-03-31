@@ -238,7 +238,9 @@ python -m venv venv
 # Windows (Git Bash)
 source venv/Scripts/activate
 # Windows (PowerShell)
-# .\venv\Scripts\Activate.ps1
+.\venv\Scripts\Activate.ps1
+# Windows (CMD)
+venv\Scripts\activate.bat
 
 # 의존성 설치
 pip install -r requirements.txt
@@ -363,8 +365,10 @@ cd "c:/최지호/상명대학교/4학년 1학기/캡스톤 디자인/shadowfit/b
 # ai-server 폴더로 이동
 cd "c:/최지호/상명대학교/4학년 1학기/캡스톤디자인/shadowfit/ai-server"
 
-# 가상환경 활성화
-source venv/Scripts/activate
+# 가상환경 활성화 (터미널에 따라 택 1)
+source venv/Scripts/activate           # Git Bash
+# .\venv\Scripts\Activate.ps1          # PowerShell
+# venv\Scripts\activate.bat            # CMD
 
 # AI 서버 실행
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -411,10 +415,38 @@ npx expo start
 ### 앱을 보는 방법 (택 1)
 
 #### 방법 A: 실제 휴대폰으로 보기 (권장)
+
+**사전 조건:**
+- 컴퓨터와 휴대폰이 **같은 Wi-Fi 네트워크**에 연결되어 있어야 합니다
+- 다른 Wi-Fi이거나 휴대폰이 모바일 데이터를 사용 중이면 연결이 안 됩니다
+
+**연결 방법:**
 1. 휴대폰에서 **Expo Go** 앱 설치 (Play Store 또는 App Store)
-2. **컴퓨터와 휴대폰이 같은 Wi-Fi**에 연결되어 있는지 확인
-3. 안드로이드: Expo Go 앱에서 QR 코드 스캔
-4. iOS: 기본 카메라 앱으로 QR 코드 스캔
+2. 안드로이드: Expo Go 앱에서 QR 코드 스캔
+3. iOS: 기본 카메라 앱으로 QR 코드 스캔
+
+**QR 스캔 후 무한 로딩이 걸릴 때:**
+
+Windows 방화벽이 연결을 차단하는 경우가 많습니다. **터널 모드**로 우회할 수 있습니다:
+
+```bash
+# 터널 모드 사용 시 Expo 로그인이 필요합니다
+npx expo login
+npx expo start --tunnel
+```
+
+> **Expo 로그인 관련:**
+> - Expo Go 앱에서 Google 간편 가입을 한 경우, 비밀번호가 설정되어 있지 않아 터미널 로그인이 안 됩니다.
+> - https://expo.dev 에 접속 → Google 계정으로 로그인 → Settings에서 **비밀번호를 별도로 설정**한 후 터미널에서 다시 `npx expo login`을 시도하세요.
+> - `@expo/ngrok` 설치 여부를 물으면 `y`를 입력하세요.
+
+**방화벽을 직접 허용하는 방법 (터널 없이 연결):**
+
+PowerShell을 **관리자 권한**으로 열고 실행:
+```powershell
+New-NetFirewallRule -DisplayName "Expo Metro" -Direction Inbound -Port 8081 -Protocol TCP -Action Allow
+```
+이후 일반 `npx expo start`로 QR 스캔이 가능합니다.
 
 #### 방법 B: 웹 브라우저로 보기 (가장 간편)
 - Expo 터미널에서 `w` 키 입력
@@ -522,6 +554,30 @@ chmod +x gradlew
 gradlew.bat bootRun
 ```
 
+### AI Server 관련
+
+**오류: `source : 'source' 용어가 cmdlet, 함수...로 인식되지 않습니다`**
+- PowerShell에서 `source` 명령은 사용할 수 없습니다. 터미널에 맞는 명령을 사용하세요:
+  ```bash
+  # PowerShell
+  .\venv\Scripts\Activate.ps1
+
+  # PowerShell에서 권한 오류 발생 시
+  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+  .\venv\Scripts\Activate.ps1
+
+  # Git Bash
+  source venv/Scripts/activate
+
+  # CMD
+  venv\Scripts\activate.bat
+  ```
+
+**오류: `JAVA_HOME is set to an invalid directory: C:\JAVA`**
+- JAVA_HOME이 JDK 상위 폴더가 아닌 실제 JDK 경로를 가리켜야 합니다.
+- PowerShell에서 임시 설정: `$env:JAVA_HOME="C:\JAVA\jdk-21.0.10"`
+- 영구 설정: Windows 환경변수에서 JAVA_HOME을 `C:\JAVA\jdk-21.0.10` (실제 JDK 폴더)로 변경
+
 ### Frontend 관련
 
 **오류: `node_modules not found` 또는 모듈 관련 오류**
@@ -538,14 +594,22 @@ echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 ```
 
-**Expo Go에서 연결이 안 될 때**
-1. 컴퓨터와 휴대폰이 **같은 Wi-Fi**에 연결되어 있는지 확인
-2. Windows 방화벽에서 Node.js를 허용했는지 확인
-3. 그래도 안 되면 터널 모드로 시도:
+**Expo Go에서 QR 스캔 후 무한 로딩**
+1. 컴퓨터와 휴대폰이 **같은 Wi-Fi**에 연결되어 있는지 확인 (모바일 데이터 X)
+2. Windows 방화벽 허용 (PowerShell 관리자 권한):
+   ```powershell
+   New-NetFirewallRule -DisplayName "Expo Metro" -Direction Inbound -Port 8081 -Protocol TCP -Action Allow
+   ```
+3. 그래도 안 되면 터널 모드로 우회:
    ```bash
+   npx expo login          # 먼저 로그인 필요
    npx expo start --tunnel
    ```
    (최초 실행 시 `@expo/ngrok` 설치 여부를 물으면 `y` 입력)
+
+**오류: `npx expo login`에서 `AssertionError [ERR_ASSERTION]`**
+- Expo Go 앱에서 Google 간편 가입을 한 경우 비밀번호가 없어서 발생합니다.
+- 해결: https://expo.dev 접속 → Google로 로그인 → Settings → 비밀번호 설정 → 터미널에서 다시 `npx expo login`
 
 ---
 
@@ -593,7 +657,8 @@ cd backend
 
 # 3. AI Server 시작 (새 터미널)
 cd ai-server
-source venv/Scripts/activate
+source venv/Scripts/activate           # Git Bash
+# .\venv\Scripts\Activate.ps1          # PowerShell
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # 4. Frontend 시작 (새 터미널)
