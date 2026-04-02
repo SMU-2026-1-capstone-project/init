@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @Schema(description = "로그아웃 req dto")
-public class LogoutRequestDto {
+public class LogOutRequestDto {
     @Schema(description = "현재 사용 중인 액세스 토큰", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "액세스 토큰은 필수입니다.")
     private String accessToken;

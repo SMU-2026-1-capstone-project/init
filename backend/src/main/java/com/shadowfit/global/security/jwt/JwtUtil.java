@@ -1,5 +1,6 @@
 package com.shadowfit.global.security.jwt;
 
+import com.shadowfit.dto.login.CustomUserInfoDto;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;

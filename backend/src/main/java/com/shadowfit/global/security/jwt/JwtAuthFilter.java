@@ -1,5 +1,6 @@
 package com.shadowfit.global.security.jwt;
 
+import com.shadowfit.service.Member.CustomUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

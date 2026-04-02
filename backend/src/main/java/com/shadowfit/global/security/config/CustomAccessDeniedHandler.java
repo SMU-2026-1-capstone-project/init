@@ -1,6 +1,7 @@
 package com.shadowfit.global.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shadowfit.global.error.ErrorResponseDto;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

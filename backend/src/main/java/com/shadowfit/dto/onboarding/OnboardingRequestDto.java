@@ -1,5 +1,7 @@
 package com.shadowfit.dto.onboarding;
 
+import com.shadowfit.model.member.SelectedPersona;
+import com.shadowfit.model.member.WorkoutLevel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 

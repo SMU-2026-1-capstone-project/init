@@ -1,5 +1,6 @@
 package com.shadowfit.dto.login;
 
+import com.shadowfit.model.member.UserRole;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

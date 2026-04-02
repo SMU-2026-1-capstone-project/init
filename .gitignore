@@ -95,3 +95,17 @@ mysql_data/
 # ==================== 루트 생성 파일 ====================
 /package-lock.json
 /skills-lock.json
+
+# Local setting file (Secret keys)
+src/main/resources/application-local.properties
+
+# MySQL 데이터 폴더 제외 (매우 중요)
+/mysql/data/
+
+# 환경 변수 파일 제외 (보안)
+.env
+
+# 빌드 결과물 제외
+/build/
+/out/
+.gradle/

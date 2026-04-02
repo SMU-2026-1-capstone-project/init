@@ -1,5 +1,6 @@
 package com.shadowfit.global.security.auth;
 
+import com.shadowfit.model.member.Member;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;

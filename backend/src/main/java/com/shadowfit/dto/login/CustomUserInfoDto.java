@@ -1,5 +1,6 @@
 package com.shadowfit.dto.login;
 
+import com.shadowfit.model.member.UserRole;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;

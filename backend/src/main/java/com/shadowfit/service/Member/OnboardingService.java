@@ -1,5 +1,11 @@
 package com.shadowfit.service.Member;
 
+import com.shadowfit.dto.onboarding.OnboardingDto;
+import com.shadowfit.dto.onboarding.OnboardingRequestDto;
+import com.shadowfit.global.error.BusinessException;
+import com.shadowfit.global.error.ErrorCode;
+import com.shadowfit.model.member.Member;
+import com.shadowfit.repository.MemberRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,5 +1,6 @@
 package com.shadowfit.model.member;
 
+import com.shadowfit.dto.onboarding.OnboardingRequestDto;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

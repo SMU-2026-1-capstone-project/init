@@ -1,5 +1,13 @@
 package com.shadowfit.controller;
 
+import com.shadowfit.dto.login.LogOutRequestDto;
+import com.shadowfit.dto.login.LoginRequestDto;
+import com.shadowfit.dto.login.LoginResponseDto;
+import com.shadowfit.dto.login.MemberRequestDto;
+import com.shadowfit.dto.onboarding.OnboardingDto;
+import com.shadowfit.dto.onboarding.OnboardingRequestDto;
+import com.shadowfit.service.Member.MemberService;
+import com.shadowfit.service.Member.OnboardingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
