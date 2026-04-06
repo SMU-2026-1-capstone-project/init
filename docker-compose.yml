@@ -6,10 +6,10 @@ services:
     container_name: shadowfit-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: 1234
-      MYSQL_DATABASE: shadowfit
-      MYSQL_USER: shadowfit
-      MYSQL_PASSWORD: shadowfit
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: Asia/Seoul
     ports:
       - "${MYSQL_PORT:-3306}:3306"
@@ -35,8 +35,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_HOST: mysql
-      DB_USERNAME: shadowfit
-      DB_PASSWORD: shadowfit
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:-shadowfit-prod-secret-key-change-this}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
