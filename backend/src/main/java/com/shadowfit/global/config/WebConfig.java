@@ -1,4 +1,4 @@
-package com.shadowfit.global.util;
+package com.shadowfit.global.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;

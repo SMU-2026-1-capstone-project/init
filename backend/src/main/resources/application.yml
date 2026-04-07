@@ -46,6 +46,9 @@ spring:
     activate:
       on-profile: prod
 
+ai-server:
+  url: http://ai-server:8000
+
   datasource:
     url: jdbc:mysql://${DB_HOST:mysql}:3306/shadowfit?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME:shadowfit}

@@ -1,4 +1,4 @@
-package com.shadowfit.global.util;
+package com.shadowfit.global.config;
 
 import com.shadowfit.global.error.ErrorCode;
 import io.swagger.v3.oas.models.OpenAPI;
