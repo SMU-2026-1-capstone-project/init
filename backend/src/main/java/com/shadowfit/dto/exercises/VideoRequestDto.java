@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@Schema(description = "운동세션 시작 req dto")
+@Schema(description = "운동세션 시작 req dto(앱->스프링)")
 public class VideoRequestDto {
     @Schema(description = "운동 ID",
             requiredMode = Schema.RequiredMode.REQUIRED)
