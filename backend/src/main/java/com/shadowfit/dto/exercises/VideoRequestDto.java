@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 public class VideoRequestDto {
     @Schema(description = "운동 ID",
             requiredMode = Schema.RequiredMode.REQUIRED)
-    private Integer exerciseId;
+    private Long exerciseId;
 
     @Schema(description = "유튜브 링크",
             example = "https://youtu.be/xxx",

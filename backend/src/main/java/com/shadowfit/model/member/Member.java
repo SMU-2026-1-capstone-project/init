@@ -15,8 +15,11 @@ import java.time.LocalDateTime;
 @Table(name="users")
 public class Member {
     @Id
-    @Column(name = "user_id", length = 50)
-    private String userId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "user_id", nullable = false, length = 50)
+    private String userId; // 로그인용 아이디 (String)
 
     @Column(nullable = false, unique = true, length = 100)
     private String email;

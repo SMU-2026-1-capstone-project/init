@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @Schema(description = "운동세션 시작 req dto(스프링->fastapi)")
 public class FastApiRequestDto {
-    private Integer exerciseId;
+    private Long exerciseId;
     private String youtubeUrl;
     private Long sessionId;
 }

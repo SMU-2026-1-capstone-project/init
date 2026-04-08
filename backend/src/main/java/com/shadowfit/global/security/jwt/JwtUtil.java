@@ -24,7 +24,7 @@ public class JwtUtil {
             @Value("${jwt.expiration_time}") final long accessTokenExpTime,
             @Value("${jwt.refresh_expiration_time}") final long refreshTokenExpTime)
     {
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+        byte[] keyBytes = secretKey.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         this.key = Keys.hmacShaKeyFor(keyBytes);
         this.accessTokenExpTime = accessTokenExpTime;
         this.refreshTokenExpTime = refreshTokenExpTime;

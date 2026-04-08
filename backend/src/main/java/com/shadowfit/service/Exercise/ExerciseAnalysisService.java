@@ -4,6 +4,7 @@ import com.shadowfit.dto.exercises.FastApiRequestDto;
 import com.shadowfit.dto.exercises.VideoRequestDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
+import com.shadowfit.global.util.YoutubeValidator;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
@@ -18,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -32,12 +32,12 @@ public class ExerciseAnalysisService {
     private String internalToken;
 
     @Transactional
-    public Long sendToAnalysisServer(VideoRequestDto appDto,String currentMemberId){
+    public Long sendToAnalysisServer(VideoRequestDto appDto,Long currentMemberId){
         Member member = memberRepository.findById(currentMemberId)
                 .orElseThrow(()-> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        Exercise exercise = exercisesRepository.findById(appDto.getExerciseId()
-                .longValue()).orElseThrow(()->new BusinessException(ErrorCode.EXERCISE_NOT_FOUND));
+        Exercise exercise = exercisesRepository.findById(appDto.getExerciseId())
+                .orElseThrow(()->new BusinessException(ErrorCode.EXERCISE_NOT_FOUND));
 
         Session session = Session.builder()
                 .user(member)
@@ -49,11 +49,12 @@ public class ExerciseAnalysisService {
 
         Session savedSession = sessionRepository.save(session);
         Long sessionId = savedSession.getId();
+        String youtubeVideoId = YoutubeValidator.extractId(appDto.getReferenceSource());
 
         //파이썬 dto 생성
         FastApiRequestDto apiDto = FastApiRequestDto.builder().
                 exerciseId(appDto.getExerciseId())
-                .youtubeUrl(appDto.getReferenceSource())
+                .youtubeUrl(youtubeVideoId)
                 .sessionId(sessionId)
                 .build();
 

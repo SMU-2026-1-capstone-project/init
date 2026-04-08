@@ -66,7 +66,7 @@ public class MemberService{
     //회원가입 로직
     @Transactional
     public String signup(MemberRequestDto dto) {
-        if(memberRepository.existsById(dto.getUserId())) {
+        if(memberRepository.existsByUserId((dto.getUserId()))) {
             throw new BusinessException(ErrorCode.USERID_DUPLICATION);
         }
         String encodedPassword = passwordEncoder.encode(dto.getPassword());

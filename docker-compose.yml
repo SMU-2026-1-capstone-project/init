@@ -23,6 +23,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - shadowfit-net
 
   backend:
     build:
@@ -34,14 +36,18 @@ services:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      DB_HOST: mysql
+      # application.yml에서 사용할 호스트명을 shadowfit-mysql로 고정
+      DB_HOST: shadowfit-mysql
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
       JWT_SECRET: ${JWT_SECRET:-shadowfit-prod-secret-key-change-this}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
       mysql:
         condition: service_healthy
+    networks:
+      - shadowfit-net
 
   ai-server:
     build:
@@ -53,13 +59,21 @@ services:
       - "8000:8000"
     environment:
       DEBUG: "false"
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
       POSE_MODEL_COMPLEXITY: 1
-      BACKEND_URL: http://backend:8080/api/v1
+      # 백엔드 주소도 서비스명이 아닌 컨테이너명으로 통일하면 더 확실함
+      BACKEND_URL: http://shadowfit-backend:8080/api/v1
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - shadowfit-net
+
+networks:
+  shadowfit-net:
+    driver: bridge
 
 volumes:
   mysql_data:

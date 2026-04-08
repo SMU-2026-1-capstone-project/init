@@ -1,6 +1,7 @@
 package com.shadowfit.controller;
 
 import com.shadowfit.dto.exercises.VideoRequestDto;
+import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.service.Exercise.ExerciseAnalysisService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,8 @@ public class ExercisesController {
 
     @PostMapping("/sessions")
     public ResponseEntity<String> startAnalysis(@RequestBody VideoRequestDto dto,
-                                                @AuthenticationPrincipal String memberId){
+                                                @AuthenticationPrincipal CustomUserDetails userDetails){
+        Long memberId = userDetails.getMember().getId();
         Long sessionId = analysisService.sendToAnalysisServer(dto,memberId);
 
         return ResponseEntity.accepted().body("분석이 시작되었습니다. 작업 ID: "+sessionId);
