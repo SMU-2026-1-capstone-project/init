@@ -1,9 +1,9 @@
--- 1. 사용자 데이터 (비밀번호는 'password'를 단순 예시로 둠)
-INSERT INTO users (user_id, email, password, nickname, sex, selected_persona, workout_level, onboarding_completed)
+-- 1. 사용자 데이터 (비밀번호: {noop}1234)
+INSERT INTO users (user_id, email, password, nickname, sex, selected_persona, workout_level, onboarding_completed, role)
 VALUES
-    ('user_01', 'beginner@test.com', '{noop}1234', '헬린이1', 'MALE', 'BEGINNER', 'STARTER', TRUE),
-    ('user_02', 'pro@test.com', '{noop}1234', '득근득근', 'FEMALE', 'ADVANCED', 'PRO', TRUE),
-    ('user_03', 'diet@test.com', '{noop}1234', '다이어터', 'NONE', 'DIET', 'BEGINNER', TRUE);
+    ('user_01', 'beginner@test.com', '{noop}1234', '헬린이1', 'MALE', 'BEGINNER', 'STARTER', TRUE, 'USER'),
+    ('user_02', 'pro@test.com', '{noop}1234', '득근득근', 'FEMALE', 'ADVANCED', 'PRO', TRUE, 'USER'),
+    ('user_03', 'diet@test.com', '{noop}1234', '다이어터', 'NONE', 'DIET', 'BEGINNER', TRUE, 'USER');
 
 -- 2. 운동 종목 마스터 데이터
 INSERT INTO exercises (name, category, description, target_joints, sync_threshold_beginner, sync_threshold_advanced)
@@ -16,19 +16,21 @@ VALUES
      '["left_hip", "right_hip", "left_knee", "right_knee", "left_shoulder", "right_shoulder"]', 65.0, 90.0);
 
 -- 3. 운동 세션 (사용자 1이 스쿼트 완료)
+-- 테이블명이 엔티티 설정에 따라 'sessions' 또는 'exercise_sessions'일 수 있으니 확인 필요!
 INSERT INTO exercise_sessions (user_id, exercise_id, start_time, end_time, total_reps, avg_sync_rate, max_sync_rate, status)
 VALUES
     (1, 1, '2026-04-01 09:00:00', '2026-04-01 09:15:00', 30, 78.5, 92.0, 'COMPLETED'),
     (1, 2, '2026-04-02 10:00:00', '2026-04-02 10:10:00', 20, 65.2, 80.0, 'COMPLETED');
 
 -- 4. 자세 데이터 (세션 1에 대한 1~3초 예시 데이터)
+-- 방금 만든 PoseData 엔티티 구조에 맞춤
 INSERT INTO pose_data (session_id, timestamp_sec, joint_coordinates, sync_rate, is_correct, feedback_message)
 VALUES
-    (1, 1, '{"point_0": [0.5, 0.5, 0.1], "point_1": [0.52, 0.48, 0.12]}', 85.5, TRUE, '좋은 자세입니다!'),
-    (1, 2, '{"point_0": [0.49, 0.51, 0.1], "point_1": [0.53, 0.47, 0.11]}', 45.0, FALSE, '무릎이 너무 안쪽으로 모이고 있어요.'),
-    (1, 3, '{"point_0": [0.5, 0.5, 0.1], "point_1": [0.52, 0.48, 0.12]}', 90.2, TRUE, '완벽하게 교정되었습니다.');
+    (1, 1.0, '{"point_0": [0.5, 0.5, 0.1], "point_1": [0.52, 0.48, 0.12]}', 85.5, TRUE, '좋은 자세입니다!'),
+    (1, 2.0, '{"point_0": [0.49, 0.51, 0.1], "point_1": [0.53, 0.47, 0.11]}', 45.0, FALSE, '무릎이 너무 안쪽으로 모이고 있어요.'),
+    (1, 3.0, '{"point_0": [0.5, 0.5, 0.1], "point_1": [0.52, 0.48, 0.12]}', 90.2, TRUE, '완벽하게 교정되었습니다.');
 
--- 5. 달력 일지 (사용자 1의 4월 기록)
+-- 5. 달력 일지
 INSERT INTO daily_logs (user_id, log_date, memo, total_exercise_time, total_calories, mood)
 VALUES
     (1, '2026-04-01', '첫 스쿼트 완료! 땀나고 좋다.', 15, 120.5, 'GREAT'),
