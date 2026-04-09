@@ -19,6 +19,7 @@ export default function ExerciseScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isRecording, setIsRecording] = useState(false);
   const [syncRate, setSyncRate] = useState(0);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   // 테두리 점멸 애니메이션
   const borderOpacity = useRef(new Animated.Value(0)).current;
@@ -147,6 +148,28 @@ export default function ExerciseScreen() {
           </View>
           <Text style={[styles.syncValue, { color: syncColor }]}>{syncRate}%</Text>
         </View>
+
+        {/* 촬영 가이드 (접기/펴기) */}
+        <TouchableOpacity
+          style={styles.guideToggle}
+          onPress={() => setGuideOpen(!guideOpen)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.guideToggleText}>📌 촬영 가이드</Text>
+          <FontAwesome
+            name={guideOpen ? 'chevron-up' : 'chevron-down'}
+            size={12}
+            color={COLORS.textSecondary}
+          />
+        </TouchableOpacity>
+        {guideOpen && (
+          <View style={styles.guidePanel}>
+            <Text style={styles.guideRow}>📐  정면 또는 측면(45°)에서 촬영</Text>
+            <Text style={styles.guideRow}>🧍  전신이 보이도록 1.5m 이상 거리 확보</Text>
+            <Text style={styles.guideRow}>💡  밝은 조명, 단색 배경 권장</Text>
+            <Text style={styles.guideRow}>🚫  거울 반사, 여러 사람 환경 주의</Text>
+          </View>
+        )}
 
         {/* 하단: 기준영상 + 녹화 버튼 */}
         <View style={styles.bottomOverlay}>
@@ -307,4 +330,34 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   refVideoText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.xs },
+
+  // 촬영 가이드
+  guideToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    paddingVertical: SPACING.sm,
+  },
+  guideToggleText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+  },
+  guidePanel: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    marginHorizontal: SPACING.lg,
+    marginTop: 4,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.md,
+    gap: SPACING.xs,
+  },
+  guideRow: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+  },
 });

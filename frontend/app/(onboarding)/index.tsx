@@ -5,8 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
@@ -18,6 +17,117 @@ import type { ExerciseLevel, PersonaType, OnboardingData } from '@/types/user';
 
 const TOTAL_STEPS = 4;
 
+// ─── 기준 영상 데이터 ────────────────────────────────
+interface ReferenceVideo {
+  id: string;
+  title: string;
+  youtubeId: string;
+  thumbnail: string;
+}
+
+interface ExerciseCategory {
+  key: string;
+  icon: string;
+  label: string;
+  videos: ReferenceVideo[];
+}
+
+const EXERCISE_VIDEOS: ExerciseCategory[] = [
+  {
+    key: 'squat',
+    icon: '🏋️',
+    label: '스쿼트',
+    videos: [
+      {
+        id: 'sq1',
+        title: '기본 바벨 스쿼트',
+        youtubeId: 'ultWZbUMPL8',
+        thumbnail: 'https://img.youtube.com/vi/ultWZbUMPL8/mqdefault.jpg',
+      },
+      {
+        id: 'sq2',
+        title: '프론트 스쿼트 자세',
+        youtubeId: 'tlfahNdNPPI',
+        thumbnail: 'https://img.youtube.com/vi/tlfahNdNPPI/mqdefault.jpg',
+      },
+      {
+        id: 'sq3',
+        title: '고블릿 스쿼트',
+        youtubeId: 'MeIiIdhvXT4',
+        thumbnail: 'https://img.youtube.com/vi/MeIiIdhvXT4/mqdefault.jpg',
+      },
+      {
+        id: 'sq4',
+        title: '불가리안 스플릿 스쿼트',
+        youtubeId: '2C-uNgKwPLE',
+        thumbnail: 'https://img.youtube.com/vi/2C-uNgKwPLE/mqdefault.jpg',
+      },
+    ],
+  },
+  {
+    key: 'deadlift',
+    icon: '💪',
+    label: '데드리프트',
+    videos: [
+      {
+        id: 'dl1',
+        title: '컨벤셔널 데드리프트',
+        youtubeId: 'op9kVnSso6Q',
+        thumbnail: 'https://img.youtube.com/vi/op9kVnSso6Q/mqdefault.jpg',
+      },
+      {
+        id: 'dl2',
+        title: '루마니안 데드리프트',
+        youtubeId: 'jEy_czb3RKA',
+        thumbnail: 'https://img.youtube.com/vi/jEy_czb3RKA/mqdefault.jpg',
+      },
+      {
+        id: 'dl3',
+        title: '스모 데드리프트',
+        youtubeId: 'widGEAjS_Fs',
+        thumbnail: 'https://img.youtube.com/vi/widGEAjS_Fs/mqdefault.jpg',
+      },
+      {
+        id: 'dl4',
+        title: '트랩바 데드리프트',
+        youtubeId: 'dLhNzjR_kOc',
+        thumbnail: 'https://img.youtube.com/vi/dLhNzjR_kOc/mqdefault.jpg',
+      },
+    ],
+  },
+  {
+    key: 'pullup',
+    icon: '🤸',
+    label: '턱걸이',
+    videos: [
+      {
+        id: 'pu1',
+        title: '기본 풀업 자세',
+        youtubeId: 'eGo4IYlbE5g',
+        thumbnail: 'https://img.youtube.com/vi/eGo4IYlbE5g/mqdefault.jpg',
+      },
+      {
+        id: 'pu2',
+        title: '친업 (언더그립)',
+        youtubeId: 'brhRXlOhWMg',
+        thumbnail: 'https://img.youtube.com/vi/brhRXlOhWMg/mqdefault.jpg',
+      },
+      {
+        id: 'pu3',
+        title: '네거티브 풀업',
+        youtubeId: 'S3gKOkCBjXk',
+        thumbnail: 'https://img.youtube.com/vi/S3gKOkCBjXk/mqdefault.jpg',
+      },
+      {
+        id: 'pu4',
+        title: '와이드 그립 풀업',
+        youtubeId: 'CnEP2VhSaN0',
+        thumbnail: 'https://img.youtube.com/vi/CnEP2VhSaN0/mqdefault.jpg',
+      },
+    ],
+  },
+];
+
 export default function OnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -26,7 +136,7 @@ export default function OnboardingScreen() {
     exerciseLevel: null,
     targetWeight: 70,
     persona: null,
-    referenceVideoUrl: '',
+    selectedVideoId: null,
   });
 
   const canNext = () => {
@@ -34,7 +144,7 @@ export default function OnboardingScreen() {
       case 0: return data.exerciseLevel !== null;
       case 1: return true;
       case 2: return data.persona !== null;
-      case 3: return true;
+      case 3: return data.selectedVideoId !== null;
       default: return false;
     }
   };
@@ -231,7 +341,7 @@ function StepPersona({
   );
 }
 
-// ─── Step 4: 기준 영상 ──────────────────────────────
+// ─── Step 4: 기준 영상 선택 ─────────────────────────
 function StepVideo({
   data,
   setData,
@@ -241,58 +351,55 @@ function StepVideo({
 }) {
   return (
     <View>
-      <Text style={styles.stepIcon}>📹</Text>
-      <Text style={styles.stepTitle}>기준 영상을 설정해주세요</Text>
-      <Text style={styles.stepDesc}>따라 하고 싶은 운동 영상을 등록하세요. 나중에 변경할 수 있어요.</Text>
+      <Text style={styles.stepIcon}>▶</Text>
+      <Text style={styles.stepTitle}>기준 영상을 선택해주세요</Text>
+      <Text style={styles.stepDesc}>
+        따라 할 운동 영상을 하나 골라주세요. 나중에 변경할 수 있어요.
+      </Text>
 
-      {/* 촬영 가이드라인 */}
-      <View style={styles.guideBox}>
-        <Text style={styles.guideTitle}>📌 영상 촬영 가이드</Text>
-        <View style={styles.guideItem}>
-          <Text style={styles.guideBullet}>📐</Text>
-          <Text style={styles.guideText}>정면 또는 측면(45°)에서 촬영된 영상</Text>
+      {EXERCISE_VIDEOS.map((category) => (
+        <View key={category.key} style={styles.categorySection}>
+          <Text style={styles.categoryTitle}>
+            {category.icon}  {category.label}
+          </Text>
+          <View style={styles.videoGrid}>
+            {category.videos.map((video) => {
+              const isSelected = data.selectedVideoId === video.id;
+              return (
+                <TouchableOpacity
+                  key={video.id}
+                  style={[styles.videoCard, isSelected && styles.videoCardActive]}
+                  onPress={() =>
+                    setData({ ...data, selectedVideoId: video.id })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.thumbnailWrap}>
+                    <Image
+                      source={{ uri: video.thumbnail }}
+                      style={styles.thumbnail}
+                    />
+                    {isSelected && (
+                      <View style={styles.checkOverlay}>
+                        <FontAwesome name="check" size={18} color={COLORS.primaryText} />
+                      </View>
+                    )}
+                  </View>
+                  <Text
+                    style={[
+                      styles.videoTitle,
+                      isSelected && styles.videoTitleActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {video.title}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
-        <View style={styles.guideItem}>
-          <Text style={styles.guideBullet}>🧍</Text>
-          <Text style={styles.guideText}>전신이 보이도록 1.5m 이상 거리 확보</Text>
-        </View>
-        <View style={styles.guideItem}>
-          <Text style={styles.guideBullet}>💡</Text>
-          <Text style={styles.guideText}>밝은 조명, 단색 배경 권장</Text>
-        </View>
-        <View style={styles.guideItem}>
-          <Text style={styles.guideBullet}>🚫</Text>
-          <Text style={styles.guideText}>거울 반사, 여러 사람이 보이는 영상은 피해주세요</Text>
-        </View>
-      </View>
-
-      <Text style={styles.inputLabel}>🔗 유튜브 링크</Text>
-      <TextInput
-        style={styles.urlInput}
-        placeholder="https://youtube.com/watch?v=..."
-        placeholderTextColor={COLORS.textPlaceholder}
-        value={data.referenceVideoUrl}
-        onChangeText={(v) => setData({ ...data, referenceVideoUrl: v })}
-        autoCapitalize="none"
-        keyboardType="url"
-      />
-
-      <View style={styles.dividerRow}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>또는</Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      <Text style={styles.inputLabel}>📤 MP4 파일 업로드</Text>
-      <TouchableOpacity
-        style={styles.uploadBox}
-        onPress={() => Alert.alert('파일 선택', '추후 구현 예정')}
-        activeOpacity={0.7}
-      >
-        <FontAwesome name="cloud-upload" size={32} color={COLORS.textMuted} />
-        <Text style={styles.uploadText}>탭하여 MP4 파일 선택</Text>
-        <Text style={styles.uploadHint}>최대 100MB</Text>
-      </TouchableOpacity>
+      ))}
     </View>
   );
 }
@@ -383,70 +490,62 @@ const styles = StyleSheet.create({
   sliderLabels: { flexDirection: 'row', justifyContent: 'space-between' },
   sliderLabel: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted },
 
-  // Video
-  inputLabel: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
+  // Video selection
+  categorySection: {
+    marginBottom: SPACING.xxl,
   },
-  urlInput: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+  categoryTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '800',
     color: COLORS.text,
-    fontSize: FONT_SIZE.md,
+    marginBottom: SPACING.md,
   },
-  dividerRow: {
+  videoGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: SPACING.xxl,
+    flexWrap: 'wrap',
     gap: SPACING.md,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.cardBorder },
-  dividerText: { color: COLORS.textMuted, fontSize: FONT_SIZE.sm },
-  uploadBox: {
-    backgroundColor: COLORS.surface,
+  videoCard: {
+    width: '47%',
     borderRadius: RADIUS.md,
-    borderWidth: 1,
+    overflow: 'hidden',
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
     borderColor: COLORS.cardBorder,
-    borderStyle: 'dashed',
-    paddingVertical: SPACING.xxxl,
+  },
+  videoCardActive: {
+    borderColor: COLORS.primary,
+  },
+  thumbnailWrap: {
+    position: 'relative',
+    aspectRatio: 16 / 9,
+    backgroundColor: COLORS.surfaceLight,
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  checkOverlay: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: SPACING.sm,
   },
-  uploadText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.md },
-  uploadHint: { color: COLORS.textMuted, fontSize: FONT_SIZE.xs },
-
-  // Guide
-  guideBox: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    padding: SPACING.lg,
-    marginBottom: SPACING.xxl,
-    gap: SPACING.sm,
-  },
-  guideTitle: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
-  },
-  guideItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING.sm,
-  },
-  guideBullet: { fontSize: 14 },
-  guideText: {
-    flex: 1,
+  videoTitle: {
     fontSize: FONT_SIZE.sm,
     color: COLORS.textSecondary,
-    lineHeight: 20,
+    padding: SPACING.sm,
+    textAlign: 'center',
+  },
+  videoTitleActive: {
+    color: COLORS.primary,
+    fontWeight: '700',
   },
 
   // Footer

@@ -6,8 +6,7 @@ export interface OnboardingData {
   exerciseLevel: ExerciseLevel | null;
   targetWeight: number;
   persona: PersonaType | null;
-  referenceVideoUrl?: string;
-  referenceVideoFile?: string;
+  selectedVideoId: string | null;
 }
 
 export interface UserProfile {
