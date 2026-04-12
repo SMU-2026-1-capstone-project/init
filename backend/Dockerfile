@@ -1,5 +1,5 @@
 # 빌드 스테이지
-FROM gradle:8.5-jdk21 AS builder
+FROM gradle:jdk21 AS builder
 WORKDIR /app
 COPY build.gradle settings.gradle ./
 COPY gradle ./gradle
