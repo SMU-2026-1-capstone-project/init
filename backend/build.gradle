@@ -90,9 +90,14 @@ dependencies {
     // WebClient 사용을 위한 WebFlux 의존성 추가
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
-//gRPC 스프링 부트 스타터 추가
-	implementation 'net.devh:grpc-client-spring-boot-starter:3.1.0.RELEASE' // 클라이언트용
-	implementation 'net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE' // 서버용
+// gRPC & Protobuf (여기가 핵심입니다!)
+	implementation 'net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE'
+	implementation 'net.devh:grpc-client-spring-boot-starter:3.1.0.RELEASE'
+
+	// 도커 런타임 오류 방지를 위한 Protobuf 코어 추가
+	implementation 'com.google.protobuf:protobuf-java:3.25.1'
+	implementation 'com.google.protobuf:protobuf-java-util:3.25.1'
+
 	// Protobuf 관련 의존성
 	implementation 'io.grpc:grpc-netty-shaded:1.62.2'
 	implementation 'io.grpc:grpc-protobuf:1.62.2'

@@ -5,6 +5,7 @@ import com.shadowfit.dto.exercises.VideoRequestDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.util.YoutubeValidator;
+import com.shadowfit.grpc.AnalyzeResponse;
 import com.shadowfit.grpc.ExerciseServiceGrpc;
 import com.shadowfit.grpc.AnalyzeRequest;
 import com.shadowfit.model.exercise.Exercise;
@@ -14,7 +15,9 @@ import com.shadowfit.model.member.Member;
 import com.shadowfit.repository.ExercisesRepository;
 import com.shadowfit.repository.MemberRepository;
 import com.shadowfit.repository.SessionRepository;
+import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ExerciseAnalysisService {
     private final WebClient webClient;
     private final SessionRepository sessionRepository;
@@ -35,7 +39,7 @@ public class ExerciseAnalysisService {
     private String internalToken;
 
     @GrpcClient("fastapi-client")
-    private ExerciseServiceGrpc.ExerciseServiceBlockingStub exerciseStub;
+    private ExerciseServiceGrpc.ExerciseServiceStub exerciseAsyncStub;
 
     @Transactional
     public Long sendToAnalysisServer(VideoRequestDto appDto,Long currentMemberId){
@@ -91,10 +95,27 @@ public class ExerciseAnalysisService {
                 .setSessionId(sessionId)
                 .build();
 
-        // 3. gRPC로 FastAPI에 분석 시작 명령 전달
-        exerciseStub.startAnalysis(request);
+        // 비동기 호출 (StreamObserver 활용)
+        exerciseAsyncStub.startAnalysis(request, new StreamObserver<AnalyzeResponse>() {
+            @Override
+            public void onNext(AnalyzeResponse value) {
+                // FastAPI가 분석 시작 응답을 보냈을 때
+                log.info("FastAPI 분석 시작 응답 성공: {}", sessionId);
+            }
 
-        return sessionId;
+            @Override
+            public void onError(Throwable t) {
+                // 통신 에러 발생 시 (FastAPI가 꺼져있거나 등등)
+                log.error("gRPC 통신 장애: {}", t.getMessage());
+            }
+
+            @Override
+            public void onCompleted() {
+                // 완료
+            }
+        });
+
+        return sessionId; // 요청만 던지고 즉시 세션 ID 반환!
     }
 
 

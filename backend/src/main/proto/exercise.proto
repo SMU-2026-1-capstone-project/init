@@ -7,6 +7,7 @@ option java_outer_classname = "ExerciseProto";
 service ExerciseService {
   rpc startAnalysis (AnalyzeRequest) returns (AnalyzeResponse);
   rpc GetFinalPoseData (SessionRequest) returns (PoseDataList);
+  rpc SavePoseDataBatch (PoseDataBatchRequest) returns (PoseDataResponse);
 }
 
 message AnalyzeRequest {
@@ -24,11 +25,22 @@ message SessionRequest {
 }
 
 message PoseDataResponse {
-  int64 sessionId = 1;
-  double timestampSec = 2;
-  string jointCoordinates = 3;
+  bool success = 1;
+  int64 sessionId = 2;
+  double timestampSec = 3;
+  string jointCoordinates = 4;
 }
 
 message PoseDataList {
   repeated PoseDataResponse poseData = 1;
 }
+message PoseDataRequest {
+  double timestamp_sec = 1;
+  string joint_coordinates = 2; // JSON 문자열 등으로 전달
+}
+
+message PoseDataBatchRequest {
+  int64 session_id = 1;
+  repeated PoseDataRequest pose_data = 2; // List<PoseDataRequest>와 같음
+}
+
