@@ -51,7 +51,7 @@ public class ExerciseAnalysisService {
         // 2. gRPC 요청 객체 생성 (FastApiRequestDto 대신 Proto 메시지 사용)
         AnalyzeRequest request = AnalyzeRequest.newBuilder()
                 .setExerciseId(appDto.getExerciseId())
-                .setYoutubeId(YoutubeValidator.extractId(appDto.getReferenceSource()))
+                .setReferenceSource(YoutubeValidator.extractId(appDto.getReferenceSource()))
                 .setSessionId(sessionId)
                 .build();
 
@@ -60,7 +60,10 @@ public class ExerciseAnalysisService {
             @Override
             public void onNext(AnalyzeResponse value) {
                 // FastAPI가 분석 시작 응답을 보냈을 때
-                log.info("FastAPI 분석 시작 응답 성공: {}", sessionId);
+                log.info("FastAPI 분석 시작 응답 - 세션: {}, 상태: {}, 시작시간: {}",
+                        value.getSessionId(),
+                        value.getStatus(),
+                        value.getStartTime());
             }
 
             @Override

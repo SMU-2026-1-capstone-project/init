@@ -13,6 +13,8 @@ import com.shadowfit.repository.SessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.shadowfit.grpc.SessionStatus;
+import com.shadowfit.grpc.SessionCompleteRequest;
 
 import java.time.LocalDateTime;
 
@@ -40,5 +42,16 @@ public class SessionService {
                 .build();
 
         return sessionRepository.save(session);
+    }
+
+    @Transactional
+    public void completeSession(SessionCompleteRequest request){
+        Session session = sessionRepository.findById(request.getSessionId())
+                .orElseThrow(()->new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+
+        session.setStatus(Status.COMPLETED);
+        session.setEndTime(LocalDateTime.now());
+
+        sessionRepository.save(session);
     }
 }
