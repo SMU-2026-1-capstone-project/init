@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+// 시간 처리를 위한 구글 라이브러리 임포트
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.shadowfit.grpc";
+option java_outer_classname = "ExerciseProto";
+
+// [Service] 운동 분석 및 세션 관리 서비스
+service ExerciseService {
+
+  // [추가] 등록 단계: 유튜브 링크를 주면 전체 좌표를 반환 (Spring -> FastAPI)
+  rpc ExtractReferenceData (ExtractRequest) returns (ExtractResponse);
+
+  // [수정] 실행 단계: 세션 정보와 함께 'DB에 저장된 기준 좌표'를 전달 (Spring -> FastAPI)
+  rpc StartAnalysis (AnalyzeRequest) returns (AnalyzeResponse);
+
+  // 3. 분석 결과 배치 저장 (FastAPI -> Spring)
+  rpc SavePoseDataBatch (PoseDataBatchRequest) returns (PoseDataResponse);
+
+  // 4. 최종 결과 조회 (Spring -> FastAPI)
+  rpc GetFinalPoseData (SessionRequest) returns (PoseDataList);
+
+  rpc CompleteAnalysis (SessionCompleteRequest) returns (SessionCompleteResponse);
+}
+
+// ------------------------------------------------------------
+// [공통] 세션 상태 정의
+// ------------------------------------------------------------
+enum SessionStatus {
+  IN_PROGRESS = 0;
+  COMPLETED = 1;
+  FAILED = 2;
+}
+
+// ------------------------------------------------------------
+// 1. 세션 시작 관련 메시지 (ExercisesRequestDto/ResponseDto 대응)
+// ------------------------------------------------------------
+
+// 1. 등록용 메시지
+message ExtractRequest {
+  int64 exercise_id = 1;
+  string youtube_url = 2;
+  repeated PoseDataRequest extracted_poses = 3; // <--- 요청에 리스트가 있어야 함!
+}
+
+message ExtractResponse {
+  bool success = 1;
+  int64 exercise_id = 2;
+  repeated PoseDataRequest extracted_poses = 3; // 추출된 모든 프레임 좌표
+}
+
+message AnalyzeRequest {
+  int64 exercise_id = 1;
+  int64 session_id = 3;
+  string reference_source = 2;
+  // [핵심] 스프링 DB에서 조회한 기준 좌표 리스트를 여기에 담아서 보냅니다.
+  repeated PoseDataRequest reference_poses = 4;
+}
+
+message AnalyzeResponse {
+  bool success = 1;
+  int64 session_id = 2;
+  int64 exercise_id = 3;
+  google.protobuf.Timestamp start_time = 4; // 시작 시간 (LocalDateTime 대용)
+  SessionStatus status = 5;                 // 세션 상태
+}
+
+// ------------------------------------------------------------
+// 2. 세션 종료 관련 메시지 (PUT /complete 대응)
+// ------------------------------------------------------------
+
+message SessionCompleteRequest {
+  int64 session_id = 1;
+  int32 total_reps = 2;       // 총 횟수
+  double avg_sync_rate = 3;   // 평균 일치율
+  double max_sync_rate = 4;   // 최대 일치율
+  double min_sync_rate = 5;   // 최소 일치율
+  double calories_burned = 6; // 소모 칼로리
+  int32 difficulty_level = 7; // 난이도
+}
+
+message SessionCompleteResponse {
+  int64 session_id = 1;
+  SessionStatus status = 2;
+  google.protobuf.Timestamp end_time = 3;   // 종료 시간
+}
+
+// ------------------------------------------------------------
+// 3. 기존 데이터 저장 관련 메시지 (유지)
+// ------------------------------------------------------------
+
+message SessionRequest {
+  int64 session_id = 1;
+}
+
+message PoseDataList {
+  repeated PoseDataResponse pose_data = 1;
+}
+
+message PoseDataRequest {
+  double timestamp_sec = 1;
+  string joint_coordinates = 2;
+}
+
+message PoseDataBatchRequest {
+  int64 session_id = 1;
+  repeated PoseDataRequest pose_data = 2;
+}
+
+message PoseDataResponse {
+  bool success = 1;
+  int64 session_id = 2;
+  double timestamp_sec = 3;
+  string joint_coordinates = 4;
+}

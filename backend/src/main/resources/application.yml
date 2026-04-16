@@ -4,46 +4,7 @@ spring:
   profiles:
     active: prod
 
-# [1] 공통 설정
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-
-logging:
-  level:
-    root: INFO
-    com.shadowfit: DEBUG
-
-# [중요] 모든 환경에서 공통으로 사용할 화이트리스트를 여기에 두거나, 아래 prod 섹션에 넣어야 합니다.
-security:
-  whitelist:
-    - "/"
-    - "/error"
-    - "/favicon.ico"
-    - "/v3/api-docs"
-    - "/v3/api-docs/"
-    - "/v3/api-docs/**"
-    - "/swagger-ui/**"
-    - "/swagger-ui.html"
-    - "/api-docs/**"
-    - "/swagger-resources/**"
-    - "/webjars/**"
-    - "/member/login"
-    - "/member/signup"
-    - "/css/**"
-    - "/js/**"
-    - "/img/**"
-    - "/ws/**"
-
----
-# [2] 운영 환경 (Docker / Production)
-spring:
-  config:
-    activate:
-      on-profile: prod
-
+  # [1] 데이터베이스 및 JPA 설정 (spring 하위로 정렬)
   datasource:
     url: jdbc:mysql://shadowfit-mysql:3306/shadowfit?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME:shadowfit}
@@ -58,11 +19,39 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
-
         jdbc.batch_size: 100
-        order_inserts: true        # insert 문을 정렬해서 배치를 최적화
-        order_updates: true        # update 문도 정렬해서 배치 최적화
-        batch_versioned_data: true # 데이터 버전 관리 시에도 배치 적용
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+
+# [2] gRPC 설정 (최상단 레벨)
+grpc:
+  port: 6565
+  server:
+    port: 6565
+    reflection-enabled: true
+  client:
+    fastapi-client: # @GrpcClient("fastapi-client")와 일치
+      address: 'static://ai-server:8585' # 컨테이너명:AI서버gRPC포트
+      negotiation-type: plaintext
+
+# [3] Swagger 및 기타 설정 (최상단 레벨)
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+security:
+  whitelist:
+    - "/"
+    - "/error"
+    - "/v3/api-docs/**"
+    - "/swagger-ui/**"
+    - "/member/login"
+    - "/member/signup"
+    - "/ws/**"
+
 jwt:
   secret: ${JWT_SECRET}
   expiration_time: ${JWT_EXPIRATION_TIME:86400}
@@ -74,3 +63,11 @@ internal:
 
 ai-server:
   url: http://shadowfit-ai:8000
+
+# [4] 로깅 설정 (최상단 레벨)
+logging:
+  level:
+    root: INFO
+    com.shadowfit: DEBUG
+    io.github.lognet.grpc: DEBUG
+    net.devh: DEBUG

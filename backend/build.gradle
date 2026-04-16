@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.5'
+	id 'org.springframework.boot' version '3.4.0'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'com.google.protobuf' version '0.9.4'
 }
@@ -24,80 +24,62 @@ repositories {
 	mavenCentral()
 }
 
+configurations.all {
+	resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+		if (details.requested.group == 'io.grpc') {
+			details.useVersion '1.62.2'
+		}
+	}
+}
+
 dependencies {
-	// Spring Boot 핵심
+	// --- Spring Boot 핵심 ---
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
-
-	// docker db
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	runtimeOnly 'com.mysql:mysql-connector-j'
-
-	// MySQL
-	runtimeOnly 'com.mysql:mysql-connector-j'
-
-	//.env
-	implementation 'io.github.cdimascio:dotenv-java:3.0.0'
-
-	//JPA library
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-
-	//security
-	implementation 'org.springframework.boot:spring-boot-starter-security'
-
-	//ModelMapper
-	implementation group: 'org.modelmapper', name: 'modelmapper', version: '2.4.2'
-
-	//validation
-	implementation group: 'jakarta.validation', name: 'jakarta.validation-api', version: '3.1.0'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'org.springframework.security:spring-security-config'
-
-	//developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
-	annotationProcessor 'org.projectlombok:lombok'
-	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-thymeleaf-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-	//s3 upload
-	implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
-
-	// jwt
-	implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
-	implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
-	implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
-
-	// Swagger API 문서
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
-
-	// Lombok
-	compileOnly 'org.projectlombok:lombok'
-	annotationProcessor 'org.projectlombok:lombok'
-
-	// DevTools
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-
-	// 테스트
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testImplementation 'org.springframework.security:spring-security-test'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-    // WebClient 사용을 위한 WebFlux 의존성 추가
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
-//gRPC 스프링 부트 스타터 추가
-	implementation 'io.github.lognet:grpc-spring-boot-starter:5.1.5'
+	// --- DB & Utility ---
+	runtimeOnly 'com.mysql:mysql-connector-j'
+	implementation 'io.github.cdimascio:dotenv-java:3.0.0'
+	implementation group: 'org.modelmapper', name: 'modelmapper', version: '2.4.2'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
 
-	// Protobuf 관련 의존성
-	implementation 'io.grpc:grpc-netty-shaded:1.62.2'
-	implementation 'io.grpc:grpc-protobuf:1.62.2'
-	implementation 'io.grpc:grpc-stub:1.62.2'
+	// --- AWS & Security ---
+	implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
+	implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+	// --- Lombok & Dev ---
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+	// --- gRPC & Protobuf (버전 정합성 해결) ---
+	def grpcVersion = '1.62.2'
+	def protobufVersion = '3.25.1'
+
+	// Starter는 API만 제공하고 실제 구현체는 아래에서 버전 고정
+	implementation 'net.devh:grpc-client-spring-boot-starter:3.1.0.RELEASE'
+	implementation 'net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE'
+
+	// 핵심 클래스들 (GeneratedMessageV3 등을 포함함)
+	implementation "io.grpc:grpc-netty-shaded:${grpcVersion}"
+	implementation "io.grpc:grpc-protobuf:${grpcVersion}"
+	implementation "io.grpc:grpc-stub:${grpcVersion}"
+	implementation "io.grpc:grpc-services:${grpcVersion}"
+
+	// 유틸리티 (Timestamps 사용을 위해 필수!)
+	implementation "com.google.protobuf:protobuf-java:${protobufVersion}"
+	implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
+
 	compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+
+	// --- Test ---
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
 }
 
 protobuf {
@@ -111,11 +93,22 @@ protobuf {
 	}
 	generateProtoTasks {
 		all()*.plugins {
+			// 이 중괄호 안에 아무것도 없어도 이 블록 자체가 'grpc' 파일을 만들라고 명령하는 겁니다.
 			grpc {}
 		}
 	}
 }
 
-tasks.named('test') {
-	useJUnitPlatform()
+sourceSets {
+	main {
+		java {
+			// 하드코딩된 문자열 대신, generateProto 태스크가 만든 결과물 경로를 직접 참조합니다.
+			srcDirs 'src/main/java'
+			srcDirs 'build/generated/source/proto/main/java'
+			srcDirs 'build/generated/source/proto/main/grpc'
+		}
+	}
 }
+	tasks.named('test') {
+		useJUnitPlatform()
+	}

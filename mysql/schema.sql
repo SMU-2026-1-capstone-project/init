@@ -38,6 +38,17 @@ CREATE TABLE exercises (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+### exercise_references (운동별 기준 자세 데이터)
+
+CREATE TABLE IF NOT EXISTS exercise_references (
+                                                   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                                                   exercise_id BIGINT NOT NULL,          -- exercises 테이블 참조
+                                                   timestamp_sec DECIMAL(10,3) NOT NULL, -- 영상 내 시점
+    joint_coordinates JSON NOT NULL,      -- MediaPipe 좌표 (JSON)
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (exercise_id) REFERENCES exercises(id),
+    INDEX idx_exercise_ref_id (exercise_id) -- 조회 성능 향상
+    );
 
 ### exercise_sessions (운동 세션)
 
