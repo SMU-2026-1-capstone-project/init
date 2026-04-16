@@ -342,6 +342,8 @@ function StepPersona({
 }
 
 // ─── Step 4: 기준 영상 선택 ─────────────────────────
+const VIDEOS_PER_PAGE = 4;
+
 function StepVideo({
   data,
   setData,
@@ -349,6 +351,25 @@ function StepVideo({
   data: OnboardingData;
   setData: React.Dispatch<React.SetStateAction<OnboardingData>>;
 }) {
+  const [activeKey, setActiveKey] = useState(EXERCISE_VIDEOS[0].key);
+  const [page, setPage] = useState(0);
+
+  const activeCategory =
+    EXERCISE_VIDEOS.find((c) => c.key === activeKey) ?? EXERCISE_VIDEOS[0];
+  const totalPages = Math.max(
+    1,
+    Math.ceil(activeCategory.videos.length / VIDEOS_PER_PAGE),
+  );
+  const pageVideos = activeCategory.videos.slice(
+    page * VIDEOS_PER_PAGE,
+    (page + 1) * VIDEOS_PER_PAGE,
+  );
+
+  const handleCategoryChange = (key: string) => {
+    setActiveKey(key);
+    setPage(0);
+  };
+
   return (
     <View>
       <Text style={styles.stepIcon}>▶</Text>
@@ -357,49 +378,130 @@ function StepVideo({
         따라 할 운동 영상을 하나 골라주세요. 나중에 변경할 수 있어요.
       </Text>
 
-      {EXERCISE_VIDEOS.map((category) => (
-        <View key={category.key} style={styles.categorySection}>
-          <Text style={styles.categoryTitle}>
-            {category.icon}  {category.label}
-          </Text>
-          <View style={styles.videoGrid}>
-            {category.videos.map((video) => {
-              const isSelected = data.selectedVideoId === video.id;
-              return (
-                <TouchableOpacity
-                  key={video.id}
-                  style={[styles.videoCard, isSelected && styles.videoCardActive]}
-                  onPress={() =>
-                    setData({ ...data, selectedVideoId: video.id })
-                  }
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.thumbnailWrap}>
-                    <Image
-                      source={{ uri: video.thumbnail }}
-                      style={styles.thumbnail}
-                    />
-                    {isSelected && (
-                      <View style={styles.checkOverlay}>
-                        <FontAwesome name="check" size={18} color={COLORS.primaryText} />
-                      </View>
-                    )}
+      {/* 카테고리 탭 */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryTabs}
+      >
+        {EXERCISE_VIDEOS.map((category) => {
+          const isActive = category.key === activeKey;
+          return (
+            <TouchableOpacity
+              key={category.key}
+              style={[styles.categoryTab, isActive && styles.categoryTabActive]}
+              onPress={() => handleCategoryChange(category.key)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.categoryTabText,
+                  isActive && styles.categoryTabTextActive,
+                ]}
+              >
+                {category.icon}  {category.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* 선택된 카테고리 영상 그리드 */}
+      <View style={styles.videoGrid}>
+        {pageVideos.map((video) => {
+          const isSelected = data.selectedVideoId === video.id;
+          return (
+            <TouchableOpacity
+              key={video.id}
+              style={[styles.videoCard, isSelected && styles.videoCardActive]}
+              onPress={() =>
+                setData({ ...data, selectedVideoId: video.id })
+              }
+              activeOpacity={0.7}
+            >
+              <View style={styles.thumbnailWrap}>
+                <Image
+                  source={{ uri: video.thumbnail }}
+                  style={styles.thumbnail}
+                />
+                {isSelected && (
+                  <View style={styles.checkOverlay}>
+                    <FontAwesome name="check" size={18} color={COLORS.primaryText} />
                   </View>
-                  <Text
-                    style={[
-                      styles.videoTitle,
-                      isSelected && styles.videoTitleActive,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {video.title}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      ))}
+                )}
+              </View>
+              <Text
+                style={[
+                  styles.videoTitle,
+                  isSelected && styles.videoTitleActive,
+                ]}
+                numberOfLines={1}
+              >
+                {video.title}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* 페이지네이션 */}
+      <View style={styles.pagination}>
+        <TouchableOpacity
+          style={[styles.pageArrow, page === 0 && styles.pageArrowDisabled]}
+          onPress={() => setPage(Math.max(0, page - 10))}
+          disabled={page === 0}
+        >
+          <FontAwesome
+            name="angle-double-left"
+            size={16}
+            color={page === 0 ? COLORS.textMuted : COLORS.text}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.pageArrow, page === 0 && styles.pageArrowDisabled]}
+          onPress={() => page > 0 && setPage(page - 1)}
+          disabled={page === 0}
+        >
+          <FontAwesome
+            name="chevron-left"
+            size={14}
+            color={page === 0 ? COLORS.textMuted : COLORS.text}
+          />
+        </TouchableOpacity>
+
+        <Text style={styles.pageIndicator}>
+          {page + 1} / {totalPages}
+        </Text>
+
+        <TouchableOpacity
+          style={[
+            styles.pageArrow,
+            page === totalPages - 1 && styles.pageArrowDisabled,
+          ]}
+          onPress={() => page < totalPages - 1 && setPage(page + 1)}
+          disabled={page === totalPages - 1}
+        >
+          <FontAwesome
+            name="chevron-right"
+            size={14}
+            color={page === totalPages - 1 ? COLORS.textMuted : COLORS.text}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.pageArrow,
+            page === totalPages - 1 && styles.pageArrowDisabled,
+          ]}
+          onPress={() => setPage(Math.min(totalPages - 1, page + 10))}
+          disabled={page === totalPages - 1}
+        >
+          <FontAwesome
+            name="angle-double-right"
+            size={16}
+            color={page === totalPages - 1 ? COLORS.textMuted : COLORS.text}
+          />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -491,14 +593,58 @@ const styles = StyleSheet.create({
   sliderLabel: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted },
 
   // Video selection
-  categorySection: {
-    marginBottom: SPACING.xxl,
+  categoryTabs: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    paddingBottom: SPACING.lg,
   },
-  categoryTitle: {
-    fontSize: FONT_SIZE.lg,
+  categoryTab: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.surface,
+  },
+  categoryTabActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDim,
+  },
+  categoryTabText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  categoryTabTextActive: {
+    color: COLORS.primary,
     fontWeight: '800',
+  },
+  pagination: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.lg,
+    marginTop: SPACING.lg,
+  },
+  pageArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pageArrowDisabled: {
+    opacity: 0.4,
+  },
+  pageIndicator: {
+    fontSize: FONT_SIZE.sm,
     color: COLORS.text,
-    marginBottom: SPACING.md,
+    fontWeight: '700',
+    minWidth: 56,
+    textAlign: 'center',
   },
   videoGrid: {
     flexDirection: 'row',

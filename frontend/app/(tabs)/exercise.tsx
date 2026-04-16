@@ -1,11 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { LinearGradient } from 'expo-linear-gradient';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { COLORS, FONT_SIZE, SPACING, RADIUS } from '@/constants/Colors';
 import Button from '@/components/ui/Button';
+
+/** 색상을 rgba 문자열로 변환 (hex만 지원) */
+function hexToRgba(hex: string, alpha: number) {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 /** 싱크로율 → 색상 */
 function getSyncColor(rate: number) {
@@ -24,16 +34,9 @@ export default function ExerciseScreen() {
   // 테두리 점멸 애니메이션
   const borderOpacity = useRef(new Animated.Value(0)).current;
 
-  // 녹화 중 mock 싱크로율 시뮬레이션 (TODO: AI 서버 연동 시 제거)
+  // 녹화 정지 시 싱크로율 0으로 초기화
   useEffect(() => {
-    if (!isRecording) {
-      setSyncRate(0);
-      return;
-    }
-    const interval = setInterval(() => {
-      setSyncRate(Math.floor(Math.random() * 100));
-    }, 1500);
-    return () => clearInterval(interval);
+    if (!isRecording) setSyncRate(0);
   }, [isRecording]);
 
   // 싱크로율 낮을 때 진동 피드백
@@ -52,7 +55,7 @@ export default function ExerciseScreen() {
     }
   }, [syncRate, isRecording]);
 
-  // 싱크로율 낮을 때 테두리 점멸
+  // 싱크로율에 따른 비네트 페이드 애니메이션
   useEffect(() => {
     if (!isRecording) {
       borderOpacity.setValue(0);
@@ -60,19 +63,23 @@ export default function ExerciseScreen() {
     }
 
     if (syncRate < 40) {
-      // 빨간 테두리 점멸
+      // 빨강: 부드러운 페이드 in/out (점멸 X)
       const pulse = Animated.loop(
         Animated.sequence([
-          Animated.timing(borderOpacity, { toValue: 1, duration: 300, useNativeDriver: false }),
-          Animated.timing(borderOpacity, { toValue: 0.3, duration: 300, useNativeDriver: false }),
+          Animated.timing(borderOpacity, { toValue: 0.9, duration: 800, useNativeDriver: false }),
+          Animated.timing(borderOpacity, { toValue: 0.4, duration: 800, useNativeDriver: false }),
         ]),
       );
       pulse.start();
       return () => pulse.stop();
     }
 
-    // 40% 이상이면 고정 표시
-    borderOpacity.setValue(isRecording ? 1 : 0);
+    // 40% 이상: 은은하게 고정
+    Animated.timing(borderOpacity, {
+      toValue: syncRate >= 70 ? 0.5 : 0.6,
+      duration: 400,
+      useNativeDriver: false,
+    }).start();
   }, [syncRate, isRecording]);
 
   const syncColor = getSyncColor(syncRate);
@@ -105,17 +112,16 @@ export default function ExerciseScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 싱크로율 기반 테두리 */}
+      {/* 싱크로율 기반 비네트 그라데이션 (4방향) */}
       <Animated.View
-        style={[
-          styles.cameraBorder,
-          {
-            borderColor: syncColor,
-            opacity: borderOpacity,
-          },
-        ]}
+        style={[styles.vignetteWrap, { opacity: borderOpacity }]}
         pointerEvents="none"
-      />
+      >
+        <LinearGradient
+          colors={[hexToRgba(syncColor, 0.85), 'transparent']}
+          style={styles.vignetteTop}
+        />
+      </Animated.View>
 
       {/* 카메라 뷰 */}
       <CameraView style={styles.camera} facing="front">
@@ -171,6 +177,39 @@ export default function ExerciseScreen() {
           </View>
         )}
 
+        {/* DEV: 싱크로율 수동 조절 (AI 서버 연동 전 테스트용) */}
+        {__DEV__ && isRecording && (
+          <View style={styles.devPanel}>
+            <Text style={styles.devLabel}>🛠 DEV 싱크로율 테스트</Text>
+            <View style={styles.devRow}>
+              <TouchableOpacity
+                style={[styles.devBtn, { borderColor: COLORS.syncLow }]}
+                onPress={() => setSyncRate(25)}
+              >
+                <Text style={[styles.devBtnText, { color: COLORS.syncLow }]}>
+                  빨강 25%
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.devBtn, { borderColor: COLORS.syncMid }]}
+                onPress={() => setSyncRate(55)}
+              >
+                <Text style={[styles.devBtnText, { color: COLORS.syncMid }]}>
+                  주황 55%
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.devBtn, { borderColor: COLORS.syncHigh }]}
+                onPress={() => setSyncRate(85)}
+              >
+                <Text style={[styles.devBtnText, { color: COLORS.syncHigh }]}>
+                  녹색 85%
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* 하단: 기준영상 + 녹화 버튼 */}
         <View style={styles.bottomOverlay}>
           <View style={styles.bottomCenter}>
@@ -222,16 +261,21 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
 
-  // 싱크로율 테두리
-  cameraBorder: {
+  // 비네트 그라데이션
+  vignetteWrap: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    borderWidth: 4,
-    borderRadius: 0,
     zIndex: 10,
+  },
+  vignetteTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 260,
   },
 
   camera: { flex: 1 },
@@ -359,5 +403,39 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     color: COLORS.textSecondary,
     lineHeight: 20,
+  },
+
+  // DEV 패널
+  devPanel: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+  },
+  devLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.warning,
+    fontWeight: '700',
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  },
+  devRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  devBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: RADIUS.sm,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  devBtnText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
   },
 });
