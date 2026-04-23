@@ -139,7 +139,14 @@ public class SessionService {
                     date.equals(today)
             ));
         }
-
+        return WeeklyActivityResponseDto.builder()
+                .dateRange(String.format("%d월 %d일 - %d일",
+                        startOfWeek.getMonthValue(), startOfWeek.getDayOfMonth(), endOfWeek.getDayOfMonth()))
+                .totalWorkouts(weeklySessions.size())
+                .totalMinutes(totalMinutes)
+                .totalCalories((int) totalCalories)
+                .dailyLogs(dailyLogs)
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -153,7 +160,8 @@ public class SessionService {
 
         // 2. 상단 카드 데이터 계산 (평균 싱크로율)
         double avgSyncRate = monthlySessions.stream()
-                .mapToDouble(s -> s.getAvgSyncRate().doubleValue())
+                .map(s -> s.getAvgSyncRate()) // 일단 객체로 가져오고
+                .mapToDouble(val -> val != null ? val.doubleValue() : 0.0)
                 .average()
                 .orElse(0.0);
 
@@ -161,7 +169,7 @@ public class SessionService {
         List<CalendarDayDto> dayDtos = monthlySessions.stream()
                 .map(s -> s.getStartTime().toLocalDate())
                 .distinct()
-                .map(date -> new CalendarDayDto(date.toString(), true)) // 운동한 날은 true
+                .map(date -> new CalendarDayDto()) // 운동한 날은 true
                 .collect(Collectors.toList());
 
         CalendarMainResponseDto response = new CalendarMainResponseDto();

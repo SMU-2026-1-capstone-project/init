@@ -1,10 +1,7 @@
 package com.shadowfit.dto.report.record;
 
 import com.shadowfit.dto.report.detailreport.ExerciseSessionDto;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.util.List;
 
@@ -12,6 +9,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class WeeklyActivityResponseDto {
     private String dateRange;            // "3월 23일 - 29일"
     private int totalWorkouts;           // 4 Workouts

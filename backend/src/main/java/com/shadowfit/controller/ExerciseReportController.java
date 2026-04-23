@@ -1,6 +1,7 @@
 package com.shadowfit.controller;
 
 import com.shadowfit.dto.report.detailreport.SessionReportResponseDto;
+import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.service.Report.ReportService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,7 @@ public class ExerciseReportController {
 
     @GetMapping("/session/{sessionId}")
     public ResponseEntity<SessionReportResponseDto> getSessionReport(
-            @AuthenticationPrincipal Long memberId,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails,
             @PathVariable Long sessionId) {
 
         SessionReportResponseDto response = reportService.getSessionReport(sessionId);

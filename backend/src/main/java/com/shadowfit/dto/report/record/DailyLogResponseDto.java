@@ -1,5 +1,6 @@
 package com.shadowfit.dto.report.record;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.shadowfit.model.report.DailyLog;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -15,6 +16,8 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class DailyLogResponseDto {
     private Long id;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate logDate;
     private String memo;
     private Integer totalExerciseTime; // 분 단위
