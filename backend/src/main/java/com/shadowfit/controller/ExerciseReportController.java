@@ -3,6 +3,7 @@ package com.shadowfit.controller;
 import com.shadowfit.dto.report.detailreport.SessionReportResponseDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.service.Report.ReportService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ExerciseReportController {
     private final ReportService reportService;
 
+    @Operation(summary="일 별 운동 보고서",description = "일 별 운동 보고서 열람 가능")
     @GetMapping("/session/{sessionId}")
     public ResponseEntity<SessionReportResponseDto> getSessionReport(
             @AuthenticationPrincipal CustomUserDetails customUserDetails,

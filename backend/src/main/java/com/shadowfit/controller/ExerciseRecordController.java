@@ -6,6 +6,7 @@ import com.shadowfit.dto.report.record.WeeklyActivityResponseDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.service.Exercise.SessionService;
 import com.shadowfit.service.Report.DailyLogServcie;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ public class ExerciseRecordController {
     private final SessionService sessionService;
     private final DailyLogServcie dailyLogService;
 
+    @Operation(summary="주간 운동 요약",description = "주간 운동 기록 열람 가능")
     @GetMapping("/weekly-summary")
     public ResponseEntity<WeeklyActivityResponseDto> getWeeklySummary(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
         // 서비스 로직에서 주간 통계 및 오늘 운동 리스트를 계산해서 반환
@@ -31,6 +33,7 @@ public class ExerciseRecordController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary="메인화면 달력 데이터 조회",description = "메인화면에 달력 api")
     @GetMapping("/calendar")
     public ResponseEntity<CalendarMainResponseDto> getCalendarRecords(
             @AuthenticationPrincipal CustomUserDetails customUserDetails,
@@ -41,6 +44,7 @@ public class ExerciseRecordController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary="운동 메모",description = "운동 메모를 적을 수 있다")
     @PostMapping("/daily-logs")
     public ResponseEntity<Void> saveDailyLog(
             @AuthenticationPrincipal CustomUserDetails customUserDetails,
