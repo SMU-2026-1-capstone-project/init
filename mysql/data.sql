@@ -59,24 +59,28 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- 1. 유저 데이터 (ID 1번 확실히 생성)
 INSERT INTO users (email, password, username, role, onboarding_completed)
 VALUES ('test@test.com', '$2a$10$.mpvpjYHKGukSTvbCukWNusFWU/lHUBCmHjp3Un2mz6qjrOg9z/LC', '효재', 'USER', TRUE);
-    ON DUPLICATE KEY UPDATE id=id;
 
--- 2. 운동 종목 데이터
-INSERT INTO exercises (id, name, category, created_at) VALUES (1, '스쿼트', 'LOWER', NOW()) ON DUPLICATE KEY UPDATE id=id;
-INSERT INTO exercises (id, name, category, created_at) VALUES (2, '런지', 'LOWER', NOW()) ON DUPLICATE KEY UPDATE id=id;
-INSERT INTO exercises (id, name, category, created_at) VALUES (3, '플랭크', 'CORE', NOW()) ON DUPLICATE KEY UPDATE id=id;
+-- 2. 운동 종목 데이터 (REPLACE 사용으로 에러 방지)
+REPLACE INTO exercises (id, name, category, created_at) VALUES (1, '스쿼트', 'LOWER', NOW());
+REPLACE INTO exercises (id, name, category, created_at) VALUES (2, '런지', 'LOWER', NOW());
+REPLACE INTO exercises (id, name, category, created_at) VALUES (3, '플랭크', 'CORE', NOW());
 
--- 3. 운동 세션 데이터 (여러 행으로 나누어 작성하면 파싱 에러를 줄일 수 있습니다)
-INSERT INTO exercise_sessions (id, member_id, exercise_id, start_time, end_time, avg_sync_rate, total_reps, calories_burned, status, created_at) VALUES (601, 1, 1, '2026-04-01 09:00:00', '2026-04-01 09:30:00', 75.5, 30, 150, 'COMPLETED', NOW());
-INSERT INTO exercise_sessions (id, member_id, exercise_id, start_time, end_time, avg_sync_rate, total_reps, calories_burned, status, created_at) VALUES (602, 1, 2, '2026-04-03 18:00:00', '2026-04-03 18:40:00', 82.0, 40, 210, 'COMPLETED', NOW());
-INSERT INTO exercise_sessions (id, member_id, exercise_id, start_time, end_time, avg_sync_rate, total_reps, calories_burned, status, created_at) VALUES (603, 1, 1, '2026-04-05 10:00:00', '2026-04-05 10:20:00', 88.5, 20, 100, 'COMPLETED', NOW());
-INSERT INTO exercise_sessions (id, member_id, exercise_id, start_time, end_time, avg_sync_rate, total_reps, calories_burned, status, created_at) VALUES (617, 1, 1, '2026-04-25 09:00:00', '2026-04-25 09:20:00', 92.5, 20, 100, 'COMPLETED', NOW());
-INSERT INTO exercise_sessions (id, member_id, exercise_id, start_time, end_time, avg_sync_rate, total_reps, calories_burned, status, created_at) VALUES (618, 1, 2, '2026-04-25 14:00:00', '2026-04-25 14:40:00', 88.0, 40, 190, 'COMPLETED', NOW());
-INSERT INTO exercise_sessions (id, member_id, exercise_id, start_time, end_time, avg_sync_rate, total_reps, calories_burned, status, created_at) VALUES (619, 1, 3, '2026-04-25 20:00:00', '2026-04-25 20:30:00', 95.0, 30, 140, 'COMPLETED', NOW());
+-- 3. 운동 세션 데이터 (4월 데이터)
+REPLACE INTO exercise_sessions (id, member_id, exercise_id, start_time, end_time, avg_sync_rate, total_reps, calories_burned, status, created_at) VALUES
+(601, 1, 1, '2026-04-01 09:00:00', '2026-04-01 09:30:00', 75.5, 30, 150, 'COMPLETED', NOW()),
+(602, 1, 2, '2026-04-03 18:00:00', '2026-04-03 18:40:00', 82.0, 40, 210, 'COMPLETED', NOW()),
+(603, 1, 1, '2026-04-05 10:00:00', '2026-04-05 10:20:00', 88.5, 20, 100, 'COMPLETED', NOW()),
+(617, 1, 1, '2026-04-25 09:00:00', '2026-04-25 09:20:00', 92.5, 20, 100, 'COMPLETED', NOW()),
+(618, 1, 2, '2026-04-25 14:00:00', '2026-04-25 14:40:00', 88.0, 40, 190, 'COMPLETED', NOW()),
+(619, 1, 3, '2026-04-25 20:00:00', '2026-04-25 20:30:00', 95.0, 30, 140, 'COMPLETED', NOW());
 
--- 4. 리포트 자동 생성
-INSERT INTO reports (session_id, member_id, report_type, summary, improvement_tips, created_at)
-SELECT id, member_id, 'SESSION', CONCAT(id, '번 리포트'), '안정적입니다.', NOW()
-FROM exercise_sessions WHERE id >= 601;
+-- 4. 리포트 데이터
+REPLACE INTO reports (id, session_id, member_id, report_type, summary, improvement_tips, created_at) VALUES
+(701, 601, 1, 'SESSION', '601번 리포트', '안정적입니다.', NOW()),
+(702, 602, 1, 'SESSION', '602번 리포트', '안정적입니다.', NOW()),
+(703, 603, 1, 'SESSION', '603번 리포트', '안정적입니다.', NOW()),
+(717, 617, 1, 'SESSION', '617번 리포트', '안정적입니다.', NOW()),
+(718, 618, 1, 'SESSION', '618번 리포트', '안정적입니다.', NOW()),
+(719, 619, 1, 'SESSION', '719번 리포트', '안정적입니다.', NOW());
 
 SET FOREIGN_KEY_CHECKS = 1;
