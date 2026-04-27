@@ -27,7 +27,7 @@ public class OnboardingService {
                 member.getWorkoutLevel() != null &&
                 member.getHeight() != null &&
                 member.getWeight() != null &&
-                member.getPreferredSquatUrl() != null) {
+                member.getPreferredUrl() != null) {
             member.completeOnboarding();
         }
         return OnboardingDto.fromEntity(member);

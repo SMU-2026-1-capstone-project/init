@@ -26,5 +26,5 @@ public class OnboardingRequestDto {
     private Double weight;
 
     @Schema(description = "선택한 스쿼트 기준 영상 URL", example = "https://www.youtube.com/watch?v=q6hBSSis_60")
-    private String preferredSquatUrl;
+    private String preferredUrl;
 }

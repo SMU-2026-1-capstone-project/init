@@ -6,13 +6,16 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.util.YoutubeValidator;
 import com.shadowfit.grpc.*;
+import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.ExerciseReference;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
+import com.shadowfit.model.member.Member;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
+import io.grpc.Metadata;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +28,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
 import java.util.List;
+
+import static jdk.javadoc.internal.doclets.formats.html.markup.HtmlStyle.header;
 
 @Service
 @RequiredArgsConstructor
@@ -43,19 +48,39 @@ public class ExerciseAnalysisService {
     @GrpcClient("fastapi-client")
     private ExerciseServiceGrpc.ExerciseServiceStub exerciseAsyncStub;
 
+    // 토큰 fastapi에게 보내기
+    private ExerciseServiceGrpc.ExerciseServiceStub getAuthenticatedStub() {
+        Metadata header = new Metadata();
+        Metadata.Key<String> authKey = Metadata.Key.of("Authorization", Metadata.ASCII_STRING_MARSHALLER);
+        header.put(authKey, "Bearer " + internalToken);
+
+        return MetadataUtils.attachHeaders(exerciseAsyncStub, header);
+    }
+
     /**
      * [STEP 1: 기준 데이터 등록]
-     * 사용자가 선택한 유튜브 URL에서 AI가 스켈레톤 좌표를 추출하도록 요청합니다.
+     * 사용자가 선택한 유튜브 URL에서 AI가 스켈레톤 좌표를 추출하도록 요청합니다. -- 등록하는건 관리자용
      */
-    public void extractReferencePoses(Long exerciseId, String youtubeUrl) {
+    public void extractReferencePoses(Long exerciseId) {
+
+        Exercise exercise = exercisesRepository.findById(exerciseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.EXERCISE_NOT_FOUND));
+
+        String adminReferenceUrl = exercise.getPreferredUrl();
+
+        if (adminReferenceUrl == null || adminReferenceUrl.isEmpty()) {
+            log.error("운동 ID {} 에 등록된 기준 영상 URL이 없습니다.", exerciseId);
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
         com.shadowfit.grpc.ExtractRequest request = com.shadowfit.grpc.ExtractRequest.newBuilder()
                 .setExerciseId(exerciseId)
-                .setYoutubeUrl(youtubeUrl)
+                .setYoutubeUrl(adminReferenceUrl)
                 .build();
 
         log.info("FastAPI에게 기준 좌표 추출 요청 전송 - 운동 ID: {}", exerciseId);
 
-        exerciseAsyncStub.extractReferenceData(request, new StreamObserver<com.shadowfit.grpc.ExtractResponse>() {
+        getAuthenticatedStub().extractReferenceData(request, new StreamObserver<com.shadowfit.grpc.ExtractResponse>() {
             @Override
             public void onNext(com.shadowfit.grpc.ExtractResponse value) {
                 log.info("FastAPI 추출 시작 응답 수신 - 운동 ID: {}", value.getExerciseId());
@@ -109,7 +134,7 @@ public class ExerciseAnalysisService {
                     .build());
         }
 
-        exerciseAsyncStub.startAnalysis(requestBuilder.build(), new StreamObserver<AnalyzeResponse>() {
+        getAuthenticatedStub().startAnalysis(requestBuilder.build(), new StreamObserver<AnalyzeResponse>() {
             @Override
             public void onNext(AnalyzeResponse value) {
                 log.info("FastAPI 응답 수신 - 세션: {}", value.getSessionId());
@@ -136,7 +161,7 @@ public class ExerciseAnalysisService {
                 .setSessionId(sessionId.intValue())
                 .build();
 
-        exerciseAsyncStub.stopAnalysis(request, new io.grpc.stub.StreamObserver<com.shadowfit.grpc.StopResponse>() {
+        getAuthenticatedStub().stopAnalysis(request, new io.grpc.stub.StreamObserver<com.shadowfit.grpc.StopResponse>() {
             @Override
             public void onNext(com.shadowfit.grpc.StopResponse value) {
                 log.info("AI 서버 응답: {}", value.getMessage());
@@ -167,5 +192,5 @@ public class ExerciseAnalysisService {
         sessionRepository.save(session);
         log.info("세션 {} DB 업데이트 완료", sessionId);
     }
-
 }
+

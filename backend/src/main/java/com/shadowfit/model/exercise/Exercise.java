@@ -29,8 +29,8 @@ public class Exercise {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(length = 500)
-    private String referenceVideoUrl;
+    @Column(name = "preferred_url", length = 500)
+    private String preferredUrl;
 
     /**
      * SQL의 JSON 타입을 매핑합니다.

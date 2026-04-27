@@ -28,7 +28,7 @@ grpc:
     reflection-enabled: true
   client:
     fastapi-client: # @GrpcClient("fastapi-client")와 일치
-      address: 'static://ai-server:8585' # 컨테이너명:AI서버gRPC포트
+      address: 'static://shadowfit-ai:8585' # 컨테이너명:AI서버gRPC포트
       negotiation-type: plaintext
 
 # [3] Swagger 및 기타 설정 (최상단 레벨)

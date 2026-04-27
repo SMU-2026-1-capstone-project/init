@@ -9,12 +9,13 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- 2. 전체 테이블 생성 (AUTO_INCREMENT를 PRIMARY KEY 옆에 바로 붙여야 합니다)
 CREATE TABLE users (
-                       id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 자동 증가 추가
+                       id BIGINT AUTO_INCREMENT PRIMARY KEY,
                        email VARCHAR(255) UNIQUE NOT NULL,
                        password VARCHAR(255) NOT NULL,
                        username VARCHAR(255),
                        role VARCHAR(20) DEFAULT 'ROLE_USER',
                        selected_persona VARCHAR(50),
+                       preferredUrl VARCHAR(500),
                        onboarding_completed BOOLEAN DEFAULT FALSE,
                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -23,6 +24,7 @@ CREATE TABLE exercises (
                            id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 자동 증가 추가
                            name VARCHAR(255) NOT NULL,
                            category VARCHAR(50),
+                           Preferredurl VARCHAR(500),
                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -57,14 +59,19 @@ CREATE TABLE reports (
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- 1. 유저 데이터 (ID 1번 확실히 생성)
-INSERT INTO users (email, password, username, role, onboarding_completed, preferred_squat_url)
+INSERT INTO users (email, password, username, role, onboarding_completed, preferredUrl)
 VALUES ('test@test.com', '$2a$10$.mpvpjYHKGukSTvbCukWNusFWU/lHUBCmHjp3Un2mz6qjrOg9z/LC', '효재', 'USER', TRUE,
         'https://www.youtube.com/watch?v=q6hBSSis_60');
 
 -- 2. 운동 종목 데이터 (REPLACE 사용으로 에러 방지)
-REPLACE INTO exercises (id, name, category, created_at) VALUES (1, '스쿼트', 'LOWER', NOW());
-REPLACE INTO exercises (id, name, category, created_at) VALUES (2, '런지', 'LOWER', NOW());
-REPLACE INTO exercises (id, name, category, created_at) VALUES (3, '플랭크', 'CORE', NOW());
+REPLACE INTO exercises (id, name, category, Preferredurl, created_at)
+VALUES (1, '스쿼트', 'LOWER', 'https://www.youtube.com/watch?v=q6hBSSis_60', NOW());
+
+REPLACE INTO exercises (id, name, category, Preferredurl, created_at)
+VALUES (2, '런지', 'LOWER', 'https://www.youtube.com/watch?v=U4s4mEQ5ovM', NOW());
+
+REPLACE INTO exercises (id, name, category, Preferredurl, created_at)
+VALUES (3, '플랭크', 'CORE', 'https://www.youtube.com/watch?v=ASdvN_XEl_c', NOW());
 
 -- 3. 운동 세션 데이터 (4월 데이터)
 REPLACE INTO exercise_sessions (id, member_id, exercise_id, start_time, end_time, avg_sync_rate, total_reps, calories_burned, status, created_at) VALUES

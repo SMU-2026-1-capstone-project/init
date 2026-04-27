@@ -27,6 +27,9 @@ public class Member {
     @Column(nullable = false, length = 1000)
     private String password;
 
+    @Column(name = "Preferredurl", length = 500)
+    private String Preferredurl;
+
     @Enumerated(EnumType.STRING)
     @Column(name="selected_persona",nullable=false, length = 10)
     @Builder.Default
@@ -56,8 +59,8 @@ public class Member {
     @Column(name = "workout_level")
     private WorkoutLevel workoutLevel;
 
-    @Column(name = "preferred_squat_url", length = 500)
-    private String preferredSquatUrl;
+    @Column(name = "preferredUrl", length = 500)
+    private String preferredUrl;
 
     @Column(name = "onboarding_completed", nullable = false)
     @Builder.Default
@@ -72,8 +75,8 @@ public class Member {
         if (dto.getWorkoutLevel() != null) this.workoutLevel = dto.getWorkoutLevel();
         if (dto.getHeight() != null) this.height = dto.getHeight();
         if (dto.getWeight() != null) this.weight = dto.getWeight();
-        if (dto.getPreferredSquatUrl() != null) {
-            this.preferredSquatUrl = dto.getPreferredSquatUrl();
+        if (dto.getPreferredUrl() != null) {
+            this.preferredUrl = dto.getPreferredUrl();
         }
     }
 

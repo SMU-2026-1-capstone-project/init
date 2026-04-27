@@ -10,7 +10,7 @@ import com.shadowfit.grpc.*;
 import net.devh.boot.grpc.server.service.GrpcService;
 
 @Slf4j
-@GrpcService
+@GrpcService(interceptors = {InternalAuthInterceptor.class})
 @RequiredArgsConstructor
 public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImplBase {
     private final PoseDataService poseDataService;
@@ -52,7 +52,6 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
 
             poseDataService.saveReferencePoses(request.getExerciseId(), request.getExtractedPosesList());
 
-            // [수정] 변수 이름을 'response' 대신 'extractResponse'로 바꿉니다.
             ExtractResponse extractResponse = ExtractResponse.newBuilder()
                     .setSuccess(true)
                     .setExerciseId(request.getExerciseId())

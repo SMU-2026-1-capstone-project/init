@@ -46,7 +46,7 @@ public class ExercisesController {
 
         // 응답 DTO 생성
         ExercisesResponseDto response = ExercisesResponseDto.builder()
-                .sessionId(sessionId.intValue()) // 👉 Long → Integer 변환 (DTO 맞춤)
+                .sessionId(sessionId.intValue())
                 .exerciseId(dto.getExerciseId().intValue())
                 .startTime(LocalDateTime.now())
                 .status(Status.IN_PROGRESS)
@@ -62,11 +62,10 @@ public class ExercisesController {
     @PostMapping("/{exerciseId}/reference")
     public ResponseEntity<String> extractReference(
             @PathVariable Long exerciseId,
-            @RequestBody String youtubeUrl
     ) {
         log.info("기준 좌표 추출 요청 - exerciseId: {}", exerciseId);
 
-        analysisService.extractReferencePoses(exerciseId, youtubeUrl);
+        analysisService.extractReferencePoses(exerciseId);
 
         return ResponseEntity.accepted()
                 .body("기준 좌표 추출 요청이 전달되었습니다.");
