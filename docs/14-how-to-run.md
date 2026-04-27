@@ -363,12 +363,12 @@ cd "c:/최지호/상명대학교/4학년 1학기/캡스톤 디자인/shadowfit/b
 
 ```bash
 # ai-server 폴더로 이동
-cd "c:/최지호/상명대학교/4학년 1학기/캡스톤디자인/shadowfit/ai-server"
+cd "c:/dev/shadowfit/ai-server"
 
 # 가상환경 활성화 (터미널에 따라 택 1)
 source venv/Scripts/activate           # Git Bash
-# .\venv\Scripts\Activate.ps1          # PowerShell
-# venv\Scripts\activate.bat            # CMD
+.\venv\Scripts\Activate.ps1          # PowerShell
+venv\Scripts\activate.bat            # CMD
 
 # AI 서버 실행
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

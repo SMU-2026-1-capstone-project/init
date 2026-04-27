@@ -6,7 +6,7 @@ spring:
 
   # [1] 데이터베이스 및 JPA 설정 (spring 하위로 정렬)
   datasource:
-    url: jdbc:mysql://shadowfit-mysql:3306/shadowfit?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    url: jdbc:mysql://${DB_HOST:shadowfit-mysql}:${DB_PORT:3306}/${DB_NAME:shadowfit}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME:shadowfit}
     password: ${DB_PASSWORD:shadowfit}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -58,7 +58,7 @@ internal:
     token: ${INTERNAL_API_TOKEN}
 
 ai-server:
-  url: http://shadowfit-ai:8000
+  url: ${AI_SERVER_URL:http://shadowfit-ai:8000}
 
 # [4] 로깅 설정 (최상단 레벨)
 logging:
