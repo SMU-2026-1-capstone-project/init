@@ -61,14 +61,14 @@ public class ExercisesController {
     @Operation(summary="기준 좌표 추출",description = "기준 좌표 추출 요청을 할 수 있음")
     @PostMapping("/{exerciseId}/reference")
     public ResponseEntity<String> extractReference(
-            @PathVariable Long exerciseId,
+            @PathVariable Long exerciseId
     ) {
         log.info("기준 좌표 추출 요청 - exerciseId: {}", exerciseId);
 
         analysisService.extractReferencePoses(exerciseId);
 
         return ResponseEntity.accepted()
-                .body("기준 좌표 추출 요청이 전달되었습니다.");
+                .body("운동 ID [" + exerciseId + "]에 대한 기준 좌표 추출이 시작되었습니다.");
     }
 
     /**

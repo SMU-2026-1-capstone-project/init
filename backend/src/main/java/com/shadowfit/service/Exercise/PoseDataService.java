@@ -14,6 +14,7 @@ import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PoseDataService {
     private final PoseDataRepository poseDataRepository;
     private final SessionRepository sessionRepository;
@@ -34,52 +36,54 @@ public class PoseDataService {
      * WebClient 등을 통해 리스트 형태로 넘어온 좌표 데이터를 한꺼번에 저장합니다.
      */
     @Transactional
-    public void savePoseDataBatch(List<PoseDataRequestDto> dtos) {
-        if (dtos.isEmpty()) return;
+    public void savePoseDataBatch(Long sessionId, List<com.shadowfit.grpc.PoseDataRequest> grpcList) {
 
-        // 1. 세션 정보 조회 (리스트의 첫 번째 세션 ID 기준)
-        Long sessionId = dtos.get(0).getSessionId();
         Session session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 세션입니다. ID: " + sessionId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
 
-        // 2. DTO 리스트를 PoseData 엔티티 리스트로 한 번에 변환
-        List<PoseData> entities = dtos.stream()
-                .map(dto -> PoseData.builder()
+        // 1. gRPC 객체 리스트를 DB 엔티티 리스트로 변환
+        List<PoseData> entities = grpcList.stream()
+                .map(grpc -> PoseData.builder()
                         .session(session)
-                        .timestampSec(dto.getTimestampSec())
-                        .jointCoordinates(dto.getJointCoordinates())
+                        .timestampSec(grpc.getTimestampSec())
+                        .jointCoordinates(grpc.getJointCoordinates())
+                        .syncRate(grpc.getSyncRate())
+                        .isCorrect(grpc.getSyncRate() >= 40.0)
+                        .feedbackMessage(grpc.getFeedbackMessage())
                         .build())
-                .collect(Collectors.toList());
+                .toList();
 
-        // 3. 배치 저장 실행
+        // 2. DB에 일괄 저장 (Batch Insert)
         poseDataRepository.saveAll(entities);
+        log.info("세션 {} : 실시간 포즈 데이터 {}개 배치 저장 완료", sessionId, entities.size());
     }
+}
 
-    /**
-     * [gRPC 방식] 기준 좌표(Reference) 저장
-     * AI 서버가 추출한 운동 종목별 '정석 포즈' 좌표들을 DB에 저장합니다.
-     */
-    @Transactional
-    public void saveReferencePoses(Long exerciseId, List<PoseDataRequest> poseDataList) {
-        // 1. 해당 운동이 존재하는지 확인
-        Exercise exercise = exercisesRepository.findById(exerciseId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.EXERCISE_NOT_FOUND));
+/**
+ * [관리자용] 추출된 기준 좌표(정석 자세)를 DB에 저장합니다.
+ */
+@Transactional
+public void saveReferencePoses(Long exerciseId, List<com.shadowfit.grpc.PoseDataRequest> grpcList) {
+    // 1. 해당 운동(Exercise) 엔티티가 있는지 확인
+    Exercise exercise = exercisesRepository.findById(exerciseId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.EXERCISE_NOT_FOUND));
 
-        // 2. 기존에 저장된 기준 좌표가 있다면 삭제 (선택 사항: 업데이트 개념이라면 삭제 후 재입력)
-        // referenceRepository.deleteByExercise(exercise);
+    // 2. gRPC 리스트를 ExerciseReference(기준 좌표 엔티티) 리스트로 변환
+    // (만약 엔티티 이름이 다르다면 프로젝트에 맞춰 수정하세요!)
+    List<ExerciseReference> referenceEntities = grpcList.stream()
+            .map(grpc -> ExerciseReference.builder()
+                    .exercise(exercise)
+                    .timestampSec(grpc.getTimestampSec())
+                    .jointCoordinates(grpc.getJointCoordinates())
+                    .build())
+            .toList();
 
-        // 3. Proto 메시지 리스트 -> ExerciseReference 엔티티 리스트 변환
-        List<ExerciseReference> entities = poseDataList.stream()
-                .map(p -> ExerciseReference.builder()
-                        .exercise(exercise)
-                        .timestampSec(p.getTimestampSec())
-                        .jointCoordinates(p.getJointCoordinates())
-                        .build())
-                .collect(Collectors.toList());
+    // 3. 기준 좌표 테이블에 일괄 저장
+    // exerciseReferenceRepository는 미리 주입받아야 합니다.
+    exerciseReferenceRepository.saveAll(referenceEntities);
 
-        // 4. 저장 (referenceRepository는 ExerciseReferenceRepository 주입 필요)
-        referenceRepository.saveAll(entities);
-    }
+    log.info("운동 ID {} : 총 {}개의 기준 좌표 저장 완료", exerciseId, referenceEntities.size());
+}
 
     /**
      * [gRPC 방식] 실시간 분석 좌표 배치 저장

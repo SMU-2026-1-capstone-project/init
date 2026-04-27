@@ -105,6 +105,8 @@ message PoseDataList {
 message PoseDataRequest {
   double timestamp_sec = 1;
   string joint_coordinates = 2;
+  double sync_rate = 3;
+  string feedback_message = 4;
 }
 
 message PoseDataBatchRequest {

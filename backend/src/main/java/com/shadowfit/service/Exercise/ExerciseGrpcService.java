@@ -1,4 +1,5 @@
 package com.shadowfit.service.Exercise;
+import com.google.protobuf.Empty;
 import com.shadowfit.grpc.ExerciseServiceGrpc;
 import com.shadowfit.grpc.PoseDataBatchRequest;
 import com.shadowfit.grpc.PoseDataRequest;
@@ -8,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.shadowfit.grpc.*;
 import net.devh.boot.grpc.server.service.GrpcService;
+
+
 
 @Slf4j
 @GrpcService(interceptors = {InternalAuthInterceptor.class})
@@ -23,20 +26,22 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
     @Override
     public void savePoseDataBatch(PoseDataBatchRequest request, StreamObserver<PoseDataResponse> responseObserver) {
         try {
-            poseDataService.savePoseDataBatchGrpc(request);
+            log.info("세션 {} : 실시간 데이터 {}개 수신 및 저장 시작",
+                    request.getSessionId(), request.getPoseDataCount());
 
-            PoseDataRequest lastData = request.getPoseData(request.getPoseDataCount() - 1);
-            PoseDataResponse response = PoseDataResponse.newBuilder().setSuccess(true).
-                    setSessionId(request.getSessionId())
-                    .setTimestampSec(lastData.getTimestampSec())
-                    .setJointCoordinates(lastData.getJointCoordinates())
+            poseDataService.savePoseDataBatch(request.getSessionId(), request.getPoseDataList());
+
+            com.shadowfit.grpc.PoseDataResponse response = com.shadowfit.grpc.PoseDataResponse.newBuilder()
+                    .setSuccess(true)
+                    .setSessionId(request.getSessionId())
                     .build();
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
 
         } catch (Exception e) {
-            responseObserver.onError(e);
+            log.error("저장 실패: {}", e.getMessage());
+            responseObserver.onError(io.grpc.Status.INTERNAL.asRuntimeException());
         }
     }
 
