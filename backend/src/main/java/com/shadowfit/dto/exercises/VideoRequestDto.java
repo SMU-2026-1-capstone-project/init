@@ -16,8 +16,4 @@ public class VideoRequestDto {
             requiredMode = Schema.RequiredMode.REQUIRED)
     private Long exerciseId;
 
-    @Schema(description = "유튜브 링크",
-            example = "https://youtu.be/xxx",
-            requiredMode = Schema.RequiredMode.REQUIRED)
-    private String referenceSource;
 }

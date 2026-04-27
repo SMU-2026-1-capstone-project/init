@@ -27,6 +27,24 @@ public class ExercisesController {
     private final ExerciseAnalysisService analysisService;
 
     /**
+     * ✅ 기준 좌표 추출 (관리자/등록용)
+     */
+    @Operation(summary="기준 좌표 추출",description = "기준 좌표 추출 요청을 할 수 있음")
+    @PostMapping("/{exerciseId}/reference")
+    public ResponseEntity<String> extractReference(
+            @PathVariable Long exerciseId,
+            @RequestParam String youtubeUrl
+    ) {
+        log.info("기준 좌표 추출 요청 - exerciseId: {}", exerciseId);
+
+        analysisService.extractReferencePoses(exerciseId, youtubeUrl);
+
+        return ResponseEntity.accepted()
+                .body("운동 ID [" + exerciseId + "]에 대한 기준 좌표 추출이 시작되었습니다.");
+    }
+
+
+    /**
      * ✅ 운동 세션 시작 (핵심 API)
      * App → Spring → gRPC → FastAPI 흐름 시작점
      */
@@ -55,21 +73,6 @@ public class ExercisesController {
         return ResponseEntity.accepted().body(response);
     }
 
-    /**
-     * ✅ 기준 좌표 추출 (관리자/등록용)
-     */
-    @Operation(summary="기준 좌표 추출",description = "기준 좌표 추출 요청을 할 수 있음")
-    @PostMapping("/{exerciseId}/reference")
-    public ResponseEntity<String> extractReference(
-            @PathVariable Long exerciseId
-    ) {
-        log.info("기준 좌표 추출 요청 - exerciseId: {}", exerciseId);
-
-        analysisService.extractReferencePoses(exerciseId);
-
-        return ResponseEntity.accepted()
-                .body("운동 ID [" + exerciseId + "]에 대한 기준 좌표 추출이 시작되었습니다.");
-    }
 
     /**
      * ✅ 운동 세션 종료 및 결과 저장
@@ -96,8 +99,4 @@ public class ExercisesController {
 
         return ResponseEntity.ok(response);
     }
-
-
-
-
 }

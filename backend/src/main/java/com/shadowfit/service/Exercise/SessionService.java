@@ -45,7 +45,7 @@ public class SessionService {
      * @return 생성된 세션 엔티티
      */
     @Transactional
-    public Session createSession(VideoRequestDto appDto, Long currentMemberId) {
+    public Session createSession(VideoRequestDto appDto, Long currentMemberId, String finalUrl) {
         Member member = memberRepository.findById(currentMemberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -55,7 +55,7 @@ public class SessionService {
         Session session = Session.builder()
                 .member(member)
                 .exercise(exercise)
-                .referenceSource(appDto.getReferenceSource())
+                .referenceSource(finalUrl)
                 .startTime(LocalDateTime.now())
                 .status(Status.IN_PROGRESS)
                 .build();
@@ -81,29 +81,6 @@ public class SessionService {
         session.setCaloriesBurned(java.math.BigDecimal.valueOf(request.getCaloriesBurned()));
 
         sessionRepository.save(session);
-    }
-
-    /**
-     * ✅ 구버전 WebClient 방식 (필요 시 사용)
-     */
-    @Transactional
-    public Long sendToAnalysisServer(VideoRequestDto appDto, Long currentMemberId) {
-        Member member = memberRepository.findById(currentMemberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
-        Exercise exercise = exercisesRepository.findById(appDto.getExerciseId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.EXERCISE_NOT_FOUND));
-
-        Session session = Session.builder()
-                .member(member)
-                .exercise(exercise)
-                .referenceSource(appDto.getReferenceSource())
-                .startTime(LocalDateTime.now())
-                .status(Status.IN_PROGRESS)
-                .build();
-
-        Session savedSession = sessionRepository.save(session);
-        return savedSession.getId();
     }
 
     @Transactional(readOnly = true)

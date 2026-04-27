@@ -64,21 +64,19 @@ public class ExerciseAnalysisService {
      * [STEP 1: 기준 데이터 등록]
      * 사용자가 선택한 유튜브 URL에서 AI가 스켈레톤 좌표를 추출하도록 요청합니다. -- 등록하는건 관리자용
      */
-    public void extractReferencePoses(Long exerciseId) {
+    public void extractReferencePoses(Long exerciseId,String youtubeUrl) {
 
         Exercise exercise = exercisesRepository.findById(exerciseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.EXERCISE_NOT_FOUND));
 
-        String adminReferenceUrl = exercise.getPreferredUrl();
-
-        if (adminReferenceUrl == null || adminReferenceUrl.isEmpty()) {
-            log.error("운동 ID {} 에 등록된 기준 영상 URL이 없습니다.", exerciseId);
+        if (youtubeUrl == null || youtubeUrl.isEmpty()) {
+            log.error("전달된 기준 영상 URL이 없습니다.");
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
         com.shadowfit.grpc.ExtractRequest request = com.shadowfit.grpc.ExtractRequest.newBuilder()
                 .setExerciseId(exerciseId)
-                .setYoutubeUrl(adminReferenceUrl)
+                .setYoutubeUrl(youtubeUrl) // ✅ 직접 삽입된 URL 사용
                 .build();
 
         log.info("FastAPI에게 기준 좌표 추출 요청 전송 - 운동 ID: {}", exerciseId);
@@ -105,11 +103,20 @@ public class ExerciseAnalysisService {
      */
     @Transactional
     public Long startAnalysis(VideoRequestDto appDto, Long currentMemberId) {
-        Session savedSession = sessionService.createSession(appDto, currentMemberId);
+        Member member = memberRepository.findById(currentMemberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        String finalUrl = member.getPreferredUrl();
+
+        if (finalUrl == null || finalUrl.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        Session savedSession = sessionService.createSession(appDto, currentMemberId, finalUrl);
         Long sessionId = savedSession.getId();
 
         // 비동기로 FastAPI에 분석 요청
-        this.sendAnalysisRequestToFastApi(sessionId, appDto);
+        this.sendAnalysisRequestToFastApi(sessionId, appDto, finalUrl);
 
         return sessionId;
     }
@@ -120,7 +127,7 @@ public class ExerciseAnalysisService {
      */
     @Async
     @Transactional(readOnly = true)
-    public void sendAnalysisRequestToFastApi(Long sessionId, VideoRequestDto appDto) {
+    public void sendAnalysisRequestToFastApi(Long sessionId, VideoRequestDto appDto, String finalUrl) {
         log.info("비동기 분석 요청 시작 - 세션 ID: {}", sessionId);
 
         List<ExerciseReference> referencePoses = referenceRepository.findByExerciseId(appDto.getExerciseId());
@@ -128,7 +135,7 @@ public class ExerciseAnalysisService {
         AnalyzeRequest.Builder requestBuilder = AnalyzeRequest.newBuilder()
                 .setExerciseId(appDto.getExerciseId())
                 .setSessionId(sessionId)
-                .setReferenceSource(YoutubeValidator.extractId(appDto.getReferenceSource()));
+                .setReferenceSource(YoutubeValidator.extractId(finalUrl));
 
         for (ExerciseReference ref : referencePoses) {
             requestBuilder.addReferencePoses(PoseDataRequest.newBuilder()

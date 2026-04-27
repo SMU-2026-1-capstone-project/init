@@ -17,7 +17,7 @@ spring:
 
   jpa:
      hibernate:
-       ddl-auto: update # 혹은 none (도커에서 schema.sql을 실행하므로)
+       ddl-auto: none # 혹은 none (도커에서 schema.sql을 실행하므로)
      defer-datasource-initialization: true
 
 # [2] gRPC 설정 (최상단 레벨)
