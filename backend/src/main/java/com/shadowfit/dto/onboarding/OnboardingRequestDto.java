@@ -24,4 +24,7 @@ public class OnboardingRequestDto {
 
     @Schema(description = "몸무게 (kg 단위)", example = "75.5", requiredMode = Schema.RequiredMode.REQUIRED)
     private Double weight;
+
+    @Schema(description = "선택한 스쿼트 기준 영상 URL", example = "https://www.youtube.com/watch?v=q6hBSSis_60")
+    private String preferredUrl;
 }

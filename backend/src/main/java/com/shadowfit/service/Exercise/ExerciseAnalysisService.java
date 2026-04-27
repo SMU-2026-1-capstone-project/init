@@ -6,13 +6,17 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.util.YoutubeValidator;
 import com.shadowfit.grpc.*;
+import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.ExerciseReference;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
+import com.shadowfit.model.member.Member;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,9 +26,10 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
-
+import io.grpc.stub.MetadataUtils;
 import java.time.LocalDateTime;
 import java.util.List;
+
 
 @Service
 @RequiredArgsConstructor
@@ -43,19 +48,40 @@ public class ExerciseAnalysisService {
     @GrpcClient("fastapi-client")
     private ExerciseServiceGrpc.ExerciseServiceStub exerciseAsyncStub;
 
+    // 토큰 fastapi에게 보내기
+    private ExerciseServiceGrpc.ExerciseServiceStub getAuthenticatedStub() {
+        Metadata header = new Metadata();
+        Metadata.Key<String> authKey = Metadata.Key.of("Authorization", Metadata.ASCII_STRING_MARSHALLER);
+        header.put(authKey, "Bearer " + internalToken);
+
+        // .attachHeaders() 호출 시 명확하게 stub 타입을 맞춰줍니다.
+        return exerciseAsyncStub.withInterceptors(
+                io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(header)
+        );
+    }
+
     /**
      * [STEP 1: 기준 데이터 등록]
-     * 사용자가 선택한 유튜브 URL에서 AI가 스켈레톤 좌표를 추출하도록 요청합니다.
+     * 사용자가 선택한 유튜브 URL에서 AI가 스켈레톤 좌표를 추출하도록 요청합니다. -- 등록하는건 관리자용
      */
-    public void extractReferencePoses(Long exerciseId, String youtubeUrl) {
+    public void extractReferencePoses(Long exerciseId,String youtubeUrl) {
+
+        Exercise exercise = exercisesRepository.findById(exerciseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.EXERCISE_NOT_FOUND));
+
+        if (youtubeUrl == null || youtubeUrl.isEmpty()) {
+            log.error("전달된 기준 영상 URL이 없습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
         com.shadowfit.grpc.ExtractRequest request = com.shadowfit.grpc.ExtractRequest.newBuilder()
                 .setExerciseId(exerciseId)
-                .setYoutubeUrl(youtubeUrl)
+                .setYoutubeUrl(youtubeUrl) // ✅ 직접 삽입된 URL 사용
                 .build();
 
         log.info("FastAPI에게 기준 좌표 추출 요청 전송 - 운동 ID: {}", exerciseId);
 
-        exerciseAsyncStub.extractReferenceData(request, new StreamObserver<com.shadowfit.grpc.ExtractResponse>() {
+        getAuthenticatedStub().extractReferenceData(request, new StreamObserver<com.shadowfit.grpc.ExtractResponse>() {
             @Override
             public void onNext(com.shadowfit.grpc.ExtractResponse value) {
                 log.info("FastAPI 추출 시작 응답 수신 - 운동 ID: {}", value.getExerciseId());
@@ -77,11 +103,20 @@ public class ExerciseAnalysisService {
      */
     @Transactional
     public Long startAnalysis(VideoRequestDto appDto, Long currentMemberId) {
-        Session savedSession = sessionService.createSession(appDto, currentMemberId);
+        Member member = memberRepository.findById(currentMemberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        String finalUrl = member.getPreferredUrl();
+
+        if (finalUrl == null || finalUrl.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        Session savedSession = sessionService.createSession(appDto, currentMemberId, finalUrl);
         Long sessionId = savedSession.getId();
 
         // 비동기로 FastAPI에 분석 요청
-        this.sendAnalysisRequestToFastApi(sessionId, appDto);
+        this.sendAnalysisRequestToFastApi(sessionId, appDto, finalUrl);
 
         return sessionId;
     }
@@ -92,7 +127,7 @@ public class ExerciseAnalysisService {
      */
     @Async
     @Transactional(readOnly = true)
-    public void sendAnalysisRequestToFastApi(Long sessionId, VideoRequestDto appDto) {
+    public void sendAnalysisRequestToFastApi(Long sessionId, VideoRequestDto appDto, String finalUrl) {
         log.info("비동기 분석 요청 시작 - 세션 ID: {}", sessionId);
 
         List<ExerciseReference> referencePoses = referenceRepository.findByExerciseId(appDto.getExerciseId());
@@ -100,7 +135,7 @@ public class ExerciseAnalysisService {
         AnalyzeRequest.Builder requestBuilder = AnalyzeRequest.newBuilder()
                 .setExerciseId(appDto.getExerciseId())
                 .setSessionId(sessionId)
-                .setReferenceSource(YoutubeValidator.extractId(appDto.getReferenceSource()));
+                .setReferenceSource(YoutubeValidator.extractId(finalUrl));
 
         for (ExerciseReference ref : referencePoses) {
             requestBuilder.addReferencePoses(PoseDataRequest.newBuilder()
@@ -109,7 +144,7 @@ public class ExerciseAnalysisService {
                     .build());
         }
 
-        exerciseAsyncStub.startAnalysis(requestBuilder.build(), new StreamObserver<AnalyzeResponse>() {
+        getAuthenticatedStub().startAnalysis(requestBuilder.build(), new StreamObserver<AnalyzeResponse>() {
             @Override
             public void onNext(AnalyzeResponse value) {
                 log.info("FastAPI 응답 수신 - 세션: {}", value.getSessionId());
@@ -136,7 +171,7 @@ public class ExerciseAnalysisService {
                 .setSessionId(sessionId.intValue())
                 .build();
 
-        exerciseAsyncStub.stopAnalysis(request, new io.grpc.stub.StreamObserver<com.shadowfit.grpc.StopResponse>() {
+        getAuthenticatedStub().stopAnalysis(request, new io.grpc.stub.StreamObserver<com.shadowfit.grpc.StopResponse>() {
             @Override
             public void onNext(com.shadowfit.grpc.StopResponse value) {
                 log.info("AI 서버 응답: {}", value.getMessage());
@@ -167,5 +202,5 @@ public class ExerciseAnalysisService {
         sessionRepository.save(session);
         log.info("세션 {} DB 업데이트 완료", sessionId);
     }
-
 }
+

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     weight DECIMAL(5,1),
     workout_level VARCHAR(20),
     selected_persona ENUM('BEGINNER', 'ADVANCED', 'DIET', 'REHAB') NOT NULL DEFAULT 'BEGINNER',
+    preferred_url VARCHAR(500),
     onboarding_completed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- DATETIME 대신 TIMESTAMP 권장 (타임존 대응)
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- 자동 갱신 설정
@@ -26,7 +27,7 @@ CREATE TABLE IF NOT EXISTS exercises (
                                          name VARCHAR(100) NOT NULL,
     category ENUM('LOWER', 'BACK', 'UPPER', 'CORE', 'FULL') NOT NULL,
     description TEXT,
-    reference_video_url VARCHAR(500),
+    preferred_url VARCHAR(500),
     target_joints JSON,
     sync_threshold_beginner DECIMAL(5,2) DEFAULT 60.00,
     sync_threshold_advanced DECIMAL(5,2) DEFAULT 85.00,
@@ -68,12 +69,12 @@ CREATE TABLE IF NOT EXISTS exercise_sessions (
 CREATE TABLE IF NOT EXISTS pose_data (
                                          id BIGINT AUTO_INCREMENT PRIMARY KEY,
                                          session_id BIGINT NOT NULL,
-                                         timestamp_sec INT NOT NULL,
-                                         joint_coordinates JSON NOT NULL,
-                                         sync_rate DECIMAL(5,2) NOT NULL,
+                                         timestamp_sec DECIMAL(10,3) NOT NULL, -- [수정] 소수점 타임스탬프 대응을 위해 DECIMAL로 변경
+    joint_coordinates JSON NOT NULL,
+    sync_rate DECIMAL(5,2) NOT NULL,
     is_correct BOOLEAN DEFAULT TRUE,
     feedback_message VARCHAR(500),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- DEFAULT 추가
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES exercise_sessions(id) ON DELETE CASCADE,
     INDEX idx_session_timestamp (session_id, timestamp_sec)
     );

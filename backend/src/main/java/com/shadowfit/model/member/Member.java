@@ -27,10 +27,13 @@ public class Member {
     @Column(nullable = false, length = 1000)
     private String password;
 
+    @Column(name = "preferred_url", length = 500)
+    private String preferredUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(name="selected_persona",nullable=false, length = 10)
     @Builder.Default
-    private SelectedPersona selectedPersona = SelectedPersona.Beginner;
+    private SelectedPersona selectedPersona = SelectedPersona.BEGINNER;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable=false)
@@ -69,6 +72,9 @@ public class Member {
         if (dto.getWorkoutLevel() != null) this.workoutLevel = dto.getWorkoutLevel();
         if (dto.getHeight() != null) this.height = dto.getHeight();
         if (dto.getWeight() != null) this.weight = dto.getWeight();
+        if (dto.getPreferredUrl() != null) {
+            this.preferredUrl = dto.getPreferredUrl();
+        }
     }
 
 }

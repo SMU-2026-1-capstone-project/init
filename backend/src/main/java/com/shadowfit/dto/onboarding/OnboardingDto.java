@@ -31,6 +31,9 @@ public class OnboardingDto {
     @Schema(description = "체중 (kg)", example = "72.3", requiredMode = Schema.RequiredMode.REQUIRED)
     private Double weight;
 
+    @Schema(description = "선택한 기준 영상 유튜브 URL", example = "https://www.youtube.com/watch?v=q6hBSSis_60")
+    private String preferredUrl;
+
     public static OnboardingDto fromEntity(Member member){
         return OnboardingDto.builder()
                 .id(member.getId())
@@ -39,6 +42,7 @@ public class OnboardingDto {
                 .workoutLevel(member.getWorkoutLevel())
                 .height(member.getHeight())
                 .weight(member.getWeight())
+                .preferredUrl(member.getPreferredUrl())
                 .build();
     }
 }

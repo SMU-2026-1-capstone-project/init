@@ -30,7 +30,7 @@ services:
     networks:
       - shadowfit-net
 
-  backend:
+  shadowfit-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -45,6 +45,9 @@ services:
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+      AI_SERVER_HOST: shadowfit-ai
+      AI_SERVER_GRPC_PORT: 8585
+      AI_SERVER_HTTP_PORT: 8000
       JWT_SECRET: ${JWT_SECRET:-shadowfit-prod-secret-key-change-this}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
@@ -53,7 +56,7 @@ services:
     networks:
       - shadowfit-net
 
-  ai-server:
+  shadowfit-ai:
     build:
       context: ./ai-server
       dockerfile: Dockerfile
