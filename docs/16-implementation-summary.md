@@ -303,6 +303,125 @@ public void applyComplete(SessionCompleteRequest request) {
 
 ---
 
+### 🧰 테스트 환경 정비 (H2 인메모리 DB)
+
+#### 문제 상황
+
+기존 테스트는 `@SpringBootTest`로 전체 컨텍스트를 띄우면서 production용 `application.yml`을 그대로 사용했고, 이 설정은 Docker 컨테이너명 `shadowfit-mysql`을 가리켰기 때문에 **로컬에서 `gradlew test` 실행 시 항상 실패**했습니다.
+
+```
+java.net.UnknownHostException: 알려진 호스트가 없습니다 (shadowfit-mysql)
+→ Unable to determine Dialect without JDBC metadata
+```
+
+#### 해결: 테스트 전용 application.yml + H2 인메모리
+
+| 변경 | 내용 |
+|---|---|
+| `build.gradle` | `testRuntimeOnly 'com.h2database:h2'` 추가 |
+| `src/test/resources/application.yml` | **신규 생성** — H2 인메모리 DB, JPA `ddl-auto: create-drop`, MySQL 전용 `schema.sql` 비활성화 (`sql.init.mode: never`) |
+| 기타 | JWT/internal 토큰 더미값, gRPC 더미 주소, security.whitelist 모두 포함 |
+
+→ JPA가 `@Entity`에서 자동으로 스키마를 생성하므로 ENUM/JSON 등 MySQL 전용 syntax 호환 문제 없음.
+
+**결과**: `gradlew test` / `gradlew build`가 Docker 없이도 깔끔하게 통과.
+
+---
+
+### 🎤 운동 보조 기능 확장
+
+운동 중 실시간 피드백(관절 색상 / TTS)은 클라이언트와 FastAPI에서 처리하지만, **설정/저장/후처리는 Spring**이 담당해야 합니다. 이를 위한 4가지 기능을 추가했습니다.
+
+#### A. TTS 사용자 설정 (한국어 전용)
+
+사용자별 음성 피드백 on/off, 속도(0.5~2.0)를 저장하고 노출합니다.
+
+| 항목 | 내용 |
+|---|---|
+| 엔티티 변경 | `Member`에 `ttsEnabled`, `ttsSpeed` 컬럼 추가 |
+| API | `GET /preferences/tts`, `PATCH /preferences/tts` (JWT 인증) |
+| DTO | `TtsPreferenceDto` (응답), `TtsPreferenceUpdateDto` (요청, 0.5~2.0 검증) |
+| 정책 | **한국어 단일 언어** 운영 — 다국어 분리 필드 없음 |
+
+```
+[App 시작]   GET /preferences/tts → ttsEnabled, ttsSpeed
+[운동 중]    클라이언트가 device TTS로 자체 재생 (네트워크 X)
+[설정 변경]  PATCH /preferences/tts → DB 즉시 갱신
+```
+
+#### B. 운동별 피드백 메시지 템플릿
+
+자세 문제 유형별 안내 멘트를 DB에서 운영자가 관리. 코드 배포 없이 멘트 추가/수정 가능.
+
+| 항목 | 내용 |
+|---|---|
+| 신규 enum | `FeedbackType` (KNEE_OUT, KNEE_IN, HIP_LOW, HIP_HIGH, BACK_BENT, SHOULDER_TILT, ELBOW_BENT, HEAD_DOWN) |
+| 신규 엔티티 | `ExerciseFeedbackTemplate` (운동×문제유형 unique, priority 정렬) |
+| API | `GET /exercises/{exerciseId}/feedback-templates` |
+| 시드 데이터 | 스쿼트(4건) / 런지(3건) / 플랭크(4건) 초기 멘트 |
+
+```
+[세션 시작] 클라이언트가 GET 호출 → 템플릿 매핑 메모리에 보관
+[FastAPI]   자세 분석 중 KNEE_OUT 감지 → 클라이언트에 type=KNEE_OUT 전송
+[App]       매핑에서 message 꺼내 device TTS 재생
+```
+
+#### C. 피드백 발화 로그 (배치 저장)
+
+세션 동안 발화된 피드백 이벤트를 **세션 종료 시 일괄 저장**. 실시간 호출 X.
+
+| 항목 | 내용 |
+|---|---|
+| 신규 엔티티 | `SessionFeedbackLog` — session, feedbackType, syncRateAtTrigger, occurredAt |
+| 인덱스 | `(session_id, occurred_at)` 복합 인덱스 |
+| API | `POST /internal/feedback/batch` — internal token 인증, FastAPI 호출 |
+| 집계 쿼리 | `countByTypeForSession` — 리포트에서 "이번 세션 KNEE_OUT 12회" 산출 |
+
+```
+[운동 중]   FastAPI가 발화 이벤트 메모리에 누적
+[세션 종료] FastAPI → POST /internal/feedback/batch
+            { sessionId, events: [{type, syncRate, occurredAt}, ...] }
+            Spring saveAll 일괄 저장
+[리포트]    GET /reports/{sessionId} → groupBy type 집계
+```
+
+#### D. 관리자 임계값 변경 API
+
+운동별 싱크로율 임계값을 운영자가 즉시 변경 (코드 배포 불필요).
+
+| 항목 | 내용 |
+|---|---|
+| API | `PATCH /admin/exercises/{exerciseId}/thresholds` |
+| 권한 | `@PreAuthorize("hasRole('ADMIN')")` — `UserRole.ADMIN` 필요 |
+| 검증 | 0~100 범위 + `beginner < advanced` 비즈니스 규칙 |
+| 적용 | 신규 세션부터 즉시 반영 (진행중 세션은 영향 없음) |
+
+```
+[운영자] PATCH /admin/exercises/1/thresholds  { "beginner": 50.0, "advanced": 80.0 }
+        → ROLE_ADMIN 권한 체크
+        → exercises 테이블 업데이트
+        → 다음 세션 시작 시점부터 새 값 사용
+```
+
+#### 추가된 파일 요약
+
+| 영역 | 신규 파일 |
+|---|---|
+| TTS | `dto/preference/TtsPreferenceDto.java`, `TtsPreferenceUpdateDto.java`, `service/Member/PreferenceService.java`, `controller/PreferenceController.java` |
+| 피드백 템플릿 | `model/exercise/FeedbackType.java`, `ExerciseFeedbackTemplate.java`, `repository/exercise/ExerciseFeedbackTemplateRepository.java`, `dto/exercises/feedback/FeedbackTemplateDto.java`, `service/Exercise/FeedbackTemplateService.java`, `controller/FeedbackTemplateController.java` |
+| 피드백 로그 | `model/exercise/SessionFeedbackLog.java`, `repository/exercise/SessionFeedbackLogRepository.java`, `dto/exercises/feedback/FeedbackEventDto.java`, `FeedbackBatchRequestDto.java`, `service/Exercise/FeedbackLogService.java`, `controller/InternalFeedbackController.java` |
+| 관리자 API | `dto/admin/ThresholdUpdateDto.java`, `ExerciseThresholdResponseDto.java`, `service/Exercise/AdminExerciseService.java`, `controller/AdminExerciseController.java` |
+
+#### DB 스키마 변경
+- `users`: `tts_enabled` BOOLEAN, `tts_speed` DECIMAL(3,1)
+- 신규 `exercise_feedback_templates` 테이블 (UNIQUE on `exercise_id, feedback_type`)
+- 신규 `session_feedback_logs` 테이블 (INDEX on `session_id, occurred_at`)
+
+#### 부수 수정
+- `InternalExerciseController.java`: pre-existing 컴파일 오류 수정 (`PoseDataService.savePoseDataBatch` 시그니처 변경 미반영) — 이전에는 캐시된 클래스로 가려져 있었으나 본 작업의 전체 재컴파일로 표면화
+
+---
+
 ### 🧪 테스트 검증
 
 모든 테스트가 성공적으로 수행되었습니다:
@@ -365,17 +484,24 @@ exercise:
 | Status.java | FAILED 상태 추가 |
 | Exercise.java | expectedDurationMinutes 필드 추가 |
 | Session.java | **@Version 필드 추가 (낙관적 락)** |
+| Member.java | **TTS 설정 필드 (ttsEnabled, ttsSpeed)** |
 | SessionTimeoutScheduler.java | **신규 생성** + 충돌 양보 처리 |
-| SessionService.java | **completeSession 재시도 + markAsFailedIfStillInProgress 헬퍼** |
-| ExerciseAnalysisService.java | **completeSession 재시도 로직** |
+| SessionService.java | **completeSession 재시도 + markAsFailedIfStillInProgress + 멱등성 가드** |
+| ExerciseAnalysisService.java | **completeSession 재시도 + 멱등성 가드** |
 | SessionRepository.java | findByStatus() 메서드 추가 |
 | ShadowfitApplication.java | @EnableScheduling 추가 |
 | SchedulerConfig.java | **신규 생성** |
 | application.yml | 타임아웃 설정 추가 |
-| schema.sql | 스키마 업데이트 + **version 컬럼** |
-| data.sql | 데이터 초기화 수정 |
+| schema.sql | 스키마 업데이트 + **version, tts_*, feedback 테이블** |
+| data.sql | 데이터 초기화 + **TTS 컬럼, 피드백 테이블, 시드 멘트** |
 | SessionTimeoutSchedulerTest.java | **신규 생성** + 동시성 충돌 테스트 |
 | 15-session-timeout-guide.md | **신규 생성** (문서) |
+| InternalExerciseController.java | pre-existing 컴파일 오류 수정 |
+| **TTS 설정** | PreferenceController, PreferenceService, TtsPreferenceDto, TtsPreferenceUpdateDto 신규 |
+| **피드백 템플릿** | FeedbackType, ExerciseFeedbackTemplate, Repository, Service, Controller, DTO 신규 |
+| **피드백 로그** | SessionFeedbackLog, Repository, FeedbackLogService, InternalFeedbackController, DTO 2종 신규 |
+| **관리자 API** | AdminExerciseController, AdminExerciseService, ThresholdUpdateDto, ExerciseThresholdResponseDto 신규 |
+| **테스트 환경** | build.gradle (H2 추가), src/test/resources/application.yml (신규) |
 
 ---
 
@@ -424,12 +550,19 @@ exercise:
 - [x] **completeSession 재시도 로직 (FAILED → COMPLETED 덮어쓰기)**
 - [x] **동시성 테스트 케이스 추가**
 - [x] **completeSession 멱등성 처리 (재전송 대응 - 시나리오 2-1, 2-2)**
+- [x] **테스트 환경 H2 정비 (Docker 의존 제거)**
+- [x] **TTS 사용자 설정 (Member + PreferenceController, 한국어 전용)**
+- [x] **운동별 피드백 메시지 템플릿 (ExerciseFeedbackTemplate + 시드)**
+- [x] **세션 피드백 발화 로그 배치 저장 (SessionFeedbackLog + Internal API)**
+- [x] **관리자 임계값 변경 API (ROLE_ADMIN 보호)**
 
 ---
 
 ### 🚀 배포 준비
 
 현재 상태: **프로덕션 배포 가능**
+
+
 
 배포 시 체크사항:
 1. 운동별 예상시간 데이터 마이그레이션
@@ -448,7 +581,7 @@ exercise:
 
 ---
 
-**구현 완료 날짜**: 2026년 5월 8일  
+**구현 완료 날짜**: 2026년 5월 8일 (타임아웃/동시성/멱등성), 2026년 5월 9일 (테스트 환경 + 운동 보조 기능 4종)
 **상태**: ✅ 준비 완료
 
 

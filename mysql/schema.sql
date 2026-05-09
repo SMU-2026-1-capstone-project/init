@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
     selected_persona ENUM('BEGINNER', 'ADVANCED', 'DIET', 'REHAB') NOT NULL DEFAULT 'BEGINNER',
     preferred_url VARCHAR(500),
     onboarding_completed BOOLEAN DEFAULT FALSE,
+    tts_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    tts_speed DECIMAL(3,1) NOT NULL DEFAULT 1.0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- DATETIME 대신 TIMESTAMP 권장 (타임존 대응)
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- 자동 갱신 설정
     );
@@ -110,6 +112,30 @@ CREATE TABLE IF NOT EXISTS reports (
     FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (session_id) REFERENCES exercise_sessions(id) ON DELETE CASCADE
     );
+
+-- 9-A. 운동별 피드백 메시지 템플릿 (TTS 멘트)
+CREATE TABLE IF NOT EXISTS exercise_feedback_templates (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    exercise_id BIGINT NOT NULL,
+    feedback_type VARCHAR(30) NOT NULL,
+    message VARCHAR(200) NOT NULL,
+    priority INT NOT NULL DEFAULT 100,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_exercise_feedback (exercise_id, feedback_type)
+);
+
+-- 9-B. 세션 피드백 발화 로그 (운동 중 TTS로 발화된 피드백 이벤트 기록)
+CREATE TABLE IF NOT EXISTS session_feedback_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id BIGINT NOT NULL,
+    feedback_type VARCHAR(30) NOT NULL,
+    sync_rate_at_trigger DECIMAL(5,2),
+    occurred_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES exercise_sessions(id) ON DELETE CASCADE,
+    INDEX idx_session_feedback (session_id, occurred_at)
+);
 
 -- 9. 신체 변화 기록 (user_id -> member_id 변경)
 CREATE TABLE body_records (

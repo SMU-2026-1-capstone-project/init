@@ -1,10 +1,12 @@
 package com.shadowfit.model.member;
 
 import com.shadowfit.dto.onboarding.OnboardingRequestDto;
+import com.shadowfit.dto.preference.TtsPreferenceUpdateDto;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -63,8 +65,23 @@ public class Member {
     @Builder.Default
     private boolean onboardingCompleted = false; // 온보딩 완료 여부
 
+    // --- TTS 음성 피드백 사용자 설정 ---
+
+    @Column(name = "tts_enabled", nullable = false)
+    @Builder.Default
+    private Boolean ttsEnabled = true;
+
+    @Column(name = "tts_speed", nullable = false, precision = 3, scale = 1)
+    @Builder.Default
+    private BigDecimal ttsSpeed = new BigDecimal("1.0");
+
     public void completeOnboarding(){
         this.onboardingCompleted = true;
+    }
+
+    public void updateTtsPreferences(TtsPreferenceUpdateDto dto) {
+        if (dto.ttsEnabled() != null) this.ttsEnabled = dto.ttsEnabled();
+        if (dto.ttsSpeed() != null) this.ttsSpeed = dto.ttsSpeed();
     }
 
     public void updateOnboarding(OnboardingRequestDto dto){
