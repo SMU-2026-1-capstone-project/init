@@ -1,1 +1,1 @@
-"""gRPC server and client integration for the AI service."""
+"""gRPC 서버/클라이언트 및 세션 상태 관리."""

@@ -20,6 +20,8 @@ CREATE TABLE users (
                        workout_level VARCHAR(20),
                        onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE,
                        sex VARCHAR(10),
+                       tts_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                       tts_speed DECIMAL(3,1) NOT NULL DEFAULT 1.0,
                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -33,6 +35,7 @@ CREATE TABLE exercises (
                            target_joints JSON,
                            sync_threshold_beginner DECIMAL(5,2) DEFAULT 60.00,
                            sync_threshold_advanced DECIMAL(5,2) DEFAULT 85.00,
+                           expected_duration_minutes INT DEFAULT 15,
                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -73,6 +76,28 @@ CREATE TABLE IF NOT EXISTS refresh_token (
     FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+CREATE TABLE IF NOT EXISTS exercise_feedback_templates (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    exercise_id BIGINT NOT NULL,
+    feedback_type VARCHAR(30) NOT NULL,
+    message VARCHAR(200) NOT NULL,
+    priority INT NOT NULL DEFAULT 100,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_exercise_feedback (exercise_id, feedback_type)
+);
+
+CREATE TABLE IF NOT EXISTS session_feedback_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id BIGINT NOT NULL,
+    feedback_type VARCHAR(30) NOT NULL,
+    sync_rate_at_trigger DECIMAL(5,2),
+    occurred_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES exercise_sessions(id) ON DELETE CASCADE,
+    INDEX idx_session_feedback (session_id, occurred_at)
+);
+
 -- 3. 데이터 삽입 시작
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -99,6 +124,27 @@ REPLACE INTO exercise_sessions (id, member_id, exercise_id, start_time, end_time
 (617, 1, 1, '2026-04-25 09:00:00', '2026-04-25 09:20:00', 92.5, 20, 100, 'COMPLETED', NOW()),
 (618, 1, 2, '2026-04-25 14:00:00', '2026-04-25 14:40:00', 88.0, 40, 190, 'COMPLETED', NOW()),
 (619, 1, 3, '2026-04-25 20:00:00', '2026-04-25 20:30:00', 95.0, 30, 140, 'COMPLETED', NOW());
+
+-- 3-A. 피드백 템플릿 시드 데이터 (운동별 자세 피드백 멘트)
+-- 스쿼트 (id=1)
+INSERT INTO exercise_feedback_templates (exercise_id, feedback_type, message, priority) VALUES
+(1, 'KNEE_OUT', '무릎이 발끝보다 나가지 않게 해주세요', 10),
+(1, 'KNEE_IN', '무릎이 안쪽으로 모이지 않게 벌려주세요', 20),
+(1, 'HIP_HIGH', '엉덩이를 더 낮춰주세요', 30),
+(1, 'BACK_BENT', '허리를 곧게 펴주세요', 5);
+
+-- 런지 (id=2)
+INSERT INTO exercise_feedback_templates (exercise_id, feedback_type, message, priority) VALUES
+(2, 'KNEE_OUT', '앞 무릎이 발끝을 넘지 않게 해주세요', 10),
+(2, 'BACK_BENT', '상체를 곧게 세워주세요', 5),
+(2, 'HIP_HIGH', '뒷무릎을 더 굽혀주세요', 20);
+
+-- 플랭크 (id=3)
+INSERT INTO exercise_feedback_templates (exercise_id, feedback_type, message, priority) VALUES
+(3, 'HIP_HIGH', '엉덩이를 너무 들지 마세요', 10),
+(3, 'HIP_LOW', '엉덩이가 처지지 않게 들어주세요', 10),
+(3, 'HEAD_DOWN', '고개를 너무 숙이지 마세요', 30),
+(3, 'BACK_BENT', '몸을 일직선으로 유지해주세요', 5);
 
 -- 4. 리포트 데이터
 REPLACE INTO reports (id, session_id, member_id, report_type, summary, improvement_tips, created_at) VALUES
