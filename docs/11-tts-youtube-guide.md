@@ -1,6 +1,55 @@
 # TTS 음성 안내 & YouTube 영상 처리 가이드
 
-## TTS (Text-to-Speech) 구현
+## TTS 책임 분담 요약
+
+| 책임 | 위치 |
+|------|------|
+| 사용자 설정(활성/속도) 저장 | Spring 백엔드 (`users.tts_enabled`, `users.tts_speed`) |
+| 설정 조회/변경 API | `GET /preferences/tts`, `PATCH /preferences/tts` |
+| 운동별 멘트 마스터 | DB `exercise_feedback_templates`, `GET /exercises/{id}/feedback-templates` |
+| 실제 음성 합성·재생 | **클라이언트 device TTS** (`expo-speech`) — 서버는 TTS 오디오 합성하지 않음 |
+| 발화 이벤트 로그 | 클라이언트가 모아 AI 가 세션 종료 시 `POST /internal/feedback/batch` 로 일괄 전송 → `session_feedback_logs` 테이블 |
+
+> 모든 멘트는 한국어 단일 ([`project-korean-only`](../../C:/Users/khjae/.claude/projects/E--init/memory/project_korean_only.md)). 다국어 분리 컬럼·로직 없음.
+
+---
+
+## 서버 측 TTS 설정 API (2026-05 추가)
+
+### GET /preferences/tts
+현재 로그인 사용자의 TTS 활성/속도 조회. 앱 시작 시 한 번 호출해 device TTS 옵션으로 적용.
+```json
+{ "ttsEnabled": true, "ttsSpeed": 1.0 }
+```
+
+### PATCH /preferences/tts
+설정 화면에서 사용자가 변경할 때 호출. `ttsSpeed` 는 0.5~2.0 범위.
+```json
+// Request
+{ "ttsEnabled": false, "ttsSpeed": 1.2 }
+// Response (갱신 후 상태)
+{ "ttsEnabled": false, "ttsSpeed": 1.2 }
+```
+
+클라이언트는 받은 값을 그대로 `expo-speech` 의 `rate` 로 전달하면 됨.
+
+---
+
+## 운동별 피드백 멘트 마스터
+
+`GET /exercises/{exerciseId}/feedback-templates` 로 받아 device TTS 재생용 매핑으로 사용:
+```json
+[
+  { "feedbackType": "KNEE_OVER", "message": "무릎이 발끝을 넘었습니다", "priority": 10 },
+  { "feedbackType": "BACK_BEND", "message": "허리가 굽었습니다", "priority": 20 },
+  { "feedbackType": "GOOD_FORM", "message": "좋은 자세입니다", "priority": 100 }
+]
+```
+멘트가 바뀌면 관리자가 DB `exercise_feedback_templates` 만 수정 → 앱 재배포 불필요.
+
+---
+
+## TTS (Text-to-Speech) 클라이언트 구현
 
 ### expo-speech 사용 (권장)
 ```bash
@@ -10,12 +59,16 @@ npx expo install expo-speech
 ```typescript
 import * as Speech from 'expo-speech';
 
-// 기본 사용법
+// 사용자 설정을 서버에서 받아온 뒤 옵션으로 적용 (`GET /preferences/tts`)
+let userTtsEnabled = true;
+let userTtsSpeed = 1.0;
+
 const speak = (message: string) => {
+  if (!userTtsEnabled) return;
   Speech.speak(message, {
-    language: 'ko-KR',       // 한국어
-    pitch: 1.0,              // 음높이
-    rate: 1.0,               // 속도
+    language: 'ko-KR',       // 한국어 고정 ([project-korean-only])
+    pitch: 1.0,
+    rate: userTtsSpeed,      // 0.5 ~ 2.0
   });
 };
 

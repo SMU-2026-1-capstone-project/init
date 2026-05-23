@@ -64,9 +64,12 @@ services:
       dockerfile: Dockerfile
     container_name: shadowfit-ai
     restart: unless-stopped
-    ports:
-      - "8000:8000"
-      - "8585:8585"
+    # HTTP(8000)/gRPC(8585) 포트는 외부에 노출하지 않는다. Spring(같은 Docker
+    # 네트워크)이 컨테이너명으로 직접 접근하면 충분하며, HTTP 엔드포인트는
+    # 현재 무인증이라 외부 노출 시 임의 데이터 주입이 가능해 막아둔다.
+    expose:
+      - "8000"
+      - "8585"
     environment:
       DEBUG: "false"
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}

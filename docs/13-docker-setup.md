@@ -11,7 +11,9 @@
   docker compose version
   ```
 
-## docker-compose.yml (프로젝트 루트)
+## docker-compose.yml (프로젝트 루트, 실제 구성)
+
+> 아래는 운영 중인 실제 설정. 변경 시 `docker-compose.yml` 이 단일 진실 원천.
 
 ```yaml
 version: '3.8'
@@ -23,70 +25,102 @@ services:
     container_name: shadowfit-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: shadowfit
-      MYSQL_DATABASE: shadowfit
-      MYSQL_USER: shadowfit
-      MYSQL_PASSWORD: shadowfit
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: Asia/Seoul
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - ./mysql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./mysql/data.sql:/docker-entrypoint-initdb.d/data.sql
+      - ./mysql/my.cnf:/etc/mysql/conf.d/charset.cnf:ro   # 한글 charset 강제 (커밋 0fe056e)
     command: >
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
-      --default-authentication-plugin=mysql_native_password
+      --skip-character-set-client-handshake
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
+    networks:
+      - shadowfit-net
 
   # Spring Boot 백엔드 (배포용)
-  backend:
+  shadowfit-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: shadowfit-backend
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8080:8080"      # REST API (외부 공개)
+      - "6565:6565"      # gRPC 서버 (AI → Spring 콜백 수신)
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      DB_HOST: mysql
-      DB_USERNAME: shadowfit
-      DB_PASSWORD: shadowfit
-      JWT_SECRET: ${JWT_SECRET:-your-256-bit-secret-key}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DB_HOST: shadowfit-mysql
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}   # AI 와 공유 (gRPC + REST 내부 채널)
+      AI_SERVER_HOST: shadowfit-ai
+      AI_SERVER_GRPC_PORT: 8585
+      AI_SERVER_HTTP_PORT: 8000
+      JWT_SECRET: ${JWT_SECRET:-shadowfit-prod-secret-key-change-this}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
       mysql:
         condition: service_healthy
+    networks:
+      - shadowfit-net
 
-  # Python AI 서버 (MediaPipe + DTW)
-  ai-server:
+  # Python AI 서버 (MediaPipe + gRPC)
+  shadowfit-ai:
     build:
       context: ./ai-server
       dockerfile: Dockerfile
     container_name: shadowfit-ai
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    # 외부 노출 금지 — 컨테이너 내부 통신만 허용 (커밋 c7657f1)
+    # HTTP(8000) 엔드포인트가 무인증이라 외부 노출 시 임의 데이터 주입 위험
+    expose:
+      - "8000"           # HTTP (FastAPI, 내부 전용)
+      - "8585"           # gRPC (Spring 에서 호출, 내부 전용)
     environment:
       DEBUG: "false"
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
       POSE_MODEL_COMPLEXITY: 1
-      BACKEND_URL: http://backend:8080/api/v1
+      BACKEND_URL: http://shadowfit-backend:8080/api/v1
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
+    networks:
+      - shadowfit-net
+
+networks:
+  shadowfit-net:
+    driver: bridge
 
 volumes:
   mysql_data:
     driver: local
 ```
+
+### 포트 노출 정책 (커밋 c7657f1 이후)
+
+| 컨테이너 | 호스트 노출 | 컨테이너간 통신 |
+|---------|-----------|--------------|
+| `shadowfit-mysql` | 3306 (개발 편의) | `shadowfit-mysql:3306` |
+| `shadowfit-backend` | 8080 (REST), 6565 (gRPC) | 위와 동일 |
+| `shadowfit-ai` | **없음** (`expose` 만) | `shadowfit-ai:8000`, `shadowfit-ai:8585` |
+
+AI 의 8000/8585를 `ports` 로 열면 `INTERNAL_API_TOKEN` 검증이 없는 HTTP 경로(`/health`, `/pose` 등)에 외부에서 직접 접근 가능. 그래서 2026-05-17 부로 `expose` 만 사용.
 
 ## Backend Dockerfile
 

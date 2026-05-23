@@ -173,7 +173,7 @@ public class ExerciseAnalysisService {
         log.info("AI 서버 분석 중단 요청 전송 - sessionId: {}", sessionId);
 
         com.shadowfit.grpc.StopRequest request = com.shadowfit.grpc.StopRequest.newBuilder()
-                .setSessionId(sessionId.intValue())
+                .setSessionId(sessionId)
                 .build();
 
         getAuthenticatedStub().stopAnalysis(request, new io.grpc.stub.StreamObserver<com.shadowfit.grpc.StopResponse>() {

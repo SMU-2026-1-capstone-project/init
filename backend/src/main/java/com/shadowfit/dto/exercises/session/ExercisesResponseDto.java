@@ -18,11 +18,11 @@ import java.time.LocalDateTime;
 public class ExercisesResponseDto {
     @Schema(description = "세션 id",
             requiredMode = Schema.RequiredMode.REQUIRED)
-    public Integer sessionId;
+    public Long sessionId;
 
     @Schema(description = "운동 id",
             requiredMode = Schema.RequiredMode.REQUIRED)
-    public Integer exerciseId;
+    public Long exerciseId;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Schema(description = "시작 시간",

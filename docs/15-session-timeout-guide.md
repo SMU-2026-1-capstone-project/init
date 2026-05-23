@@ -275,11 +275,176 @@ A: 확인 사항:
 
 ---
 
+---
+
+### 🔒 동시성 처리 (낙관적 락)
+
+#### 문제 상황
+
+`SessionTimeoutScheduler`(Spring)와 `CompleteAnalysis` gRPC 콜백(AI)이 **같은 세션을 동시에 갱신**하려고 할 때 데이터 정합성 문제 발생.
+
+```
+[충돌 시점]
+  Spring 스케줄러: IN_PROGRESS → FAILED
+  AI 콜백       : IN_PROGRESS → COMPLETED + 운동 기록
+                ↓
+        어느 쪽이 마지막에 commit 하느냐에 따라
+        실제 운동 데이터가 사라질 수 있음
+```
+
+#### 해결: `@Version` 기반 낙관적 락
+
+Session 엔티티에 버전 컬럼을 추가하면 JPA가 UPDATE 시 `WHERE id=? AND version=?` 을 자동으로 붙임. 다른 트랜잭션이 먼저 커밋해 버전이 바뀌었으면 `ObjectOptimisticLockingFailureException` 발생.
+
+```java
+// Session.java
+@Version
+@Column(nullable = false)
+private Long version = 0L;
+```
+
+```sql
+-- schema.sql
+ALTER TABLE exercise_sessions ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+```
+
+#### 시나리오별 처리
+
+##### 1-1) 정상 케이스
+AI 가 타임아웃 전에 결과 도착 → COMPLETED + 기록 저장 (v=0 → v=1).
+
+##### 1-2) 경계 시점 동시 발생 (찰나의 충돌)
+
+| 시각 | 스케줄러 | AI 콜백 | DB |
+|---|---|---|---|
+| T   | findById (v=0) | findById (v=0) | IN_PROGRESS, v=0 |
+| T+ε | FAILED set | COMPLETED + 기록 set | IN_PROGRESS, v=0 |
+| T+δ | saveAndFlush 성공 | — | **FAILED, v=1** |
+| T+2δ | — | saveAndFlush → `OptimisticLockException` (v=0 기대했지만 v=1) | FAILED, v=1 |
+| T+3δ | — | **재시도**: findById (v=1, FAILED) → COMPLETED + 기록 → saveAndFlush | **COMPLETED, v=2** |
+
+→ 스케줄러가 먼저 commit 했어도 **사용자 운동 데이터는 유실되지 않음**.
+
+##### 1-3) 늦은 재연결 (충돌 없음)
+
+```
+T+0   세션 시작                              IN_PROGRESS, v=0
+T+45  스케줄러 → FAILED                      FAILED, v=1
+T+60  AI 가 뒤늦게 결과 도착
+        findById (v=1, FAILED) 로드
+        COMPLETED + 기록 set
+        saveAndFlush                         COMPLETED, v=2
+```
+
+이미 스케줄러가 commit 을 끝낸 상태라 충돌 없음. AI 가 가져온 시점의 v=1 을 그대로 갱신해 v=2.
+
+#### 구현 핵심
+
+| 위치 | 처리 |
+|---|---|
+| `SessionTimeoutScheduler` | 충돌 시 `ObjectOptimisticLockingFailureException` catch → 양보 (AI 결과 우선) |
+| `SessionService.completeSession` | 충돌 시 최대 3회 재시도 → 재조회 후 COMPLETED + 기록 덮어쓰기 |
+| `ExerciseAnalysisService.completeSession` | 동일 재시도 로직 (앱→Spring 경로) |
+| 트랜잭션 분리 | 스케줄러는 세션별 독립 트랜잭션(`SessionService.markAsFailedIfStillInProgress`) — 한 세션 충돌이 다른 세션 처리를 막지 않음 |
+| 자기 주입(`@Lazy`) | 같은 클래스 내부 메서드 호출 시에도 Spring 프록시를 거치도록 `@Transactional` 적용 보장 |
+
+---
+
+### 🔁 멱등성 처리 (AI ↔ Spring 응답 신호 유실)
+
+#### 문제 상황
+
+gRPC 양방향이라 어느 쪽 신호든 유실 가능:
+
+```
+2-1) AI → Spring 요청 신호 유실
+     AI: 결과 메모리 보관 → Spring 전송 → 응답 미수신
+        → (네트워크 복구 후) 같은 결과 재전송
+
+2-2) Spring → AI 응답 신호 유실
+     Spring: DB 저장 완료 → 응답 송신 중 끊김
+     AI:     응답 미수신 → 같은 결과 재전송
+```
+
+두 케이스 모두 **Spring 입장에서는 "같은 sessionId로 CompleteAnalysis 가 두 번 들어오는 상황"**.
+
+#### 멱등성 미적용 시 문제
+
+| 항목 | 문제 |
+|---|---|
+| 첫 `endTime` 손실 | 두 번째 호출 시각으로 덮어써짐 |
+| 불필요한 DB write | 같은 데이터 재저장 |
+| `version` 무의미한 증가 | 낙관적 락 카운터만 올라감 |
+| 자기 자신과 충돌 가능 | 동시 재전송 시 OptimisticLockException |
+
+#### 해결: 진입점에서 status 체크
+
+```java
+@Transactional
+public void applyComplete(SessionCompleteRequest request) {
+    Session session = sessionRepository.findById(request.getSessionId())
+            .orElseThrow(...);
+
+    // 멱등성: 이미 COMPLETED 면 첫 완료 시각/기록 보존하고 즉시 종료
+    if (session.getStatus() == Status.COMPLETED) {
+        return;
+    }
+    session.setStatus(Status.COMPLETED);
+    // ... 기록 저장
+}
+```
+
+#### Status 별 동작
+
+| 진입 시 status | 동작 | 설명 |
+|---|---|---|
+| `IN_PROGRESS` | 정상 완료 처리 | 가장 일반적 |
+| `FAILED` | COMPLETED + 기록으로 덮어쓰기 | 시나리오 1-2/1-3 |
+| `COMPLETED` | **즉시 return (no-op)** | **시나리오 2-1/2-2 (재전송)** |
+| `CANCELED` | 현재는 덮어씀 (기존 동작 유지) | 사용자 명시적 취소 — 추후 정책 결정 필요 |
+
+#### 효과
+- 첫 완료 시각(`endTime`) 보존
+- AI 는 안심하고 재전송 가능 (At-Least-Once 보장)
+- 동일 데이터로 인한 OptimisticLock 충돌 방지
+- 진입점이 두 곳(`SessionService`, `ExerciseAnalysisService`)이지만 동일 정책 적용
+
+---
+
+### 🧰 테스트 환경 정비 (H2 인메모리)
+
+#### 문제 상황
+
+기존 테스트는 `@SpringBootTest` 로 전체 컨텍스트를 띄우면서 production 용 `application.yml` 을 그대로 사용 → Docker 컨테이너명 `shadowfit-mysql` 을 가리키므로 **로컬에서 `gradlew test` 항상 실패**.
+
+```
+java.net.UnknownHostException: shadowfit-mysql
+→ Unable to determine Dialect without JDBC metadata
+```
+
+#### 해결: 테스트 전용 application.yml + H2
+
+| 변경 | 내용 |
+|---|---|
+| `build.gradle` | `testRuntimeOnly 'com.h2database:h2'` 추가 |
+| `src/test/resources/application.yml` | 신규 생성 — H2 인메모리, JPA `ddl-auto: create-drop`, `sql.init.mode: never` |
+| 기타 | JWT/internal 토큰 더미값, gRPC 더미 주소, security.whitelist 모두 포함 |
+
+JPA가 `@Entity` 에서 자동 스키마 생성하므로 ENUM/JSON 등 MySQL 전용 syntax 호환 문제 없음.
+
+**결과**: `gradlew test` / `gradlew build` 가 Docker 없이도 통과.
+
+---
+
 ### 📚 관련 코드
 
-- **Model**: `com.shadowfit.model.exercise.Session`
-- **Enum**: `com.shadowfit.model.exercise.Status`
+- **Model**: `com.shadowfit.model.exercise.Session` (`@Version` 포함)
+- **Enum**: `com.shadowfit.model.exercise.Status` (`FAILED` 포함)
 - **Scheduler**: `com.shadowfit.service.Exercise.SessionTimeoutScheduler`
+- **Service**: `com.shadowfit.service.Exercise.SessionService.completeSession` / `markAsFailedIfStillInProgress`
+- **Service**: `com.shadowfit.service.Exercise.ExerciseAnalysisService.completeSession`
 - **Repository**: `com.shadowfit.repository.exercise.SessionRepository`
 - **Config**: `com.shadowfit.global.config.SchedulerConfig`
+- **Test**: `test/java/com/shadowfit/service/Exercise/SessionTimeoutSchedulerTest.java`
+- **Test resources**: `src/test/resources/application.yml`
 

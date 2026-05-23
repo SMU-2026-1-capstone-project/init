@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Schema(description = "운동 세션 종료 응답 DTO")
 public class SessionUpdateResponseDto {
     @Schema(description = "완료된 세션 ID", example = "101")
-    private Integer sessionId;
+    private Long sessionId;
 
     @Schema(description = "최종 상태", example = "COMPLETED")
     private Status status; // COMPLETED
