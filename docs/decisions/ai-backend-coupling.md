@@ -177,6 +177,41 @@ DP-4 (AI 측 직접 알람) 는 정확도는 가장 높지만 [`feedback-minimiz
 
 ---
 
+## 5-β. 분기 H: 카메라 프레임 송신 경로 (프론트 → AI `POST /pose`)
+
+**문제**: 프론트가 운동 중 카메라 프레임을 AI 의 `POST /pose` 로 보내야 자세 분석이 시작됨. 그런데 AI 의 HTTP 8000 은 **외부 노출 안 됨** (`docker-compose.yml` 의 `expose` 만, 커밋 c7657f1) — 프론트가 직접 부를 수 없다.
+
+**현황**:
+- AI `POST /pose` 는 무인증 — 외부 노출하면 임의 데이터 주입 가능 (그래서 expose 만 둔 것)
+- 백엔드는 같은 Docker 네트워크 안이라 AI 8000 호출 가능
+- 프론트는 외부 클라이언트 — 백엔드 8080 만 호출 가능
+
+| 선택지 | 의미 | AI 변경 | Spring 변경 | 보안 | 지연 |
+|--------|------|--------|------------|------|------|
+| **H1. 백엔드 프록시** | 프론트 → 백엔드 `/exercises/sessions/{id}/frame` → 백엔드가 WebClient 로 AI `POST /pose` 전달 | 없음 | controller 1개 + service 1개 (~70줄) | ✅ 외부 노출 유지 차단 | 한 홉 추가 (~수십 ms, base64 페이로드라 무시 가능) |
+| **H2. AI 8000 외부 노출 + 인증 추가** | docker-compose `ports` 복귀 + AI HTTP 에 토큰 검증 미들웨어 추가 | 큼 (HTTP auth 미들웨어 신설) | 없음 | ⚠️ 노출 후퇴 — 토큰만으로 충분한가? | 한 홉 (가장 짧음) |
+| **H3. 백엔드가 자체 MediaPipe** | Java/Kotlin MediaPipe 라이브러리로 백엔드에서 직접 분석 | 무관 (AI 서버 불필요해질 수도) | 매우 큼 | ✅ | 백엔드 부하 ↑ |
+| **H4. WebSocket / gRPC streaming** | 프론트 ↔ 백엔드 양방향 스트리밍, 백엔드 ↔ AI 도 streaming | 큼 | 큼 | ✅ | 가장 낮음 (스트리밍) |
+
+**구체적인 변경 면 (H1)**:
+- **Spring**:
+  - `ExercisesController` 에 `POST /exercises/sessions/{sessionId}/frame` 추가
+  - `dto/exercises/PoseFrameRequestDto` 신설 — `{ image: String(base64), timestampSec: Double, exerciseType: String }`
+  - `service/Exercise/PoseFrameProxyService` (가칭) — `WebClient` 로 `http://shadowfit-ai:8000/pose` 호출 후 응답 그대로 반환
+- **AI**: 무변경. 기존 `POST /pose` 가 그대로 받는다.
+- **docker-compose**: 무변경.
+
+**추천**: **H1 (백엔드 프록시)** — AI 무변경, 보안 유지, 지연 추가는 base64 페이로드 대비 무시 가능. H2 는 보안 후퇴, H3/H4 는 변경량 과다.
+
+**미결 질문**:
+- 프레임 전송 빈도? — 매 프레임? 0.1초당 1회? 송신 빈도가 지연·서버 부하 결정
+- base64 페이로드 크기 — 640×480 JPEG 압축 가정 시 한 프레임 ~30~50KB. 초당 N회면 대역폭 N×40KB/s
+- 프레임 송신 실패 시 정책 — 재시도? 스킵? (현재 AI 는 rep 완성 시 콜백이라 일부 프레임 누락은 큰 문제 아님)
+
+**현재 결정**: H1 잠정 추천. 사용자 확정 시 §11 결정 로그에 기록.
+
+---
+
 ## 6. 분기 C: 새 운동 종목 시 `exercise_type`
 
 **문제**: 현재 AI는 `exercise_type="squat"` 하드코딩(`exercise_servicer.py:70`), `_analyzers = {"squat": ...}`(`pose.py:28-30`). proto에 `exercise_type` 필드 없음. 두 번째 운동이 들어올 때 어떻게 표현할지.
