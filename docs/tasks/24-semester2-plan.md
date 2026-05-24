@@ -11,7 +11,10 @@
 ## 0. 출발 가정 (방학 종료 시점)
 
 **완료됐다고 가정하는 것 (백엔드)**:
-- BE-01 (프록시 endpoint) — 분기 H1 채택
+- ~~BE-01 (프록시 endpoint)~~ 🗑️ 폐기 — 분기 **H2 (프론트 → AI 직결)** 채택 (2026-05-24)
+- BE-10 (AI 헬스체크 + Resilience4j Circuit Breaker, H2 부속)
+- BE-11 (콜백 PoseData 검증 게이트, H2 부속)
+- 분기 I (인증 토큰 흐름) I1 잠정 — `INTERNAL_API_TOKEN` 정적 공유
 - BE-02 (worst 구간 보강)
 - BE-03 (GPT/Claude 리포트, LLM 제공자 결정 완료)
 - BE-04 A안 (카테고리 조회) — 1h 짜리 가벼운 안
@@ -235,6 +238,8 @@
 
 | 결정 | 의존 | 추천 |
 |------|------|------|
+| ~~분기 H 결정~~ | ~~Week 1~~ | ✅ **H2 (직결) 채택** (2026-05-24, 방학 진입 전 확정) |
+| 분기 I (인증 토큰 흐름) 운영 단계 I2 전환 시점 | 사용자 수 N 이상 또는 베타 종료 시 | I1 정적 공유 잠정, 운영 전 I2 검토 |
 | AI 작업자와 BE-09 proto 동기 일정 | Week 2 | 같은 주 같은 PR 머지 |
 | LLM 호출 정책 (1세션 1회 vs 무제한) | Week 5 BE-03 점검 | 1세션 1회 + 월 한도 $20 |
 | BE-08 추천 알고리즘 (규칙 기반 vs LLM) | Week 8 | 규칙 기반 (시연용 충분, 비용 0) |
@@ -245,7 +250,7 @@
 
 ## 관련 문서
 - [`21-task-assignment.md`](./21-task-assignment.md) — 전체 작업 목록 (스택별, 프론트·AI·인프라 트랙 포함)
-- [`22-backend-tasks-detail.md`](./22-backend-tasks-detail.md) — BE 작업 상세 풀이 (BE-01~09)
+- [`22-backend-tasks-detail.md`](./22-backend-tasks-detail.md) — BE 작업 상세 풀이 (BE-02~12, BE-01 폐기)
 - [`20-feature-roadmap.md`](./20-feature-roadmap.md) — PPT 요구사항 ↔ 코드 매핑
 - [`../decisions/ai-backend-coupling.md`](../decisions/ai-backend-coupling.md) — 결합 결정 이력
 - [`../architecture/ai-backend-monthly-log.md`](../architecture/ai-backend-monthly-log.md) — 1학기 결합 작업 이력 (회고·보고서 자료)
