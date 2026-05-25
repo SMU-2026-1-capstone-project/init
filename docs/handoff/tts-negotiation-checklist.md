@@ -1,8 +1,16 @@
 # TTS 피드백 — 구현 전 협의 체크리스트
 
-마지막 업데이트: 2026-05-25
+마지막 업데이트: 2026-05-26 (gRPC 통일 + ET-H 결정 박제)
 배경: [`../decisions/tts-design.md`](../decisions/tts-design.md) §12 — 8-A 채택 후 구현 시작 전 Front/AI/Spring 3자가 합의해야 할 경계 계약 28건
-연관: [`./ai-tts-feedback-batch.md`](./ai-tts-feedback-batch.md) — AI 측 작업 요청서
+연관: [`./ai-tts-feedback-batch.md`](./ai-tts-feedback-batch.md) — AI 측 작업 요청서, [`../decisions/session-end-trigger.md`](../decisions/session-end-trigger.md) — ET 분기 재검토
+
+> **✅ 2026-05-26 일괄 갱신**: 두 결정 (gRPC 통일 + ET-H) 이 다수 안건을 *해소*. 영향 안건 11건:
+>
+> - **gRPC 통일로 해소** — #3 (proto schema 강제로 payload 합의 불필요), #5 (REST `/internal/*` 자체 소멸), #4 (proto `feedback_type` 양쪽 박힘), #20 (proto `FeedbackBatchResponse` 박힘), #22 (gRPC deadline 으로 변경 — httpx timeout 무관), #23 (gRPC `Authorization: Bearer` 단일화 — 회전 정책만 잔존)
+> - **ET-H 채택으로 해소** — #6 (AI 신규 endpoint 불필요), #7 (클라 1 endpoint 호출만)
+> - **이미 구현 완료로 해소** — #10 (멱등성 박힘), #11 (proto 통일로 부분 실패 없음 — 전체 batch 1 응답)
+>
+> 잔여 협의 안건: #1, #2, #8, #9, #12, #13, #15, #17~19, #21, #24~28 (16건). 표는 원형 유지 (당시 합의 맥락 보존) + 해소 안건은 *상태* 컬럼에 `✅ 2026-05-26 해소` 표시. 잔여 안건 중심으로 진행할 것.
 
 ---
 
@@ -29,7 +37,7 @@
 | 분기 3 (rep 다중 결함) | priority 최솟값 1개 + RC-2 (5배수 카운트 발화) |
 | 분기 6 (GOOD_FORM) | 발화·송신 안 함 |
 | 분기 9 (영상 audio ducking) | `expo-av setAudioModeAsync` (9-1) |
-| **분기 2.A.ET (세션 종료 trigger)** | **ET-A (클라가 Spring + AI 양쪽 통보) — BE-14 endpoint 유지. 호출 trigger 3가지: 명시 종료 / 목표 달성 자동 / 강제 종료(safety net 별도)** |
+| **분기 2.A.ET (세션 종료 trigger)** | **ET-H (재검토 2026-05-26): Spring 단일 분배자. 클라는 `PATCH /sessions/{id}/end` 한 번만, Spring 이 afterCommit 으로 gRPC `StopAnalysis` → AI. ~~ET-A~~ 폐기. safety net 은 `SessionTimeoutScheduler` 이미 존재** |
 | #25 (priority 응답 메타) | 포함 유지 (현 코드) |
 | #16 (시간대 형식) | 서버 Asia/Seoul 고정 + API JSON 마커 없음 + DB LocalDateTime + UI KST |
 | #14 (ttsSpeed 검증) | UI 슬라이더 + Spring `@DecimalMin/@DecimalMax` 표준 검증 |
@@ -48,7 +56,7 @@
 |---|---|:-:|
 | 분기 1 | 1-B (AI 가 8종 분류) | - |
 | 분기 2 | 2-A (AI 가 batch 송신) | - |
-| ~~분기 2.A.ET~~ | ~~ET-A~~ → ✅ 확정 (2026-05-25). 위 confirm 표로 이동 |
+| ~~분기 2.A.ET~~ | ~~ET-A~~ → ET-H (재검토 2026-05-26, 위 confirm 표 참조) |
 | **분기 2.A.BT** | **BT-SET (세트 경계 + 세션 종료 final)** | 갱신 13·14 |
 | 분기 4 | 4-A (운동 진입 시 1회 캐시) | - |
 | 분기 7 | 7-1 (HTTP response 확장) | - |
@@ -116,11 +124,11 @@
 
 | # | 안건 | 관련 Spring API / 인터페이스 | 결정 옵션 (추천) | 당사자 | 상태 |
 |:-:|---|---|---|:-:|:-:|
-| 1 | 8종 enum 표기 | `POST /internal/feedback/batch`, `GET /sessions/{id}/feedbacks`, `GET /sessions/{id}/feedback-summary`, `GET /exercises/{id}/feedback-templates`, proto `feedback_type` | **추천**: `KNEE_OUT` UPPER_SNAKE / master = `REQUIREMENTS.md` §6 (코드 `FeedbackType.java` 이미 일치, 문서 명시만) | 3자 | ☐ |
+| 1 | 8종 enum 표기 | gRPC `ReportFeedbackBatch`, `GET /sessions/{id}/feedbacks`, `GET /sessions/{id}/feedback-summary`, `GET /exercises/{id}/feedback-templates`, proto `FeedbackEvent.feedback_type` | **추천**: `KNEE_OUT` UPPER_SNAKE / master = `REQUIREMENTS.md` §6 (코드 `FeedbackType.java` 이미 일치, 문서 명시만) | 3자 | ☐ |
 | 2 | 페르소나 enum 표기 | `GET /users/me`, `PATCH /users/me/persona`, `GET /exercises/{id}/feedback-templates` | **추천**: `BEGINNER/ADVANCED/DIET/REHAB` / master = `12-persona-difficulty.md` (`Member.selectedPersona` 와 정합) | 3자 | ☐ |
-| 3 | batch payload schema | `POST /internal/feedback/batch` | **추천**: snake_case `{session_id, set_no, is_final, events:[{feedback_type, sync_rate_at_trigger, occurred_at}]}` + Spring DTO 에 `@JsonNaming(SnakeCaseStrategy.class)`. `set_no`·`is_final` 은 BT-SET (분기 2.A.BT) 채택 결과 | A ↔ S | ☐ |
-| 4 | proto `feedback_type` 필드 | `ai-server/app/proto/exercise.proto` + `backend/src/main/proto/exercise.proto`, `POST /pose` 응답 모델 | **추천**: string + 화이트리스트 검증 (enum 보다 호환성·유연성 우위) / 필드 번호 양쪽 동기 | A ↔ S | ☐ |
-| 5 | 인증·토큰 endpoint 분리 | 전체 — `/api/*` (JWT) vs `/internal/*` (`X-Internal-Token`) | **추천**: 경로 prefix 명확 분리 (`/api/*` JWT, `/internal/*` `X-Internal-Token`) — 이미 `InternalFeedbackController` 구현에 반영됨 | 3자 | ☐ |
+| 3 | batch payload schema | ~~`POST /internal/feedback/batch`~~ → gRPC `ReportFeedbackBatch` | proto `FeedbackBatchRequest{session_id, set_no, is_final, events:[FeedbackEvent]}` 가 schema 강제. snake_case 자동 (proto 기본). DTO `@JsonNaming` 불필요 | A ↔ S | ✅ 2026-05-26 해소 |
+| 4 | proto `feedback_type` 필드 | `ai-server/app/proto/exercise.proto` + `backend/src/main/proto/exercise.proto`, `POST /pose` 응답 모델 | proto `FeedbackEvent.feedback_type = 1` (string) 양쪽 동기 박힘. AI 측 화이트리스트 검증은 `classify_rep` 함수 내장 | A ↔ S | ✅ 2026-05-26 해소 |
+| 5 | 인증·토큰 endpoint 분리 | ~~`/api/*` (JWT) vs `/internal/*` (`X-Internal-Token`)~~ | gRPC 통일로 `/internal/*` REST 자체 소멸. 클라↔Spring 전부 JWT, AI↔Spring 전부 gRPC `Authorization: Bearer` (`InternalAuthInterceptor`) | 3자 | ✅ 2026-05-26 해소 |
 
 ---
 
@@ -128,12 +136,12 @@
 
 | # | 안건 | 관련 Spring API / 인터페이스 | 결정 옵션 (추천) | 당사자 | 상태 |
 |:-:|---|---|---|:-:|:-:|
-| 6 | 세션 종료 신호 형식 (ET-A) | (AI 측) 마지막 `POST /pose` 의 `session_end=true` vs 별도 `POST /sessions/{id}/end` — Spring 의 `PATCH /sessions/{id}/end` 와는 별개 | **추천**: 옵션 1 (플래그) — 기존 `POST /pose` 채널 활용, 신규 endpoint 회피 | A ↔ F | ☐ |
-| 7 | 클라 양방향 호출 순서 | (Front) `PATCH /sessions/{id}/end` + AI 측 종료 신호 | **추천**: `Promise.all` 동시 / 부분 실패 허용 — *부분 실패 처리 정책* Front 합의 필요 | F ↔ S | ☐ |
+| 6 | 세션 종료 신호 형식 (~~ET-A~~ → ET-H) | Spring 이 분배자 — 클라는 `PATCH /sessions/{id}/end` 만, Spring afterCommit 으로 gRPC `StopAnalysis` → AI | ET-H 채택 (분기 2.A.ET 재검토, 2026-05-26). AI 신규 endpoint 불필요 — 기존 `StopAnalysis` 핸들러 그대로 사용 | A ↔ F | ✅ 2026-05-26 해소 |
+| 7 | 클라 양방향 호출 순서 | ~~Spring + AI 양쪽~~ → Spring 1 endpoint 만 | ET-H 채택으로 클라는 `PATCH /sessions/{id}/end` 단일 호출. 부분 실패 처리 불필요 | F ↔ S | ✅ 2026-05-26 해소 |
 | 8 | 분류 임계값 위치 | (Spring API 없음 — AI 내부) | **추천**: `squat_analyzer` 상수 + 영상 5~10건 튜닝 | A 단독 (공유) | ☐ |
 | 9 | priority 상수 위치 | (Spring API 없음 또는 `GET /exercises/{id}/feedback-templates` 응답에 포함) | **추천**: AI 내장 (3-A-1) — 3-A-2 거부 | A 단독 | ☐ |
-| 10 | batch 재시도·멱등성 | `POST /internal/feedback/batch` | **추천**: AI 측 휴식 중 retry (0s/5s/15s/35s backoff, 총 ~55s) + Spring 측 `(session_id, occurred_at, feedback_type)` uniqueKey + `INSERT IGNORE` (BT-SET 채택으로 필수, 갱신 13·14 와 묶임) | A ↔ S | ☐ |
-| 11 | batch 부분 실패 처리 | `POST /internal/feedback/batch` | **추천**: 유효한 것만 insert + reject 목록 응답 | A ↔ S | ☐ |
+| 10 | batch 재시도·멱등성 | gRPC `ReportFeedbackBatch` | Spring 측 `(session_id, occurred_at, feedback_type)` uniqueKey + `INSERT IGNORE` 박힘. AI 측 retry 백오프는 handoff §2.E 가이드에 명시 | A ↔ S | ✅ 2026-05-26 해소 |
+| 11 | batch 부분 실패 처리 | gRPC `ReportFeedbackBatch` | proto 통일로 *전체 batch 1 응답* — `saved_count` 만 반환 (멱등 중복 제외). invalid `feedback_type` 1건이라도 있으면 전체 reject (`INVALID_ARGUMENT`) → AI 가 재송신 | A ↔ S | ✅ 2026-05-26 해소 |
 | 12 | templates 응답 구조 | `GET /exercises/{id}/feedback-templates` | **추천**: `[{feedbackType, message}]` Array (정렬·확장 유리) | F ↔ S | ☐ |
 | 13 | 페르소나 변경 후 캐시 무효화 | `PATCH /users/me/persona` → `GET /exercises/{id}/feedback-templates` 재호출 | PATCH 응답에 `templatesReloadRequired: true` vs 클라가 운동 시작 시 항상 재호출 — *Front 의 캐시 정책* 합의 필요 | F ↔ S | ☐ |
 | 14 | `ttsSpeed` 검증 | `PATCH /preferences/tts` | **✅ 결정 (2026-05-25)**: UI 슬라이더로 0.5~2.0 범위 강제 + Spring 표준 `@DecimalMin("0.5") @DecimalMax("2.0")` 검증 어노테이션 (방어용). UI 가 범위 보장 → 평시 발동 X, 비정상 호출만 422 응답 | F ↔ S | ✅ |
@@ -145,14 +153,14 @@
 
 | # | 안건 | 관련 Spring API / 인터페이스 | 결정 옵션 | 당사자 | 상태 |
 |:-:|---|---|---|:-:|:-:|
-| 16 | 시간대 형식 | 시각 필드 포함 모든 API — `POST /internal/feedback/batch`, `GET /sessions/{id}/feedbacks`, `PATCH /sessions/{id}/end`, `GET /sessions/{id}/feedback-summary` | **✅ 결정 (2026-05-25)**: 한국 전용 서비스 정합. (1) 서버 timezone Asia/Seoul 고정 (Spring `spring.jackson.time-zone: Asia/Seoul` + AI `TZ=Asia/Seoul`), (2) API JSON 형식 마커 없음 (`"2026-05-25T10:23:45"`), (3) DB `LocalDateTime` 유지, (4) UI KST 표시. 글로벌 진출 시 재검토 | 3자 | ✅ |
+| 16 | 시간대 형식 | 시각 필드 포함 모든 API — gRPC `ReportFeedbackBatch` (proto `Timestamp` Asia/Seoul 변환), `GET /sessions/{id}/feedbacks`, `PATCH /sessions/{id}/end`, `GET /sessions/{id}/feedback-summary` | **✅ 결정 (2026-05-25)**: 한국 전용 서비스 정합. (1) 서버 timezone Asia/Seoul 고정 (Spring `spring.jackson.time-zone: Asia/Seoul` + AI `TZ=Asia/Seoul`), (2) API JSON 형식 마커 없음 (`"2026-05-25T10:23:45"`), (3) DB `LocalDateTime` 유지, (4) UI KST 표시. gRPC proto `Timestamp` → Asia/Seoul `LocalDateTime` 변환은 `FeedbackLogService` 안에서 처리. 글로벌 진출 시 재검토 | 3자 | ✅ |
 | 17 | summary 집계 단위 | `GET /sessions/{id}/feedback-summary` | `feedback_type` 별 카운트 + sync_rate avg/min/max | F ↔ S | ☐ |
 | 18 | events 페이징 | `GET /sessions/{id}/feedbacks` | `page/size` (max ~210건 가능) | F ↔ S | ☐ |
 | 19 | 트레이너 권한 헤더 | `GET /sessions/{id}/feedbacks`, `GET /sessions/{id}/feedback-summary` | 기존 권한 모듈 재사용 | S 단독 | ☐ |
-| 20 | batch 응답 형식 | `POST /internal/feedback/batch` | `200 OK {insertedCount}` vs `204 No Content` | A ↔ S | ☐ |
-| 21 | batch 크기 한도 | `POST /internal/feedback/batch` | events 최대 200~500, 초과 시 split | A ↔ S | ☐ |
-| 22 | batch 타임아웃 | `POST /internal/feedback/batch` (AI 측 httpx timeout) | Spring 응답 대기 10초 | A ↔ S | ☐ |
-| 23 | 내부 토큰 관리·회전 | `POST /internal/feedback/batch` 인증 | 환경변수 → secret manager 단계적 / 회전 정책 미정 | S 단독 | ☐ |
+| 20 | batch 응답 형식 | gRPC `ReportFeedbackBatch` | proto `FeedbackBatchResponse{session_id, saved_count}` 박힘 | A ↔ S | ✅ 2026-05-26 해소 |
+| 21 | batch 크기 한도 | gRPC `ReportFeedbackBatch` | gRPC 기본 max message size 4MB. events ~수천 건까지 안전 (FeedbackEvent ~50 bytes). 분할 정책 일단 불필요 — 베타 진입 후 측정 | A ↔ S | 🟢 자연 해소 |
+| 22 | batch 타임아웃 | gRPC `ReportFeedbackBatch` (deadline) | gRPC deadline ~10초 권장. AI 측 httpx 사라짐 | A ↔ S | ✅ 2026-05-26 해소 |
+| 23 | 내부 토큰 관리·회전 | gRPC `Authorization: Bearer` metadata (`InternalAuthInterceptor`) | 채널 단일화로 토큰도 단일. 환경변수 → secret manager 단계적 / 회전 정책은 미정 (잔여) | S 단독 | 🟡 단순화 — 잔여 |
 | 24 | 빈 결과 처리 | `GET /exercises/{id}/feedback-templates` | 페르소나 row 없으면 BEGINNER fallback vs 404 | F ↔ S | ☐ |
 | 25 | enum 응답 메타 (priority) | `GET /exercises/{id}/feedback-templates` | **✅ 결정 (2026-05-25)**: priority 응답 포함 유지 (현 코드 상태). 변경 0, 응답 부담 무시 수준 (~16 byte), 미래 활용 (Front 별표·색 표시) 가능성 보존 | F ↔ S | ✅ |
 | 26 | 종료 신호 safety net | (AI 측 종료 처리, Spring API 무관) | 클라 신호 누락 시 N분 timeout 으로 batch 송신 (ET-C 미니멀 도입) | A ↔ F | ☐ |
@@ -171,17 +179,17 @@
 
 **#2 페르소나 enum 표기** — 사용자 페르소나 (`BEGINNER`/`ADVANCED`/`DIET`/`REHAB`) 의 *master 위치*. `Member.selectedPersona` 와 `12-persona-difficulty.md` 가 정합한지 확인 + 문서·코드 어느 쪽이 master 인지 명시.
 
-**#3 batch payload schema** — AI 가 *세트 경계마다* Spring 에 보내는 `POST /internal/feedback/batch` 의 request body (분기 2.A.BT BT-SET 채택). **snake_case 채택** — Pydantic 기본·proto 공식 컨벤션 + AI 측 변환 코드 불필요 ([[feedback-minimize-python-changes]] 정합). Spring DTO 2개 (`FeedbackBatchRequestDto`, `FeedbackEventDto`) 에 `@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)` 어노테이션 + `set_no`·`is_final` 필드 추가. Java 필드명은 camelCase 그대로.
+**#3 batch payload schema** — ✅ **2026-05-26 해소**. REST → gRPC `ReportFeedbackBatch` 통일로 proto `FeedbackBatchRequest` 가 schema 강제. DTO snake_case 어노테이션 불필요 (proto 기본 snake_case). 이전 합의안 (Spring DTO `@JsonNaming` + `set_no`/`is_final` 필드) 은 proto 메시지로 실현.
 
-**#4 proto `feedback_type` 필드** — AI ↔ Spring gRPC 의 `RepCompletedEvent` + Pose API 응답에 추가할 신규 필드. proto 파일 양쪽(`ai-server/app/proto/exercise.proto`, `backend/src/main/proto/exercise.proto`) 동기 + 필드 번호·타입 결정.
+**#4 proto `feedback_type` 필드** — ✅ **2026-05-26 해소**. proto `FeedbackEvent.feedback_type = 1` (string) 으로 양쪽 동기 박힘. AI 측 화이트리스트 검증은 `classify_rep` 함수 내장. `RepCompletedEvent` 라는 이름 대신 `FeedbackEvent` 로 정착.
 
-**#5 인증·토큰 endpoint 분리** — 사용자 JWT 와 내부 토큰을 endpoint 경로로 분리. `/api/*` → JWT 인증, `/internal/*` → `X-Internal-Token`. 정책 충돌·외부 노출 방지.
+**#5 인증·토큰 endpoint 분리** — ✅ **2026-05-26 해소**. gRPC 통일로 `/internal/*` REST 자체 소멸. 클라↔Spring 전부 JWT, AI↔Spring 전부 gRPC `Authorization: Bearer` (`InternalAuthInterceptor`).
 
 ### 🟡 중요
 
-**#6 (AI 측) 세션 종료 신호 형식** — AI 가 "세션 끝났음" 을 인지하는 방법. 마지막 `POST /pose` 의 `session_end=true` 플래그 vs 별도 `POST /sessions/{id}/end` endpoint. Spring 의 `PATCH /sessions/{id}/end` 와는 *별개 채널*.
+**#6 (AI 측) 세션 종료 신호 형식** — ✅ **2026-05-26 해소**. ET-H 채택으로 Spring 이 단일 분배자. 클라는 `PATCH /sessions/{id}/end` 만, Spring 이 afterCommit 으로 gRPC `StopAnalysis` → AI. AI 측 신규 endpoint 불필요 — 기존 `StopAnalysis` 핸들러 (`exercise_servicer.py:98`) 에 `state.on_session_end()` 1줄만 추가하면 됨 (handoff §2.F 참조).
 
-**#7 클라 양방향 호출 순서** — 종료 시 클라가 Spring(`PATCH /sessions/{id}/end`) 과 AI(종료 신호) 양쪽 호출. 동시 (`Promise.all`) vs 직렬, 부분 실패 시 처리 정책.
+**#7 클라 양방향 호출 순서** — ✅ **2026-05-26 해소**. ET-H 로 클라는 단일 호출만. 부분 실패 처리 정책 불필요.
 
 **#8 분류 임계값 위치** — `KNEE_OUT` 판정 임계값 (예: 무릎 거리 비율 > 1.2) 을 어디에 두는가. `squat_analyzer.py` 코드 상수 / config 파일 / DB. 영상 5~10건 튜닝 책임 주체도 포함.
 
@@ -209,13 +217,13 @@
 
 ### 🟢 차순위
 
-**#20 batch 응답 형식** — `POST /internal/feedback/batch` 응답 — `200 OK {insertedCount: 12}` JSON vs `204 No Content`. AI 측 검증 정보 필요한가.
+**#20 batch 응답 형식** — ✅ **2026-05-26 해소**. proto `FeedbackBatchResponse{session_id, saved_count}` 박힘.
 
-**#21 batch 크기 한도** — events 최대 개수 제한 (200·500?). 한 세션 결함 이벤트가 그 이상 누적 시 AI 가 split 송신 vs Spring 이 자체 처리.
+**#21 batch 크기 한도** — 🟢 **자연 해소 경향**. gRPC 기본 max message size 4MB. `FeedbackEvent` 약 50 bytes 가정 시 수만 건까지 안전. 베타 진입 후 측정 결과 필요시 split.
 
-**#22 batch 타임아웃** — AI 측 `httpx` 클라이언트의 Spring 응답 대기 시간 (5초·10초). 초과 시 retry 정책과 연결.
+**#22 batch 타임아웃** — ✅ **2026-05-26 해소**. AI 측 `httpx` 사라짐 (gRPC 단일화). gRPC deadline ~10초 권장.
 
-**#23 내부 토큰 관리·회전** — `X-Internal-Token` 값의 저장 위치 (환경변수 → secret manager 단계적 이전) 및 정기 회전 정책. 1학기는 환경변수 고정으로 충분, 운영 단계 강화.
+**#23 내부 토큰 관리·회전** — 🟡 **부분 해소**. gRPC `Authorization: Bearer` 단일 토큰으로 단순화 (`X-Internal-Token` 사라짐). 1학기는 환경변수 고정으로 충분, 운영 단계 회전 정책은 잔여.
 
 **#24 빈 결과 처리** — `GET /exercises/{id}/feedback-templates` 호출 시 사용자 페르소나에 맞는 row 가 없을 때 — `persona IS NULL` 공통 row fallback (BE-13 권장) vs BEGINNER fallback vs 404.
 
@@ -246,11 +254,11 @@ Spring 단독 (1건):    19, 23 — *재정렬 후*
 
 | Spring API | 안건 # | 관여 수 |
 |---|---|:-:|
-| `POST /internal/feedback/batch` | 1, 3, 5, 10, 11, 16, 20, 21, 22, 23 | **10** |
+| gRPC `ReportFeedbackBatch` (← ~~`POST /internal/feedback/batch`~~) | 1 + ~~3, 5, 10, 11, 20, 22~~ 해소 + 16, 21, 23 잔여 | **잔여 4** (10→4) |
 | `GET /exercises/{id}/feedback-templates` | 1, 2, 12, 13, 24, 25 | 6 |
 | `GET /sessions/{id}/feedbacks` | 1, 16, 18, 19, 28 | 5 |
 | `GET /sessions/{id}/feedback-summary` | 1, 16, 17, 19 | 4 |
-| `PATCH /sessions/{id}/end` (ET-A) | 7, 16 | 2 |
+| `PATCH /sessions/{id}/end` (ET-H) | ~~7~~ 해소 + 16 | 잔여 1 |
 | `PATCH /preferences/tts` | 14, 15 | 2 |
 | `GET /preferences/tts` | 15 | 1 |
 | `PATCH /users/me/persona` | 13 | 1 |
@@ -302,19 +310,19 @@ Spring 단독 (1건):    19, 23 — *재정렬 후*
 
 **차단 요소**: #1·#16 (3자 미팅에서 BE-13·14 와 동시 해결)
 
-### 기존 InternalFeedbackController — 사후 *공식화* 만
+### ~~기존 InternalFeedbackController — 사후 *공식화* 만~~ → ✅ 2026-05-26 폐기·gRPC 통일
 
-코드는 구현되어 있으나 운영·확장 시 합의 명문화 필요. *BE 신규 작업 차단 요소 아님*.
+기존 REST `InternalFeedbackController` 가 gRPC `ExerciseGrpcService.reportFeedbackBatch` 로 대체됨. 본 표의 협의 안건들은 대부분 *gRPC 통일 결정* 으로 해소. 잔여만 진행.
 
-| 협의 안건 # | 누구와 | 시점 | 현재 코드 상태 |
+| 협의 안건 # | 누구와 | 시점 | 현재 코드 상태 (2026-05-26) |
 |:-:|:-:|:-:|---|
-| #3 batch payload schema | A ↔ S | 🟢 사후 명문화 | `FeedbackBatchRequestDto` 이미 구현 |
-| #10 재시도·멱등성 | A ↔ S | 🟡 BE-13 시점 | `session_feedback_logs` uniqueKey 없음 — 재송신 시 중복 가능. **BE-13 의 schema 변경 시 같이 검토 권장** |
-| #11 부분 실패 | A ↔ S | 🟢 사후 | `saveBatch` 트랜잭션 정책 확인 |
-| #20 응답 형식 | A ↔ S | 🟢 사후 | 현재 문자열 응답, JSON 권장 |
-| #21 batch 크기 한도 | A ↔ S | 🟢 운영 후 | 현재 무제한 |
-| #22 타임아웃 | A 측 | 🟢 운영 후 | AI 측 httpx |
-| #23 내부 토큰 관리 | S 단독 | 🟢 사후 | `application.yml` 환경변수, 회전 정책 미정 |
+| ~~#3 batch payload schema~~ | — | ✅ 해소 | proto `FeedbackBatchRequest` 가 schema 강제 |
+| ~~#10 재시도·멱등성~~ | — | ✅ 해소 | `session_feedback_logs` uniqueKey + INSERT IGNORE 박힘 |
+| ~~#11 부분 실패~~ | — | ✅ 해소 | gRPC unary — 전체 batch 1 응답 (`INVALID_ARGUMENT` 시 전체 reject + AI 재송신) |
+| ~~#20 응답 형식~~ | — | ✅ 해소 | proto `FeedbackBatchResponse{session_id, saved_count}` |
+| #21 batch 크기 한도 | A ↔ S | 🟢 운영 후 | gRPC 기본 max 4MB. 자연 여유 |
+| ~~#22 타임아웃~~ | — | ✅ 해소 | httpx 사라짐. gRPC deadline ~10초 |
+| #23 내부 토큰 관리 | S 단독 | 🟡 잔여 | gRPC `Authorization: Bearer` 단일화로 단순화. 회전 정책만 미정 |
 
 ---
 

@@ -427,7 +427,7 @@
 #### 2f48526 (05-09) — feat: tts 백엔드 로직 추가
 
 **Spring 측**
-- `AdminExerciseController`, `FeedbackTemplateController`, `InternalFeedbackController`, `PreferenceController` 신규 controller 4개
+- `AdminExerciseController`, `FeedbackTemplateController`, `InternalFeedbackController` (→ 2026-05-26 삭제), `PreferenceController` 신규 controller 4개
 - `model/exercise/ExerciseFeedbackTemplate`, `FeedbackType`, `SessionFeedbackLog`
 - 관련 service·dto
 - `controller/InternalExerciseController.java` ±18 — **다시 사용처가 생긴 듯 보였지만**, 이후 8ac8248에서 결국 다시 삭제됨
@@ -446,6 +446,8 @@
   2. **REST `/internal/feedback/batch`** — TTS 발화 이벤트 배치 (보조, 세션 종료 시 1회)
 - 이 변화가 처음 commit 분석 시 누락된 이유: TTS 도메인 확장이 visually 크게 보여서 결합 표면 분석에서 빠짐. 그러나 `InternalFeedbackController` 가 `InternalExerciseController` (5번 흔들리다 폐기) 와 같은 "AI → Spring 콜백" 카테고리의 REST endpoint 라는 점 동일
 - 향후 정리 후보: 이 보조 결합도 gRPC 콜백 RPC 로 통합 가능 (proto 에 `ReportFeedbackBatch` RPC 신설). 다만 배치 빈도 낮고(세션당 1회) 단순 INSERT 라 REST 유지의 비용도 낮음 — 분기 K 로 별도 분석 가능
+
+> **✅ 2026-05-26 실현**: 위 "향후 정리 후보" 가 한 달 안에 실현됨. 사유는 *BT-SET (세트 경계 batch) 도입으로 세션당 호출 빈도 1 → 3~5 회로 늘어 REST 유지의 비용 (인증 채널 이중화·schema validation 누락 가능성) 이 더 두드러져서*. `ExerciseService.ReportFeedbackBatch` RPC 추가, `InternalFeedbackController` 삭제, 결합 표면이 다시 *gRPC 단일* 로 통일됨. 분기 K 별도 분석 없이 자연 수렴. 박제: [`../decisions/tts-design.md`](../decisions/tts-design.md) 상단 박스.
 
 ### 05-12 — 프론트 잡일
 
@@ -656,4 +658,4 @@
 - **proto는 양쪽 동기 비용**: `backend/src/main/proto/exercise.proto`와 `ai-server/app/proto/exercise.proto`가 사본으로 평행 존재 (04-14부터). 한쪽 변경은 항상 다른 쪽 동기 작업 필요 — 953bad6, 4eb153b, ea1c636, f172933→2dd55e0이 그 패턴.
 - **`InternalExerciseController`의 여정**: 도입(0d89668) → 삭제(5ce1872) → 복원(e5f5b29) → 또 삭제(a9f9017) → 부활(2f48526) → 최종 종료(8ac8248). REST 콜백 시대의 잔재가 gRPC 전환 후 5번에 걸쳐 흔들린 흔적.
 - **AI 측 평행 구현 청산**: `mock_server.py`(04-14 신설 → 05-16 삭제)와 실제 `app/grpc/` 패키지(04-28 신설)가 17일간 공존. 5/16에 mock 제거하고, 같은 날 `session_registry`/`pose_analysis_engine`/`auth_interceptor` 등 평행 사본도 정리.
-- **결합 표면이 사실은 1개가 아니라 2개**: 메인 결합은 gRPC 양방향(`exercise.proto` 9개 RPC)이지만, **2f48526 (05-09) 의 TTS 도메인 추가 시 `POST /internal/feedback/batch` REST endpoint가 신설**되어 보조 결합 경로가 생김. 처음 분석에선 TTS 도메인 확장으로만 보여 결합 표면 변경에서 빠졌으나, 2026-05-25 정정. 향후 분기 K (REST 보조 결합을 gRPC RPC 로 통합?) 로 분석 가능 — 다만 배치 빈도 낮아 우선순위 낮음.
+- **결합 표면이 1개로 다시 통일**: 메인 결합은 gRPC 양방향(`exercise.proto`). 2f48526 (05-09) 의 TTS 도메인 추가 시 `POST /internal/feedback/batch` REST endpoint가 한 달간 보조 결합으로 공존했으나, **2026-05-26 gRPC 통일 결정으로 `ReportFeedbackBatch` RPC 추가 + REST endpoint 삭제** → 결합 표면 다시 gRPC 단일. `InternalExerciseController` 의 5번 흔들림과 유사한 *REST→gRPC 수렴 패턴* 재현.

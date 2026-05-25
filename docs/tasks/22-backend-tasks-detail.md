@@ -380,18 +380,12 @@
 6. `mysql/data.sql` — 스쿼트 4 결함 × 4 페르소나 = 16 row seed (스쿼트만 우선, 런지·플랭크는 후속) (~20줄)
    - 12-persona-difficulty.md 의 페르소나별 톤 가이드 활용
 
-**B. BT-SET 송신 trigger 지원 (0.5h)** — AI 가 *세트 경계마다* batch 송신할 수 있게 기존 endpoint 확장. 협의 안건 #3 (snake_case + set_no/is_final) 및 #10 (멱등성) 동시 처리.
-7. `dto/exercises/feedback/FeedbackBatchRequestDto.java` — `set_no`, `is_final` 필드 추가 + `@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)` 어노테이션
-   ```java
-   @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-   public record FeedbackBatchRequestDto(
-       @NotNull Long sessionId,
-       @NotNull Integer setNo,                    // 신규 (BT-SET)
-       @NotNull Boolean isFinal,                  // 신규 (마지막 batch 인지)
-       @NotEmpty @Valid List<FeedbackEventDto> events
-   ) {}
-   ```
-8. `dto/exercises/feedback/FeedbackEventDto.java` — `@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)` 어노테이션 1줄 (필드 변경 없음)
+**B. BT-SET 송신 trigger 지원 (0.5h)** — AI 가 *세트 경계마다* batch 송신할 수 있게 endpoint 확장. 협의 안건 #3 (snake_case + set_no/is_final) 및 #10 (멱등성) 동시 처리.
+
+> **✅ 2026-05-26 갱신**: 채널을 REST → gRPC 로 통일. 작업 7·8 (DTO snake_case) 무효화 — DTO 폐기되고 proto 가 schema 강제. 작업 10·11 도 proto 직접 수신 형태로 재구성. 박제: [`../decisions/tts-design.md`](../decisions/tts-design.md) 상단 박스.
+
+7. ~~`dto/exercises/feedback/FeedbackBatchRequestDto.java` — `set_no`, `is_final` 필드 추가 + `@JsonNaming`~~ **→ 2026-05-26 DTO 자체 삭제됨**. proto `FeedbackBatchRequest` 가 대체. 필드는 proto 에 동일하게 `int32 set_no = 2; bool is_final = 3;` 으로 존재
+8. ~~`dto/exercises/feedback/FeedbackEventDto.java` — `@JsonNaming`~~ **→ 2026-05-26 DTO 자체 삭제됨**. proto `FeedbackEvent` 가 대체. snake_case 자동 (proto 기본)
 9. `model/exercise/SessionFeedbackLog.java` + `mysql/schema.sql:132-140` — uniqueKey 추가 `(session_id, occurred_at, feedback_type)`. 멱등성 (협의 안건 #10) 보장
    ```java
    @Table(name = "session_feedback_logs",
@@ -400,8 +394,8 @@
               columnNames = {"session_id", "occurred_at", "feedback_type"}),
           indexes = @Index(name = "idx_session_feedback", columnList = "session_id, occurred_at"))
    ```
-10. `service/Exercise/FeedbackLogService.java` — `saveBatch()` 가 중복 row 처리. JPA 의 `saveAll` 대신 native `INSERT IGNORE` 또는 try-catch + skip. AI 측 retry 가 같은 events 재송신해도 안전 흡수
-11. (선택) `InternalFeedbackController.batch()` — 응답에 `insertedCount` 포함 (협의 안건 #20). 현재는 문자열 응답 → JSON 권장. **MVP 보류 가능**
+10. `service/Exercise/FeedbackLogService.java` — `saveBatch(FeedbackBatchRequest proto)` 시그니처 (D-2 채택). native `INSERT IGNORE` 사용. AI 측 retry 가 같은 events 재송신해도 안전 흡수
+11. `service/Exercise/ExerciseGrpcService.java` — `reportFeedbackBatch` 핸들러 신규. proto → `FeedbackLogService.saveBatch` 위임. 응답에 `saved_count` 포함. ~~`InternalFeedbackController` REST endpoint~~ → 삭제됨
 
 ### 완료 기준
 
@@ -412,7 +406,7 @@
 - 단위 테스트 — 4 페르소나 × 1 호출 = 4 응답 검증
 
 **BT-SET 지원**:
-- `POST /internal/feedback/batch` 가 snake_case payload 수신 (`{session_id, set_no, is_final, events:[...]}`)
+- gRPC `ExerciseService.ReportFeedbackBatch` 가 `FeedbackBatchRequest{session_id, set_no, is_final, events:[...]}` proto 수신 (snake_case 는 proto 기본)
 - 같은 세션의 다중 batch 정상 처리 (각각 별 row 로 적재)
 - 같은 `(session_id, occurred_at, feedback_type)` 의 재송신 시 멱등 (INSERT IGNORE 동작, 중복 row 생성 안 됨)
 - 단위 테스트 — 같은 events 2번 송신 → DB row 수 1번과 동일
@@ -439,7 +433,7 @@
 
 ---
 
-## BE-14 — Session 종료 endpoint (분기 2.A.ET ET-A)
+## BE-14 — Session 종료 endpoint (분기 2.A.ET ET-H, 재검토 2026-05-26)
 
 **우선**: 🔴 | **추정**: 1.5h | **의존**: 없음 | **상태**: 📋
 
@@ -447,12 +441,13 @@
 
 ### 현재 상태
 - ✅ `Session.endTime` 컬럼 존재 — `model/exercise/Session.java:40`
-- ❌ `PATCH /sessions/{id}/end` endpoint 없음 (`grep "endSession\|sessions.*end\|endedAt"` 결과 0건)
+- ✅ `PATCH /sessions/{id}/end` endpoint 구현 완료 — `SessionController.endSession`
+- ✅ ET-H 채택 (2026-05-26 재검토): Spring 이 endTime 기록 + afterCommit gRPC `StopAnalysis` 호출. 클라는 단일 endpoint 만 호출 (Spring 이 분배자). 분석: [`../decisions/session-end-trigger.md`](../decisions/session-end-trigger.md)
 
-### 만질 파일
-1. `controller/SessionController.java` (또는 기존 컨트롤러) — `PATCH /sessions/{id}/end` 추가 (~15줄)
-2. `service/Exercise/SessionService.java` — `endSession(sessionId, member)` 메서드. 권한 검증 (본인 session 인가) + `endTime = LocalDateTime.now()` 또는 클라 전달 값 + 통계 컬럼 (`avgSyncRate` 등) 갱신 트리거 (~10줄)
-3. `dto/session/SessionEndDto.java` (선택) — body 가 필요한 경우만
+### 만질 파일 (완료됨)
+1. ✅ `controller/SessionController.java` — `PATCH /sessions/{id}/end` 구현
+2. ✅ `service/Exercise/SessionService.java` — `endSession(sessionId, member)`: 권한 검증 + endTime 기록 + `TransactionSynchronization.afterCommit` 안에서 `analysisService.stopAnalysis(sessionId)` 호출
+3. ~~`dto/session/SessionEndDto.java`~~ — body 불필요 (서버 시각 권위 채택)
 
 ### 완료 기준
 - `PATCH /sessions/{id}/end` 호출 시 `Session.endTime` 갱신
@@ -465,14 +460,14 @@
 
 | 안건 | 누구와 | 시점 | 차단? |
 |---|:-:|:-:|:-:|
-| **#5 인증·토큰 endpoint 분리** — `/api/*` JWT / `/internal/*` `X-Internal-Token` | 3자 | 작업 전 | 🔴 |
-| **#7 클라 양방향 호출 순서** — Spring + AI 양쪽 호출, `Promise.all` 동시 권장, 부분 실패 허용 | Front | 작업 전 | 🔴 |
-| **#6 (AI 측) 종료 신호 형식** — *Spring 무관* (AI ↔ Front 사이). 클라가 양쪽 호출하는 것만 알아두면 됨 | AI ↔ Front | 병행 | 🟡 |
-| **#16 시간대 형식** — `endTime` ISO 8601 + `+09:00`. body 의 `endedAt` 받지 말고 *서버 시각 권위* 권장 (보안·일관성) | 3자 | 작업 중 | 🟡 |
+| ~~**#5 인증·토큰 endpoint 분리**~~ | — | 해소 | ✅ 2026-05-26 gRPC 통일로 `/internal/*` REST 자체 소멸 |
+| ~~**#7 클라 양방향 호출 순서**~~ | — | 해소 | ✅ ET-H 채택으로 클라는 1 endpoint 만 호출 |
+| ~~**#6 (AI 측) 종료 신호 형식**~~ | — | 해소 | ✅ Spring 이 afterCommit gRPC `StopAnalysis` 송신, AI 는 기존 핸들러 그대로 |
+| **#16 시간대 형식** — Asia/Seoul 단일 TZ. `endTime` 서버 시각 권위 | 3자 | 작업 중 | 🟢 박힘 (`TZ=Asia/Seoul`) |
 
 기타:
-- 통계 갱신 (`avgSyncRate`, `totalReps`) — 종료 시점이 적합한가? AI 가 보내는 batch 와 데이터 일관성. 일단 endpoint 는 *시각만 기록*, 통계는 별도 갱신 흐름 유지
-- 이미 종료된 session 재호출 시 멱등 (200 OK, `endTime` 미변경)
+- 통계 갱신 (`avgSyncRate`, `totalReps`) — endpoint 는 *시각만 기록*. 통계는 AI 의 `CompleteAnalysis` 콜백이 별도 갱신
+- 이미 종료된 session 재호출 시 멱등 (200 OK, `endTime` 미변경, AI gRPC 도 안 부름)
 
 ---
 
@@ -523,8 +518,8 @@
 **우선**: 🟢 | **추정**: 4h | **의존**: BE-07 (패턴 분석) 와 묶기 권장 | **상태**: 📋
 
 ### 현재 상태
-- 📁 TTS 도메인 자체는 완성 (2f48526, 2026-05-09) — `PreferenceController`, `FeedbackTemplateController`, `InternalFeedbackController`, `SessionFeedbackLog`, `PreferenceService` 등 8개 파일
-- ✅ FastAPI 가 세션 종료 시 `POST /internal/feedback/batch` 로 발화 이벤트 배치 송신 → `SessionFeedbackLog` 저장
+- 📁 TTS 도메인 자체는 완성 (2f48526, 2026-05-09) — `PreferenceController`, `FeedbackTemplateController`, ~~`InternalFeedbackController`~~ (2026-05-26 삭제), `SessionFeedbackLog`, `PreferenceService` 등 7개 파일
+- ✅ FastAPI 가 세트 경계·세션 종료 시 gRPC `ReportFeedbackBatch` 송신 → `SessionFeedbackLog` 저장 (2026-05-26 gRPC 통일)
 - ❌ 저장된 발화 이벤트가 분석되지 않음 — 단순 로그만
 
 ### 만질 파일
