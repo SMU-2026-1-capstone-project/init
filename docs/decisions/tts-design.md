@@ -121,7 +121,15 @@ Header: X-Internal-Token: ***
 }
 ```
 
-### 2.A.ET 세션 종료 trigger — *누가 AI 에게 "세션 끝" 을 알리나?* → 추천 **ET-A (클라가 AI 에 직접 신호)**
+### 2.A.ET 세션 종료 trigger — *누가 AI 에게 "세션 끝" 을 알리나?* → **✅ ET-A 확정 (2026-05-25)**
+
+> **결정 (2026-05-25)**: ET-A (클라가 Spring + AI 양쪽에 직접 종료 통보) 채택. BE-14 endpoint (`PATCH /sessions/{id}/end`) 유지.
+> **호출 trigger 3가지 인지**:
+> - A 사용자 명시 종료 (버튼) — 클라가 endpoint 호출
+> - B 목표 rep/세트 달성 자동 종료 — 클라가 자동으로 endpoint 호출 (UI 가 "운동 끝났습니다 ✓" 확인 받고 동일 endpoint)
+> - C 강제 종료 (앱 죽음·네트워크 끊김) — endpoint 호출 불가, 별도 **safety net (협의 안건 #26, 베타 진입 전 도입)**
+>
+> ET-C (AI timeout 자동 종료) 거부 사유 재확인: *세트 사이 휴식 시간(30~90초)도 frame 안 오는 구간이라 휴식과 종료 구분 불가*. ET-B (Spring 경유) 도 hop 추가로 거부.
 
 분기 2 가 *송신 주체는 AI* 라고 결정했지만, AI 가 세션 종료 시점을 어떻게 인지하느냐는 미정. "운동 종료" 버튼 → AI batch POST 사이 trigger 경로.
 
@@ -1300,6 +1308,16 @@ Speech.speak(message, { language: 'ko-KR', rate: userTtsSpeed });
 - **2026-05-25 (갱신 5)**: 분기 8 안에 "후보 4 갈래로 묶어 보기 (큰 그림)" 섹션 추가. 7개 후보를 ①사전캐시 / ②on-device / ③cloud실시간 / ④LLM / ⑤혼합 으로 묶어 설명. 기존 §8.1~§8.7 번호 변경 없음.
 - **2026-05-25 (갱신 6)**: 갱신 5 의 ①~⑤ 갈래(*음성 합성 위치* 한 축) 위에 **2차원 분류** 섹션 추가. *텍스트 생성 위치* 축을 추가하여 7개 후보를 2×2 매트릭스에 배치. 왼쪽 아래(텍스트 외부+음성 내부)는 비용·합리성 측면에서 의미 없음. 8-G 단독으로 오른쪽 아래(텍스트·음성 모두 외부) 차지. 현재 추천(8-A → 8-D)이 왼쪽 열에 위치함을 명시 — *운동 중 발화에는 LLM 미사용* 일관 원칙 확인.
 - **2026-05-25 (갱신 7)**: §10 "데이터 플로우 (8-A 채택 시 전체 흐름)" + §11 "Spring 서버 책임" 신설. 분기 1~9 결정을 end-to-end 다이어그램으로 통합. Spring 의 책임/비책임 영역을 명시 — Spring 은 (a) Setup API 3개, (b) batch 수신 1개, (c) 조회 API 2개, (d) 데이터 모델 운영, (e) BE-03 (추후) 만 담당. 8종 분류·멘트 생성·TTS 합성·ducking 등은 Spring 비책임으로 명시. 신규 BE 작업 ~150~180줄, BE-10 의 일부로 분류 가능. 운동 중 Spring 실시간 부담 0 (요구사항 §1 정합).
+- **2026-05-25 (갱신 16)**: **협의 안건 #14·#15 (preferences) 결정 진행 + #15 보류 전환**:
+  - #14 ttsSpeed 검증: ✅ UI 슬라이더로 0.5~2.0 범위 강제 + Spring `@DecimalMin("0.5") @DecimalMax("2.0")` 표준 검증 어노테이션 (방어용, 평시 발동 X)
+  - #15 TTS preferences 즉시 효과: 🔵 *보류* — 일단 cached value 추천 박제했으나 *Front UI 디자인 확정 후 재검토 필요* (운동 중 변경 UI 만들 가능성). 사용자 결정으로 보류 전환
+  - 사용자 명시적 confirm 항목 5건 → **6건** (#14 만 추가)
+- **2026-05-25 (갱신 15)**: **협의 안건 #16 (시간대 형식) 단순화 결정**:
+  - 한국 전용 서비스 ([[project-korean-only]]) 정합 — timezone 마커 가치 약하고 산업 mainstream (카카오·네이버·토스) 도 미사용
+  - 결정: (1) 서버 timezone Asia/Seoul 고정 (Spring `spring.jackson.time-zone: Asia/Seoul` + AI `TZ=Asia/Seoul`), (2) API JSON 형식 *timezone 마커 없음* (`"2026-05-25T10:23:45"`), (3) DB `LocalDateTime` 유지, (4) UI KST 표시
+  - 작업 영향: `application.yml` + `docker-compose.yml` 각 1줄. 코드 변경 0
+  - 글로벌 진출 시 재검토 (현재 가능성 0)
+  - 미팅 안건 4 *사전 해결* — 3자 미팅에서 제외 가능. tts-negotiation-checklist.md #16 ✅, 3way-meeting-agenda.md 안건 4 단순화안으로 갱신
 - **2026-05-25 (갱신 14)**: **BT-SET 작업 분담 명시 + 점진 전환 단계 박제**:
   - §2.A.BT 에 *책임 분담* sub-섹션 신설 — Spring (DTO·uniqueKey·INSERT IGNORE) ~10줄 + AI (set 카운터·retry·target_reps_per_set 자체 계산) ~60줄. **Front 변경 없음** (분기 7-1 의 발화 채널만 관여)
   - §2.A.BT 에 *점진 전환* 4 단계 명시 — Phase 1 (MVP, BT-NONE) → Phase 2 (BE-13, Spring 준비) → Phase 3 (베타, AI 전환) → Phase 4 (정식, 디스크 영속화). **Spring 측 작업은 Phase 2 한 번으로 끝**

@@ -114,6 +114,29 @@ public class SessionService {
     }
 
     /**
+     * [세션 종료 — 분기 2.A.ET ET-A]
+     * 클라가 "운동 종료" 버튼 → 종료 시각만 기록. 통계 갱신은 AI 의 completeSession 콜백이 별도 처리.
+     * 본인 세션이 아니면 ACCESS_DENIED, 이미 종료된 세션이면 멱등 (변경 없음, 200 OK).
+     */
+    @Transactional
+    public void endSession(Long sessionId, Long currentMemberId) {
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+
+        if (!session.getMember().getId().equals(currentMemberId)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
+
+        // 멱등: 이미 endTime 기록된 세션은 변경 없음
+        if (session.getEndTime() != null) {
+            return;
+        }
+
+        session.setEndTime(LocalDateTime.now());
+        sessionRepository.saveAndFlush(session);
+    }
+
+    /**
      * [타임아웃 처리] 세션이 아직 IN_PROGRESS 상태이면 FAILED로 변경합니다.
      *
      * 스케줄러 호출용. 별도 트랜잭션으로 실행되어 한 세션의 충돌이 다른 세션 처리에 영향을 주지 않습니다.

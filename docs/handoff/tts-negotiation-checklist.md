@@ -20,32 +20,124 @@
 
 ---
 
+## 📊 현재 결정 상태 종합 (2026-05-25)
+
+### ✅ 사용자 명시적 confirm (7건)
+
+| 위치 | 결정 |
+|---|---|
+| 분기 3 (rep 다중 결함) | priority 최솟값 1개 + RC-2 (5배수 카운트 발화) |
+| 분기 6 (GOOD_FORM) | 발화·송신 안 함 |
+| 분기 9 (영상 audio ducking) | `expo-av setAudioModeAsync` (9-1) |
+| **분기 2.A.ET (세션 종료 trigger)** | **ET-A (클라가 Spring + AI 양쪽 통보) — BE-14 endpoint 유지. 호출 trigger 3가지: 명시 종료 / 목표 달성 자동 / 강제 종료(safety net 별도)** |
+| #25 (priority 응답 메타) | 포함 유지 (현 코드) |
+| #16 (시간대 형식) | 서버 Asia/Seoul 고정 + API JSON 마커 없음 + DB LocalDateTime + UI KST |
+| #14 (ttsSpeed 검증) | UI 슬라이더 + Spring `@DecimalMin/@DecimalMax` 표준 검증 |
+
+### 🔵 보류 (Front UI 디자인 확정 후 재검토, 1건)
+
+| # | 추천 (보류) |
+|:-:|---|
+| #15 TTS preferences 즉시 효과 | cached value / 다음 rep 부터 반영 (운동 중 변경 UI 없음 가정) — Front UI 결정 후 |
+
+### 📝 추천 박제 — 분기 결정 (확정 마크 미완, 9건)
+
+작업 시작은 가능하나 *공식 ✅ 미마크*:
+
+| 분기 | 추천 | 갱신 |
+|---|---|:-:|
+| 분기 1 | 1-B (AI 가 8종 분류) | - |
+| 분기 2 | 2-A (AI 가 batch 송신) | - |
+| ~~분기 2.A.ET~~ | ~~ET-A~~ → ✅ 확정 (2026-05-25). 위 confirm 표로 이동 |
+| **분기 2.A.BT** | **BT-SET (세트 경계 + 세션 종료 final)** | 갱신 13·14 |
+| 분기 4 | 4-A (운동 진입 시 1회 캐시) | - |
+| 분기 7 | 7-1 (HTTP response 확장) | - |
+| 분기 8 | 8-A (`expo-speech` OS TTS) + 8-D 격상 | 갱신 3 |
+| §갱신 12 | snake_case payload + Spring `@JsonNaming` | 갱신 12 |
+
+### ⚠️ OPEN — 명시적 confirm 미완
+
+| 분기 | 사유 |
+|---|---|
+| **분기 5 (TTS off fallback)** | 사용자 답변이 질문 의도와 어긋남. *언어 한국어 확정* 만, *off 시 자막+진동* 안 확정 |
+
+### ☐ 미결정 — 체크리스트 28건 중
+
+```
+🔴 최우선 5건:    #1, #2, #3, #4, #5         (3자 미팅 1회로 일괄 가능)
+🟡 중요 10건:     #6~#15 (#10, #14·15 제외)
+🟢 차순위 13건:   #16~#28 (#25 제외)
+                  ─────
+                  미결정 22건
+```
+
+### 🔵 MVP 보류 권장 (7건)
+
+```
+#8  분류 임계값 위치 (AI 단독, 작업 시 결정)
+#9  priority 상수 위치 (분기 3-A-1 채택으로 사실상 끝)
+#11 batch 부분 실패 (운영 진입 후)
+#18 events 페이징 (MVP 미도입)
+#21 batch 크기 한도 (운영 후)
+#22 batch 타임아웃 (10초 가정 충분)
+#23 내부 토큰 관리·회전 (환경변수 고정 충분)
+```
+
+### 진짜 협의 필요 (4건)
+
+| # | 안건 | 누구와 | 시점 |
+|:-:|---|---|---|
+| #7 | 클라 양방향 호출 순서 | Front | BE-14 시작 전 |
+| #13 | 페르소나 변경 후 캐시 무효화 | Front | BE-13 작업 중 |
+| #17 | summary 집계 단위 | Front | BE-15 작업 중 |
+| #26 | 종료 신호 safety net | Front | 베타 진입 전 |
+
+### 코드 상태로 *사실상 결정* (2건)
+
+| # | 코드 상태 |
+|:-:|---|
+| #12 templates 응답 구조 | 이미 Array (`List<FeedbackTemplateDto>`) — 변경 안 하면 결정 |
+| #19 트레이너 권한 | `UserRole` 에 `TRAINER` 없음 → 1학기 보류 자연 |
+
+### 작업 시작 가능 여부
+
+| 작업 | 차단 요소 | 시작 가능? |
+|---|---|---|
+| BE-13 (페르소나 + BT-SET) | #1·#2·#3 (추천 박제) | ⭕ 추천대로 가능 |
+| BE-14 (Session 종료) | #5·#7 (추천 + 1:1) | ⭕ 추천대로 가능 |
+| BE-15 (피드백 조회) | #17 (진짜 결정) | △ #17 결정 후 |
+| AI handoff | #3·#4·#6·#10 (추천 박제) | ⭕ 추천대로 가능 |
+
+---
+
+---
+
 ## 🔴 최우선 — 통합 전 반드시 합의
 
-| # | 안건 | 관련 Spring API / 인터페이스 | 결정 옵션 | 당사자 | 상태 |
+| # | 안건 | 관련 Spring API / 인터페이스 | 결정 옵션 (추천) | 당사자 | 상태 |
 |:-:|---|---|---|:-:|:-:|
-| 1 | 8종 enum 표기 | `POST /internal/feedback/batch`, `GET /sessions/{id}/feedbacks`, `GET /sessions/{id}/feedback-summary`, `GET /exercises/{id}/feedback-templates`, proto `feedback_type` | `KNEE_OUT` UPPER_SNAKE 통일 / master = `REQUIREMENTS.md` §6 | 3자 | ☐ |
-| 2 | 페르소나 enum 표기 | `GET /users/me`, `PATCH /users/me/persona`, `GET /exercises/{id}/feedback-templates` | `BEGINNER/ADVANCED/DIET/REHAB` / master = `12-persona-difficulty.md` | 3자 | ☐ |
-| 3 | batch payload schema | `POST /internal/feedback/batch` | **snake_case** `{session_id, set_no, is_final, events:[{feedback_type, sync_rate_at_trigger, occurred_at}]}` + Spring DTO 에 `@JsonNaming(SnakeCaseStrategy.class)`. `set_no`·`is_final` 은 BT-SET (분기 2.A.BT) 채택 결과 | A ↔ S | ☐ |
-| 4 | proto `feedback_type` 필드 | `ai-server/app/proto/exercise.proto` + `backend/src/main/proto/exercise.proto`, `POST /pose` 응답 모델 | string + 화이트리스트 검증 / 필드 번호 양쪽 동기 | A ↔ S | ☐ |
-| 5 | 인증·토큰 endpoint 분리 | 전체 — `/api/*` (JWT) vs `/internal/*` (`X-Internal-Token`) | 경로 prefix 로 명확 분리 | 3자 | ☐ |
+| 1 | 8종 enum 표기 | `POST /internal/feedback/batch`, `GET /sessions/{id}/feedbacks`, `GET /sessions/{id}/feedback-summary`, `GET /exercises/{id}/feedback-templates`, proto `feedback_type` | **추천**: `KNEE_OUT` UPPER_SNAKE / master = `REQUIREMENTS.md` §6 (코드 `FeedbackType.java` 이미 일치, 문서 명시만) | 3자 | ☐ |
+| 2 | 페르소나 enum 표기 | `GET /users/me`, `PATCH /users/me/persona`, `GET /exercises/{id}/feedback-templates` | **추천**: `BEGINNER/ADVANCED/DIET/REHAB` / master = `12-persona-difficulty.md` (`Member.selectedPersona` 와 정합) | 3자 | ☐ |
+| 3 | batch payload schema | `POST /internal/feedback/batch` | **추천**: snake_case `{session_id, set_no, is_final, events:[{feedback_type, sync_rate_at_trigger, occurred_at}]}` + Spring DTO 에 `@JsonNaming(SnakeCaseStrategy.class)`. `set_no`·`is_final` 은 BT-SET (분기 2.A.BT) 채택 결과 | A ↔ S | ☐ |
+| 4 | proto `feedback_type` 필드 | `ai-server/app/proto/exercise.proto` + `backend/src/main/proto/exercise.proto`, `POST /pose` 응답 모델 | **추천**: string + 화이트리스트 검증 (enum 보다 호환성·유연성 우위) / 필드 번호 양쪽 동기 | A ↔ S | ☐ |
+| 5 | 인증·토큰 endpoint 분리 | 전체 — `/api/*` (JWT) vs `/internal/*` (`X-Internal-Token`) | **추천**: 경로 prefix 명확 분리 (`/api/*` JWT, `/internal/*` `X-Internal-Token`) — 이미 `InternalFeedbackController` 구현에 반영됨 | 3자 | ☐ |
 
 ---
 
 ## 🟡 중요 — 구현 중 결정
 
-| # | 안건 | 관련 Spring API / 인터페이스 | 결정 옵션 | 당사자 | 상태 |
+| # | 안건 | 관련 Spring API / 인터페이스 | 결정 옵션 (추천) | 당사자 | 상태 |
 |:-:|---|---|---|:-:|:-:|
-| 6 | 세션 종료 신호 형식 (ET-A) | (AI 측) 마지막 `POST /pose` 의 `session_end=true` vs 별도 `POST /sessions/{id}/end` — Spring 의 `PATCH /sessions/{id}/end` 와는 별개 | 옵션 1 (플래그) 또는 옵션 2 (endpoint) 결정 | A ↔ F | ☐ |
-| 7 | 클라 양방향 호출 순서 | (Front) `PATCH /sessions/{id}/end` + AI 측 종료 신호 | `Promise.all` 동시 / 부분 실패 허용 | F ↔ S | ☐ |
-| 8 | 분류 임계값 위치 | (Spring API 없음 — AI 내부) | `squat_analyzer` 상수 / 영상 5~10건 튜닝 | A 단독 (공유) | ☐ |
-| 9 | priority 상수 위치 | (Spring API 없음 또는 `GET /exercises/{id}/feedback-templates` 응답에 포함) | AI 내장 (3-A-1) — 3-A-2 거부 | A 단독 | ☐ |
-| 10 | batch 재시도·멱등성 | `POST /internal/feedback/batch` | **BT-SET 채택으로 필수**. AI 측 휴식 중 retry (0s/5s/15s/35s backoff, 총 ~55s) + Spring 측 `(session_id, occurred_at, feedback_type)` uniqueKey + `INSERT IGNORE`/`ON DUPLICATE KEY UPDATE` | A ↔ S | ☐ |
-| 11 | batch 부분 실패 처리 | `POST /internal/feedback/batch` | 전체 reject vs 유효한 것만 insert + reject 목록 응답 | A ↔ S | ☐ |
-| 12 | templates 응답 구조 | `GET /exercises/{id}/feedback-templates` | `{type: message}` Map vs `[{type, message}]` Array | F ↔ S | ☐ |
-| 13 | 페르소나 변경 후 캐시 무효화 | `PATCH /users/me/persona` → `GET /exercises/{id}/feedback-templates` 재호출 | PATCH 응답에 `templatesReloadRequired: true` vs 클라가 운동 시작 시 항상 재호출 | F ↔ S | ☐ |
-| 14 | `ttsSpeed` 검증 | `PATCH /preferences/tts` | 0.5~2.0 범위 위배 시 422 vs 자동 클램프 | F ↔ S | ☐ |
-| 15 | TTS preferences 즉시 효과 | `GET /preferences/tts`, `PATCH /preferences/tts` | 현재 운동 중 변경은 다음 rep 부터 / 클라 cached value 사용 | F ↔ S | ☐ |
+| 6 | 세션 종료 신호 형식 (ET-A) | (AI 측) 마지막 `POST /pose` 의 `session_end=true` vs 별도 `POST /sessions/{id}/end` — Spring 의 `PATCH /sessions/{id}/end` 와는 별개 | **추천**: 옵션 1 (플래그) — 기존 `POST /pose` 채널 활용, 신규 endpoint 회피 | A ↔ F | ☐ |
+| 7 | 클라 양방향 호출 순서 | (Front) `PATCH /sessions/{id}/end` + AI 측 종료 신호 | **추천**: `Promise.all` 동시 / 부분 실패 허용 — *부분 실패 처리 정책* Front 합의 필요 | F ↔ S | ☐ |
+| 8 | 분류 임계값 위치 | (Spring API 없음 — AI 내부) | **추천**: `squat_analyzer` 상수 + 영상 5~10건 튜닝 | A 단독 (공유) | ☐ |
+| 9 | priority 상수 위치 | (Spring API 없음 또는 `GET /exercises/{id}/feedback-templates` 응답에 포함) | **추천**: AI 내장 (3-A-1) — 3-A-2 거부 | A 단독 | ☐ |
+| 10 | batch 재시도·멱등성 | `POST /internal/feedback/batch` | **추천**: AI 측 휴식 중 retry (0s/5s/15s/35s backoff, 총 ~55s) + Spring 측 `(session_id, occurred_at, feedback_type)` uniqueKey + `INSERT IGNORE` (BT-SET 채택으로 필수, 갱신 13·14 와 묶임) | A ↔ S | ☐ |
+| 11 | batch 부분 실패 처리 | `POST /internal/feedback/batch` | **추천**: 유효한 것만 insert + reject 목록 응답 | A ↔ S | ☐ |
+| 12 | templates 응답 구조 | `GET /exercises/{id}/feedback-templates` | **추천**: `[{feedbackType, message}]` Array (정렬·확장 유리) | F ↔ S | ☐ |
+| 13 | 페르소나 변경 후 캐시 무효화 | `PATCH /users/me/persona` → `GET /exercises/{id}/feedback-templates` 재호출 | PATCH 응답에 `templatesReloadRequired: true` vs 클라가 운동 시작 시 항상 재호출 — *Front 의 캐시 정책* 합의 필요 | F ↔ S | ☐ |
+| 14 | `ttsSpeed` 검증 | `PATCH /preferences/tts` | **✅ 결정 (2026-05-25)**: UI 슬라이더로 0.5~2.0 범위 강제 + Spring 표준 `@DecimalMin("0.5") @DecimalMax("2.0")` 검증 어노테이션 (방어용). UI 가 범위 보장 → 평시 발동 X, 비정상 호출만 422 응답 | F ↔ S | ✅ |
+| 15 | TTS preferences 즉시 효과 | `GET /preferences/tts`, `PATCH /preferences/tts` | **추천**: 클라 cached value / 다음 rep 부터 반영 (운동 중 변경 UI 없음 가정) — 단 *Front UI 디자인* 확정 후 재검토 필요 | F ↔ S | 🔵 보류 |
 
 ---
 
@@ -53,7 +145,7 @@
 
 | # | 안건 | 관련 Spring API / 인터페이스 | 결정 옵션 | 당사자 | 상태 |
 |:-:|---|---|---|:-:|:-:|
-| 16 | 시간대 형식 | 시각 필드 포함 모든 API — `POST /internal/feedback/batch`, `GET /sessions/{id}/feedbacks`, `PATCH /sessions/{id}/end`, `GET /sessions/{id}/feedback-summary` | ISO 8601 + `+09:00` / DB UTC 저장 / 클라 KST 표시 | 3자 | ☐ |
+| 16 | 시간대 형식 | 시각 필드 포함 모든 API — `POST /internal/feedback/batch`, `GET /sessions/{id}/feedbacks`, `PATCH /sessions/{id}/end`, `GET /sessions/{id}/feedback-summary` | **✅ 결정 (2026-05-25)**: 한국 전용 서비스 정합. (1) 서버 timezone Asia/Seoul 고정 (Spring `spring.jackson.time-zone: Asia/Seoul` + AI `TZ=Asia/Seoul`), (2) API JSON 형식 마커 없음 (`"2026-05-25T10:23:45"`), (3) DB `LocalDateTime` 유지, (4) UI KST 표시. 글로벌 진출 시 재검토 | 3자 | ✅ |
 | 17 | summary 집계 단위 | `GET /sessions/{id}/feedback-summary` | `feedback_type` 별 카운트 + sync_rate avg/min/max | F ↔ S | ☐ |
 | 18 | events 페이징 | `GET /sessions/{id}/feedbacks` | `page/size` (max ~210건 가능) | F ↔ S | ☐ |
 | 19 | 트레이너 권한 헤더 | `GET /sessions/{id}/feedbacks`, `GET /sessions/{id}/feedback-summary` | 기존 권한 모듈 재사용 | S 단독 | ☐ |
@@ -62,7 +154,7 @@
 | 22 | batch 타임아웃 | `POST /internal/feedback/batch` (AI 측 httpx timeout) | Spring 응답 대기 10초 | A ↔ S | ☐ |
 | 23 | 내부 토큰 관리·회전 | `POST /internal/feedback/batch` 인증 | 환경변수 → secret manager 단계적 / 회전 정책 미정 | S 단독 | ☐ |
 | 24 | 빈 결과 처리 | `GET /exercises/{id}/feedback-templates` | 페르소나 row 없으면 BEGINNER fallback vs 404 | F ↔ S | ☐ |
-| 25 | enum 응답 메타 (priority) | `GET /exercises/{id}/feedback-templates` | `priority` 응답 제외 (클라 미사용) | F ↔ S | ☐ |
+| 25 | enum 응답 메타 (priority) | `GET /exercises/{id}/feedback-templates` | **✅ 결정 (2026-05-25)**: priority 응답 포함 유지 (현 코드 상태). 변경 0, 응답 부담 무시 수준 (~16 byte), 미래 활용 (Front 별표·색 표시) 가능성 보존 | F ↔ S | ✅ |
 | 26 | 종료 신호 safety net | (AI 측 종료 처리, Spring API 무관) | 클라 신호 누락 시 N분 timeout 으로 batch 송신 (ET-C 미니멀 도입) | A ↔ F | ☐ |
 | 27 | 세션 메모리 정리 | (Spring API 없음) | batch 송신 성공 후 즉시 누적 데이터 삭제 | A 단독 | ☐ |
 | 28 | enum 추가 시 배포 순서 | 모든 enum 사용 API | Spring 먼저 (DB seed + enum) → AI → Front | 3자 | ☐ |
