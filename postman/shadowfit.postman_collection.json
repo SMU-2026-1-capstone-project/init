@@ -1,0 +1,407 @@
+{
+  "info": {
+    "name": "ShadowFit Backend API",
+    "description": "ShadowFit Spring 백엔드 전체 endpoint 컬렉션. 로그인 시 accessToken/refreshToken 자동 추출 → environment 변수로 박힘. 다른 요청은 {{accessToken}} 자동 사용.\n\n생성: 2026-05-27 / 기준 commit: backend 브랜치 HEAD",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{accessToken}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" }
+  ],
+  "item": [
+    {
+      "name": "01. 인증·온보딩 (/member)",
+      "item": [
+        {
+          "name": "회원가입",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/member/signup", "host": ["{{baseUrl}}"], "path": ["member", "signup"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"shadow_fit_01\",\n  \"email\": \"test@shadowfit.local\",\n  \"password\": \"P@ssw0rd!\",\n  \"sex\": \"MALE\",\n  \"role\": \"USER\"\n}"
+            }
+          }
+        },
+        {
+          "name": "로그인 (토큰 자동 저장)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.environment.set('accessToken', json.accessToken);",
+                  "  pm.environment.set('refreshToken', json.refreshToken);",
+                  "  pm.environment.set('role', json.role);",
+                  "  console.log('✅ accessToken 저장됨');",
+                  "} else {",
+                  "  console.warn('❌ 로그인 실패:', pm.response.code);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/member/login", "host": ["{{baseUrl}}"], "path": ["member", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@shadowfit.local\",\n  \"password\": \"P@ssw0rd!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "로그아웃",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/member/logout", "host": ["{{baseUrl}}"], "path": ["member", "logout"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accessToken\": \"{{accessToken}}\",\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "회원탈퇴",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/member/{{email}}", "host": ["{{baseUrl}}"], "path": ["member", "{{email}}"] }
+          }
+        },
+        {
+          "name": "온보딩 정보 조회",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/member/onboarding/{{email}}", "host": ["{{baseUrl}}"], "path": ["member", "onboarding", "{{email}}"] }
+          }
+        },
+        {
+          "name": "온보딩 단계별 저장",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/member/onboarding/{{email}}", "host": ["{{baseUrl}}"], "path": ["member", "onboarding", "{{email}}"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"selectedPersona\": \"ADVANCED\",\n  \"workoutLevel\": \"STARTER\",\n  \"height\": 180.0,\n  \"weight\": 75.5,\n  \"preferredUrl\": \"https://www.youtube.com/watch?v=q6hBSSis_60\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. 운동 세션 (/exercises, /sessions)",
+      "item": [
+        {
+          "name": "기준 좌표 추출 (관리자/등록용)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/exercises/{{exerciseId}}/reference?youtubeUrl=https://www.youtube.com/watch?v=q6hBSSis_60",
+              "host": ["{{baseUrl}}"],
+              "path": ["exercises", "{{exerciseId}}", "reference"],
+              "query": [{ "key": "youtubeUrl", "value": "https://www.youtube.com/watch?v=q6hBSSis_60" }]
+            }
+          }
+        },
+        {
+          "name": "운동 세션 시작 (sessionId 자동 저장)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "  const json = pm.response.json();",
+                  "  pm.environment.set('sessionId', json.sessionId);",
+                  "  console.log('✅ sessionId 저장됨:', json.sessionId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/exercises/sessions", "host": ["{{baseUrl}}"], "path": ["exercises", "sessions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exerciseId\": {{exerciseId}}\n}"
+            }
+          }
+        },
+        {
+          "name": "[Deprecated] 운동 세션 종료 (옛 흐름)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/exercises/sessions/{{sessionId}}/complete", "host": ["{{baseUrl}}"], "path": ["exercises", "sessions", "{{sessionId}}", "complete"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"totalReps\": 12,\n  \"syncRate\": 78.5\n}"
+            },
+            "description": "사용 자제. PATCH /sessions/{id}/end (ET-H) 로 대체됨."
+          }
+        },
+        {
+          "name": "세션 종료 (ET-H, ⭐ 현행)",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{baseUrl}}/sessions/{{sessionId}}/end", "host": ["{{baseUrl}}"], "path": ["sessions", "{{sessionId}}", "end"] },
+            "description": "운동 종료 시 호출. Spring 이 endTime 기록 + afterCommit 으로 AI 에 gRPC StopAnalysis 송신.\n본인 세션 아니면 403, 이미 종료된 세션 재호출은 멱등 (200 OK)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. TTS · 피드백 (/preferences, /exercises/.../feedback-templates, /sessions/.../feedbacks)",
+      "item": [
+        {
+          "name": "TTS 설정 조회",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/preferences/tts", "host": ["{{baseUrl}}"], "path": ["preferences", "tts"] }
+          }
+        },
+        {
+          "name": "TTS 설정 변경 (부분 업데이트)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/preferences/tts", "host": ["{{baseUrl}}"], "path": ["preferences", "tts"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ttsEnabled\": true,\n  \"ttsSpeed\": 1.25\n}"
+            },
+            "description": "ttsEnabled, ttsSpeed 둘 다 nullable — 하나만 보내도 OK. ttsSpeed 는 0.5~2.0 범위."
+          }
+        },
+        {
+          "name": "운동 피드백 템플릿 조회 (페르소나 자동 필터)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/exercises/{{exerciseId}}/feedback-templates", "host": ["{{baseUrl}}"], "path": ["exercises", "{{exerciseId}}", "feedback-templates"] },
+            "description": "세션 시작 시 클라가 호출. 토큰의 selectedPersona 자동 적용 → 페르소나별 멘트 반환. 없으면 NULL fallback."
+          }
+        },
+        {
+          "name": "세션 피드백 이벤트 리스트",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/sessions/{{sessionId}}/feedbacks", "host": ["{{baseUrl}}"], "path": ["sessions", "{{sessionId}}", "feedbacks"] },
+            "description": "발생 시각 오름차순. 본인 세션만 (MVP — 페이징 없음, 협의 #18)."
+          }
+        },
+        {
+          "name": "세션 피드백 집계 (type 별 카운트 + sync_rate 통계)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/sessions/{{sessionId}}/feedback-summary", "host": ["{{baseUrl}}"], "path": ["sessions", "{{sessionId}}", "feedback-summary"] },
+            "description": "리포트 차트용 — feedback_type 별 카운트 + avg/min/max sync_rate (협의 #17)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. 운동 리포트 (/reports)",
+      "item": [
+        {
+          "name": "주간 운동 요약",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/reports/weekly-summary", "host": ["{{baseUrl}}"], "path": ["reports", "weekly-summary"] }
+          }
+        },
+        {
+          "name": "메인 달력 데이터",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/calendar?year=2026&month=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["reports", "calendar"],
+              "query": [
+                { "key": "year", "value": "2026" },
+                { "key": "month", "value": "5" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "운동 메모 저장",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/reports/daily-logs", "host": ["{{baseUrl}}"], "path": ["reports", "daily-logs"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"logDate\": \"2026-05-27\",\n  \"memo\": \"오늘 스쿼트 12회 완료\",\n  \"mood\": \"GOOD\"\n}"
+            },
+            "description": "mood: GREAT / GOOD / NORMAL / BAD / TERRIBLE"
+          }
+        },
+        {
+          "name": "일별 운동 보고서 (session 단위)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/reports/session/{{sessionId}}", "host": ["{{baseUrl}}"], "path": ["reports", "session", "{{sessionId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. 관리자 (/admin)",
+      "item": [
+        {
+          "name": "운동 싱크로율 임계값 변경 (ADMIN)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/admin/exercises/{{exerciseId}}/thresholds", "host": ["{{baseUrl}}"], "path": ["admin", "exercises", "{{exerciseId}}", "thresholds"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"beginner\": 60.0,\n  \"advanced\": 80.0\n}"
+            },
+            "description": "beginner < advanced 필수. 0~100 범위. ROLE_ADMIN 만 가능."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. 유틸 (/api)",
+      "item": [
+        {
+          "name": "BCrypt 해시 확인",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/check-my-hash?password=P@ssw0rd!",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "check-my-hash"],
+              "query": [{ "key": "password", "value": "P@ssw0rd!" }]
+            },
+            "description": "디버그용 — 평문 비밀번호 → BCrypt 해시 반환."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. gRPC — ExerciseService (localhost:6565)",
+      "description": "Spring ↔ FastAPI 내부 gRPC 채널. Postman 의 gRPC 요청 기능 필요 (좌측 New → gRPC Request).\n\n사용 절차:\n1. 좌측 New → gRPC Request 생성\n2. Server URL: {{grpcUrl}} (기본 localhost:6565)\n3. 'Select a method' → 'Import a .proto file' → backend/src/main/proto/exercise.proto 임포트\n4. Service: shadowfit.grpc.ExerciseService (또는 proto 의 java_package 와 service 명에 따라)\n5. Metadata 에 authorization: Bearer {{internalToken}} 추가\n6. 아래 RPC 별 body 예시를 Message 에 붙여넣기\n\n호출 방향 표기:\n- ⬅️ FastAPI → Spring (Spring 이 서버 역할)\n- ➡️ Spring → FastAPI (FastAPI 가 서버 역할, AI 서버 :50051 또는 동일 :6565 운영 설정에 따라)",
+      "item": [
+        {
+          "name": "ExtractReferenceData ➡️ FastAPI",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": { "raw": "{{grpcUrl}}/shadowfit.grpc.ExerciseService/ExtractReferenceData", "host": ["{{grpcUrl}}"], "path": ["shadowfit.grpc.ExerciseService", "ExtractReferenceData"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exercise_id\": 1,\n  \"youtube_url\": \"https://www.youtube.com/watch?v=q6hBSSis_60\",\n  \"extracted_poses\": []\n}"
+            },
+            "description": "등록 단계: 유튜브 링크 → 전체 기준 좌표 추출. Spring 이 호출, FastAPI 가 응답."
+          }
+        },
+        {
+          "name": "StartAnalysis ➡️ FastAPI",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": { "raw": "{{grpcUrl}}/shadowfit.grpc.ExerciseService/StartAnalysis", "host": ["{{grpcUrl}}"], "path": ["shadowfit.grpc.ExerciseService", "StartAnalysis"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exercise_id\": 1,\n  \"session_id\": 123,\n  \"reference_source\": \"https://www.youtube.com/watch?v=q6hBSSis_60\",\n  \"reference_poses\": [\n    {\n      \"timestamp_sec\": 0.033,\n      \"joint_coordinates\": \"{...mediapipe landmarks json...}\",\n      \"sync_rate\": 0.0,\n      \"feedback_message\": \"\"\n    }\n  ]\n}"
+            },
+            "description": "실행 단계: 세션 시작 시 DB 의 기준 좌표를 FastAPI 에 전달. POST /exercises/sessions 의 내부 호출."
+          }
+        },
+        {
+          "name": "SavePoseDataBatch ⬅️ FastAPI → Spring",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "authorization", "value": "Bearer {{internalToken}}", "description": "AI 서버 → Spring 내부 인증" }],
+            "url": { "raw": "{{grpcUrl}}/shadowfit.grpc.ExerciseService/SavePoseDataBatch", "host": ["{{grpcUrl}}"], "path": ["shadowfit.grpc.ExerciseService", "SavePoseDataBatch"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": {{sessionId}},\n  \"pose_data\": [\n    {\n      \"timestamp_sec\": 1.234,\n      \"joint_coordinates\": \"{...mediapipe landmarks json...}\",\n      \"sync_rate\": 78.5,\n      \"feedback_message\": \"자세 양호\"\n    },\n    {\n      \"timestamp_sec\": 2.567,\n      \"joint_coordinates\": \"{...}\",\n      \"sync_rate\": 52.3,\n      \"feedback_message\": \"자세 보정 필요\"\n    }\n  ]\n}"
+            },
+            "description": "rep 완료 시 PoseData 묶음 송신. Spring 이 pose_data 테이블에 적재."
+          }
+        },
+        {
+          "name": "CompleteAnalysis ⬅️ FastAPI → Spring",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "authorization", "value": "Bearer {{internalToken}}" }],
+            "url": { "raw": "{{grpcUrl}}/shadowfit.grpc.ExerciseService/CompleteAnalysis", "host": ["{{grpcUrl}}"], "path": ["shadowfit.grpc.ExerciseService", "CompleteAnalysis"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": {{sessionId}},\n  \"total_reps\": 12,\n  \"avg_sync_rate\": 78.5,\n  \"max_sync_rate\": 92.1,\n  \"min_sync_rate\": 45.3,\n  \"calories_burned\": 35.2,\n  \"difficulty_level\": 2\n}"
+            },
+            "description": "AI 가 세션 종료 시 종합 분석 결과 송신. Spring 이 session 의 통계 컬럼 업데이트."
+          }
+        },
+        {
+          "name": "StopAnalysis ➡️ FastAPI (ET-H afterCommit)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": { "raw": "{{grpcUrl}}/shadowfit.grpc.ExerciseService/StopAnalysis", "host": ["{{grpcUrl}}"], "path": ["shadowfit.grpc.ExerciseService", "StopAnalysis"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": {{sessionId}}\n}"
+            },
+            "description": "사용자 종료 시 Spring afterCommit hook 에서 FastAPI 에 통보 (ET-H). FastAPI 는 세션 메모리 정리 + final batch 송신."
+          }
+        },
+        {
+          "name": "⭐ ReportFeedbackBatch ⬅️ FastAPI → Spring (BT-SET)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "authorization", "value": "Bearer {{internalToken}}", "description": "AI 서버 → Spring 내부 인증" }],
+            "url": { "raw": "{{grpcUrl}}/shadowfit.grpc.ExerciseService/ReportFeedbackBatch", "host": ["{{grpcUrl}}"], "path": ["shadowfit.grpc.ExerciseService", "ReportFeedbackBatch"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": {{sessionId}},\n  \"set_no\": 1,\n  \"is_final\": false,\n  \"events\": [\n    {\n      \"feedback_type\": \"KNEE_OUT\",\n      \"sync_rate_at_trigger\": 52.3,\n      \"occurred_at\": \"2026-05-27T10:23:45Z\"\n    },\n    {\n      \"feedback_type\": \"BACK_BENT\",\n      \"sync_rate_at_trigger\": 48.1,\n      \"occurred_at\": \"2026-05-27T10:24:12Z\"\n    }\n  ]\n}"
+            },
+            "description": "📌 AI 송신 판정 이벤트 수신 → DB 적재 (옛 POST /internal/feedback/batch 의 대체). 세트 경계마다 또는 세션 종료 시점에 호출. 멱등 — uniqueKey (session_id, occurred_at, feedback_type) + INSERT IGNORE 로 retry 안전. feedback_type 은 8종 enum 중 하나: KNEE_OUT / KNEE_IN / HIP_LOW / HIP_HIGH / BACK_BENT / SHOULDER_TILT / ELBOW_BENT / HEAD_DOWN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. gRPC — UserService (localhost:6565)",
+      "item": [
+        {
+          "name": "GetUserInfo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "authorization", "value": "Bearer {{internalToken}}" }],
+            "url": { "raw": "{{grpcUrl}}/shadowfit.grpc.UserService/GetUserInfo", "host": ["{{grpcUrl}}"], "path": ["shadowfit.grpc.UserService", "GetUserInfo"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 1\n}"
+            },
+            "description": "내부 서비스 간 사용자 조회 (nickname 반환)."
+          }
+        }
+      ]
+    }
+  ]
+}
