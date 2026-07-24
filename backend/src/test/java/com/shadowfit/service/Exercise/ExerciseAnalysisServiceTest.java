@@ -136,6 +136,13 @@ class ExerciseAnalysisServiceTest {
         // no-op됨 — 그래서 동기 반환 직후 이 트랜잭션 안에서는 항상 IN_PROGRESS로 보여야 함.
         // (self. 대신 this.로 self-invocation하면 @Async가 무시돼 동기 실행되면서 이 값이
         // 깨질 수 있음 — 2026-07-24 발견·수정한 버그의 회귀 방지 성격도 겸함)
+        //
+        // CodeRabbit 지적(2026-07-24, sendAnalysisRequestToFastApi를 목 처리해서 백그라운드 gRPC
+        // 호출 부수효과를 끊어내라) 검토 결과 skip: self.sendAnalysisRequestToFastApi()는
+        // registerSynchronization(...).afterCommit()으로만 실행되는데, 이 테스트는 클래스
+        // @Transactional 기본 rollback 정책상 실제 커밋이 한 번도 일어나지 않아 afterCommit
+        // 콜백 자체가 트리거되지 않음(실측: 로그에 "비동기 분석 요청 시작"이 전혀 안 찍힘) —
+        // 즉 이 테스트에서는 gRPC 호출도, 그로 인한 부수효과도 실제로 발생하지 않아 목 처리 대상이 없음.
         Session created = sessionRepository.findById(sessionId).orElseThrow();
         assertThat(created.getStatus()).isEqualTo(Status.IN_PROGRESS);
         assertThat(created.getMember().getId()).isEqualTo(member.getId());
