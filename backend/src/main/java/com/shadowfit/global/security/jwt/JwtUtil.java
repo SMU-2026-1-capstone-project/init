@@ -4,6 +4,7 @@ import com.shadowfit.dto.login.CustomUserInfoDto;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SecurityException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -63,6 +64,10 @@ public class JwtUtil {
     }
 
     // JWT 검증
+    // ⚠️ 2026-07-24 수정: 위에서 io.jsonwebtoken.security.SecurityException을 명시 import하지
+    // 않았을 땐 여기 SecurityException이 java.lang.SecurityException으로 잘못 resolve돼(io.jsonwebtoken
+    // 패키지엔 이 이름의 클래스가 base package에 없음), 서명 변조 토큰(io.jsonwebtoken.security.
+    // SignatureException)이 이 catch에 안 걸리고 그대로 던져지는 버그가 있었음 — JwtUtilTest로 발견.
     public boolean isValidToken(String token){
         try{
             Jwts.parser().verifyWith(key).build().parseSignedClaims(token);

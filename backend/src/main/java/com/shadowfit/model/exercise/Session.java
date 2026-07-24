@@ -4,6 +4,8 @@ import com.shadowfit.model.member.Member;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import jakarta.persistence.Version;
 import lombok.AccessLevel;
 
@@ -26,6 +28,7 @@ public class Session {
     // 연관관계 설정 (N:1)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE) // 실 schema.sql의 ON DELETE CASCADE와 일치 — 회원 탈퇴 시 함께 정리
     private Member member;
 
     @ManyToOne(fetch = FetchType.LAZY)
