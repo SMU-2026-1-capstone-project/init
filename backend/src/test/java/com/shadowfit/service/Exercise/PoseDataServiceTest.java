@@ -72,19 +72,38 @@ class PoseDataServiceTest {
     }
 
     @Test
-    @DisplayName("정상 batch — 전부 삽입, is_correct는 syncRate>=40.0 기준으로 계산됨")
+    @DisplayName("정상 batch — 다운샘플 윈도우(5) 안이면 sync_rate 최저(자세 최악) 프레임 1개만 대표로 저장, is_correct는 그 프레임 기준")
     void savePoseDataBatch_success_computesIsCorrect() {
         poseDataService.savePoseDataBatch(session.getId(), List.of(
-                frame(0.0, 50.0),  // is_correct = true
-                frame(0.1, 30.0)   // is_correct = false
+                frame(0.0, 50.0),  // is_correct = true, 대표 아님(최악 아님)
+                frame(0.1, 30.0)   // is_correct = false, 윈도우 내 최저 sync_rate → 대표로 저장
         ));
 
         List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT sync_rate, is_correct FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
 
+        assertThat(rows).hasSize(1);
+        assertThat((Boolean) rows.get(0).get("IS_CORRECT")).isFalse();
+        assertThat(((Number) rows.get(0).get("SYNC_RATE")).doubleValue()).isEqualTo(30.0);
+    }
+
+    @Test
+    @DisplayName("다운샘플 — 윈도우(5)마다 sync_rate 최저 프레임만 남기고 나머지는 버림")
+    void savePoseDataBatch_downsamples_keepsWorstSyncRatePerWindow() {
+        // 첫 윈도우(0~4): 최저 sync_rate=10.0(3번째) / 둘째 윈도우(5~6, 부분): 최저=20.0(2번째)
+        poseDataService.savePoseDataBatch(session.getId(), List.of(
+                frame(0.0, 90.0), frame(0.1, 80.0), frame(0.2, 10.0), frame(0.3, 70.0), frame(0.4, 60.0),
+                frame(0.5, 50.0), frame(0.6, 20.0)
+        ));
+
+        List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT timestamp_sec, sync_rate FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
+
         assertThat(rows).hasSize(2);
-        assertThat((Boolean) rows.get(0).get("IS_CORRECT")).isTrue();
-        assertThat((Boolean) rows.get(1).get("IS_CORRECT")).isFalse();
+        assertThat(((Number) rows.get(0).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.2);
+        assertThat(((Number) rows.get(0).get("SYNC_RATE")).doubleValue()).isEqualTo(10.0);
+        assertThat(((Number) rows.get(1).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.6);
+        assertThat(((Number) rows.get(1).get("SYNC_RATE")).doubleValue()).isEqualTo(20.0);
     }
 
     @Test

@@ -18,6 +18,11 @@ spring:
     username: ${DB_USERNAME:shadowfit}
     password: ${DB_PASSWORD:shadowfit}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 기본값(10)은 분리 배포(앱서버·DB 별도 인스턴스) 고부하(c=100)에서 47% 타임아웃 실패로
+      # 무너짐 — 15부터 20/30과 동급으로 안정화되는 걸 실측 확인(2026-07-25,
+      # docs/decisions/pose-ingest-downsampling.md §5-1(7)(8)). 30까지 늘려도 이득 없어 15로 설정.
+      maximum-pool-size: 15
 
   sql:
     init:

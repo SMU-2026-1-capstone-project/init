@@ -149,15 +149,17 @@ class ExerciseSessionFlowIntegrationTest {
             Session session = createInProgressSession();
             Long sessionId = session.getId();
 
-            // when 1: rep 1 완성 콜백 (AI → Spring)
+            // when 1: rep 1 완성 콜백 (AI → Spring) — 15프레임(실제 R=25 배치 규모에 준함, 다운샘플
+            // 윈도우 5개 정확히 채워 3행 남김: WorstSectionCalculator가 worst 구간을 잡으려면
+            // 다운샘플 후에도 최소 WORST_WINDOW_SIZE(3)행이 있어야 함(그 아래면 null, 정상 케이스)
             @SuppressWarnings("unchecked")
             StreamObserver<PoseDataResponse> batchObs1 = mock(StreamObserver.class);
-            grpcService.savePoseDataBatch(sampleBatch(sessionId, 5, 80.0), batchObs1);
+            grpcService.savePoseDataBatch(sampleBatch(sessionId, 15, 80.0), batchObs1);
 
-            // when 2: rep 2 완성 콜백
+            // when 2: rep 2 완성 콜백 (10프레임 → 다운샘플 후 2행)
             @SuppressWarnings("unchecked")
             StreamObserver<PoseDataResponse> batchObs2 = mock(StreamObserver.class);
-            grpcService.savePoseDataBatch(sampleBatch(sessionId, 4, 75.0), batchObs2);
+            grpcService.savePoseDataBatch(sampleBatch(sessionId, 10, 75.0), batchObs2);
 
             // when 3: 세션 종료 콜백
             @SuppressWarnings("unchecked")
@@ -176,9 +178,10 @@ class ExerciseSessionFlowIntegrationTest {
             assertThat(respCaptor.getValue().getStatus()).isEqualTo(SessionStatus.COMPLETED);
             assertThat(respCaptor.getValue().getSessionId()).isEqualTo(sessionId);
 
-            // then: pose_data 테이블에 rep1(5행) + rep2(4행) = 9행
+            // then: pose_data 테이블에 다운샘플 대표행만 저장 — rep1(15프레임→3행), rep2(10프레임→2행) = 5행
+            // (PoseDataService.DOWNSAMPLE_WINDOW=5, docs/decisions/pose-ingest-downsampling.md §5-1(7)(8))
             List<PoseData> rows = poseDataRepository.findAll();
-            assertThat(rows).hasSize(9);
+            assertThat(rows).hasSize(5);
             assertThat(rows).allSatisfy(p -> {
                 assertThat(p.getSession().getId()).isEqualTo(sessionId);
                 assertThat(p.getJointCoordinates()).isNotEmpty();
@@ -315,7 +318,8 @@ class ExerciseSessionFlowIntegrationTest {
             StreamObserver<SessionCompleteResponse> completeObs = mock(StreamObserver.class);
             grpcService.completeAnalysis(sampleComplete(sessionId, 1, 80.0), completeObs);
 
-            assertThat(poseDataRepository.count()).isEqualTo(5);
+            // 5프레임 → 다운샘플 윈도우(5) 1개 → 대표 1행만 저장됨
+            assertThat(poseDataRepository.count()).isEqualTo(1);
             assertThat(reportRepository.findBySessionId(sessionId)).isPresent();
             assertThat(feedbackLogRepository.findBySessionIdOrderByOccurredAtAsc(sessionId)).hasSize(1);
 

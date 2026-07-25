@@ -168,7 +168,9 @@
 - ~~유튜브 좌표를 시드로~~ → **안 씀**. 실제 시드는 더미 JSON `{}`/`_pose_template`(행수·payload 디커플링). 유튜브 추출은 별도 기능([`youtube-coordinate-harvest.md`](./youtube-coordinate-harvest.md))으로 분리, 시드와 무관.
 
 **아직 진짜 미결정:**
-- [ ] **"1초 평균 집계"를 AI(FastAPI)에서 할지 / Spring INSERT 직전에 할지** (쓰기 축 첫 갈림길, §7 갭). → 분석+측정 문서: [`pose-ingest-downsampling.md`](./pose-ingest-downsampling.md). **2026-06-12 측정 결과**: 쓰기 천장(~25 RPS)은 행수가 아니라 **HikariCP 풀=10 + 단일세션 rig 아티팩트**로 귀속(버퍼풀 가설 반증). R-sweep로 **배치 비용 고정비용 지배** 확인 → **다운샘플은 천장 해법 아님, 1순위는 풀 사이징**. 다운샘플은 저장·배치 효율 부수 카드로 강등. → 다음 미결정: **풀 10→20/30 재측정**(컨테이너 재생성 동반).
+- [ ] **"1초 평균 집계"를 AI(FastAPI)에서 할지 / Spring INSERT 직전에 할지** (쓰기 축 첫 갈림길, §7 갭). → 분석+측정 문서: [`pose-ingest-downsampling.md`](./pose-ingest-downsampling.md). **2026-06-12 측정 결과**: 쓰기 천장(~25 RPS)은 행수가 아니라 **HikariCP 풀=10 + 단일세션 rig 아티팩트**로 귀속(버퍼풀 가설 반증). R-sweep로 **배치 비용 고정비용 지배** 확인 → **다운샘플은 천장 해법 아님, 1순위는 풀 사이징**. 다운샘플은 저장·배치 효율 부수 카드로 강등.
+  - ~~다음 미결정: 풀 10→20/30 재측정~~ → **2026-07-25 완료**([`pose-ingest-downsampling.md §5-1(7)(8)`](./pose-ingest-downsampling.md)). AWS EC2 임시 인스턴스 2대(DB 전용+백엔드/ghz 분리)로 실측 — **로컬 결론이 반전**: 분리 배포에서는 고부하(c≥50)에서 풀=30이 풀=10 대비 확실히 우세, c=100은 풀=10이 붕괴(47% 타임아웃). "풀 무용"은 로컬 동거 환경 종속 결론이었음. 이어서 pool=15·20을 c=100 기준 추가 실측해 cliff를 10~15 사이로 좁힘 — **15부터 20/30과 동급이라 실측 스위트스폿은 ~15**(이론 공식 ≈5보다 3배 큼). 인프라는 실측 후 삭제.
+  - **다운샘플도 실제 착수 완료**(2026-07-25, PR #53): `PoseDataService.savePoseDataBatch`에 R≈5 대표추출(윈도우별 sync_rate 최저 프레임만 저장) 반영, HikariCP `maximum-pool-size`도 15로 변경. "1초 평균 집계" 위치(AI vs Spring) 자체는 위치 B(Spring)로 확정 반영된 상태 — 남은 건 pool=11~14 정밀 cliff 위치, 리포트 해상도 SLA 도메인 확인 정도.
 
 > 참고: 보강 축(outbox·관측성·회복탄력성)의 착수 순서는 별도 미결정 — [`portfolio-narrative.md §7`](../portfolio/portfolio-narrative.md), [`outbox-reliable-messaging.md`](./outbox-reliable-messaging.md).
 
