@@ -18,7 +18,8 @@
 
 ## 3. 이미 스스로 인지한 약점
 
-- [ ] **관측성/모니터링/N+1 점검** — `portfolio-narrative.md` §6에 🔴로 자체 표시.
+- [x] **관측성** — **1차 완료(2026-07-28)**. correlation id 5단계 전파(HTTP·gRPC 진입점 발급/수용, MDC+`logback-spring.xml` 패턴, `@Async` TaskDecorator, Spring↔FastAPI 양방향 metadata, 스케줄러 tick 자체 발급) + 커스텀 메트릭 3종(상태 전이·낙관락 충돌·배치 행수). 기존 `log.` 호출 70여 건은 한 줄도 수정 안 함. JSON 구조화·분산추적은 규모상 의식적 제외. 설계·근거: [`observability-correlation-id.md`](../decisions/observability-correlation-id.md).
+- [ ] **모니터링/N+1 점검** — 관측성과 함께 🔴로 묶여 있던 항목 중 남은 부분. N+1 점검은 미착수.
 - [ ] **테스트 커버리지** — 테스트 파일 5개뿐.
 - [ ] **외부 통합 다양성 부족** — OAuth2·S3·결제·푸시·검색 등 0개. [`25-portfolio-strategy.md`](./25-portfolio-strategy.md).
 - [ ] **AI→Spring 콜백 방향 장애 보호 없음** — 서킷브레이커/재시도가 Spring→AI 방향에만 있음, 반대 방향은 fire-and-forget(의도적 스코프 제외, `production-signal-checklist.md` §2-3-4-2).

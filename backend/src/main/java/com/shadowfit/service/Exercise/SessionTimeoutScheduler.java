@@ -1,5 +1,7 @@
 package com.shadowfit.service.Exercise;
 
+import com.shadowfit.global.observability.CorrelationIds;
+import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.repository.exercise.SessionRepository;
@@ -28,13 +30,16 @@ public class SessionTimeoutScheduler {
 
     private final SessionRepository sessionRepository;
     private final SessionService sessionService;
+    private final SessionMetrics sessionMetrics;
     private final Integer defaultBufferMinutes;
 
     public SessionTimeoutScheduler(SessionRepository sessionRepository,
                                    SessionService sessionService,
+                                   SessionMetrics sessionMetrics,
                                    @Value("${exercise.session.timeout.default-buffer-minutes:30}") Integer bufferMinutes) {
         this.sessionRepository = sessionRepository;
         this.sessionService = sessionService;
+        this.sessionMetrics = sessionMetrics;
         this.defaultBufferMinutes = bufferMinutes;
     }
 
@@ -47,6 +52,17 @@ public class SessionTimeoutScheduler {
     @Scheduled(fixedDelayString = "${exercise.session.timeout.check-interval-minutes:1}m",
                initialDelayString = "30s")
     public void checkAndTimeoutSessions() {
+        // 스케줄러는 들어오는 요청이 없어 물려받을 correlation id 가 없다 — tick 1회를 하나의 흐름으로
+        // 보고 스스로 발급한다. 그러면 AI 콜백(cid 다름)과 이 tick 이 같은 sessionId 를 건드린 로그가
+        // "다른 cid + 같은 sessionId" 로 남아, 경쟁이 실제로 일어난 순간을 사후에 짚을 수 있다.
+        // (try-with-resources 는 catch 보다 자원을 먼저 닫으므로, 실패 로그가 cid 를 잃지 않도록
+        //  스코프를 바깥에 두고 try/catch 를 안쪽에 둔다.)
+        try (CorrelationIds.Scope tick = CorrelationIds.startTask("timeout-sweep")) {
+            sweep();
+        }
+    }
+
+    private void sweep() {
         try {
             log.debug("세션 타임아웃 체크 시작 - 버퍼시간: {}분", defaultBufferMinutes);
 
@@ -70,23 +86,27 @@ public class SessionTimeoutScheduler {
                     continue;
                 }
 
-                try {
-                    boolean changed = sessionService.markAsFailedIfStillInProgress(session.getId(), now);
-                    if (changed) {
-                        log.warn("세션 타임아웃 처리 - 세션 ID: {}, 멤버: {}, 운동: {}, 시작시간: {}, 타임아웃기준: {}",
-                                session.getId(),
-                                session.getMember().getId(),
-                                session.getExercise().getName(),
-                                session.getStartTime(),
-                                timeoutThreshold);
-                        timeoutCount++;
+                try (CorrelationIds.Scope perSession = CorrelationIds.withSession(session.getId())) {
+                    try {
+                        boolean changed = sessionService.markAsFailedIfStillInProgress(session.getId(), now);
+                        if (changed) {
+                            log.warn("세션 타임아웃 처리 - 세션 ID: {}, 멤버: {}, 운동: {}, 시작시간: {}, 타임아웃기준: {}",
+                                    session.getId(),
+                                    session.getMember().getId(),
+                                    session.getExercise().getName(),
+                                    session.getStartTime(),
+                                    timeoutThreshold);
+                            timeoutCount++;
+                            sessionMetrics.sessionTransition(Status.FAILED, "timeout-scheduler");
+                        }
+                    } catch (ObjectOptimisticLockingFailureException e) {
+                        // FastAPI 완료 콜백이 동시에 같은 세션을 갱신함. 결과 데이터가 더 가치있으므로 양보.
+                        yieldedCount++;
+                        sessionMetrics.optimisticLockConflict("timeout-scheduler", "yield");
+                        log.info("세션 타임아웃 양보 - 세션 ID: {} (FastAPI 결과 우선)", session.getId());
+                    } catch (Exception e) {
+                        log.error("세션 {} 타임아웃 처리 실패", session.getId(), e);
                     }
-                } catch (ObjectOptimisticLockingFailureException e) {
-                    // FastAPI 완료 콜백이 동시에 같은 세션을 갱신함. 결과 데이터가 더 가치있으므로 양보.
-                    yieldedCount++;
-                    log.info("세션 타임아웃 양보 - 세션 ID: {} (FastAPI 결과 우선)", session.getId());
-                } catch (Exception e) {
-                    log.error("세션 {} 타임아웃 처리 실패", session.getId(), e);
                 }
             }
 

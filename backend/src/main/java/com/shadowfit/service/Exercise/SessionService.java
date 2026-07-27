@@ -13,6 +13,7 @@ import com.shadowfit.dto.report.record.DailyLogSummaryDto;
 import com.shadowfit.dto.report.record.WeeklyActivityResponseDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
+import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
@@ -53,6 +54,7 @@ public class SessionService {
     private final PoseDataRepository poseDataRepository;
     private final WorstSectionCalculator worstSectionCalculator;
     private final ReportRepository reportRepository;
+    private final SessionMetrics sessionMetrics;
 
     // 자기 주입: completeSession → applyComplete 호출이 Spring 프록시를 통과해 @Transactional이 적용되도록 함.
     @Lazy
@@ -113,10 +115,13 @@ public class SessionService {
                 self.applyComplete(request);
                 return;
             } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+                // 동시에 스케줄러가 FAILED로 변경한 케이스. 재조회 후 COMPLETED로 덮어쓰기 위해 재시도.
+                // 헤드라인 서사(스케줄러↔AI 콜백 경쟁)의 실제 발생 빈도를 볼 수 있는 유일한 지점이라
+                // 지표로 남긴다 — 이긴 쪽(retry)과 3회로도 못 이긴 쪽(exhausted)을 구분해서.
+                sessionMetrics.optimisticLockConflict("ai-callback", attempt == maxAttempts ? "exhausted" : "retry");
                 if (attempt == maxAttempts) {
                     throw e;
                 }
-                // 동시에 스케줄러가 FAILED로 변경한 케이스. 재조회 후 COMPLETED로 덮어쓰기 위해 재시도.
             }
         }
     }
@@ -145,6 +150,8 @@ public class SessionService {
                 exerciseMinutes, java.math.BigDecimal.valueOf(request.getCaloriesBurned()));
 
         precomputeReport(session);
+
+        sessionMetrics.sessionTransition(Status.COMPLETED, "ai-callback");
     }
 
     /**

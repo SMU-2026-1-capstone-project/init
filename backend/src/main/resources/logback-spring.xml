@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  로그 패턴에 correlation id(cid)와 세션 id를 노출하기 위한 설정.
+
+  Boot 기본 콘솔 패턴에는 MDC가 없어서, 스레드가 4~5개 걸친 세션 종료 경로의 로그를 사후에
+  이어붙일 수단이 없었다. %X{키}로 MDC를 찍으면 기존 log.info(...) 호출을 하나도 고치지 않고
+  모든 로그 줄이 상관관계를 갖는다.
+
+  [읽는 법] [cid|sessionId] — cid는 요청 1건(짧은 수명), sessionId는 운동 세션 1건(긴 수명).
+  cid가 다른데 sessionId가 같으면 서로 다른 두 흐름이 같은 세션을 건드린 것(스케줄러↔AI 콜백 경쟁).
+  값이 없으면 '·' 로 표시된다(애플리케이션 기동 로그 등 요청 맥락 밖).
+
+  로그 레벨은 여기서 고정하지 않고 application.yml 의 logging.level.* 을 그대로 쓴다
+  (Boot 가 logback 초기화 이후 레벨을 덮어씌우므로 두 설정이 충돌하지 않음).
+-->
+<configuration>
+    <!-- clr(색상) 변환 규칙과 LOG_LEVEL_PATTERN 등 Boot 기본 프로퍼티를 가져온다 -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <property name="CORRELATION_CONSOLE_PATTERN"
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr([%15.15t]){faint} %clr([%X{cid:-·}|%X{sessionId:-·}]){magenta} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CORRELATION_CONSOLE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

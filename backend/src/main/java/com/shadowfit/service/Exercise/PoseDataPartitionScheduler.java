@@ -1,5 +1,6 @@
 package com.shadowfit.service.Exercise;
 
+import com.shadowfit.global.observability.CorrelationIds;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -53,6 +54,15 @@ public class PoseDataPartitionScheduler {
     // 달리 급하지 않고, 실제 파티션 목록을 매번 다시 조회해 판단하므로 어느 날 실행되든 멱등적으로 안전.
     @Scheduled(cron = "${pose-data.partition.check-cron:0 0 4 * * *}")
     public void checkAndMaintainPartitions() {
+        // 요청 원점이 없는 흐름이라 실행 1회를 하나의 cid 로 묶는다 — DROP PARTITION 처럼 되돌릴 수
+        // 없는 작업은 "어느 실행이 무엇을 지웠는지"가 사후 추적의 전부다.
+        // (스코프를 바깥에 둬야 아래 catch 의 실패 로그도 cid 를 갖는다 — 자원이 catch 보다 먼저 닫힘.)
+        try (CorrelationIds.Scope tick = CorrelationIds.startTask("partition-maintenance")) {
+            maintainPartitions();
+        }
+    }
+
+    private void maintainPartitions() {
         try {
             YearMonth currentMonth = YearMonth.now(SEOUL);
             List<PartitionInfo> partitions = fetchNamedPartitions();

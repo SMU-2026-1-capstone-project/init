@@ -58,7 +58,7 @@
 |---|---|---|
 | **신뢰성(전달 의미론)** | 멱등 수신(있음) + **outbox로 at-least-once 송신** = exactly-once. 현재 gRPC 송신은 fire-and-forget(onError 로그만)이라 유실 가능 → 보강 | 🔶 보강 대상 |
 | **회복탄력성** | gRPC **deadline** + Resilience4j **서킷브레이커** ("FastAPI 죽으면?") | 🔶 보강 대상 |
-| **관측성** | 구조화 로깅 + **correlation id 전파**(@Async/콜백 스레드) + Actuator | 🔴 빈칸 |
+| **관측성** | **correlation id 전파**(@Async·gRPC 콜백·스케줄러·FastAPI 왕복) + Actuator + 커스텀 메트릭 3종 | 🟢 1차 완료(2026-07-28, [문서](../decisions/observability-correlation-id.md)) — JSON 구조화는 수집기 도입 시 |
 | **캐싱** | 기준 좌표·TTS 템플릿 = 카탈로그 패턴(유한·불변·공유). 로컬 Caffeine → 다중 인스턴스 시 Redis | 🔶 설계됨 |
 | **보안** | JWT + RefreshToken + blacklist + BCrypt + role | 🟢 있음 |
 
@@ -85,12 +85,12 @@
 
 | 구분 | 항목 |
 |---|---|
-| ✅ Built·측정 | 세션 정합성(낙관락·멱등·afterCommit), RealMySQL 카드(배치·인덱스·keyset·파티션·락·MVCC·JSON트림·버퍼풀), JWT/보안 |
+| ✅ Built·측정 | 세션 정합성(낙관락·멱등·afterCommit), RealMySQL 카드(배치·인덱스·keyset·파티션·락·MVCC·JSON트림·버퍼풀), JWT/보안, **관측성(correlation id·커스텀 메트릭, 2026-07-28)** |
 | 🔶 설계·보강 대상 | outbox(exactly-once), gRPC deadline·서킷브레이커, 캐싱(카탈로그), 선택형 스타일 기준 |
-| 🔴 빈칸 | 관측성(로깅·correlation id·Actuator), 검증 커버리지·TestController 점검·N+1 점검 |
+| 🔴 빈칸 | TestController 점검·N+1 점검, 구조화 로깅(JSON, 수집기 도입 시) |
 
 ## 7. 미결정 (사용자 confirm 필요)
 
-- [ ] 보강 착수 순서: 관측성(빈칸·ROI↑) vs outbox(헤드라인 강화) vs 회복탄력성
+- [ ] 보강 착수 순서: ~~관측성~~(2026-07-28 착수·완료) → 남은 건 **outbox(헤드라인 강화) vs 회복탄력성**
 - [ ] 캐싱 백엔드: 로컬 Caffeine로 충분 vs Redis(시그널)
 - [ ] §1 보강 실험화: "신뢰성 있는 비동기 메시징(outbox+멱등=exactly-once)" 카드를 만들지
