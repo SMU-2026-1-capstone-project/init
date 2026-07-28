@@ -1,0 +1,101 @@
+name: Backend tests
+
+# 백엔드 테스트 스위트를 PR마다 자동 실행한다.
+# 테스트는 H2(MySQL 모드) 인메모리로 돌고 JWT/내부토큰은 src/test/resources/application.yml 의
+# 더미값을 쓰므로, 외부 DB나 시크릿 없이 러너 단독으로 완결된다.
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle/**'
+      - 'gradlew'
+      - '.github/workflows/backend-test.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle/**'
+      - 'gradlew'
+      - '.github/workflows/backend-test.yml'
+
+# 같은 브랜치에 연속 푸시하면 이전 실행은 취소 — 러너 시간 낭비 방지
+concurrency:
+  group: backend-test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: :backend:test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # 의존성·빌드 캐시. 첫 실행은 느리고 이후부터 짧아진다.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run backend test suite
+        run: ./gradlew :backend:test
+
+      # 실패 원인을 아티팩트 다운로드 없이 PR 화면에서 바로 보기 위한 요약.
+      # 컴파일 단계에서 죽으면 XML 자체가 없으므로 그 경우도 명시적으로 알린다.
+      - name: 테스트 결과 요약
+        if: always()
+        run: |
+          dir=backend/build/test-results/test
+          if [ ! -d "$dir" ] || [ -z "$(ls -A "$dir"/*.xml 2>/dev/null)" ]; then
+            echo "테스트 결과 XML이 없습니다 — 컴파일 단계에서 실패했을 가능성이 큽니다. 위 로그를 확인하세요." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          read -r total skipped failures errors <<EOF
+          $(grep -ho 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' "$dir"/*.xml \
+              | sed -E 's/[a-z]+="([0-9]*)"/\1/g' \
+              | awk '{t+=$1; s+=$2; f+=$3; e+=$4} END{printf "%d %d %d %d", t, s, f, e}')
+          EOF
+          {
+            echo "## 백엔드 테스트 결과"
+            echo ""
+            echo "| 총 | 성공 | 실패 | 오류 | 건너뜀 |"
+            echo "|---|---|---|---|---|"
+            echo "| $total | $((total - failures - errors - skipped)) | $failures | $errors | $skipped |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # 실패한 테스트 이름 (best-effort — <failure>/<error> 바로 앞 줄의 testcase 를 집는다)
+          if [ "$failures" != "0" ] || [ "$errors" != "0" ]; then
+            {
+              echo ""
+              echo "### 실패한 테스트"
+              grep -hB1 -E '<(failure|error)[ >]' "$dir"/*.xml \
+                | grep -oE 'testcase name="[^"]*"' \
+                | sed -E 's/testcase name="(.*)"/- `\1`/' \
+                | sort -u
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # 요약으로 부족할 때 볼 수 있는 HTML 리포트 원본
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: |
+            backend/build/reports/tests/test
+            backend/build/test-results/test
+          retention-days: 7
+          if-no-files-found: ignore
