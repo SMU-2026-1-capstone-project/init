@@ -239,6 +239,48 @@ class SessionServiceTest {
         }
 
         @Test
+        @DisplayName("getCalendarMain — avg_sync_rate가 null인 세션은 0점이 아니라 평균에서 제외된다")
+        void getCalendarMain_nullSyncRateExcludedFromAverage() {
+            LocalDate today = LocalDate.now();
+            completedSessionOn(today, 80.0, 100.0, 20);
+            // 분석 전/실패라 값이 없는 세션 — 0으로 치면 월평균이 40으로 반토막 난다
+            LocalDateTime start = today.atTime(11, 0);
+            sessionRepository.saveAndFlush(Session.builder()
+                    .member(member).exercise(exercise)
+                    .startTime(start).endTime(start.plusMinutes(10))
+                    .status(Status.COMPLETED).totalReps(5)
+                    .avgSyncRate(null)
+                    .caloriesBurned(BigDecimal.valueOf(50))
+                    .build());
+
+            CalendarMainResponseDto result = sessionService.getCalendarMain(
+                    member.getId(), today.getYear(), today.getMonthValue());
+
+            assertThat(result.getTotalAvgSyncRate()).isEqualTo(80);
+            assertThat(result.getRecords().get(0).getDailyAvgSyncRate()).isEqualTo(80.0);
+        }
+
+        @Test
+        @DisplayName("getCalendarMain — 모든 세션의 sync_rate가 null이면 평균 0으로 떨어진다")
+        void getCalendarMain_allNullSyncRate_fallsBackToZero() {
+            LocalDate today = LocalDate.now();
+            LocalDateTime start = today.atTime(11, 0);
+            sessionRepository.saveAndFlush(Session.builder()
+                    .member(member).exercise(exercise)
+                    .startTime(start).endTime(start.plusMinutes(10))
+                    .status(Status.COMPLETED).totalReps(5)
+                    .avgSyncRate(null).caloriesBurned(BigDecimal.valueOf(50))
+                    .build());
+
+            CalendarMainResponseDto result = sessionService.getCalendarMain(
+                    member.getId(), today.getYear(), today.getMonthValue());
+
+            // 평균 낼 값이 하나도 없을 때의 fallback — 운동일수는 그대로 1일로 잡혀야 한다
+            assertThat(result.getTotalAvgSyncRate()).isZero();
+            assertThat(result.getMonthlyExerciseDays()).isEqualTo(1);
+        }
+
+        @Test
         @DisplayName("getDailyActivity — 특정 날짜의 세션만 반환, 빈 날은 빈 리스트")
         void getDailyActivity_returnsOnlyThatDate() {
             LocalDate today = LocalDate.now();
