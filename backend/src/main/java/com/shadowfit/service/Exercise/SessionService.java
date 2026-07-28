@@ -330,9 +330,13 @@ public class SessionService {
                 memberId, startOfMonth.atStartOfDay(), endOfMonth.atTime(23, 59, 59));
 
         // 2. 상단 카드 데이터 계산 (평균 싱크로율)
+        // avg_sync_rate 는 nullable — 분석 전/실패 세션은 값이 없다. 예전엔 null 을 0.0 으로
+        // 치환해 평균에 넣었는데, 그러면 "측정 안 됨"이 "싱크로율 0%"로 집계돼 사용자에게
+        // 보이는 평균이 실제보다 낮아진다. 값이 있는 세션만으로 평균을 낸다.
         double avgSyncRate = monthlySessions.stream()
-                .map(s -> s.getAvgSyncRate()) // 일단 객체로 가져오고
-                .mapToDouble(val -> val != null ? val.doubleValue() : 0.0)
+                .map(Session::getAvgSyncRate)
+                .filter(java.util.Objects::nonNull)
+                .mapToDouble(java.math.BigDecimal::doubleValue)
                 .average()
                 .orElse(0.0);
 
@@ -345,9 +349,13 @@ public class SessionService {
                     dto.setDate(date.toString());
                     dto.setHasRecord(true);
 
+                    // 월 평균과 같은 이유로 값 없는 세션은 평균에서 제외한다(0점으로 치지 않음)
                     double dailyAvg = monthlySessions.stream()
                             .filter(s -> s.getStartTime().toLocalDate().equals(date))
-                            .mapToDouble(s -> s.getAvgSyncRate() != null ? s.getAvgSyncRate().doubleValue() : 0.0)                            .average()
+                            .map(Session::getAvgSyncRate)
+                            .filter(java.util.Objects::nonNull)
+                            .mapToDouble(java.math.BigDecimal::doubleValue)
+                            .average()
                             .orElse(0.0);
 
                     dto.setDailyAvgSyncRate(dailyAvg);

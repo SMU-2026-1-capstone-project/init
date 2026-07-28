@@ -79,6 +79,11 @@ ai-server/uvicorn.*.log
 # ==================== Java ====================
 *.class
 *.jar
+# Gradle 래퍼 jar 은 반드시 커밋한다 — 없으면 clone 후 ./gradlew 가 바로 죽는다
+# ("Unable to access jarfile ...", 2026-07-28 CI 최초 실행에서 발각).
+# 아래 경로는 래퍼가 backend/ 에서 저장소 루트로 옮겨진 뒤에도 갱신되지 않아
+# 실제로는 아무것도 예외 처리하지 못하고 있었다.
+!gradle/wrapper/gradle-wrapper.jar
 !backend/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.ear
