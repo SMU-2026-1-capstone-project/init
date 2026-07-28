@@ -18,6 +18,12 @@ public interface DailyLogRepository extends JpaRepository<DailyLog,Long> {
     // Hibernate 세션이 flush 실패로 손상돼 같은 트랜잭션에서 후속 쿼리가 깨짐(실측으로 확인,
     // DailyLogServiceConcurrencyTest 최초 실패: "don't flush the Session after an exception occurs")
     // — 그래서 네이티브 upsert 한 문장으로 우회.
+    // [알려진 기술부채] ON DUPLICATE KEY UPDATE 안의 VALUES(col) 함수는 MySQL 8.0.20에서
+    // deprecated(향후 제거 예정)다. 대체 문법은 8.0.19+ 의 행 별칭:
+    //     VALUES (...) AS new ON DUPLICATE KEY UPDATE col = col + new.col
+    // 그런데 테스트가 H2 MySQL 모드에서 도는데 H2 파서가 `AS new` 를 거부한다(2026-07-28 실측:
+    // "Syntax error ... [*]AS new"). 지금 바꾸면 운영(MySQL)은 되고 테스트만 깨지므로 보류.
+    // 해소 조건: 테스트 DB를 Testcontainers MySQL 로 바꾸거나 H2 가 이 문법을 지원할 때.
     @Modifying
     @Query(value = "INSERT INTO daily_logs (member_id, log_date, total_exercise_time, total_calories) " +
                    "VALUES (:memberId, :logDate, :addTime, :addCalories) " +
