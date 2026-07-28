@@ -14,6 +14,8 @@ import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,7 @@ class PoseDataServiceTest {
     @Autowired private ExerciseReferenceRepository referenceRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private MeterRegistry meterRegistry;
 
     private Session session;
     private Exercise exercise;
@@ -104,6 +107,26 @@ class PoseDataServiceTest {
         assertThat(((Number) rows.get(0).get("SYNC_RATE")).doubleValue()).isEqualTo(10.0);
         assertThat(((Number) rows.get(1).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.6);
         assertThat(((Number) rows.get(1).get("SYNC_RATE")).doubleValue()).isEqualTo(20.0);
+    }
+
+    @Test
+    @DisplayName("배치 지표 — 수신 프레임 수와 다운샘플 후 저장 행수가 stage 태그로 기록됨")
+    void savePoseDataBatch_recordsFrameMetrics() {
+        // 공유 컨텍스트라 다른 테스트가 이미 올려둔 값이 있을 수 있어 절대값이 아니라 증분으로 본다
+        DistributionSummary received = meterRegistry.summary("shadowfit.pose.batch.frames", "stage", "received");
+        DistributionSummary stored = meterRegistry.summary("shadowfit.pose.batch.frames", "stage", "stored");
+        double receivedBefore = received.totalAmount();
+        double storedBefore = stored.totalAmount();
+
+        // 7프레임 → 윈도우(5) 기준 2행으로 다운샘플
+        poseDataService.savePoseDataBatch(session.getId(), List.of(
+                frame(0.0, 90.0), frame(0.1, 80.0), frame(0.2, 10.0), frame(0.3, 70.0), frame(0.4, 60.0),
+                frame(0.5, 50.0), frame(0.6, 20.0)
+        ));
+
+        // 실제 저장 행수와 지표가 어긋나면 운영 중 다운샘플 비율을 잘못 읽게 된다
+        assertThat(received.totalAmount() - receivedBefore).isEqualTo(7.0);
+        assertThat(stored.totalAmount() - storedBefore).isEqualTo(2.0);
     }
 
     @Test

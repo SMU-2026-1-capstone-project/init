@@ -135,13 +135,30 @@ sessionId는 metadata가 아니라 메시지 payload 안에 있어 인터셉터�
 | `GrpcCorrelationInterceptorTest` (5) | 송신 부착·미보유 시 발급, **수신이 핸들러 실행 컨텍스트에서 노출**, 왕복 동일 id |
 | `GrpcObservabilityWiringTest` (2) | 전역 인터셉터 등록 — 로직이 맞아도 **등록이 빠지면 조용히 아무 일도 안 일어나서** 별도 확인 |
 | `SessionTimeoutSchedulerTest` (수정) | 양보/전이 지표가 실제로 올라가는지 (`SimpleMeterRegistry` 실측) |
+| `SessionMetricsRecordingTest` (11) + `PoseDataServiceTest` (1) | **지표 3종의 전 기록 지점** — §5-1 |
 | `ai-server/tests/test_correlation.py` (10) | sanitize, 핸들러 컨텍스트 노출, 재송신 시 동일 id 유지, LogRecord 주입, **스레드 경계 전파 + 안 감쌌을 때 끊김 + 재시도 id 고정**(§3-3-1) |
 
-백엔드 전체 스위트 통과. Python은 venv에 pytest가 없어 함수 직접 호출로 10건 실행(전부 통과) — **pytest는 requirements.txt에 없어서 설치하지 않았다.** 이 실행 방식(한 프로세스에서 순차 호출) 때문에 전역 상태를 건드리는 테스트는 반드시 원복해야 한다 — `test_log_record_factory_injects_cid` 가 `LogRecordFactory` 를 `finally` 로 되돌리는 이유.
+백엔드 전체 스위트 통과(181건). Python은 venv에 pytest가 없어 함수 직접 호출로 10건 실행(전부 통과) — **pytest는 requirements.txt에 없어서 설치하지 않았다.** 이 실행 방식(한 프로세스에서 순차 호출) 때문에 전역 상태를 건드리는 테스트는 반드시 원복해야 한다 — `test_log_record_factory_injects_cid` 가 `LogRecordFactory` 를 `finally` 로 되돌리는 이유.
 
----
+### 5-1. 지표 검증 — 계수기는 조용히 실패한다 (리뷰 지적 반영, 2026-07-28)
 
-## 6. 의식적으로 안 한 것
+1차에는 `SessionTimeoutSchedulerTest` 하나만 지표를 검증했다. 나머지 기록 지점은 무검증이었는데, **계수기는 빠져도 예외가 안 난다** — 호출이 누락되든 태그를 오타 내든 조용히 0으로 남고, 나중에 대시보드의 "충돌 0건"이 진짜 0건인지 계측 고장인지 구분할 수 없게 된다. 관측성이 이 PR의 주제인데 그 관측 장치 자체가 무검증인 건 앞뒤가 안 맞아서 채웠다.
+
+| 기록 지점 | 검증 |
+|---|---|
+| `ExerciseAnalysisService` 서킷 OPEN | FAILED/`circuit-open` 1건, **세션이 이미 종료면 0건**(조건 분기까지) |
+| `ExerciseAnalysisService` gRPC `onError` | FAILED/`grpc-error` 1건 — 목 스텁이 `onError` 를 직접 발화 |
+| `ExerciseAnalysisService` 앱 콜백 | COMPLETED/`app-callback` 1건, **멱등 재전송 시 중복 0건** |
+| `ExerciseAnalysisService` / `SessionService` 낙관락 충돌 | 1회 충돌 → `retry` 1건 / 3회 전패 → `retry` 2 + `exhausted` 1 후 예외 전파 |
+| `PoseDataService.savePoseDataBatch` | 7프레임 → `received` 7 / `stored` 2 (실제 저장 행수와 일치하는지) |
+
+설계 결정 3가지:
+
+- **목이 아니라 진짜 `SimpleMeterRegistry`.** `verify(metrics).sessionTransition(...)` 는 지표 **이름·태그** 오타를 못 잡는다. 실제 레지스트리에 그 이름·그 태그로 조회해 값이 나와야 통과.
+- **단위 테스트(원객체 직접 호출).** 낙관락 충돌과 gRPC `onError` 는 통합 컨텍스트에서 결정적으로 재현하기 어렵다(전자는 실제 동시 커밋, 후자는 죽은 AI 서버 + 테스트 트랜잭션 밖 콜백 스레드). 프록시를 안 거치면 `@Async`/`@Transactional` 없이 그 분기만 정확히 때릴 수 있다. `self` 는 `ReflectionTestUtils` 로 교체.
+- **"안 올라가는 것"도 검증.** 이미 종료된 세션·멱등 재전송에서 **0건**임을 함께 확인한다. 지표가 실제보다 부풀면 없느니만 못하다.
+
+`savePoseDataBatch` 만 통합 테스트에 뒀다 — 다운샘플 실제 저장 행수와 지표가 일치하는지가 핵심이라 진짜 DB 경로를 타야 의미가 있다. 공유 컨텍스트라 절대값이 아니라 **증분**으로 본다.
 
 | 안 함 | 이유 |
 |---|---|
@@ -160,10 +177,11 @@ sessionId는 metadata가 아니라 메시지 payload 안에 있어 인터셉터�
 - [ ] 보강 축 나머지 착수 순서: **outbox vs 회복탄력성** ([`portfolio-narrative.md §7`](../portfolio/portfolio-narrative.md)) — 관측성이 빠지면서 2개로 좁혀짐
 - [ ] gRPC 콜백 처리 시간 Timer — 이번 범위에서 제외(지표 3종만)
 - [ ] AI 쪽 HTTP 엔드포인트(`pose.py`)의 cid 전파 — 이번엔 gRPC 경로만
-- [ ] 신규 메트릭 3곳(`ExerciseAnalysisService` circuit-open/grpc-error, `PoseDataService` 배치, `SessionService` 충돌·전이)의 `SimpleMeterRegistry` 카운트 검증 테스트 — 리뷰 지적(타당), `SessionTimeoutSchedulerTest` 패턴을 그대로 확장하면 됨. 이번 PR 범위에서 의도적으로 미룸
+- [x] ~~신규 메트릭 3곳의 `SimpleMeterRegistry` 카운트 검증 테스트~~ — **완료(2026-07-28)**, §5-1
 
 ---
 
 ## 결정 로그
 - 2026-07-28: 보강 3축(관측성·outbox·회복탄력성) 중 **관측성을 1순위로 착수·완료**. 근거: 착수 시점에 Actuator·Resilience4j·gRPC deadline은 이미 있어 회복탄력성은 실질적으로 채워져 있었고, 관측성만 🔴 빈칸이라 ROI가 가장 높았음. 범위는 correlation id 5단계 + 커스텀 메트릭 3종, 분산추적·JSON 구조화는 제외(§6).
-- 2026-07-28: PR #54 CodeRabbit 리뷰 반영. **Python 백그라운드 스레드 경계 누락을 수정**(§3-3-1) — 지적은 "재시도마다 id가 달라진다"(Minor)였으나 검증해 보니 `threading.Thread` 가 컨텍스트를 상속하지 않아 `CompleteAnalysis` 콜백 전체가 원 요청과 끊겨 있었음(더 큼). §3-6의 "cid가 다르고 sessionId가 같다 = 경쟁의 증거" 주장도 **과했음을 인정하고 "단서"로 완화** — 확정은 낙관락 충돌 지표가 한다(Java javadoc·logback 주석 동일 정정). 메트릭 테스트 확장 지적은 타당하나 이번 범위 밖으로 미룸(§7). `install_log_record_factory()` 멱등화 지적은 기동 시 1회 호출이라 미적용.
+- 2026-07-28: PR #54 CodeRabbit 리뷰 반영. **Python 백그라운드 스레드 경계 누락을 수정**(§3-3-1) — 지적은 "재시도마다 id가 달라진다"(Minor)였으나 검증해 보니 `threading.Thread` 가 컨텍스트를 상속하지 않아 `CompleteAnalysis` 콜백 전체가 원 요청과 끊겨 있었음(더 큼). §3-6의 "cid가 다르고 sessionId가 같다 = 경쟁의 증거" 주장도 **과했음을 인정하고 "단서"로 완화** — 확정은 낙관락 충돌 지표가 한다(Java javadoc·logback 주석 동일 정정). `install_log_record_factory()` 멱등화 지적은 기동 시 1회 호출이라 미적용.
+- 2026-07-28: 보류했던 **메트릭 검증 테스트도 착수·완료**(§5-1). 1차에는 `SessionTimeoutSchedulerTest` 하나만 지표를 검증하고 나머지 기록 지점은 무검증이었는데, 관측성이 주제인 PR에서 관측 장치 자체가 무검증인 건 앞뒤가 안 맞다고 판단. 12건 추가(백엔드 총 181건).
