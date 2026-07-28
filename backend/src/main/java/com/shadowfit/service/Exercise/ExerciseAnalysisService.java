@@ -4,6 +4,8 @@ import com.shadowfit.dto.exercises.VideoRequestDto;
 import com.shadowfit.dto.exercises.session.SessionUpdateRequestDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
+import com.shadowfit.global.observability.CorrelationIds;
+import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.grpc.*;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.ExerciseReference;
@@ -47,6 +49,7 @@ public class ExerciseAnalysisService {
     private final SessionService sessionService;
     private final ExerciseReferenceRepository referenceRepository;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final SessionMetrics sessionMetrics;
 
     // 자기 주입: completeSession → applyCompleteFromApp 호출이 Spring 프록시를 통과하도록 함.
     @Lazy
@@ -111,7 +114,9 @@ public class ExerciseAnalysisService {
         }
         long callStart = System.nanoTime();
 
-        getAuthenticatedStub().extractReferenceData(request, new StreamObserver<com.shadowfit.grpc.ExtractResponse>() {
+        // preserving(): 아래 콜백들은 gRPC 이벤트 루프 스레드에서 실행돼 호출자 MDC가 없다.
+        // 감싸지 않으면 정작 실패 로그(onError)에 correlation id 가 안 붙는다.
+        getAuthenticatedStub().extractReferenceData(request, CorrelationIds.preserving(new StreamObserver<com.shadowfit.grpc.ExtractResponse>() {
             @Override
             public void onNext(com.shadowfit.grpc.ExtractResponse value) {
                 cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
@@ -126,7 +131,7 @@ public class ExerciseAnalysisService {
             public void onCompleted() {
                 log.info("좌표 추출 gRPC 요청 완료");
             }
-        });
+        }));
     }
 
     /**
@@ -177,53 +182,61 @@ public class ExerciseAnalysisService {
     @Async
     @Transactional(readOnly = true)
     public void sendAnalysisRequestToFastApi(Long sessionId, VideoRequestDto appDto, String finalUrl, String persona) {
-        log.info("비동기 분석 요청 시작 - 세션 ID: {}", sessionId);
+        // 여기는 이미 @Async 워커 스레드 — cid 는 AsyncConfig 의 TaskDecorator 가 넘겨줬고,
+        // 세션 id 는 이 흐름의 시작점인 여기서 얹는다.
+        try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
+            log.info("비동기 분석 요청 시작 - 세션 ID: {}", sessionId);
 
-        List<ExerciseReference> referencePoses = referenceRepository.findByExerciseId(appDto.getExerciseId());
+            List<ExerciseReference> referencePoses = referenceRepository.findByExerciseId(appDto.getExerciseId());
 
-        AnalyzeRequest.Builder requestBuilder = AnalyzeRequest.newBuilder()
-                .setExerciseId(appDto.getExerciseId())
-                .setSessionId(sessionId)
-                .setReferenceSource(finalUrl)
-                .setPersona(persona);
+            AnalyzeRequest.Builder requestBuilder = AnalyzeRequest.newBuilder()
+                    .setExerciseId(appDto.getExerciseId())
+                    .setSessionId(sessionId)
+                    .setReferenceSource(finalUrl)
+                    .setPersona(persona);
 
-        for (ExerciseReference ref : referencePoses) {
-            requestBuilder.addReferencePoses(PoseDataRequest.newBuilder()
-                    .setTimestampSec(ref.getTimestampSec())
-                    .setJointCoordinates(ref.getJointCoordinates())
-                    .build());
+            for (ExerciseReference ref : referencePoses) {
+                requestBuilder.addReferencePoses(PoseDataRequest.newBuilder()
+                        .setTimestampSec(ref.getTimestampSec())
+                        .setJointCoordinates(ref.getJointCoordinates())
+                        .build());
+            }
+
+            CircuitBreaker cb = aiCircuitBreaker();
+            if (!cb.tryAcquirePermission()) {
+                log.warn("AI 서버 서킷브레이커 OPEN — 분석 시작 요청 스킵 (세션 ID: {})", sessionId);
+                // 스킵된 세션을 IN_PROGRESS로 방치하면 SessionTimeoutScheduler 버퍼(기본 30분+)가
+                // 돌 때까지 사용자가 응답 없는 세션을 붙들고 있게 됨 — AI가 이미 죽은 걸 아는
+                // 상황이니 여기서 바로 FAILED 처리해서 사용자 피드백을 앞당긴다.
+                if (sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now())) {
+                    sessionMetrics.sessionTransition(Status.FAILED, "circuit-open");
+                }
+                return;
+            }
+            long callStart = System.nanoTime();
+
+            getAuthenticatedStub().startAnalysis(requestBuilder.build(), CorrelationIds.preserving(new StreamObserver<AnalyzeResponse>() {
+                @Override
+                public void onNext(AnalyzeResponse value) {
+                    cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
+                    log.info("FastAPI 응답 수신 - 세션: {}", value.getSessionId());
+                }
+                @Override
+                public void onError(Throwable t) {
+                    cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, t);
+                    log.error("gRPC 통신 장애: {}", t.getMessage());
+                    // 이 한 번의 호출이 실패한 것(장애가 죽 이어져 서킷이 OPEN 되기 전이라도)도
+                    // 사용자 입장에선 응답 없는 세션이므로 동일하게 즉시 FAILED 처리.
+                    if (sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now())) {
+                        sessionMetrics.sessionTransition(Status.FAILED, "grpc-error");
+                    }
+                }
+                @Override
+                public void onCompleted() {
+                    log.info("FastAPI 전송 완료");
+                }
+            }));
         }
-
-        CircuitBreaker cb = aiCircuitBreaker();
-        if (!cb.tryAcquirePermission()) {
-            log.warn("AI 서버 서킷브레이커 OPEN — 분석 시작 요청 스킵 (세션 ID: {})", sessionId);
-            // 스킵된 세션을 IN_PROGRESS로 방치하면 SessionTimeoutScheduler 버퍼(기본 30분+)가
-            // 돌 때까지 사용자가 응답 없는 세션을 붙들고 있게 됨 — AI가 이미 죽은 걸 아는
-            // 상황이니 여기서 바로 FAILED 처리해서 사용자 피드백을 앞당긴다.
-            sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now());
-            return;
-        }
-        long callStart = System.nanoTime();
-
-        getAuthenticatedStub().startAnalysis(requestBuilder.build(), new StreamObserver<AnalyzeResponse>() {
-            @Override
-            public void onNext(AnalyzeResponse value) {
-                cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
-                log.info("FastAPI 응답 수신 - 세션: {}", value.getSessionId());
-            }
-            @Override
-            public void onError(Throwable t) {
-                cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, t);
-                log.error("gRPC 통신 장애: {}", t.getMessage());
-                // 이 한 번의 호출이 실패한 것(장애가 죽 이어져 서킷이 OPEN 되기 전이라도)도
-                // 사용자 입장에선 응답 없는 세션이므로 동일하게 즉시 FAILED 처리.
-                sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now());
-            }
-            @Override
-            public void onCompleted() {
-                log.info("FastAPI 전송 완료");
-            }
-        });
     }
 
     /**
@@ -233,33 +246,35 @@ public class ExerciseAnalysisService {
      * AI 가 누적 결과로 BT-SET final batch + CompleteAnalysis 콜백을 비동기로 처리.
      */
     public void stopAnalysis(Long sessionId) {
-        log.info("AI 서버 분석 중단 요청 전송 - sessionId: {}", sessionId);
+        try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
+            log.info("AI 서버 분석 중단 요청 전송 - sessionId: {}", sessionId);
 
-        com.shadowfit.grpc.StopRequest request = com.shadowfit.grpc.StopRequest.newBuilder()
-                .setSessionId(sessionId)
-                .build();
+            com.shadowfit.grpc.StopRequest request = com.shadowfit.grpc.StopRequest.newBuilder()
+                    .setSessionId(sessionId)
+                    .build();
 
-        CircuitBreaker cb = aiCircuitBreaker();
-        if (!cb.tryAcquirePermission()) {
-            log.warn("AI 서버 서킷브레이커 OPEN — 중단 요청 스킵 (세션 ID: {})", sessionId);
-            return;
+            CircuitBreaker cb = aiCircuitBreaker();
+            if (!cb.tryAcquirePermission()) {
+                log.warn("AI 서버 서킷브레이커 OPEN — 중단 요청 스킵 (세션 ID: {})", sessionId);
+                return;
+            }
+            long callStart = System.nanoTime();
+
+            getAuthenticatedStub().stopAnalysis(request, CorrelationIds.preserving(new io.grpc.stub.StreamObserver<com.shadowfit.grpc.StopResponse>() {
+                @Override
+                public void onNext(com.shadowfit.grpc.StopResponse value) {
+                    cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
+                    log.info("AI 서버 응답: {}", value.getMessage());
+                }
+                @Override
+                public void onError(Throwable t) {
+                    cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, t);
+                    log.error("AI 서버 중단 실패: {}", t.getMessage());
+                }
+                @Override
+                public void onCompleted() {}
+            }));
         }
-        long callStart = System.nanoTime();
-
-        getAuthenticatedStub().stopAnalysis(request, new io.grpc.stub.StreamObserver<com.shadowfit.grpc.StopResponse>() {
-            @Override
-            public void onNext(com.shadowfit.grpc.StopResponse value) {
-                cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
-                log.info("AI 서버 응답: {}", value.getMessage());
-            }
-            @Override
-            public void onError(Throwable t) {
-                cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, t);
-                log.error("AI 서버 중단 실패: {}", t.getMessage());
-            }
-            @Override
-            public void onCompleted() {}
-        });
     }
 
     /**
@@ -269,17 +284,22 @@ public class ExerciseAnalysisService {
      * 낙관적 락 충돌 시(스케줄러가 동시에 FAILED로 변경한 경우) 재조회 후 COMPLETED로 덮어씁니다.
      */
     public void completeSession(Long sessionId, SessionUpdateRequestDto dto) {
-        int maxAttempts = 3;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                self.applyCompleteFromApp(sessionId, dto);
-                log.info("세션 {} DB 업데이트 완료", sessionId);
-                return;
-            } catch (ObjectOptimisticLockingFailureException e) {
-                if (attempt == maxAttempts) {
-                    throw e;
+        try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
+            int maxAttempts = 3;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    self.applyCompleteFromApp(sessionId, dto);
+                    log.info("세션 {} DB 업데이트 완료", sessionId);
+                    return;
+                } catch (ObjectOptimisticLockingFailureException e) {
+                    // 상대는 보통 SessionTimeoutScheduler. 지표로 남겨두면 "이 경쟁이 운영 중
+                    // 실제로 얼마나 일어나는가"를 로그 grep 없이 집계로 볼 수 있다.
+                    sessionMetrics.optimisticLockConflict("app-callback", attempt == maxAttempts ? "exhausted" : "retry");
+                    if (attempt == maxAttempts) {
+                        throw e;
+                    }
+                    log.warn("세션 {} 완료 처리 충돌 - 재시도 {}/{}", sessionId, attempt, maxAttempts);
                 }
-                log.warn("세션 {} 완료 처리 충돌 - 재시도 {}/{}", sessionId, attempt, maxAttempts);
             }
         }
     }
@@ -300,6 +320,7 @@ public class ExerciseAnalysisService {
         session.setEndTime(LocalDateTime.now());
 
         sessionRepository.saveAndFlush(session);
+        sessionMetrics.sessionTransition(Status.COMPLETED, "app-callback");
     }
 }
 

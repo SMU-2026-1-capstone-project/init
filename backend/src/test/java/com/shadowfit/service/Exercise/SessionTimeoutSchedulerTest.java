@@ -1,8 +1,10 @@
 package com.shadowfit.service.Exercise;
 
+import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.model.exercise.*;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.repository.exercise.SessionRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,6 +37,8 @@ class SessionTimeoutSchedulerTest {
     private SessionService sessionService;
 
     private SessionTimeoutScheduler scheduler;
+    // 목이 아니라 진짜 레지스트리 — 지표가 실제로 올라가는지 값으로 검증하기 위해.
+    private SimpleMeterRegistry meterRegistry;
 
     private Exercise testExercise;
     private Member testMember;
@@ -43,7 +47,9 @@ class SessionTimeoutSchedulerTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        scheduler = new SessionTimeoutScheduler(sessionRepository, sessionService, 30);
+        meterRegistry = new SimpleMeterRegistry();
+        scheduler = new SessionTimeoutScheduler(sessionRepository, sessionService,
+                new SessionMetrics(meterRegistry), 30);
 
         testMember = Member.builder()
                 .id(1L)
@@ -212,6 +218,13 @@ class SessionTimeoutSchedulerTest {
                 .markAsFailedIfStillInProgress(eq(10L), any(LocalDateTime.class));
         verify(sessionService, times(1))
                 .markAsFailedIfStillInProgress(eq(11L), any(LocalDateTime.class));
+
+        // 양보한 충돌이 지표로 남아야 함 — 이 경쟁의 실제 발생 빈도를 운영 중 볼 수 있는 유일한 창구
+        assertEquals(1.0, meterRegistry.counter("shadowfit.session.optimistic.lock.conflicts",
+                "source", "timeout-scheduler", "outcome", "yield").count());
+        // 성공적으로 FAILED 전환된 쪽은 상태 전이 지표로
+        assertEquals(1.0, meterRegistry.counter("shadowfit.session.transitions",
+                "status", "FAILED", "source", "timeout-scheduler").count());
     }
 
     @Test

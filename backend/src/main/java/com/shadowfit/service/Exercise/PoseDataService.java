@@ -2,6 +2,7 @@ package com.shadowfit.service.Exercise;
 
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
+import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.grpc.PoseDataRequest;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.ExerciseReference;
@@ -30,6 +31,7 @@ public class PoseDataService {
     private final ExercisesRepository exercisesRepository;
     private final ExerciseReferenceRepository referenceRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final SessionMetrics sessionMetrics;
 
     private static final String INSERT_POSE_SQL =
             "INSERT INTO pose_data " +
@@ -82,6 +84,10 @@ public class PoseDataService {
                 return downsampled.size();
             }
         });
+
+        // 수신/저장 행수를 분포로 남겨 실측 다운샘플 비율(R≈5)이 운영 중에도 유지되는지 관측한다.
+        // 로그는 배치 1건씩만 보여주지만 지표는 "지난 1시간 평균 몇 프레임이 몇 행이 됐나"에 답한다.
+        sessionMetrics.poseBatch(grpcList.size(), downsampled.size());
 
         log.info("세션 {} : 포즈 데이터 {}개 수신 → {}개로 다운샘플 후 저장 성공",
                 sessionId, grpcList.size(), downsampled.size());

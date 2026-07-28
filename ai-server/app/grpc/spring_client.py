@@ -14,6 +14,7 @@ import grpc
 import exercise_pb2
 import exercise_pb2_grpc
 from app.config import settings
+from app.grpc.correlation import correlation_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,11 @@ _COMPLETE_BACKOFF_SECONDS = (1.0, 3.0)
 
 def auth_metadata() -> tuple[tuple[str, str], ...]:
     return (("authorization", f"Bearer {settings.INTERNAL_API_TOKEN}"),)
+
+
+def call_metadata() -> tuple[tuple[str, str], ...]:
+    """인증 토큰 + correlation id. Spring 쪽 서버 인터셉터가 id 를 꺼내 자기 로그에 찍는다."""
+    return auth_metadata() + correlation_metadata()
 
 
 def get_stub() -> exercise_pb2_grpc.ExerciseServiceStub:
@@ -51,7 +57,7 @@ def report_pose_data_batch(
             session_id=session_id,
             pose_data=pose_data_list,
         )
-        response = get_stub().SavePoseDataBatch(request, metadata=auth_metadata())
+        response = get_stub().SavePoseDataBatch(request, metadata=call_metadata())
         logger.info(
             "[AI → Spring] PoseData 배치 전송 (session=%s, count=%d, success=%s)",
             session_id,
@@ -80,9 +86,13 @@ def report_complete_analysis(
         calories_burned=calories_burned,
     )
 
+    # 재시도 루프 **밖에서** 한 번만 만든다 — 안에서 만들면 컨텍스트에 id 가 없을 때
+    # 매 attempt 마다 새 id 가 발급돼 같은 CompleteAnalysis 의 시도들이 서로 안 묶인다.
+    metadata = call_metadata()
+
     for attempt in range(1, _COMPLETE_MAX_ATTEMPTS + 1):
         try:
-            response = get_stub().CompleteAnalysis(request, metadata=auth_metadata())
+            response = get_stub().CompleteAnalysis(request, metadata=metadata)
             logger.info(
                 "[AI → Spring] CompleteAnalysis 성공 (session=%s, status=%s, attempt=%d)",
                 session_id,
