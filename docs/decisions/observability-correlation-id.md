@@ -12,7 +12,7 @@
 
 세션 하나가 끝나는 경로가 **스레드 4~5개 + 프로세스 2개**에 걸쳐 있다:
 
-```
+```text
 HTTP 요청(톰캣) → @Async(워커풀) → gRPC 송신 → FastAPI(별도 프로세스)
                                                     ↓
    Spring ← gRPC 콜백(grpc-server 스레드) ← 분석 완료
@@ -47,7 +47,7 @@ HTTP 요청(톰캣) → @Async(워커풀) → gRPC 송신 → FastAPI(별도 프
 **기존 `log.info(...)` 호출은 한 줄도 고치지 않았다.** MDC + 패턴 방식의 이점이 정확히 이것.
 
 로그 출력 형태 (실제 테스트 실행 로그):
-```
+```text
 2026-07-28 00:34:59.297  INFO [ionShutdownHook] [·|·] com.zaxxer.hikari.HikariDataSource : ...
                                                  ↑ cid|sessionId, 값 없으면 ·
 ```
@@ -78,9 +78,23 @@ MDC는 `ThreadLocal`, Python `ContextVar` 는 스레드마다 독립. **인터�
 - **Java 서버**: `interceptCall` 에서 MDC.put만 하면 정작 서비스 메서드가 도는 grpc-server 워커에는 아무것도 없음 → 리스너 콜백(`onHalfClose` 등)마다 세우고 되돌림
 - **Java 클라이언트 콜백**: 비동기 스텁의 `onNext/onError` 는 gRPC 이벤트 루프 스레드 → `CorrelationIds.preserving()` 으로 호출 시점 MDC를 캡처해 복원. **감싸지 않으면 가장 중요한 `onError` 실패 로그에 cid가 안 붙는다**
 - **`@Async`**: 복사는 제출 시점(부모 스레드), 복원은 실행 시점(워커). 이 타이밍을 뒤집으면 항상 비어 있음
-- **Python**: 인터셉터에서 set하지 않고 **핸들러 함수 자체를 감싸서** 핸들러가 도는 그 스레드 안에서 set/reset
+- **Python 핸들러**: 인터셉터에서 set하지 않고 **핸들러 함수 자체를 감싸서** 핸들러가 도는 그 스레드 안에서 set/reset
+- **Python 백그라운드 스레드**: `threading.Thread` 는 부모 `ContextVar` 를 **상속하지 않는다**(상속하려면 `contextvars.copy_context()`) → `correlation.wrap()` 으로 감싸 부모 스레드에서 캡처·워커에서 복원. `@Async` 와 동일한 발상 (§3-3-1)
 
 전부 "복원 후 원상복구"를 `finally` 로 강제 — 워커 스레드는 재사용되므로 누수되면 다음 요청에 이전 cid가 새어나간다.
+
+#### 3-3-1. 1차 구현에서 놓쳤던 구멍 (CodeRabbit 리뷰로 발견, 같은 PR에서 수정)
+
+위 4가지 중 **Python 백그라운드 스레드만 1차에서 빠져 있었다.** `StopAnalysis` 핸들러가 `threading.Thread` 로 `_send_complete_analysis` 를 띄우는데, 그 스레드는 컨텍스트가 비어서 `correlation_metadata()` 가 매번 새 고아 id를 발급하고 있었다.
+
+하필 **가장 아픈 자리**였다 — 이 콜백이 곧 §1-③의 "스케줄러와 경쟁하는 AI 콜백"(`CompleteAnalysis`) 본인이라, 정작 증명하려던 경로에서 추적이 끊겨 있었다. 게다가 `report_complete_analysis` 가 재시도 루프 **안에서** metadata를 만들고 있어 같은 작업의 3번 시도에 서로 다른 id가 붙었다.
+
+수정 3가지:
+1. `correlation.wrap()` 신설 + 스레드 target에 적용 — 캡처는 부모, 복원은 워커
+2. `ensure_correlation_id()` — fallback 발급 시 **컨텍스트에 심는다**. 발급만 하고 버리면 metadata의 id와 그 스레드 로그의 `·` 가 안 이어짐
+3. metadata를 재시도 루프 **밖에서** 1회 생성
+
+> 교훈: "스레드 경계를 다 감쌌다"는 주장은 **경계를 다 열거했을 때만** 참이다. Java 3종(`@Async`·gRPC 서버 리스너·클라이언트 옵저버)은 세어놓고 Python의 raw `threading.Thread` 는 세지 않았다. `test_unwrapped_thread_loses_id` 는 감싸지 않으면 실제로 끊긴다는 걸 못 박아, 이 구멍이 다시 열리면 테스트가 깨지게 했다.
 
 ### 3-4. try-with-resources 를 catch 바깥에 둔 이유
 **자원은 catch 블록보다 먼저 닫힌다.** 한 겹으로 합치면 정작 실패 로그에서 cid/sessionId가 빠진다 — 가장 필요한 자리에서. 그래서 스코프를 바깥, `try/catch` 를 안쪽에 두는 형태로 통일했다 (`ExerciseGrpcService` 3개 메서드, 두 스케줄러).
@@ -92,7 +106,11 @@ MDC는 `ThreadLocal`, Python `ContextVar` 는 스레드마다 독립. **인터�
 - **cid** = 요청 1건, 짧은 수명
 - **sessionId** = 운동 세션 1건, 긴 수명(요청 수십 건)
 
-그래서 **"cid는 다른데 sessionId가 같다" = 서로 다른 두 흐름이 같은 레코드에서 만났다** = §1-③ 경쟁이 실제로 일어난 순간의 증거가 된다. sessionId는 metadata가 아니라 메시지 payload 안에 있어 인터셉터가 볼 수 없으므로 `ExerciseGrpcService` 각 메서드에서 얹는다.
+그래서 **"cid는 다른데 sessionId가 같다" = 서로 다른 두 요청이 같은 세션을 건드렸다**가 로그에서 바로 읽힌다.
+
+> ⚠️ **여기서 멈출 것.** 이건 경쟁의 *단서*지 *증거*가 아니다. 두 요청이 순차적으로 건드려도 똑같은 모양이 나오므로, 동시 실행이나 낙관락 충돌이 실제로 일어났다는 결론은 여기서 나오지 않는다. 확정은 같이 넣은 `shadowfit.session.optimistic.lock.conflicts` 지표(또는 충돌 재시도 로그)가 한다. **§1-③에 대한 답은 cid가 아니라 그 지표**이고, cid는 충돌이 잡혔을 때 "누구와 누구였는지"를 되짚는 용도다.
+
+sessionId는 metadata가 아니라 메시지 payload 안에 있어 인터셉터가 볼 수 없으므로 `ExerciseGrpcService` 각 메서드에서 얹는다.
 
 ---
 
@@ -101,10 +119,10 @@ MDC는 `ThreadLocal`, Python `ContextVar` 는 스레드마다 독립. **인터�
 **신규 (Java 8 · Python 1 · 설정 1)**
 `global/observability/` 에 `CorrelationIds` `CorrelationIdFilter` `GrpcCorrelationServerInterceptor` `GrpcCorrelationClientInterceptor` `GrpcObservabilityConfig` `SessionMetrics`, `global/config/AsyncConfig`, `resources/logback-spring.xml`, `ai-server/app/grpc/correlation.py`
 
-**수정 (Java 6 · Python 3)**
-`ExerciseGrpcService`(세션 MDC) · `ExerciseAnalysisService`(세션 MDC·옵저버 데코레이터·충돌 지표) · `SessionService`(전이·충돌 지표) · `PoseDataService`(배치 지표) · `SessionTimeoutScheduler`(tick id·세션 MDC·지표) · `PoseDataPartitionScheduler`(tick id) / `ai-server` 의 `grpc/server.py` `grpc/spring_client.py` `main.py`
+**수정 (Java 6 · Python 4)**
+`ExerciseGrpcService`(세션 MDC) · `ExerciseAnalysisService`(세션 MDC·옵저버 데코레이터·충돌 지표) · `SessionService`(전이·충돌 지표) · `PoseDataService`(배치 지표) · `SessionTimeoutScheduler`(tick id·세션 MDC·지표) · `PoseDataPartitionScheduler`(tick id) / `ai-server` 의 `grpc/server.py` `grpc/spring_client.py`(재시도 metadata 고정) `grpc/exercise_servicer.py`(스레드 target `wrap`) `main.py`
 
-**계획 대비 차이**: `SecurityConfig` 수정 불필요해짐(§3-1), 대신 `GrpcObservabilityConfig` 신설(§3-2). **`build.gradle` 변경 없음.**
+**계획 대비 차이**: `SecurityConfig` 수정 불필요해짐(§3-1), 대신 `GrpcObservabilityConfig` 신설(§3-2). **`build.gradle` 변경 없음.** 리뷰 반영으로 `correlation.py` 에 `wrap()`·`ensure_correlation_id()` 추가, `exercise_servicer.py` 가 수정 대상에 합류(§3-3-1).
 
 ---
 
@@ -117,9 +135,9 @@ MDC는 `ThreadLocal`, Python `ContextVar` 는 스레드마다 독립. **인터�
 | `GrpcCorrelationInterceptorTest` (5) | 송신 부착·미보유 시 발급, **수신이 핸들러 실행 컨텍스트에서 노출**, 왕복 동일 id |
 | `GrpcObservabilityWiringTest` (2) | 전역 인터셉터 등록 — 로직이 맞아도 **등록이 빠지면 조용히 아무 일도 안 일어나서** 별도 확인 |
 | `SessionTimeoutSchedulerTest` (수정) | 양보/전이 지표가 실제로 올라가는지 (`SimpleMeterRegistry` 실측) |
-| `ai-server/tests/test_correlation.py` (7) | sanitize, 핸들러 컨텍스트 노출, 재송신 시 동일 id 유지, LogRecord 주입 |
+| `ai-server/tests/test_correlation.py` (10) | sanitize, 핸들러 컨텍스트 노출, 재송신 시 동일 id 유지, LogRecord 주입, **스레드 경계 전파 + 안 감쌌을 때 끊김 + 재시도 id 고정**(§3-3-1) |
 
-백엔드 전체 스위트 통과. Python은 venv에 pytest가 없어 함수 직접 호출로 7건 실행(전부 통과) — **pytest는 requirements.txt에 없어서 설치하지 않았다.**
+백엔드 전체 스위트 통과. Python은 venv에 pytest가 없어 함수 직접 호출로 10건 실행(전부 통과) — **pytest는 requirements.txt에 없어서 설치하지 않았다.** 이 실행 방식(한 프로세스에서 순차 호출) 때문에 전역 상태를 건드리는 테스트는 반드시 원복해야 한다 — `test_log_record_factory_injects_cid` 가 `LogRecordFactory` 를 `finally` 로 되돌리는 이유.
 
 ---
 
@@ -142,8 +160,10 @@ MDC는 `ThreadLocal`, Python `ContextVar` 는 스레드마다 독립. **인터�
 - [ ] 보강 축 나머지 착수 순서: **outbox vs 회복탄력성** ([`portfolio-narrative.md §7`](../portfolio/portfolio-narrative.md)) — 관측성이 빠지면서 2개로 좁혀짐
 - [ ] gRPC 콜백 처리 시간 Timer — 이번 범위에서 제외(지표 3종만)
 - [ ] AI 쪽 HTTP 엔드포인트(`pose.py`)의 cid 전파 — 이번엔 gRPC 경로만
+- [ ] 신규 메트릭 3곳(`ExerciseAnalysisService` circuit-open/grpc-error, `PoseDataService` 배치, `SessionService` 충돌·전이)의 `SimpleMeterRegistry` 카운트 검증 테스트 — 리뷰 지적(타당), `SessionTimeoutSchedulerTest` 패턴을 그대로 확장하면 됨. 이번 PR 범위에서 의도적으로 미룸
 
 ---
 
 ## 결정 로그
 - 2026-07-28: 보강 3축(관측성·outbox·회복탄력성) 중 **관측성을 1순위로 착수·완료**. 근거: 착수 시점에 Actuator·Resilience4j·gRPC deadline은 이미 있어 회복탄력성은 실질적으로 채워져 있었고, 관측성만 🔴 빈칸이라 ROI가 가장 높았음. 범위는 correlation id 5단계 + 커스텀 메트릭 3종, 분산추적·JSON 구조화는 제외(§6).
+- 2026-07-28: PR #54 CodeRabbit 리뷰 반영. **Python 백그라운드 스레드 경계 누락을 수정**(§3-3-1) — 지적은 "재시도마다 id가 달라진다"(Minor)였으나 검증해 보니 `threading.Thread` 가 컨텍스트를 상속하지 않아 `CompleteAnalysis` 콜백 전체가 원 요청과 끊겨 있었음(더 큼). §3-6의 "cid가 다르고 sessionId가 같다 = 경쟁의 증거" 주장도 **과했음을 인정하고 "단서"로 완화** — 확정은 낙관락 충돌 지표가 한다(Java javadoc·logback 주석 동일 정정). 메트릭 테스트 확장 지적은 타당하나 이번 범위 밖으로 미룸(§7). `install_log_record_factory()` 멱등화 지적은 기동 시 1회 호출이라 미적용.
