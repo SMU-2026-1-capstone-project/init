@@ -17,7 +17,12 @@ reviews:
     - "!ai-server/exercise_pb2_grpc.py"
     - "!ai-server/app/proto/exercise_pb2.py"
     - "!ai-server/app/proto/exercise_pb2_grpc.py"
-    - "!mysql/**"
+    # data.sql 만 제외한다 — 대량 시드 INSERT 는 리뷰 가치가 없고 노이즈만 만든다.
+    # 이전에는 "!mysql/**" 로 mysql 전체를 막아 두었는데, 그러면 아래 path_instructions 의
+    # "mysql/*.sql" 지침이 영원히 발동하지 않는 죽은 설정이 된다. 실제로 outbox_events DDL 이
+    # 리뷰를 한 번도 못 받았다(2026-07-29, PR #63). 스키마는 되돌리기 어려운 변경이라 오히려
+    # 리뷰가 더 필요한 영역이다.
+    - "!mysql/data.sql"
   path_instructions:
     - path: "backend/**/*.java"
       instructions: >
