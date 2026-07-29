@@ -126,7 +126,9 @@ public class OutboxPublisher {
         switch (outcome) {
             case SENT -> {
                 LocalDateTime now = LocalDateTime.now();
-                self.recordSent(event.getId(), now);
+                if (!owned(self.recordSent(event.getId(), publisherId, now), event)) {
+                    return;
+                }
                 sessionMetrics.outboxDispatch("sent");
                 if (event.getCreatedAt() != null) {
                     sessionMetrics.outboxLag(Duration.between(event.getCreatedAt(), now));
@@ -134,7 +136,9 @@ public class OutboxPublisher {
             }
             case TERMINAL_FAILED -> {
                 // 재시도가 원리상 무의미한 실패 — 한도와 무관하게 즉시 종료 상태로 보낸다.
-                self.recordFailed(event.getId());
+                if (!owned(self.recordFailed(event.getId(), publisherId), event)) {
+                    return;
+                }
                 sessionMetrics.outboxDispatch("failed");
                 log.warn("아웃박스 전달 종료(재시도 무의미) - id: {}, sessionId: {}",
                         event.getId(), event.getAggregateId());
@@ -142,17 +146,39 @@ public class OutboxPublisher {
             case RETRY -> {
                 int attempts = event.getRetryCount() + 1;
                 if (attempts > maxRetry) {
-                    self.recordFailed(event.getId());
+                    if (!owned(self.recordFailed(event.getId(), publisherId), event)) {
+                        return;
+                    }
                     sessionMetrics.outboxDispatch("failed");
                     log.error("아웃박스 재시도 한도 초과 — 독 메시지로 종료 (id: {}, sessionId: {}, 시도: {})",
                             event.getId(), event.getAggregateId(), attempts);
                     return;
                 }
                 LocalDateTime nextAt = LocalDateTime.now().plusSeconds(backoffSeconds(attempts));
-                self.recordRetry(event.getId(), nextAt);
+                if (!owned(self.recordRetry(event.getId(), publisherId, nextAt), event)) {
+                    return;
+                }
                 sessionMetrics.outboxDispatch("retry");
             }
         }
+    }
+
+    /**
+     * 상태 전이가 실제로 반영됐는지 — 0 행이면 <b>lease 가 만료돼 다른 발행기가 이 행을 회수해 간
+     * 것</b>이다. 그 경우 우리 결과를 쓰면 새 소유자의 진행을 덮어쓰므로 조용히 물러난다.
+     *
+     * <p>지표도 올리지 않는다. 우리가 보낸 건 사실이지만 그 행의 결말은 새 소유자가 정하므로,
+     * 여기서 세면 같은 행이 두 번 집계된다.
+     */
+    private boolean owned(int updated, OutboxEvent event) {
+        if (updated > 0) {
+            return true;
+        }
+        sessionMetrics.outboxDispatch("lease-lost");
+        log.warn("선점을 잃은 뒤 결과를 기록하려 함 — 다른 발행기가 회수했다 (id: {}, sessionId: {}). "
+                + "lease({}s)가 gRPC 데드라인 대비 너무 짧지 않은지 확인 필요",
+                event.getId(), event.getAggregateId(), lockTimeoutSeconds);
+        return false;
     }
 
     /** 지수 백오프 1s → 2s → 4s … 상한까지. {@code 1L << n} 이 넘치지 않도록 지수를 먼저 자른다. */
@@ -196,18 +222,19 @@ public class OutboxPublisher {
         return rows;
     }
 
+    /** @return 갱신된 행 수. 0 이면 소유권을 잃은 것({@link #owned} 참고). */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordSent(Long id, LocalDateTime sentAt) {
-        outboxRepository.markSent(id, sentAt);
+    public int recordSent(Long id, String lockedBy, LocalDateTime sentAt) {
+        return outboxRepository.markSent(id, lockedBy, sentAt);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordRetry(Long id, LocalDateTime nextRetryAt) {
-        outboxRepository.markForRetry(id, nextRetryAt);
+    public int recordRetry(Long id, String lockedBy, LocalDateTime nextRetryAt) {
+        return outboxRepository.markForRetry(id, lockedBy, nextRetryAt);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordFailed(Long id) {
-        outboxRepository.markFailed(id);
+    public int recordFailed(Long id, String lockedBy) {
+        return outboxRepository.markFailed(id, lockedBy);
     }
 }

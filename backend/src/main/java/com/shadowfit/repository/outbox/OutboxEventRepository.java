@@ -83,7 +83,18 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
                        @Param("lockedBy") String lockedBy,
                        @Param("expiresAt") LocalDateTime expiresAt);
 
-    /** 전달 성공. 선점 흔적을 지워 회수 대상에서 완전히 빠지게 한다. */
+    /**
+     * 전달 성공. 선점 흔적을 지워 회수 대상에서 완전히 빠지게 한다.
+     *
+     * <p>[왜 {@code lockedBy} 를 조건에 거나] 소유권을 잃은 발행기가 뒤늦게 쓰는 것을 막는다.
+     * GC 스톱 등으로 lease 만 만료되면 다른 발행기가 이 행을 회수해 다시 보내는 중일 수 있는데,
+     * 그때 원래 발행기가 깨어나 상태를 덮으면 <b>새 소유자의 진행을 망가뜨린다</b>(예: 아직 송신
+     * 중인 행을 PENDING 으로 되돌려 세 번째 발행기가 또 집게 만든다). 조건이 안 맞으면 0 을
+     * 돌려주므로 호출자가 "소유권을 잃었다"를 알 수 있다 — 조건부 갱신(CAS)에 의한 경량 펜싱.
+     *
+     * <p>중복 <b>송신</b> 자체를 막지는 못한다(그건 이미 나간 뒤다). 막는 것은 <b>상태 오염</b>이다.
+     * 중복 송신은 수신측 멱등성이 흡수한다.
+     */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE OutboxEvent e
@@ -92,10 +103,13 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
                    e.lockedBy = NULL,
                    e.lockExpiresAt = NULL
              WHERE e.id = :id
+               AND e.lockedBy = :lockedBy
+               AND e.status = com.shadowfit.model.outbox.OutboxStatus.PROCESSING
             """)
-    int markSent(@Param("id") Long id, @Param("sentAt") LocalDateTime sentAt);
+    int markSent(@Param("id") Long id, @Param("lockedBy") String lockedBy,
+                 @Param("sentAt") LocalDateTime sentAt);
 
-    /** 재시도 예약 — {@code PENDING} 으로 되돌리고 백오프를 건다. */
+    /** 재시도 예약 — {@code PENDING} 으로 되돌리고 백오프를 건다. 소유권 조건은 {@link #markSent} 와 동일. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE OutboxEvent e
@@ -105,8 +119,11 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
                    e.lockedBy = NULL,
                    e.lockExpiresAt = NULL
              WHERE e.id = :id
+               AND e.lockedBy = :lockedBy
+               AND e.status = com.shadowfit.model.outbox.OutboxStatus.PROCESSING
             """)
-    int markForRetry(@Param("id") Long id, @Param("nextRetryAt") LocalDateTime nextRetryAt);
+    int markForRetry(@Param("id") Long id, @Param("lockedBy") String lockedBy,
+                     @Param("nextRetryAt") LocalDateTime nextRetryAt);
 
     /** 종료 상태의 실패(재시도 한도 초과 / AI 가 세션을 잃어 재시도가 무의미한 경우). */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -116,8 +133,10 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
                    e.lockedBy = NULL,
                    e.lockExpiresAt = NULL
              WHERE e.id = :id
+               AND e.lockedBy = :lockedBy
+               AND e.status = com.shadowfit.model.outbox.OutboxStatus.PROCESSING
             """)
-    int markFailed(@Param("id") Long id);
+    int markFailed(@Param("id") Long id, @Param("lockedBy") String lockedBy);
 
     /**
      * 적체 감시 게이지용. 계수기가 없으면 "PENDING 이 조용히 쌓이는 것"을 아무도 모른다 —
