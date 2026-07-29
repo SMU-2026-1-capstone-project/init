@@ -1,7 +1,7 @@
 # 신뢰성 있는 비동기 통보 — 세션 종료 통보 유실(E1) 보강
 
 작성일: 2026-06-12 / **전면 재작성: 2026-07-29**(실코드 재대조 — §1 피해 기술 정정, 서킷 스킵 경로 신설, outbox의 한계 명시)
-상태: **구현·측정 완료 (2026-07-29, PR #60·#63·#67)** — §7 미결정 8건 확정 → 구현 → §6 실측까지 마침. "유실 0"은 이제 주장이 아니라 실측이다 ([[feedback_user_decides_not_claude]], [[feedback_decision_doc]])
+상태: **구현·측정 완료 (2026-07-29, PR #60·#63·#67)** — §7 미결정 8건 확정 → 구현 → §6 실측까지 마침. **"통보 유실 0"은 이제 주장이 아니라 실측이다 — 단 네트워크 단절·서킷 OPEN 시나리오에 한하며, AI 프로세스 재시작 시엔 통보가 전달돼도 분석 결과는 유실된다(§3-2·§6-2)** ([[feedback_user_decides_not_claude]], [[feedback_decision_doc]])
 대상: 백엔드(Spring) 신입 포폴 — 헤드라인(세션 분산 정합성) **직접** 강화
 관련: [`portfolio-narrative.md`](../portfolio/portfolio-narrative.md)(§1 헤드라인·§3 보강), [`failure-modes.md`](../portfolio/failure-modes.md)(E1·E2·C4·T3), [`observability-correlation-id.md`](./observability-correlation-id.md), [`db-portfolio-roadmap.md`](./db-portfolio-roadmap.md)
 
@@ -212,7 +212,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     sent_at         DATETIME     NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_outbox_dispatch (status, next_retry_at)  -- 인덱스는 하나만 — §4-1-3
-);
+) COMMENT='트랜잭셔널 아웃박스 — 세션 종료 통보(STOP_ANALYSIS) 전달 보장';
 ```
 
 #### 4-1-3. ⚠️ 인덱스를 2개 두려다 실측으로 되돌린 기록
@@ -417,7 +417,7 @@ AI 를 재시작해 세션 상태를 잃게 한 뒤 종료했더니, 발행기�
 
 세션도 **6초 만에 `FAILED`** 가 됐다. 이전 설계라면 타임아웃 스케줄러(`시작시간+예상시간+30분`)를 기다려야 했다 — PR #60 의 즉시 실패 처리가 실측으로 확인된 셈이다.
 
-**①-a 와 결과가 다른 것이 이 문서의 §3-2 한계 그 자체다.** 통보 전달은 exactly-once 지만 분석 결과의 내구성은 별개다.
+**①-a 와 결과가 다른 것이 이 문서의 §3-2 한계 그 자체다.** 통보 전달은 **at-least-once**(크래시 회수 시 재전송이 남으므로 — §4-3-1)이고, 멱등 수신과 합쳐야 비로소 *처리*가 effectively-once 가 된다. 그리고 그 어느 쪽도 **분석 결과의 내구성을 주지는 않는다** — 전달과 결과 보존은 별개 축이다.
 
 ### 6-3. ② 서킷 OPEN — 이전 설계에서 통보를 버리던 구간
 
@@ -506,3 +506,4 @@ WARN [fit-scheduler-3] [41318f1afbd1|805] ExerciseAnalysisService :
 - 2026-07-29(**결정**): 착수 전 실코드 재확인에서 **문서를 넘는 사실 3건** 확인 — ⓐ `onNext:265-267`이 `getSuccess()`를 안 읽어 `success=false`가 **지금도 무증상으로 새고 있다**(§3-2-1 신설), ⓑ `deleteSession:230-233`이 IN_PROGRESS 삭제를 막아 **삭제 세션 PENDING 케이스가 문서보다 훨씬 좁다**(§4-1-1 정정), ⓒ `stopAnalysis`가 unary라 **동기 전환은 기계적** — "최대 작업량"은 과대평가였고 실제 덩어리는 발행기 로직이다(§4-2-1 정정). 이 위에서 **§7 미결정 8건 전건 확정**(사용자 confirm): 순수 A / blocking 동기 전환 / best-effort 미유지 / `success=false`는 터미널 FAILED / 삭제세션 무처리·SENT 주기 DELETE / 지수 백오프·retry>10 FAILED·알람은 지표로 대체 / SKIP LOCKED 1차 포함·T3 분리 / cid 컬럼·지표 3종 1차 포함. **구현 순서는 §7-1**, 선행 소품(ⓐ 수정)을 0번으로 분리. 상태: 분석/추천 → **결정 완료·착수 전**.
 - 2026-07-29(**구현 완료**): PR #60(선행) → PR #63(본체) 머지. 문서를 실제 코드 기준으로 동기화 — §4-1 DDL 을 반영본으로 교체, §4-1-3(인덱스 실측 기록) 신설, §4-3-1 에 경량 펜싱(CAS) 추가, §7-1 진행 상태 갱신. **착수 전 설계에서 실측으로 바뀐 것 2건**: ① 인덱스 2개는 역효과라 1개로(선두 컬럼 중복), ② 상태 전이에 `locked_by` 조건을 걸어 lease 상실 시 상태 오염 차단. 남은 것은 §6 측정뿐이며, 그 전까지 "유실 0"은 **설계상 주장이지 실측이 아니다**.
 - 2026-07-29(**측정 완료**): Docker 로 전체 스택을 띄워 §6 실측. ①-a 네트워크 단절(`docker pause`, 상태 보존) → 25초 적체 후 `SENT`+`COMPLETED`, 백오프 8→16→32s 확인. ①-b AI 재시작(상태 소실) → 재시도 0회로 터미널 `FAILED`(§3-2 한계의 실증). ② 서킷 OPEN → 이전 설계가 버리던 구간에서 행이 살아남아 복구 후 전달. **측정 중 별개 버그 발견** — `reports.updated_at` 누락으로 모든 세션 완료가 롤백되고 있었다(#66, PR #67). 단위 테스트·리뷰로는 안 잡히던 것이라, E2E 측정을 실제로 돌린 값어치가 여기서 나왔다. 미측정 잔여: 지연 p99 분포, 중복 흡수 실측, 다건·다중 발행기 거동(§6-5).
+- 2026-07-29(리뷰 반영): PR #65 CodeRabbit 지적 3건 수정. **문서가 자기 내용과 모순되던 곳 2건** — ① 헤더의 "유실 0"이 모든 장애를 포함하는 것처럼 읽혔다(①-b 에선 분석 결과가 실제로 유실된다). ② "통보 전달은 exactly-once"라고 썼는데 §4-3-1 대로 크래시 회수 시 재전송이 남으므로 **at-least-once** 가 맞고, 멱등 수신과 합쳐야 *처리*가 effectively-once 다. ③ §4-1 DDL 스니펫에 실제 스키마의 테이블 COMMENT 누락. **새 결정 없음 — 표현 정확도 수정.**
