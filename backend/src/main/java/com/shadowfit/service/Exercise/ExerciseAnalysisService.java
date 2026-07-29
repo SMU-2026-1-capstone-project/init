@@ -283,10 +283,17 @@ public class ExerciseAnalysisService {
 
                     // CompleteAnalysis 가 오지 않는 게 확정이므로 타임아웃 스케줄러(예상시간+버퍼)를
                     // 기다릴 이유가 없다. startAnalysis 가 같은 상황에서 하는 처리와 대칭.
-                    // 늦게 도착한 완료 콜백과 경합해도 completeSession 의 낙관락 재시도가
-                    // FAILED 를 COMPLETED 로 덮으므로 올바른 결과가 이긴다.
-                    if (sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now())) {
-                        sessionMetrics.sessionTransition(Status.FAILED, "ai-session-missing");
+                    try {
+                        if (sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now())) {
+                            sessionMetrics.sessionTransition(Status.FAILED, "ai-session-missing");
+                        }
+                    } catch (ObjectOptimisticLockingFailureException e) {
+                        // 늦게 도착한 완료 콜백이 같은 세션을 동시에 갱신한 것 — 결과 데이터가 더
+                        // 가치있으므로 양보한다(markAsFailedIfStillInProgress 의 계약: "호출 측이
+                        // catch 하고 양보", SessionService:248-249. 스케줄러도 같은 정책).
+                        // 여기서 안 잡으면 gRPC 콜백 스레드로 예외가 새어나가 조용히 삼켜진다.
+                        sessionMetrics.optimisticLockConflict("ai-session-missing", "yield");
+                        log.info("세션 FAILED 처리 양보 — 완료 콜백 우선 (sessionId: {})", sessionId);
                     }
                 }
                 @Override

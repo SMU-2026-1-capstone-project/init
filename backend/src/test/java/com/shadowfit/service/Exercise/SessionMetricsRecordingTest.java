@@ -177,9 +177,29 @@ SessionMetricsRecordingTest {
 
             assertThat(stopResults("session-missing")).isEqualTo(1.0);
             assertThat(transitions(Status.FAILED, "ai-session-missing")).isEqualTo(1.0);
-            // 전송은 성공했으므로 서킷은 열리지 않아야 한다 — AI 는 새 분석을 받을 수 있는 상태다
-            assertThat(circuitBreakerRegistry.circuitBreaker("aiServer").getState())
-                    .isEqualTo(CircuitBreaker.State.CLOSED);
+
+            // 전송 자체는 성공했으므로 서킷에는 "성공"으로 기록돼야 한다 — AI 는 새 분석을 받을 수
+            // 있는 상태라, 여기서 실패로 집계하면 신규 startAnalysis 까지 막히게 된다.
+            // getState()==CLOSED 만으로는 검증이 안 된다: 기본 minimumNumberOfCalls 가 100 이라
+            // 아무것도 기록되지 않아도 CLOSED 라, 그 단언은 항상 통과한다.
+            CircuitBreaker.Metrics cb = circuitBreakerRegistry.circuitBreaker("aiServer").getMetrics();
+            assertThat(cb.getNumberOfSuccessfulCalls()).isEqualTo(1);
+            assertThat(cb.getNumberOfFailedCalls()).isZero();
+        }
+
+        @Test
+        @DisplayName("FAILED 처리 중 낙관락 충돌이 나면 양보하고 예외를 콜백 밖으로 흘리지 않는다")
+        void stopAnalysis_sessionMissing_lockConflict_yields() {
+            when(sessionService.markAsFailedIfStillInProgress(eq(10L), any(LocalDateTime.class)))
+                    .thenThrow(new ObjectOptimisticLockingFailureException(Session.class, 10L));
+            stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
+
+            // 콜백 밖으로 예외가 나가면 gRPC 스레드에서 조용히 삼켜진다 — 여기서 터지면 안 됨
+            service.stopAnalysis(10L);
+
+            assertThat(conflicts("ai-session-missing", "yield")).isEqualTo(1.0);
+            // 양보했으므로 FAILED 전이는 없다 — 완료 콜백이 이긴 것
+            assertThat(transitions(Status.FAILED, "ai-session-missing")).isZero();
         }
 
         @Test
