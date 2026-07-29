@@ -160,10 +160,16 @@ CREATE TABLE IF NOT EXISTS reports (
     improvement_tips TEXT,
     comparison_with_previous JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- DEFAULT 추가
+    -- Report 는 BaseTimeEntity 를 상속해 updated_at 을 갖는다(@LastModifiedDate). 이 컬럼이 없어
+    -- INSERT 가 "Unknown column 'updated_at'" 으로 터졌고, precomputeReport 가 세션 완료와 같은
+    -- 트랜잭션이라 세션 COMPLETED 까지 롤백되면서 모든 세션이 FAILED 로 수렴했다(이슈 #66, 실제 재현).
+    -- JPA 감사(auditing)가 값을 직접 써넣으므로 DB DEFAULT/ON UPDATE 는 두지 않는다.
+    updated_at DATETIME NULL,
     FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (session_id) REFERENCES exercise_sessions(id) ON DELETE CASCADE,
-    -- 세션당 리포트 1건 보장 (report 생성 멱등성, db-deep-dive.md §C) — 현재 report를 생성하는
-    -- 애플리케이션 코드는 없고 시드(data.sql)로만 채워지지만, 추후 생성 로직이 들어올 때
+    -- 세션당 리포트 1건 보장 (report 생성 멱등성, db-deep-dive.md §C) — 아래 주석은 스키마 작성
+    -- 당시 기준이며, 현재는 SessionService.precomputeReport 가 세션 완료 시 리포트를 생성한다.
+    -- (그 변경 때 updated_at 추가가 누락돼 위 버그가 생겼다)
     -- 재시도로 인한 중복 생성을 DB 제약으로 막기 위해 선반영
     UNIQUE KEY uk_report_session (session_id)
     );
