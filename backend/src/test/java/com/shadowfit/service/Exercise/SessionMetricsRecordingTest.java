@@ -6,12 +6,15 @@ import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.grpc.AnalyzeRequest;
 import com.shadowfit.grpc.AnalyzeResponse;
 import com.shadowfit.grpc.ExerciseServiceGrpc;
+import com.shadowfit.grpc.StopRequest;
+import com.shadowfit.grpc.StopResponse;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
@@ -58,11 +61,13 @@ import static org.mockito.Mockito.when;
  * 원객체를 직접 호출하면 {@code @Async}/{@code @Transactional} 없이 그 분기만 정확히 때릴 수 있다.
  */
 @DisplayName("세션 지표 기록 테스트")
-class SessionMetricsRecordingTest {
+class
+SessionMetricsRecordingTest {
 
     private static final String TRANSITIONS = "shadowfit.session.transitions";
     private static final String CONFLICTS = "shadowfit.session.optimistic.lock.conflicts";
     private static final String POSE_FRAMES = "shadowfit.pose.batch.frames";
+    private static final String AI_STOP_RESULT = "shadowfit.ai.stop.result";
 
     private SimpleMeterRegistry registry;
     private SessionMetrics metrics;
@@ -79,6 +84,10 @@ class SessionMetricsRecordingTest {
 
     private double conflicts(String source, String outcome) {
         return registry.counter(CONFLICTS, "source", source, "outcome", outcome).count();
+    }
+
+    private double stopResults(String outcome) {
+        return registry.counter(AI_STOP_RESULT, "outcome", outcome).count();
     }
 
     @Nested
@@ -156,6 +165,75 @@ class SessionMetricsRecordingTest {
 
             assertThat(transitions(Status.FAILED, "grpc-error")).isEqualTo(1.0);
             assertThat(transitions(Status.FAILED, "circuit-open")).isZero();
+        }
+
+        @Test
+        @DisplayName("중단 응답 success=false 면 session-missing 으로 기록하고 즉시 FAILED 로 걷어낸다")
+        void stopAnalysis_sessionMissing_recordsAndFailsFast() {
+            when(sessionService.markAsFailedIfStillInProgress(eq(7L), any(LocalDateTime.class))).thenReturn(true);
+            stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
+
+            service.stopAnalysis(7L);
+
+            assertThat(stopResults("session-missing")).isEqualTo(1.0);
+            assertThat(transitions(Status.FAILED, "ai-session-missing")).isEqualTo(1.0);
+
+            // 전송 자체는 성공했으므로 서킷에는 "성공"으로 기록돼야 한다 — AI 는 새 분석을 받을 수
+            // 있는 상태라, 여기서 실패로 집계하면 신규 startAnalysis 까지 막히게 된다.
+            // getState()==CLOSED 만으로는 검증이 안 된다: 기본 minimumNumberOfCalls 가 100 이라
+            // 아무것도 기록되지 않아도 CLOSED 라, 그 단언은 항상 통과한다.
+            CircuitBreaker.Metrics cb = circuitBreakerRegistry.circuitBreaker("aiServer").getMetrics();
+            assertThat(cb.getNumberOfSuccessfulCalls()).isEqualTo(1);
+            assertThat(cb.getNumberOfFailedCalls()).isZero();
+        }
+
+        @Test
+        @DisplayName("FAILED 처리 중 낙관락 충돌이 나면 양보하고 예외를 콜백 밖으로 흘리지 않는다")
+        void stopAnalysis_sessionMissing_lockConflict_yields() {
+            when(sessionService.markAsFailedIfStillInProgress(eq(10L), any(LocalDateTime.class)))
+                    .thenThrow(new ObjectOptimisticLockingFailureException(Session.class, 10L));
+            stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
+
+            // 콜백 밖으로 예외가 나가면 gRPC 스레드에서 조용히 삼켜진다 — 여기서 터지면 안 됨
+            service.stopAnalysis(10L);
+
+            assertThat(conflicts("ai-session-missing", "yield")).isEqualTo(1.0);
+            // 양보했으므로 FAILED 전이는 없다 — 완료 콜백이 이긴 것
+            assertThat(transitions(Status.FAILED, "ai-session-missing")).isZero();
+        }
+
+        @Test
+        @DisplayName("중단 응답 success=true 면 ok 로만 기록하고 세션을 건드리지 않는다")
+        void stopAnalysis_success_recordsOkOnly() {
+            stubStopResponse(true, "분석 중단 및 결과 보고 예약 완료.");
+
+            service.stopAnalysis(8L);
+
+            assertThat(stopResults("ok")).isEqualTo(1.0);
+            assertThat(stopResults("session-missing")).isZero();
+            assertThat(transitions(Status.FAILED, "ai-session-missing")).isZero();
+        }
+
+        @Test
+        @DisplayName("success=false 여도 세션이 이미 종료 상태면(false) 전이 지표는 올리지 않는다")
+        void stopAnalysis_sessionMissing_alreadyFinished_recordsNoTransition() {
+            when(sessionService.markAsFailedIfStillInProgress(eq(9L), any(LocalDateTime.class))).thenReturn(false);
+            stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
+
+            service.stopAnalysis(9L);
+
+            // 사건 자체는 기록돼야 한다 — 세션 전이가 없었다고 유실이 없었던 건 아니다
+            assertThat(stopResults("session-missing")).isEqualTo(1.0);
+            assertThat(transitions(Status.FAILED, "ai-session-missing")).isZero();
+        }
+
+        private void stubStopResponse(boolean success, String message) {
+            doAnswer(invocation -> {
+                StreamObserver<StopResponse> observer = invocation.getArgument(1);
+                observer.onNext(StopResponse.newBuilder().setSuccess(success).setMessage(message).build());
+                observer.onCompleted();
+                return null;
+            }).when(stub).stopAnalysis(any(StopRequest.class), any());
         }
 
         @Test
