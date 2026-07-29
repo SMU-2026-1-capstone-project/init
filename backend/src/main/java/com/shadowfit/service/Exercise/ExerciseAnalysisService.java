@@ -12,6 +12,7 @@ import com.shadowfit.model.exercise.ExerciseReference;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
+import com.shadowfit.model.outbox.DispatchOutcome;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.member.MemberRepository;
@@ -19,6 +20,7 @@ import com.shadowfit.repository.exercise.SessionRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.grpc.Metadata;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +64,11 @@ public class ExerciseAnalysisService {
     @GrpcClient("fastapi-client")
     private ExerciseServiceGrpc.ExerciseServiceStub exerciseAsyncStub;
 
+    // 아웃박스 발행기 전용. 나머지 호출(추출·분석시작)은 결과를 안 쓰는 fire-and-forget 이라
+    // 비동기 스텁 그대로 두고, 결과가 행 상태를 정하는 중단 송신만 블로킹으로 받는다.
+    @GrpcClient("fastapi-client")
+    private ExerciseServiceGrpc.ExerciseServiceBlockingStub exerciseBlockingStub;
+
     // AI가 죽지 않고 그냥 응답을 안 주는(hang) 경우, 데드라인 없이는 onNext/onError
     // 둘 다 안 불려서 서킷브레이커가 그 호출을 영원히 실패/느림으로 못 잡음. 셋 다
     // "빠른 ack" 성격의 제어 호출이라 5초로 통일(실측 튜닝된 값 아닌 보수적 기본값).
@@ -82,6 +89,20 @@ public class ExerciseAnalysisService {
 
         // .attachHeaders() 호출 시 명확하게 stub 타입을 맞춰줍니다.
         return exerciseAsyncStub.withInterceptors(
+                io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(header)
+        ).withDeadlineAfter(GRPC_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+
+    /**
+     * 블로킹 스텁 버전. 데드라인이 특히 중요하다 — 없으면 AI 가 hang 했을 때 발행기 스레드가
+     * 무한정 잡혀 폴링 자체가 멈춘다(비동기였다면 스레드는 안 잡혔을 지점).
+     */
+    private ExerciseServiceGrpc.ExerciseServiceBlockingStub getAuthenticatedBlockingStub() {
+        Metadata header = new Metadata();
+        Metadata.Key<String> authKey = Metadata.Key.of("Authorization", Metadata.ASCII_STRING_MARSHALLER);
+        header.put(authKey, "Bearer " + internalToken);
+
+        return exerciseBlockingStub.withInterceptors(
                 io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(header)
         ).withDeadlineAfter(GRPC_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
@@ -240,70 +261,95 @@ public class ExerciseAnalysisService {
     }
 
     /**
-     * [STEP 4: AI 분석 중단 신호 송신]
-     * SessionService.endSession 의 afterCommit 콜백에서 호출됨 (ET-H, 분기 2.A.ET).
-     * 클라가 직접 호출하지 않음 — 단일 endpoint PATCH /sessions/{id}/end → Spring 이 분배.
-     * AI 가 누적 결과로 BT-SET final batch + CompleteAnalysis 콜백을 비동기로 처리.
+     * [STEP 4: AI 분석 중단 신호 송신] — 아웃박스 발행기가 호출하는 <b>동기</b> 송신.
+     *
+     * <p>[왜 동기인가] 이전에는 {@code endSession} 의 afterCommit 에서 fire-and-forget 으로 불렀고,
+     * 호출자가 <b>사용자 요청 스레드</b>였으므로 비동기가 맞았다(응답을 AI 만큼 기다릴 수 없다).
+     * 아웃박스가 들어오면서 호출자가 {@code @Scheduled} 발행기 스레드로 바뀌었고, 발행기는 결과를
+     * 알아야 행 상태를 정한다(SENT / 재시도 / 터미널). fire-and-forget 으로는 아무것도 못 받는다.
+     * 발행기 스레드는 대기해도 뺏길 일이 없어 블로킹 비용이 사실상 0이고, 순차 처리가 재시도·상태전이를
+     * 한 곳에 모아준다. (docs/decisions/outbox-reliable-messaging.md §4-2-1)
+     *
+     * <p>처리량 상한은 "1 / AI 응답시간"이다. 부족해지면 논블로킹 재설계가 아니라 <b>발행기 다중화</b>가
+     * 먼저다 — {@code SKIP LOCKED} 가 이미 행 단위 분배를 지원한다.
+     *
+     * @return 발행기가 행 상태로 옮길 결과 3분류. 예외를 던지지 않는다 — 모든 실패가 분류돼 나온다.
      */
-    public void stopAnalysis(Long sessionId) {
+    public DispatchOutcome stopAnalysis(Long sessionId) {
         try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
             log.info("AI 서버 분석 중단 요청 전송 - sessionId: {}", sessionId);
 
-            com.shadowfit.grpc.StopRequest request = com.shadowfit.grpc.StopRequest.newBuilder()
-                    .setSessionId(sessionId)
-                    .build();
+            StopRequest request = StopRequest.newBuilder().setSessionId(sessionId).build();
 
             CircuitBreaker cb = aiCircuitBreaker();
             if (!cb.tryAcquirePermission()) {
-                log.warn("AI 서버 서킷브레이커 OPEN — 중단 요청 스킵 (세션 ID: {})", sessionId);
-                return;
+                // 이전에는 여기서 그냥 return 해 통보를 통째로 버렸다(E1 의 두 번째 유실 경로).
+                // 하필 AI 가 죽어 통보가 가장 많이 쌓이는 구간이었다. 이제는 행이 PENDING 으로 남아
+                // 서킷이 닫힌 뒤 전달된다 — 서킷(빠른 실패)과 아웃박스(지연 후 전달)는 보완재다.
+                log.warn("AI 서버 서킷브레이커 OPEN — 중단 요청 보류 (세션 ID: {})", sessionId);
+                sessionMetrics.aiStopResult("skipped-circuit-open");
+                return DispatchOutcome.RETRY;
             }
+
             long callStart = System.nanoTime();
+            StopResponse response;
+            try {
+                response = getAuthenticatedBlockingStub().stopAnalysis(request);
+            } catch (StatusRuntimeException e) {
+                cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, e);
+                sessionMetrics.aiStopResult("grpc-error");
+                log.error("AI 서버 중단 실패 - sessionId: {}, status: {}", sessionId, e.getStatus());
+                return DispatchOutcome.RETRY;
+            } catch (RuntimeException e) {
+                // gRPC 실패는 StatusRuntimeException 으로 오지만, 인터셉터·직렬화 등 그 바깥에서 나는
+                // 예외도 있다. 여기서 안 잡으면 "예외를 던지지 않는다"는 이 메서드의 계약이 깨지고,
+                // 발행기는 결과를 못 받아 행을 PROCESSING 으로 방치한 채 lease 만료까지(60초)
+                // 불필요하게 기다리게 된다. 원인이 무엇이든 "지금은 실패, 나중에 재시도"가 맞다.
+                cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, e);
+                sessionMetrics.aiStopResult("error");
+                log.error("AI 서버 중단 요청 중 예기치 못한 오류 - sessionId: {}", sessionId, e);
+                return DispatchOutcome.RETRY;
+            }
 
-            getAuthenticatedStub().stopAnalysis(request, CorrelationIds.preserving(new io.grpc.stub.StreamObserver<com.shadowfit.grpc.StopResponse>() {
-                @Override
-                public void onNext(com.shadowfit.grpc.StopResponse value) {
-                    // 서킷브레이커에는 성공으로 기록하는 게 맞다 — 판단 대상은 "AI 서비스가 살아있나"이지
-                    // "이 세션이 있었나"가 아니다. 세션을 잃은 AI도 새 분석은 정상 처리하므로, 여기서
-                    // 서킷을 열면 신규 startAnalysis 까지 막혀 더 나빠진다.
-                    cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
+            // 서킷브레이커에는 성공으로 기록하는 게 맞다 — 판단 대상은 "AI 서비스가 살아있나"이지
+            // "이 세션이 있었나"가 아니다. 세션을 잃은 AI도 새 분석은 정상 처리하므로, 여기서
+            // 서킷을 열면 신규 startAnalysis 까지 막혀 더 나빠진다.
+            cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
 
-                    // 전송 층(onNext)과 업무 층(success)은 별개다. AI는 세션 상태를 못 찾으면 gRPC
-                    // 에러가 아니라 success=false 인 정상 응답을 준다(exercise_servicer.py StopAnalysis).
-                    // 이 필드를 안 읽으면 "결과가 영영 안 오는" 사건이 INFO 로그 한 줄로 묻힌다.
-                    if (value.getSuccess()) {
-                        sessionMetrics.aiStopResult("ok");
-                        log.info("AI 서버 응답: {}", value.getMessage());
-                        return;
-                    }
+            // 전송 층(응답이 왔나)과 업무 층(그 응답이 성공인가)은 별개다. AI는 세션 상태를 못 찾으면
+            // gRPC 에러가 아니라 success=false 인 정상 응답을 준다(exercise_servicer.py StopAnalysis).
+            if (response.getSuccess()) {
+                sessionMetrics.aiStopResult("ok");
+                log.info("AI 서버 응답: {}", response.getMessage());
+                return DispatchOutcome.SENT;
+            }
 
-                    sessionMetrics.aiStopResult("session-missing");
-                    log.warn("AI 에 세션 상태 없음 — 분석 결과 회수 불가 (sessionId: {}, 응답: {})",
-                            sessionId, value.getMessage());
+            sessionMetrics.aiStopResult("session-missing");
+            log.warn("AI 에 세션 상태 없음 — 분석 결과 회수 불가 (sessionId: {}, 응답: {})",
+                    sessionId, response.getMessage());
+            failSessionFast(sessionId);
 
-                    // CompleteAnalysis 가 오지 않는 게 확정이므로 타임아웃 스케줄러(예상시간+버퍼)를
-                    // 기다릴 이유가 없다. startAnalysis 가 같은 상황에서 하는 처리와 대칭.
-                    try {
-                        if (sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now())) {
-                            sessionMetrics.sessionTransition(Status.FAILED, "ai-session-missing");
-                        }
-                    } catch (ObjectOptimisticLockingFailureException e) {
-                        // 늦게 도착한 완료 콜백이 같은 세션을 동시에 갱신한 것 — 결과 데이터가 더
-                        // 가치있으므로 양보한다(markAsFailedIfStillInProgress 의 계약: "호출 측이
-                        // catch 하고 양보", SessionService:248-249. 스케줄러도 같은 정책).
-                        // 여기서 안 잡으면 gRPC 콜백 스레드로 예외가 새어나가 조용히 삼켜진다.
-                        sessionMetrics.optimisticLockConflict("ai-session-missing", "yield");
-                        log.info("세션 FAILED 처리 양보 — 완료 콜백 우선 (sessionId: {})", sessionId);
-                    }
-                }
-                @Override
-                public void onError(Throwable t) {
-                    cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, t);
-                    log.error("AI 서버 중단 실패: {}", t.getMessage());
-                }
-                @Override
-                public void onCompleted() {}
-            }));
+            // 재시도해도 AI 는 그 세션을 영영 모른다 — 터미널이다. SENT 로 찍으면 실제 결과 유실을
+            // "전송 성공"으로 위장하게 된다.
+            return DispatchOutcome.TERMINAL_FAILED;
+        }
+    }
+
+    /**
+     * CompleteAnalysis 가 오지 않는 게 확정된 세션을 즉시 FAILED 로 걷어낸다 — 타임아웃 스케줄러
+     * (시작시간+예상시간+버퍼)를 기다릴 이유가 없다. startAnalysis 가 같은 상황에서 하는 처리와 대칭.
+     */
+    private void failSessionFast(Long sessionId) {
+        try {
+            if (sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now())) {
+                sessionMetrics.sessionTransition(Status.FAILED, "ai-session-missing");
+            }
+        } catch (ObjectOptimisticLockingFailureException e) {
+            // 늦게 도착한 완료 콜백이 같은 세션을 동시에 갱신한 것 — 결과 데이터가 더 가치있으므로
+            // 양보한다(markAsFailedIfStillInProgress 의 계약: "호출 측이 catch 하고 양보",
+            // SessionService:248-249. 스케줄러도 같은 정책).
+            sessionMetrics.optimisticLockConflict("ai-session-missing", "yield");
+            log.info("세션 FAILED 처리 양보 — 완료 콜백 우선 (sessionId: {})", sessionId);
         }
     }
 

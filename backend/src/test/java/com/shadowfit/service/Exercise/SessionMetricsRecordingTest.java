@@ -9,6 +9,7 @@ import com.shadowfit.grpc.ExerciseServiceGrpc;
 import com.shadowfit.grpc.StopRequest;
 import com.shadowfit.grpc.StopResponse;
 import com.shadowfit.model.exercise.Session;
+import com.shadowfit.model.outbox.DispatchOutcome;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
@@ -42,6 +43,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -103,6 +106,8 @@ SessionMetricsRecordingTest {
 
         private CircuitBreakerRegistry circuitBreakerRegistry;
         private ExerciseServiceGrpc.ExerciseServiceStub stub;
+        // 중단 송신만 블로킹 스텁을 쓴다 — 발행기가 결과로 행 상태를 정하므로 반환값이 필요하다.
+        private ExerciseServiceGrpc.ExerciseServiceBlockingStub blockingStub;
         private ExerciseAnalysisService service;
 
         @BeforeEach
@@ -113,11 +118,15 @@ SessionMetricsRecordingTest {
             // getAuthenticatedStub() 의 빌더 체인 — 어느 단계든 같은 목을 돌려주면 된다
             when(stub.withInterceptors(any())).thenReturn(stub);
             when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
+            blockingStub = mock(ExerciseServiceGrpc.ExerciseServiceBlockingStub.class);
+            when(blockingStub.withInterceptors(any())).thenReturn(blockingStub);
+            when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
 
             service = new ExerciseAnalysisService(webClient, sessionRepository, exercisesRepository,
                     memberRepository, sessionService, referenceRepository, circuitBreakerRegistry, metrics);
             ReflectionTestUtils.setField(service, "internalToken", "test-token");
             ReflectionTestUtils.setField(service, "exerciseAsyncStub", stub);
+            ReflectionTestUtils.setField(service, "exerciseBlockingStub", blockingStub);
 
             when(referenceRepository.findByExerciseId(anyLong())).thenReturn(List.of());
         }
@@ -173,8 +182,11 @@ SessionMetricsRecordingTest {
             when(sessionService.markAsFailedIfStillInProgress(eq(7L), any(LocalDateTime.class))).thenReturn(true);
             stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
 
-            service.stopAnalysis(7L);
+            DispatchOutcome outcome = service.stopAnalysis(7L);
 
+            // 재시도해도 AI 는 그 세션을 영영 모른다 — 발행기가 행을 FAILED 로 종결해야 한다.
+            // SENT 로 보면 실제 결과 유실이 "전송 성공"으로 위장된다.
+            assertThat(outcome).isEqualTo(DispatchOutcome.TERMINAL_FAILED);
             assertThat(stopResults("session-missing")).isEqualTo(1.0);
             assertThat(transitions(Status.FAILED, "ai-session-missing")).isEqualTo(1.0);
 
@@ -188,15 +200,17 @@ SessionMetricsRecordingTest {
         }
 
         @Test
-        @DisplayName("FAILED 처리 중 낙관락 충돌이 나면 양보하고 예외를 콜백 밖으로 흘리지 않는다")
+        @DisplayName("FAILED 처리 중 낙관락 충돌이 나면 양보하되 전달 결과는 그대로 돌려준다")
         void stopAnalysis_sessionMissing_lockConflict_yields() {
             when(sessionService.markAsFailedIfStillInProgress(eq(10L), any(LocalDateTime.class)))
                     .thenThrow(new ObjectOptimisticLockingFailureException(Session.class, 10L));
             stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
 
-            // 콜백 밖으로 예외가 나가면 gRPC 스레드에서 조용히 삼켜진다 — 여기서 터지면 안 됨
-            service.stopAnalysis(10L);
+            // 예외가 새어나가면 발행기가 행 상태를 못 정해 PROCESSING 으로 남고, lock 만료까지
+            // 불필요하게 붙들린다 — 세션 전이 실패가 전달 결과 판정을 오염시키면 안 된다.
+            DispatchOutcome outcome = service.stopAnalysis(10L);
 
+            assertThat(outcome).isEqualTo(DispatchOutcome.TERMINAL_FAILED);
             assertThat(conflicts("ai-session-missing", "yield")).isEqualTo(1.0);
             // 양보했으므로 FAILED 전이는 없다 — 완료 콜백이 이긴 것
             assertThat(transitions(Status.FAILED, "ai-session-missing")).isZero();
@@ -207,8 +221,9 @@ SessionMetricsRecordingTest {
         void stopAnalysis_success_recordsOkOnly() {
             stubStopResponse(true, "분석 중단 및 결과 보고 예약 완료.");
 
-            service.stopAnalysis(8L);
+            DispatchOutcome outcome = service.stopAnalysis(8L);
 
+            assertThat(outcome).isEqualTo(DispatchOutcome.SENT);
             assertThat(stopResults("ok")).isEqualTo(1.0);
             assertThat(stopResults("session-missing")).isZero();
             assertThat(transitions(Status.FAILED, "ai-session-missing")).isZero();
@@ -220,20 +235,48 @@ SessionMetricsRecordingTest {
             when(sessionService.markAsFailedIfStillInProgress(eq(9L), any(LocalDateTime.class))).thenReturn(false);
             stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
 
-            service.stopAnalysis(9L);
+            assertThat(service.stopAnalysis(9L)).isEqualTo(DispatchOutcome.TERMINAL_FAILED);
 
             // 사건 자체는 기록돼야 한다 — 세션 전이가 없었다고 유실이 없었던 건 아니다
             assertThat(stopResults("session-missing")).isEqualTo(1.0);
             assertThat(transitions(Status.FAILED, "ai-session-missing")).isZero();
         }
 
+        @Test
+        @DisplayName("서킷 OPEN 이면 송신을 버리지 않고 RETRY 로 돌려준다 — 행이 남아 나중에 전달된다")
+        void stopAnalysis_circuitOpen_retriesInsteadOfDropping() {
+            circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
+
+            DispatchOutcome outcome = service.stopAnalysis(11L);
+
+            // 이전 설계는 여기서 그냥 return 해 통보를 통째로 버렸다(E1 의 두 번째 유실 경로).
+            // 하필 AI 가 죽어 통보가 가장 많이 쌓이는 구간이라 피해가 컸다.
+            assertThat(outcome).isEqualTo(DispatchOutcome.RETRY);
+            assertThat(stopResults("skipped-circuit-open")).isEqualTo(1.0);
+            // 서킷이 열려 있으니 호출 자체가 나가지 않아야 한다
+            verify(blockingStub, never()).stopAnalysis(any(StopRequest.class));
+        }
+
+        @Test
+        @DisplayName("gRPC 오류면 RETRY — 나중에 될 수 있는 실패라 종결하지 않는다")
+        void stopAnalysis_grpcError_retries() {
+            when(blockingStub.stopAnalysis(any(StopRequest.class)))
+                    .thenThrow(new StatusRuntimeException(io.grpc.Status.fromCode(Code.UNAVAILABLE)));
+
+            DispatchOutcome outcome = service.stopAnalysis(12L);
+
+            assertThat(outcome).isEqualTo(DispatchOutcome.RETRY);
+            assertThat(stopResults("grpc-error")).isEqualTo(1.0);
+            // 전송 실패는 서킷에 실패로 기록돼야 한다(업무 실패인 session-missing 과 다른 축)
+            assertThat(circuitBreakerRegistry.circuitBreaker("aiServer").getMetrics()
+                    .getNumberOfFailedCalls()).isEqualTo(1);
+            // 세션을 걷어내지 않는다 — 나중에 전달되면 정상 완료될 수 있다
+            assertThat(transitions(Status.FAILED, "ai-session-missing")).isZero();
+        }
+
         private void stubStopResponse(boolean success, String message) {
-            doAnswer(invocation -> {
-                StreamObserver<StopResponse> observer = invocation.getArgument(1);
-                observer.onNext(StopResponse.newBuilder().setSuccess(success).setMessage(message).build());
-                observer.onCompleted();
-                return null;
-            }).when(stub).stopAnalysis(any(StopRequest.class), any());
+            when(blockingStub.stopAnalysis(any(StopRequest.class)))
+                    .thenReturn(StopResponse.newBuilder().setSuccess(success).setMessage(message).build());
         }
 
         @Test
@@ -309,7 +352,8 @@ SessionMetricsRecordingTest {
                     mock(com.shadowfit.repository.exercise.PoseDataRepository.class),
                     mock(com.shadowfit.service.Report.WorstSectionCalculator.class),
                     mock(com.shadowfit.repository.report.ReportRepository.class),
-                    metrics);
+                    metrics,
+                    mock(com.shadowfit.repository.outbox.OutboxEventRepository.class));
             self = mock(SessionService.class);
             ReflectionTestUtils.setField(service, "self", self);
         }

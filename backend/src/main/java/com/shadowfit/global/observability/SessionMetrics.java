@@ -26,8 +26,17 @@ public class SessionMetrics {
     /** pose_data 배치 프레임 수 분포. tags: stage(received/stored) — 다운샘플 비율 관측용 */
     private static final String POSE_BATCH_FRAMES = "shadowfit.pose.batch.frames";
 
-    /** AI 분석 중단(StopAnalysis) 응답의 업무 결과. tags: outcome(ok/session-missing) */
+    /** AI 분석 중단(StopAnalysis) 응답의 업무 결과. tags: outcome(ok/session-missing/grpc-error/skipped-circuit-open) */
     private static final String AI_STOP_RESULT = "shadowfit.ai.stop.result";
+
+    /** 아웃박스 발행 결과. tags: outcome(sent/retry/failed) */
+    private static final String OUTBOX_DISPATCH = "shadowfit.outbox.dispatch";
+
+    /** 아웃박스 적체(PENDING 행 수) 게이지. */
+    private static final String OUTBOX_PENDING = "shadowfit.outbox.pending";
+
+    /** 통보 지연 — 행 생성(created_at)부터 전달 성공(sent_at)까지. */
+    private static final String OUTBOX_LAG = "shadowfit.outbox.lag";
 
     private final MeterRegistry registry;
 
@@ -62,6 +71,34 @@ public class SessionMetrics {
      */
     public void aiStopResult(String outcome) {
         registry.counter(AI_STOP_RESULT, "outcome", outcome).increment();
+    }
+
+    /**
+     * 아웃박스 발행 1건의 결과.
+     *
+     * @param outcome sent / retry / failed. {@code failed} 는 <b>종료 상태의 유실</b>이므로
+     *                {@code retry} 와 반드시 구분해야 한다 — 전자는 사람이 봐야 할 사건이고
+     *                후자는 정상 운영 중에도 나온다.
+     */
+    public void outboxDispatch(String outcome) {
+        registry.counter(OUTBOX_DISPATCH, "outcome", outcome).increment();
+    }
+
+    /**
+     * 적체 감시 게이지. 발행기가 죽거나 독 메시지가 쌓이면 이 값만 계속 오른다 — 아웃박스의
+     * 대표적 실패 양상이라, 이게 없으면 "조용히 안 나가는 것"을 아무도 모른다.
+     *
+     * <p>{@code supplier} 는 게이지가 스크레이프될 때마다 호출되므로 매 tick 등록하지 않는다.
+     */
+    public void registerOutboxPendingGauge(java.util.function.Supplier<Number> supplier) {
+        io.micrometer.core.instrument.Gauge.builder(OUTBOX_PENDING, supplier)
+                .description("전달 대기 중인 아웃박스 행 수")
+                .register(registry);
+    }
+
+    /** 통보 지연(생성→전달). 폴링 간격이 실제 지연에 얼마나 반영되는지 본다. */
+    public void outboxLag(java.time.Duration lag) {
+        registry.timer(OUTBOX_LAG).record(lag);
     }
 
     /** 수신 프레임 수와 다운샘플 후 저장 행수를 함께 기록 — 실측 R값이 의도대로 나오는지 관측. */

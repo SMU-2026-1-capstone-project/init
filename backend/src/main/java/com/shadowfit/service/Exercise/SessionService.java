@@ -13,7 +13,10 @@ import com.shadowfit.dto.report.record.DailyLogSummaryDto;
 import com.shadowfit.dto.report.record.WeeklyActivityResponseDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
+import com.shadowfit.global.observability.CorrelationIds;
 import com.shadowfit.global.observability.SessionMetrics;
+import com.shadowfit.model.outbox.OutboxEvent;
+import com.shadowfit.repository.outbox.OutboxEventRepository;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
@@ -55,16 +58,16 @@ public class SessionService {
     private final WorstSectionCalculator worstSectionCalculator;
     private final ReportRepository reportRepository;
     private final SessionMetrics sessionMetrics;
+    private final OutboxEventRepository outboxRepository;
 
     // 자기 주입: completeSession → applyComplete 호출이 Spring 프록시를 통과해 @Transactional이 적용되도록 함.
     @Lazy
     @Autowired
     private SessionService self;
 
-    // endSession afterCommit 에서 AI 통보용 — 순환 의존 회피 위해 @Lazy
-    @Lazy
-    @Autowired
-    private ExerciseAnalysisService analysisService;
+    // ExerciseAnalysisService 주입은 제거됐다. endSession 이 gRPC 를 직접 부르지 않고 아웃박스 행만
+    // 남기게 되면서 유일한 사용처가 사라졌고, 그 결과 SessionService ↔ ExerciseAnalysisService
+    // 순환 의존(@Lazy 로 우회하던)도 함께 없어졌다. 아웃박스가 두 서비스 사이의 결합을 끊은 셈.
 
     /**
      * [세션 생성] 새로운 운동 분석 프로세스를 시작하기 위한 초기 레코드를 생성합니다.
@@ -182,12 +185,13 @@ public class SessionService {
 
     /**
      * [세션 종료 — 분기 2.A.ET ET-H, 단일 endpoint 분배자 패턴]
-     * 클라가 "운동 종료" 버튼 → endTime 기록 + (afterCommit) AI 에 gRPC StopAnalysis 송신.
+     * 클라가 "운동 종료" 버튼 → endTime 기록 + 같은 트랜잭션에 AI 통보를 아웃박스 행으로 적재.
      *
      * - endTime 만 즉시 기록. 통계 갱신(totalReps/avgSync) 은 AI 의 CompleteAnalysis 콜백이 별도 처리
-     * - AI gRPC 호출은 transaction commit 이후 fire-and-forget — 외부 호출이 transaction 안에 끼지 않도록
+     * - AI 로의 gRPC 는 이 경로에서 <b>일어나지 않는다</b>. OutboxPublisher 가 행을 집어 송신하므로
+     *   요청 스레드는 외부 호출을 기다리지 않고, 송신이 실패해도 행이 남아 재시도된다
      * - 본인 세션이 아니면 ACCESS_DENIED, 이미 종료된 세션이면 멱등 (변경 없음, 200 OK)
-     * - gRPC 호출 실패 시: SessionTimeoutScheduler 가 safety net (IN_PROGRESS → FAILED)
+     * - 통보가 끝내 전달되지 못하면: SessionTimeoutScheduler 가 여전히 safety net (IN_PROGRESS → FAILED)
      */
     @Transactional
     public void endSession(Long sessionId, Long currentMemberId) {
@@ -206,15 +210,14 @@ public class SessionService {
         session.setEndTime(LocalDateTime.now());
         sessionRepository.saveAndFlush(session);
 
-        // afterCommit 으로 AI 통보 — DB 변경 확정 후 외부 호출
-        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                new org.springframework.transaction.support.TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        analysisService.stopAnalysis(sessionId);
-                    }
-                }
-        );
+        // AI 통보를 "지금 gRPC"가 아니라 "같은 트랜잭션 안 아웃박스 행 INSERT"로 바꾼다.
+        // 둘 다 MySQL 이므로 세션 변경과 통보 기록이 원자적으로 커밋되고, 전달 책임은
+        // OutboxPublisher 가 진다(at-least-once). 이전 afterCommit 방식은 커밋 뒤 gRPC 가
+        // 실패하면(오류·데드라인·서킷 OPEN) 복구 수단이 없었다(at-most-once).
+        //
+        // cid 를 행에 실어야 한다 — 발행기는 @Scheduled 스레드라 MDC 가 비어 있고, 아웃박스는
+        // 스레드가 아니라 시간·프로세스 경계를 넘으므로 런타임 캡처로는 원리상 이을 수 없다.
+        outboxRepository.save(OutboxEvent.stopAnalysis(sessionId, CorrelationIds.current()));
     }
 
     /**

@@ -33,6 +33,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.shadowfit.global.observability.CorrelationIds;
+import com.shadowfit.model.outbox.OutboxEvent;
+import com.shadowfit.model.outbox.OutboxEventType;
+import com.shadowfit.model.outbox.OutboxStatus;
+import com.shadowfit.repository.outbox.OutboxEventRepository;
+
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -52,7 +58,11 @@ class SessionServiceTest {
     @Autowired private SessionRepository sessionRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
-    @MockitoBean private ExerciseAnalysisService analysisService; // endSession의 afterCommit 트리거 격리 검증용
+    @Autowired private OutboxEventRepository outboxRepository;
+    // endSession 이 더 이상 이걸 부르지 않는다는 것 자체를 검증한다(요청 경로에 외부 호출 없음).
+    @MockitoBean private ExerciseAnalysisService analysisService;
+    // 발행기가 테스트 도중 돌면서 아웃박스 행을 집어가면 검증이 흔들린다 — 스케줄 실행을 막는다.
+    @MockitoBean private OutboxPublisher outboxPublisher;
 
     private Member member;
     private Exercise exercise;
@@ -160,38 +170,61 @@ class SessionServiceTest {
         }
 
         @Test
-        @DisplayName("이미 종료된 세션 재호출은 멱등 — endTime 안 바뀜, AI 재통보도 정확히 1회만(중복 등록 안 됨)")
+        @DisplayName("이미 종료된 세션 재호출은 멱등 — endTime 안 바뀜, 아웃박스 행도 정확히 1건만")
         void endSession_alreadyEnded_isIdempotent() {
             Session session = inProgressSession();
             sessionService.endSession(session.getId(), member.getId());
             LocalDateTime firstEndTime = sessionRepository.findById(session.getId()).orElseThrow().getEndTime();
 
-            sessionService.endSession(session.getId(), member.getId()); // 멱등 경로 — 동기화 재등록 안 해야 함
+            sessionService.endSession(session.getId(), member.getId()); // 멱등 경로
 
             assertThat(sessionRepository.findById(session.getId()).orElseThrow().getEndTime()).isEqualTo(firstEndTime);
 
-            // CodeRabbit 지적 반영(2026-07-24): 이전엔 afterCommit을 시뮬레이션 안 해서
-            // stopAnalysis가 애초에 호출될 일이 없어 "재통보 없음"을 증명하지 못했음 — 커밋
-            // 시뮬레이션 후 정확히 1회(첫 endSession분)만 호출됐는지 직접 검증.
-            List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
-            syncs.forEach(TransactionSynchronization::afterCommit);
-
-            verify(analysisService, times(1)).stopAnalysis(session.getId());
+            // 멱등성이 깨지면 같은 세션에 통보가 두 번 쌓여 AI 에 중복 송신된다. 수신측 멱등성이
+            // 흡수해주긴 하지만, 애초에 안 만드는 게 맞다.
+            assertThat(stopEventsFor(session.getId())).hasSize(1);
         }
 
         @Test
-        @DisplayName("커밋 시점에만 AI 분석 중단(stopAnalysis)이 트리거됨")
-        void endSession_triggersStopAnalysisOnlyAfterCommit() {
+        @DisplayName("요청 경로에서 gRPC 를 부르지 않고, 통보를 아웃박스 행으로 남긴다")
+        void endSession_writesOutboxRowInsteadOfCallingAi() {
             Session session = inProgressSession();
 
             sessionService.endSession(session.getId(), member.getId());
 
-            verify(analysisService, never()).stopAnalysis(session.getId()); // 커밋 전이라 아직
+            // 이전 설계는 afterCommit 에서 stopAnalysis 를 직접 불렀다. 이제 요청 경로엔 외부 호출이
+            // 아예 없다 — 사용자는 AI 응답을 기다리지 않고, 송신 실패가 요청에 영향을 주지도 않는다.
+            verify(analysisService, never()).stopAnalysis(session.getId());
 
-            List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
-            syncs.forEach(TransactionSynchronization::afterCommit); // 커밋 시뮬레이션
+            List<OutboxEvent> events = stopEventsFor(session.getId());
+            assertThat(events).hasSize(1);
+            OutboxEvent event = events.get(0);
+            // 아직 아무도 안 보냈다 — 전달은 OutboxPublisher 의 몫이고, 그때까지 행이 증거로 남는다.
+            assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING);
+            assertThat(event.getPayload()).contains(String.valueOf(session.getId()));
+            assertThat(event.getRetryCount()).isZero();
+        }
 
-            verify(analysisService, times(1)).stopAnalysis(session.getId());
+        @Test
+        @DisplayName("아웃박스 행에 원 요청의 cid 가 실린다 — 발행기는 MDC 로 이을 수 없으므로")
+        void endSession_carriesCorrelationIdOnRow() {
+            Session session = inProgressSession();
+
+            try (CorrelationIds.Scope ignored = CorrelationIds.withCorrelationId("test-cid-1234")) {
+                sessionService.endSession(session.getId(), member.getId());
+            }
+
+            assertThat(stopEventsFor(session.getId()))
+                    .singleElement()
+                    .extracting(OutboxEvent::getCorrelationId)
+                    .isEqualTo("test-cid-1234");
+        }
+
+        private List<OutboxEvent> stopEventsFor(Long sessionId) {
+            return outboxRepository.findAll().stream()
+                    .filter(e -> e.getEventType() == OutboxEventType.STOP_ANALYSIS)
+                    .filter(e -> sessionId.equals(e.getAggregateId()))
+                    .toList();
         }
     }
 
