@@ -46,9 +46,26 @@
 
 재개 창을 길게 잡을수록 사용자 편의는 올라가지만, **AI 상태가 증발할 수 있는 노출 시간도 같이 길어진다.** 30분 버퍼는 재개를 위한 건데 그 30분이 곧 위험 구간이다. **같은 파라미터를 두 목적이 반대 방향으로 당긴다** — 버퍼를 줄이면 재개가 불편해지고, 늘리면 유실 노출이 커진다. 이 긴장은 파라미터 튜닝으로 못 풀고 **상태 내구성으로만 풀린다.**
 
-### 2-3. ⚠️ 미검증
+### 2-3. ✅ 클라이언트 확인 완료 (2026-07-29) — 진단이 한 단계 앞으로 당겨진다
 
-**클라이언트가 복귀 시 실제로 무엇을 호출하는지 확인하지 못했다.** 확인된 범위는 "백엔드·AI 쪽에 재부착 진입점이 없다"까지. 클라가 `POST /exercises/sessions`를 다시 부르는 식으로 우회 중이라면 증상이 달라진다(대신 세션 row 중복 생성). **클라 동작 확인이 선행돼야 한다.**
+이 문서의 이전 판은 "클라가 복귀 시 무엇을 호출하는지 미확인"으로 남겨뒀다. `frontend/` 전수 확인 결과 **재개 경로가 아예 없다.**
+
+| 확인한 것 | 결과 |
+|---|---|
+| `AppState` 리스너 | `frontend/` 전체 **0건** |
+| `beforeRemove` / `blur` 리스너, `BackHandler` | **0건** |
+| 운동 화면의 `useFocusEffect` | 없음 |
+| `exercise.tsx` useEffect cleanup 3개 | 전부 세션과 무관 |
+| `sessionId` 영속화 | 없음 — 휘발성 `useState`(`exercise.tsx:72`), `persist` 없음, `async-storage` 는 의존성에만 있고 import 0건 |
+
+- 이탈 시 `PATCH /sessions/{id}/end` 가 **안 불린다**(뒤로가기도 `router.back()` 만 — `exercise.tsx:288`)
+- 복귀 시 아무 로직도 안 돈다. `startSession` 호출은 **녹화 버튼 탭 하나뿐**(`exercise.tsx:89`)
+
+**그래서 §2 의 진단은 "AI 재시작 시 재개가 깨진다"가 아니라 "재개가 애초에 구현된 적이 없다"로 정정된다.** AI 상태 소실은 그 아래 두 번째 층이다. 30분 버퍼가 DB row 를 살려두지만 **그걸 집어 드는 코드가 양쪽 어디에도 없다.**
+
+→ **B의 비용 추정이 달라진다.** 서버에 엔드포인트만 추가하면 끝이 아니라 **클라 작업이 반드시 붙는다**: `AppState` 핸들링 + `sessionId` 영속화 + 복귀 시 재부착 호출. §5 의 "B가 가장 싼 지점"은 *서버 기준*이며, 전체 비용은 그만큼 올라간다.
+
+> 상세와 프론트 담당용 정리는 [`../handoff/frontend-session-lifecycle.md`](../handoff/frontend-session-lifecycle.md), 이슈 [#59](https://github.com/Shadowfit/init/issues/59) 코멘트 참고. 덤으로 재개와 무관한 클라 결함 2건(탭 전환에도 폴링 지속, pose 응답 `success:false` 무시)도 거기 정리했다.
 
 ---
 
@@ -132,7 +149,9 @@ proto `PoseDataRequest`(`exercise.proto:99-104`)에도 `pose_data` 스키마(`my
 > 파이썬 변경 면적: `pose.py`에 `rep_number=rep_event.rep_number` 한 줄. ([[feedback_minimize_python_changes]] — 최소지만 변경은 변경이므로 명시)
 
 ### C. AI 상태 영속화
-프레임마다가 아니라 **rep 완료 시점마다** 스냅샷을 저장하면 쓰기 빈도가 감당된다(`completed_reps`만 저장, 진행 중 프레임은 잃어도 rep 하나 분량). Redis는 백엔드 채용 단골 시그널이라 포폴상 얻는 것도 있다([[user_career_target]], [`redis-introduction.md`](./redis-introduction.md)와 함께 볼 것). 다만 **B를 하면 남는 격차가 "rep 하나 분량 프레임"뿐**이라 우선순위가 내려간다.
+프레임마다가 아니라 **rep 완료 시점마다** 스냅샷을 저장하면 쓰기 빈도가 감당된다. Redis는 백엔드 채용 단골 시그널이라 포폴상 얻는 것도 있다([[user_career_target]], [`redis-introduction.md`](./redis-introduction.md)와 함께 볼 것).
+
+다만 **§4-0 대로 "무엇을 담느냐"가 곧 복원 수준**이다. `completed_reps`만 담으면 B와 실질 차이가 크지 않고(둘 다 분석기는 리셋된다), `rep_state`·`frame_index`·스무딩 이력까지 담아야 비로소 "진짜 이어짐"이 된다. 후자는 스냅샷 크기와 직렬화 비용이 올라가고, **rep 중간에 재시작하면 어차피 진행 중 프레임은 잃는다**(스냅샷 시점 이후분). 그래서 C의 값어치는 "얼마나 담을지"를 정한 뒤에야 평가할 수 있고, 그 결정 자체를 §6에 미결정으로 올려뒀다.
 
 ### D. Spring을 진실의 출처로
 AI가 rep마다 중간 보고하고 AI는 stateless를 지향. `pose_data`가 이미 Spring에 오고 있어 방향은 자연스럽지만, 분석기 진행 상태(`rep_state`, `previous_smoothed_knee` 등)까지 넘기려면 프로토콜 변경이 크다. 현 규모엔 과설계.
@@ -162,7 +181,7 @@ AI가 rep마다 중간 보고하고 AI는 stateless를 지향. `pose_data`가 �
 
 ## 6. 미결정 (사용자 confirm 필요)
 
-- [ ] **선행**: 클라이언트가 복귀 시 무엇을 호출하는지 확인(§2-3) — 이게 안 되면 A의 계약도 B의 트리거도 못 정한다
+- [x] ~~**선행**: 클라이언트가 복귀 시 무엇을 호출하는지 확인(§2-3)~~ → **완료(2026-07-29). 재개 경로가 아예 없다** — 서버 엔드포인트만으로 안 끝나고 클라 작업(AppState·영속화·재부착 호출)이 반드시 붙는다
 - [ ] A+B 채택 확정 여부 (현재 선호 표명 단계)
 - [ ] `rep_number`를 proto+`pose_data`에 추가할지 — 추가하면 rep 복원이 정확해지지만 스키마·proto 변경 발생
 - [ ] §5-1 갈림길: rep 카운트를 **AI에 주입** vs **Spring이 합산**
@@ -179,3 +198,4 @@ AI가 rep마다 중간 보고하고 AI는 stateless를 지향. `pose_data`가 �
 ## 결정 로그
 - 2026-07-29: 문서 작성. [`outbox-reliable-messaging.md`](./outbox-reliable-messaging.md) §3-2를 파다가 **"AI 상태 in-memory"가 outbox의 한계가 아니라 의도한 재개 UX를 조용히 깨뜨리고 있다**는 것을 발견해 분리. 이슈 [#59](https://github.com/Shadowfit/init/issues/59) 등록. 확인: rep 데이터가 세션 진행 중 이미 `pose_data`에 쌓임(§3-2), 그러나 rep 번호 없음(§3-3). 대안 A~D 비교, **A+B 추천** — 사용자 선호 표명 있음. **확정 아님** — §6 8건 미결정, 특히 클라 동작 확인이 선행.
 - 2026-07-29(리뷰 반영): CodeRabbit 지적으로 **과장 2건 정정** — ① B/C 복원 범위. `initial_rep_count`·`completed_reps` 만으로는 `rep_state`·`frame_index`·스무딩 이력이 복원되지 않아 "C는 거의 완전, B 이후 손실은 rep 하나 분량"은 틀렸다(§4-0 신설). ② 재부착이 `SessionStateRegistry.create` 로 **살아있는 상태를 덮어쓰는 것**을 장점으로 적었으나 반대로 위험이다 — 멱등 가드 필요(§4-B). 미결정 3건 신설. **결정 변경 없음 — 여전히 A+B 추천·확정 전.**
+- 2026-07-29(클라 확인): §2-3 미검증 해소. **재개 경로가 프론트에 아예 없음**을 확인해 진단을 "AI 재시작 시 깨짐"에서 "애초에 미구현"으로 정정. B 비용에 클라 작업이 추가됨(§2-3·§5). §6 선행 항목 종료. §4-C 에 남아있던 "격차는 rep 하나 분량" 잔여 과장도 §4-0 기준으로 정리. 핸드오프: `docs/handoff/frontend-session-lifecycle.md`(PR #62).
