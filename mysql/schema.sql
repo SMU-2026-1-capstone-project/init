@@ -215,3 +215,51 @@ CREATE TABLE body_records (
                               FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE,
                               INDEX idx_member_date (member_id, record_date)
 );
+-- 11. 아웃박스 (트랜잭셔널 메시징 — 세션 종료 통보 유실 방지)
+-- 설계 근거: docs/decisions/outbox-reliable-messaging.md
+--
+-- endSession 은 "MySQL 커밋"과 "AI 에 gRPC StopAnalysis 송신" 두 곳에 쓰는 dual-write 라,
+-- 두 번째 쓰기가 실패하면(gRPC 오류 / 서킷 OPEN 스킵) 복구 수단이 없었다(at-most-once).
+-- 보낼 통보를 같은 트랜잭션 안에 이 테이블 행으로 INSERT 하고, 별도 발행기가 전달을
+-- 책임진다(at-least-once). 수신측 멱등성(applyComplete first-write-wins)과 합쳐
+-- 통보 전달은 effectively exactly-once 가 된다.
+--   ※ 단 "통보 전달"에 한한다. AI 프로세스가 재시작해 세션 상태를 잃으면 통보는 정확히
+--     전달되지만 분석 결과는 회수되지 않는다(문서 §3-2). outbox 의 결함이 아니라 경계다.
+CREATE TABLE IF NOT EXISTS outbox_events (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    -- 애그리거트 식별. aggregate_id 에 exercise_sessions FK 를 걸지 않는다 — 걸면 outbox 가
+    -- 특정 애그리거트에 종속돼 다른 이벤트 타입으로 확장할 수 없고, 세션 삭제 시 CASCADE 로
+    -- 통보 이력까지 사라진다(문서 §4-1-1). 참조무결성은 발행기가 대체: 대상이 없으면 AI 가
+    -- success=false 를 주고 그때 터미널 FAILED 로 종결된다.
+    aggregate_type  VARCHAR(50)  NOT NULL,                    -- 'SESSION'
+    aggregate_id    BIGINT       NOT NULL,                    -- session_id
+    event_type      VARCHAR(50)  NOT NULL,                    -- 'STOP_ANALYSIS'
+    payload         JSON         NOT NULL,                    -- { "sessionId": 42 }
+    -- 발행기는 @Scheduled 스레드라 MDC 가 비어 있고, outbox 는 스레드가 아니라 시간·프로세스
+    -- 경계를 넘으므로 런타임 캡처(CorrelationIds.wrap)로는 원리상 이을 수 없다. 행에 저장해야
+    -- 원 요청의 흐름과 이어진다(문서 §4-4). MDC 와 달리 이 값은 인스턴스 재시작을 견딘다.
+    correlation_id  VARCHAR(64)  NULL,
+    -- PROCESSING: 발행기가 선점해 송신 중. SKIP LOCKED 만으로는 중복 송신이 안 막힌다 —
+    -- 행 락은 트랜잭션 수명만큼인데 gRPC 송신은 그 트랜잭션 밖에서 일어나므로, 송신 도중
+    -- 크래시하면 행은 PENDING 인 채 남아 다른 발행기가 또 집는다. 그래서 소유권을 "상태 +
+    -- 만료 시각"으로 표현한다(문서 §4-3-1). SKIP LOCKED 는 작업 분배, 중복 방지는 이쪽 담당.
+    status          ENUM('PENDING','PROCESSING','SENT','FAILED') NOT NULL DEFAULT 'PENDING',
+    retry_count     INT          NOT NULL DEFAULT 0,
+    next_retry_at   DATETIME     NULL,                        -- 지수 백오프(1s→2s→4s…, 상한 5분)
+    locked_by       VARCHAR(64)  NULL,                        -- 선점한 발행기 식별(인스턴스 ID)
+    lock_expires_at DATETIME     NULL,                        -- 이 시각이 지난 PROCESSING 은 회수 대상
+    sent_at         DATETIME     NULL,
+    -- 업무 시각은 DATETIME, created_at 만 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    -- (exercise_sessions:69-79 패턴 준수)
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- 발행기는 두 갈래를 각각 별도 쿼리로 집어 각 인덱스를 태운다(OR 한 방이면 index_merge 에
+    -- 맡기게 되고 EXPLAIN 이 흔들린다):
+    --   ① 신규·재시도분: status='PENDING'    AND (next_retry_at IS NULL OR next_retry_at <= NOW())
+    --   ② 유실 회수분:   status='PROCESSING' AND lock_expires_at <= NOW()
+    INDEX idx_outbox_dispatch (status, next_retry_at),
+    INDEX idx_outbox_stale (status, lock_expires_at)
+) COMMENT='트랜잭셔널 아웃박스 — 세션 종료 통보(STOP_ANALYSIS) 전달 보장';
+-- 보존 정책(문서 §4-1-2): SENT 는 짧게(예: 7일) 후 삭제, 터미널 FAILED 는 길게(예: 90일)
+-- 보존한다 — 지표는 건수만 알려주고 "어느 세션이 유실됐는지"는 이 행에만 남기 때문.
+-- 소량 반복 DELETE 의 파편화 누적은 이 프로젝트에서 미검증이라, 관측되면 created_at 기준
+-- 파티션 + DROP PARTITION(pose_data 에서 검증된 패턴)으로 전환한다.
