@@ -252,12 +252,22 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     -- 업무 시각은 DATETIME, created_at 만 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     -- (exercise_sessions:69-79 패턴 준수)
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    -- 발행기는 두 갈래를 각각 별도 쿼리로 집어 각 인덱스를 태운다(OR 한 방이면 index_merge 에
-    -- 맡기게 되고 EXPLAIN 이 흔들린다):
+    -- 발행기는 두 갈래를 각각 별도 쿼리로 집는다:
     --   ① 신규·재시도분: status='PENDING'    AND (next_retry_at IS NULL OR next_retry_at <= NOW())
     --   ② 유실 회수분:   status='PROCESSING' AND lock_expires_at <= NOW()
-    INDEX idx_outbox_dispatch (status, next_retry_at),
-    INDEX idx_outbox_stale (status, lock_expires_at)
+    --
+    -- 인덱스는 ①용 하나만 둔다. 처음엔 ②용 (status, lock_expires_at) 도 같이 뒀는데, 실측해보니
+    -- 둘 다 선두 컬럼이 status 라 옵티마이저가 구분하지 못하고 아무거나 골라 **양쪽 다 status
+    -- 프리픽스만** 쓰고 나머지를 필터링했다(key_len 1, filtered 33~40%). 데이터 분포를 바꿔도
+    -- 동일해 분포 탓이 아니라 구조 탓이었다. ②용을 지우자 ①이 정상화됐다(key_len 7, filtered 100%,
+    -- range + ICP). 2026-07-29 MySQL 8.0.46 실측, EXPLAIN 근거.
+    --
+    -- ②가 인덱스를 못 타는 건 감수한다 — PROCESSING 행은 "지금 송신 중 + 크래시로 묶인 것"뿐이라
+    -- 구조적으로 (배치크기 × 발행기수) 수준(수십 건)을 넘지 않아 좁힐 대상이 애초에 없다. 반면
+    -- ①은 AI 장애 시 수천 건까지 쌓이는 쿼리라 인덱스가 실제로 필요하다. 필요한 쪽만 고친 셈.
+    -- 만약 PROCESSING 이 크게 적체되는 상황이 관측되면 두 시각 컬럼을 visible_at 하나로 합쳐
+    -- (status, visible_at) 단일 인덱스로 가는 안이 있다(SQS visibility timeout 모델, 실측 확인함).
+    INDEX idx_outbox_dispatch (status, next_retry_at)
 ) COMMENT='트랜잭셔널 아웃박스 — 세션 종료 통보(STOP_ANALYSIS) 전달 보장';
 -- 보존 정책(문서 §4-1-2): SENT 는 짧게(예: 7일) 후 삭제, 터미널 FAILED 는 길게(예: 90일)
 -- 보존한다 — 지표는 건수만 알려주고 "어느 세션이 유실됐는지"는 이 행에만 남기 때문.

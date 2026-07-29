@@ -20,9 +20,15 @@ import java.util.List;
  * 대체되지 않는다 — 그건 다른 발행기를 <i>대기</i>시켜 직렬화해 버린다. 여러 발행기가 서로 다른 행을
  * 동시에 집게 하는 게 목적이므로 SKIP LOCKED 가 필수다.
  *
- * <p>[왜 두 갈래를 따로 조회하나] 폴링 조건이 두 개(신규·재시도 / 유실 회수)인데 이를 {@code OR}
- * 한 방으로 짜면 옵티마이저의 index_merge 에 맡기게 돼 EXPLAIN 이 흔들린다. 쿼리를 나눠 각자
- * {@code idx_outbox_dispatch}, {@code idx_outbox_stale} 를 타게 한다(schema.sql 주석과 같은 전제).
+ * <p>[왜 두 갈래를 따로 조회하나] 폴링 조건이 둘(신규·재시도 / 유실 회수)이고 성격이 다르다.
+ * {@code OR} 한 방으로 합치면 옵티마이저의 index_merge 에 맡기게 돼 실행계획이 흔들린다.
+ *
+ * <p>[인덱스는 하나뿐이다] 처음엔 두 쿼리에 각각 인덱스를 두려 했으나, 실측 결과 <b>둘 다 선두
+ * 컬럼이 {@code status} 라 옵티마이저가 구분하지 못하고 아무거나 골라 양쪽 다 status 프리픽스만
+ * 쓰는</b> 역효과가 났다(key_len 1, filtered 33~40%). 회수용 인덱스를 지우자 신규·재시도 쿼리가
+ * 정상화됐다(key_len 7, filtered 100%). 그래서 {@link #lockStaleProcessingBatch} 는 인덱스를
+ * 제대로 타지 못하는데, {@code PROCESSING} 행이 구조적으로 수십 건을 넘지 않아 감수한다.
+ * 자세한 근거는 schema.sql 의 {@code outbox_events} 주석.
  *
  * <p>설계 근거: docs/decisions/outbox-reliable-messaging.md §4-3-1
  */
