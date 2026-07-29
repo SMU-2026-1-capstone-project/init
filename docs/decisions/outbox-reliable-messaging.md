@@ -1,7 +1,7 @@
 # 신뢰성 있는 비동기 통보 — 세션 종료 통보 유실(E1) 보강
 
 작성일: 2026-06-12 / **전면 재작성: 2026-07-29**(실코드 재대조 — §1 피해 기술 정정, 서킷 스킵 경로 신설, outbox의 한계 명시)
-상태: **분석/추천 (결정 전)** — 대안 비교·근거 제공. 착수·방식 선택은 사용자 confirm 후 박제 ([[feedback_user_decides_not_claude]], [[feedback_decision_doc]])
+상태: **결정 완료 (2026-07-29) / 구현 착수 전** — §7 미결정 8건 전건 확정. 설계는 §4 확정본, 남은 건 구현뿐 ([[feedback_user_decides_not_claude]], [[feedback_decision_doc]])
 대상: 백엔드(Spring) 신입 포폴 — 헤드라인(세션 분산 정합성) **직접** 강화
 관련: [`portfolio-narrative.md`](../portfolio/portfolio-narrative.md)(§1 헤드라인·§3 보강), [`failure-modes.md`](../portfolio/failure-modes.md)(E1·E2·C4·T3), [`observability-correlation-id.md`](./observability-correlation-id.md), [`db-portfolio-roadmap.md`](./db-portfolio-roadmap.md)
 
@@ -168,11 +168,24 @@ endSession → outbox INSERT ✅   (신호는 안전하게 보존됨)
        → CompleteAnalysis 는 영영 안 옴 → 결과는 그대로 유실
 ```
 
-**outbox는 "신호의 전달"을 보장할 뿐 "AI 분석 상태의 내구성"을 주지 않는다.** 이건 outbox의 결함이 아니라 **경계**이고, 면접에서 먼저 말하면 오히려 강점이다(보강하려면 AI 측 상태 영속화 = 별도 카드). 또한 실무적으로 **`success=false`를 발행기가 어떻게 볼지**가 설계 결정이 된다(§7).
+**outbox는 "신호의 전달"을 보장할 뿐 "AI 분석 상태의 내구성"을 주지 않는다.** 이건 outbox의 결함이 아니라 **경계**이고, 면접에서 먼저 말하면 오히려 강점이다(보강하려면 AI 측 상태 영속화 = 별도 카드).
+
+#### 3-2-1. ⚠️ 이건 미래 얘기가 아니다 — 지금 이미 무증상으로 새고 있다
+
+`stopAnalysis`의 `onNext`(`ExerciseAnalysisService:265-267`)가 **`value.getSuccess()`를 보지 않는다**:
+
+```java
+public void onNext(StopResponse value) {
+    cb.onSuccess(...);                         // :266 — success=false 인데 "성공"으로 기록
+    log.info("AI 서버 응답: {}", value.getMessage());  // :267 — INFO 한 줄로 끝
+}
+```
+
+AI가 재시작돼 세션을 잃은 상태에서 Stop이 도착하면 `success=false`가 오지만, Spring은 이걸 **정상 응답으로 처리하고 INFO 로그만 남긴다**. 결과는 영영 안 오는데 경보는 어디에도 안 뜬다. 즉 §3-2의 한계는 "outbox를 넣으면 부딪히게 될 문제"가 아니라 **현행 코드의 무증상 유실**이고, outbox와 독립적으로 먼저 고칠 수 있다(§7-확정 ④ — 선행 소품 PR로 분리).
 
 ---
 
-## 4. 설계 (A 채택 가정 — 미확정)
+## 4. 설계 (A 확정 — 2026-07-29)
 
 ### 4-1. 테이블
 
@@ -200,11 +213,15 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 
 `aggregate_id`에 `exercise_sessions(id)` FK를 걸면 outbox가 **특정 애그리거트에 종속**되고(다른 이벤트 타입 확장 불가), `deleteSession`(`SessionService:231`) 시 CASCADE로 통보 이력이 함께 사라진다. 그래서 outbox는 관례적으로 FK를 안 건다.
 
-**대가**: 세션이 삭제됐는데 PENDING 행이 남아 **없는 세션에 stop을 쏘는** 케이스가 생긴다. 발행기가 이걸 어떻게 볼지 정해야 한다(§7) — AI가 `success=false`를 주므로 터지진 않지만, 무의미한 재시도로 남는다.
+**대가 — 그런데 생각보다 좁다**: 원래 걱정은 "세션이 삭제됐는데 PENDING 행이 남아 없는 세션에 stop을 쏘는" 케이스였다. 그러나 `deleteSession:230-233`이 **IN_PROGRESS 세션의 삭제를 막는다**(`SESSION_DELETE_NOT_ALLOWED`). PENDING 행이 살아있는 세션은 정의상 아직 IN_PROGRESS라 삭제 자체가 불가능하고, 타임아웃으로 FAILED가 되거나 COMPLETED로 수렴한 **뒤에야** 삭제 가능해진다. 즉 이 케이스는 "독 메시지가 30분 넘게 남아있는 동안 사용자가 그 세션을 지운" 좁은 창에서만 생긴다.
+
+**결정(2026-07-29)**: 별도 처리를 넣지 않는다. 발생해도 AI가 `success=false`를 돌려주므로 아래 §4-2-1의 터미널 처리로 자동 흡수된다 — 전용 분기를 만들 값이 없다.
 
 #### 4-1-2. 테이블 성장·정리
 
-`SENT` 행이 무한 누적된다. 세션당 1행 규모라 급하진 않지만 정리 정책은 필요하다. 주의: **소량 반복 DELETE의 파편화 누적은 이 프로젝트에서 아직 미검증**이라([[project_pending_delete_fragmentation_experiment]]) "DELETE로 충분하다"고 단정하지 말 것. 선택지는 (a) 주기 DELETE, (b) `created_at` 기준 파티션 + DROP PARTITION(`pose_data`에서 이미 검증된 패턴), (c) SENT 즉시 삭제(이력 포기).
+`SENT` 행이 무한 누적된다. 세션당 1행 규모라 급하진 않지만 정리 정책은 필요하다. 선택지는 (a) 주기 DELETE, (b) `created_at` 기준 파티션 + DROP PARTITION(`pose_data`에서 이미 검증된 패턴), (c) SENT 즉시 삭제(이력 포기).
+
+**결정(2026-07-29): (a) 주기 DELETE로 시작.** 다만 **소량 반복 DELETE의 파편화 누적은 이 프로젝트에서 아직 미검증**이므로([[project_pending_delete_fragmentation_experiment]]) "DELETE로 충분하다"고 **단정해 쓰지 않는다** — 문서·면접 모두에서 "현 볼륨에선 DELETE로 시작, 파편화가 관측되면 (b) 파티션으로 전환"이라고 말한다. (b)는 에스컬레이션 경로로만 박제하고 지금 구현하지 않는다. (c)는 실패 조사 시 이력이 없어 기각.
 
 ### 4-2. 코드 변경점 (최소 침습)
 
@@ -212,21 +229,44 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 |---|---|---|
 | `SessionService.endSession:206-217` | 트랜잭션 내 `saveAndFlush` + afterCommit `stopAnalysis(id)` | **트랜잭션 본문에서** `outboxRepository.save(STOP_ANALYSIS, id, cid)`. afterCommit 직접호출 제거(또는 best-effort 즉시발송 유지 — §7) |
 | 신규 `OutboxPublisher` | — | `@Scheduled(fixedDelayString=...)` → PENDING 조회 → `stopAnalysis` 송신 → SENT / retry++ |
-| `ExerciseAnalysisService.stopAnalysis:248-278` | 서킷 스킵 `return`(:259), onError 로그만(:272) | **결과를 발행기에 돌려줘야** 함 — 스킵·에러를 boolean/예외로 표면화해 발행기가 PENDING 유지를 판단 |
+| `ExerciseAnalysisService.stopAnalysis:248-278` | 비동기 스텁 + 콜백, 서킷 스킵 `return`(:259), onError 로그만(:272) | **동기(blocking stub + deadline)로 교체** — 결과를 발행기에 반환값으로 돌려준다(§4-2-1) |
 
 > 멱등 수신(`applyComplete:135` / `applyCompleteFromApp:313`)은 **그대로** — at-least-once 중복을 흡수. 손 안 댐.
 
-> ⚠️ `stopAnalysis`는 현재 **비동기 스텁 + 콜백**이라 호출자가 성공/실패를 못 받는다. 발행기가 결과로 상태를 갱신하려면 콜백 → `CompletableFuture`(또는 blocking stub) 전환이 필요하다. **이게 이 카드의 실제 코드 작업 중 가장 큰 덩어리**이므로 착수 전에 인지할 것.
+#### 4-2-1. `stopAnalysis` 동기 전환 (확정) 및 결과 3분류
+
+현재 stub은 async 하나뿐이라(`getAuthenticatedStub():78`, `ExerciseServiceStub`) 호출자가 성공/실패를 못 받는다. **확정: `CompletableFuture` 래핑이 아니라 blocking stub + deadline으로 간다.**
+
+- 발행기는 `@Scheduled` 스레드라 **블로킹이 문제되지 않는다**. 오히려 순차 처리가 재시도·상태전이를 단순하게 만든다. Future 병렬 발행은 지금 볼륨에 불필요한 복잡도.
+- afterCommit 직접호출이 사라지면(§7-확정 ③) **기존 async `stopAnalysis`를 남길 이유가 없다** → 두 버전 공존 없이 그냥 교체. `startAnalysis`의 async 경로는 그대로 둔다(그쪽은 fire-and-forget이 맞음).
+- 참고: 이전 판은 이 전환을 "이 카드 최대 작업량"으로 적었으나 **과대평가였다**. `stopAnalysis`는 unary 호출이라 전환이 기계적이고, 실제 최대 덩어리는 **발행기의 재시도·상태전이 로직**이다.
+
+발행기가 판단해야 할 결과는 셋이다:
+
+| 결과 | 조건 | outbox 행 처리 |
+|---|---|---|
+| 성공 | 응답 `success=true` | `SENT` + `sent_at` |
+| 재시도 | gRPC 에러/데드라인, **서킷 OPEN 스킵** | `PENDING` 유지 + `retry_count++` + `next_retry_at` 백오프 |
+| **터미널 실패** | 응답 `success=false`(AI에 세션 없음) | **`FAILED`**(재시도 안 함) + 지표 `outcome=ai-session-missing` |
+
+터미널 실패를 `SENT`로 찍지 않는 이유: **실제 결과 유실을 "전송 성공"으로 위장**하기 때문이다. 재시도하지 않는 이유: AI는 그 세션을 영영 모르므로(§3-2) 재시도가 원리상 무의미하다.
 
 ### 4-3. 확장성 경로 (반드시 같이 박제 — [[feedback_industry_level_standard]])
 
 | 단계 | 방식 | 깨지는 지점 → 대응 |
 |---|---|---|
-| 1차 | 단일 인스턴스 폴링 | OK |
-| 수평 확장 | 발행기 다중화 | **여러 발행기가 같은 PENDING 동시 집음 → 중복 송신.** `SELECT … FOR UPDATE SKIP LOCKED` 또는 ShedLock |
+| 1차 | 단일 인스턴스 폴링 | OK — **단, `FOR UPDATE SKIP LOCKED`는 1차부터 넣는다**(아래) |
+| 수평 확장 | 발행기 다중화 | SKIP LOCKED가 이미 있어 **중복 송신 없이 그대로 확장**된다 |
 | 고트래픽 | 폴링 빈조회·지연 | **CDC(Debezium)로 outbox binlog 스트리밍** → 폴링 제거. 운영 복잡도↑, 현 규모선 보류 |
 
-> 정직 체크: 이 프로젝트엔 **ShedLock 의존성이 없고**, 이미 `@Scheduled`가 3개(`SessionTimeoutScheduler:52`, `PoseDataPartitionScheduler:55`, `JwtBlacklist:13`) 돈다. 즉 **다중 인스턴스 중복 실행(T3)은 outbox가 새로 만드는 문제가 아니라 이미 있는 공통 갭**이다. 발행기만 SKIP LOCKED로 막고 나머지를 방치하면 앞뒤가 안 맞는다 — T3는 한 묶음으로 다룰 것.
+**결정(2026-07-29): SKIP LOCKED는 1차부터, T3(스케줄러 3개)는 별도 카드로 분리.**
+
+이전 판은 "발행기만 SKIP LOCKED로 막고 나머지 스케줄러를 방치하면 앞뒤가 안 맞으니 한 묶음으로 다루라"고 적었으나, **두 문제는 성격이 다르다**:
+
+- 발행기의 `SELECT … FOR UPDATE SKIP LOCKED`는 *중복 실행 가드*가 아니라 **행 단위 작업 분배**다. 인스턴스가 늘면 서로 다른 행을 집어 **오히려 처리량이 는다**. 폴링 쿼리 한 줄 비용이고 MySQL 8이 지원한다.
+- 반면 `SessionTimeoutScheduler:52`·`PoseDataPartitionScheduler:55`·`JwtBlacklist:13`의 다중 인스턴스 중복 tick은 **ShedLock 의존성 추가 + 락 테이블**이 필요한 별개 결정이다(현재 의존성 없음).
+
+즉 **T3는 outbox가 새로 만드는 문제가 아니라 이미 있는 공통 갭**이라는 진단은 유효하되, 해법이 달라 한 PR에 묶을 이유가 없다. T3는 별도 카드로 남긴다.
 
 ### 4-4. 관측성(2026-07-28 완료)과의 접점 — 착수 시 같이 설계할 것
 
@@ -284,17 +324,29 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 
 ---
 
-## 7. 미결정 (사용자 confirm 필요)
+## 7. 결정 완료 (2026-07-29 · 사용자 confirm) — 전건 확정
 
-- [ ] **방식 선택**: 순수 A(추천) vs C(리컨실리에이션 — §2-C대로 조건 판별이 기존 컬럼만으로 가능해 이전 판보다 유리해짐) vs A+C 결합
-- [ ] afterCommit **즉시 best-effort 송신도 유지**할지(지연↓) vs 순수 outbox만(단순)
-- [ ] `stopAnalysis` **비동기 콜백 → 동기/Future 전환 범위**(§4-2 ⚠️) — 이 카드 최대 작업량
-- [ ] **(신설)** `StopResponse.success=false`(AI에 세션 상태 없음) 처리 정책: 터미널 `SENT`로 볼지, `FAILED`로 볼지, 재시도할지 — §3-2의 한계와 직결
-- [ ] **(신설)** 삭제된 세션의 PENDING 행 처리(§4-1-1) / `SENT` 정리 정책(§4-1-2: DELETE vs 파티션 vs 즉시삭제)
-- [ ] 재시도 정책: 고정 간격 vs 지수 백오프(`next_retry_at`), `retry_count > N`의 N값·알람 채널
-- [ ] 다중 인스턴스 범위: 1차부터 SKIP LOCKED 넣을지 vs 문서화만 — **넣는다면 기존 스케줄러 3개(T3)와 한 묶음으로**(§4-3)
-- [ ] §4-4 반영 여부: `correlation_id` 컬럼 + 발행기 지표 3종을 1차부터 넣을지
+- [x] **① 방식 선택** → **순수 A(Outbox)**. C는 *기술적으로는* 이 단일 이벤트에 충분하다(§2-C: 판별 조건이 기존 컬럼만으로 성립, 재통보도 멱등). 그럼에도 A를 고른 이유는 (a) 이벤트 타입이 하나만 늘어도 C는 도메인 쿼리를 또 짜야 하고, (b) "트랜잭셔널 outbox"는 채점되는 패턴명이지만 "리컨실리에이션 잡"은 애드혹으로 읽힌다. **C가 기술적으로 밀리지 않는다는 사실은 문서에 남긴다** — "왜 더 싼 C를 안 골랐나"에 답할 수 있는 게 오히려 강점.
+- [x] **② `stopAnalysis` 전환 범위** → **blocking stub + deadline으로 동기 교체**(§4-2-1). Future 병렬 발행은 현 볼륨에 불필요. async 버전은 남기지 않고 교체(afterCommit 경로가 사라지므로 공존할 이유 없음). **이전 판의 "최대 작업량" 평가는 과대평가로 정정** — unary라 전환이 기계적이고, 실제 최대 덩어리는 발행기 재시도·상태전이 로직이다.
+- [x] **③ afterCommit 즉시 best-effort 송신** → **유지하지 않음(순수 outbox).** 유지하면 즉시송신과 발행기가 같은 행을 두고 경쟁해 결과 처리를 두 곳에 짜야 한다. 지연 우려는 `fixedDelay`를 **1초**로 두면 소멸한다 — 사용자가 이 통보를 기다리며 블록되지 않기 때문.
+- [x] **④ `StopResponse.success=false` 처리** → **터미널 `FAILED` + 지표 `outcome=ai-session-missing`**(재시도 안 함, §4-2-1). `SENT`로 찍으면 실제 유실을 전송 성공으로 위장한다. **추가 확정: 이건 outbox 이전에 이미 있는 무증상 버그**(§3-2-1 — `onNext`가 `getSuccess()`를 안 읽음)라 **선행 소품 PR로 분리**해 먼저 고친다.
+- [x] **⑤ 삭제 세션 PENDING / `SENT` 정리** → 삭제 세션은 **별도 처리 없음**(§4-1-1: `deleteSession`이 IN_PROGRESS 삭제를 막아 케이스가 좁고, ④가 흡수). `SENT`는 **주기 DELETE로 시작**하되 파편화 미검증을 이유로 "충분하다"고 단정하지 않고 파티션을 에스컬레이션 경로로 박제(§4-1-2).
+- [x] **⑥ 재시도 정책** → **지수 백오프**(`next_retry_at`, 1s→2s→4s…, **상한 5분**), **`retry_count > 10` → `FAILED` + 지표**. 서킷브레이커가 빠른 실패를 담당하므로 발행기는 느긋한 백오프가 맞다. **별도 알람 채널은 만들지 않고 지표(⑧)로 대체** — 지금 알람 인프라가 없다.
+- [x] **⑦ 다중 인스턴스 범위** → **`FOR UPDATE SKIP LOCKED`는 1차부터 포함, T3(스케줄러 3개)는 별도 카드로 분리**(§4-3). 발행기 SKIP LOCKED는 중복 가드가 아니라 행 단위 작업 분배(쿼리 한 줄, 확장 시 처리량 이득)이고, 스케줄러 중복 tick은 ShedLock 의존성이 필요한 별개 문제라 한 PR에 묶을 이유가 없다.
+- [x] **⑧ §4-4 반영** → **`correlation_id` 컬럼 + 지표 3종 모두 1차부터.** 컬럼 하나 비용이고, "MDC는 스레드에 매달려 죽지만 **DB에 적힌 cid는 재시작을 견딘다**"가 관측성 작업(PR #54)과 이 카드를 잇는 서사다. 셋 중 **`outbox.pending` gauge가 최우선** — 없으면 적체를 아무도 모른다.
 - [x] ~~보강 착수 순서에서 이걸 1번으로 둘지 (vs 관측성)~~ → **관측성이 먼저 갔다**(2026-07-28 완료, PR #54). 남은 비교 대상 회복탄력성은 Actuator·Resilience4j·gRPC deadline으로 실질 충족 — **보강 3축 중 실제로 빈 곳은 outbox뿐**이다.
+
+### 7-1. 구현 순서 (확정 결과 요약)
+
+| 순서 | 내용 | 비고 |
+|---|---|---|
+| 0 (선행 소품) | `onNext`에서 `getSuccess()` 판별 → `log.warn` + 지표 + 서킷 오분류 수정 | outbox와 독립. 작은 PR |
+| 1 | `outbox_events` 테이블 + 엔티티/리포지토리 | §4-1 DDL |
+| 2 | `endSession` afterCommit 제거 → 트랜잭션 내 outbox INSERT(cid 포함) | §4-2 |
+| 3 | `stopAnalysis` blocking 전환 + 결과 3분류 반환 | §4-2-1 |
+| 4 | `OutboxPublisher`(폴링 1s · SKIP LOCKED · 지수 백오프 · 터미널 FAILED) | §4-2-1·§4-3·⑥ |
+| 5 | 지표 3종 + `SessionMetricsRecordingTest` 패턴 검증 | §4-4 |
+| 6 | §6 측정(유실 재현 ①②, 결과 회수율) | 증거 확보 |
 
 ---
 
@@ -303,3 +355,4 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 - 2026-06-12: 추천 수정 — A+C 결합의 단점 검토 후 **순수 A + 내장 FAILED 처리**로 하향, C는 확장 옵션으로 강등(§3-1).
 - 2026-07-29(1차): 줄 번호 갱신 + 관측성 접점(§4-4) 신설.
 - 2026-07-29(재작성): 실코드 전면 재대조. **이전 판의 사실 오류 정정** — ① `endSession`은 `status`를 안 바꾼다(피해는 "불일치"가 아니라 **결과 유실 + FAILED 오분류**, §1-1), ② 유실 경로가 `onError` 말고 **서킷 OPEN 스킵**(`:257-260`)까지 둘이다(§1-2), ③ AI 상태가 in-memory 무-TTL이라 **outbox로도 못 고치는 한계**가 있다(§3-2). 추가: DDL 컨벤션(DATETIME) 정정, FK·정리 정책(§4-1-1·4-1-2), `stopAnalysis` 콜백→Future 전환이 최대 작업량(§4-2), T3는 기존 스케줄러 3개와 공통 갭(§4-3). 미결정 2건 신설. **새 결정 아님 — 방식·착수는 여전히 미결정.**
+- 2026-07-29(**결정**): 착수 전 실코드 재확인에서 **문서를 넘는 사실 3건** 확인 — ⓐ `onNext:265-267`이 `getSuccess()`를 안 읽어 `success=false`가 **지금도 무증상으로 새고 있다**(§3-2-1 신설), ⓑ `deleteSession:230-233`이 IN_PROGRESS 삭제를 막아 **삭제 세션 PENDING 케이스가 문서보다 훨씬 좁다**(§4-1-1 정정), ⓒ `stopAnalysis`가 unary라 **동기 전환은 기계적** — "최대 작업량"은 과대평가였고 실제 덩어리는 발행기 로직이다(§4-2-1 정정). 이 위에서 **§7 미결정 8건 전건 확정**(사용자 confirm): 순수 A / blocking 동기 전환 / best-effort 미유지 / `success=false`는 터미널 FAILED / 삭제세션 무처리·SENT 주기 DELETE / 지수 백오프·retry>10 FAILED·알람은 지표로 대체 / SKIP LOCKED 1차 포함·T3 분리 / cid 컬럼·지표 3종 1차 포함. **구현 순서는 §7-1**, 선행 소품(ⓐ 수정)을 0번으로 분리. 상태: 분석/추천 → **결정 완료·착수 전**.
