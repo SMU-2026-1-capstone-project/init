@@ -263,8 +263,31 @@ public class ExerciseAnalysisService {
             getAuthenticatedStub().stopAnalysis(request, CorrelationIds.preserving(new io.grpc.stub.StreamObserver<com.shadowfit.grpc.StopResponse>() {
                 @Override
                 public void onNext(com.shadowfit.grpc.StopResponse value) {
+                    // 서킷브레이커에는 성공으로 기록하는 게 맞다 — 판단 대상은 "AI 서비스가 살아있나"이지
+                    // "이 세션이 있었나"가 아니다. 세션을 잃은 AI도 새 분석은 정상 처리하므로, 여기서
+                    // 서킷을 열면 신규 startAnalysis 까지 막혀 더 나빠진다.
                     cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
-                    log.info("AI 서버 응답: {}", value.getMessage());
+
+                    // 전송 층(onNext)과 업무 층(success)은 별개다. AI는 세션 상태를 못 찾으면 gRPC
+                    // 에러가 아니라 success=false 인 정상 응답을 준다(exercise_servicer.py StopAnalysis).
+                    // 이 필드를 안 읽으면 "결과가 영영 안 오는" 사건이 INFO 로그 한 줄로 묻힌다.
+                    if (value.getSuccess()) {
+                        sessionMetrics.aiStopResult("ok");
+                        log.info("AI 서버 응답: {}", value.getMessage());
+                        return;
+                    }
+
+                    sessionMetrics.aiStopResult("session-missing");
+                    log.warn("AI 에 세션 상태 없음 — 분석 결과 회수 불가 (sessionId: {}, 응답: {})",
+                            sessionId, value.getMessage());
+
+                    // CompleteAnalysis 가 오지 않는 게 확정이므로 타임아웃 스케줄러(예상시간+버퍼)를
+                    // 기다릴 이유가 없다. startAnalysis 가 같은 상황에서 하는 처리와 대칭.
+                    // 늦게 도착한 완료 콜백과 경합해도 completeSession 의 낙관락 재시도가
+                    // FAILED 를 COMPLETED 로 덮으므로 올바른 결과가 이긴다.
+                    if (sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now())) {
+                        sessionMetrics.sessionTransition(Status.FAILED, "ai-session-missing");
+                    }
                 }
                 @Override
                 public void onError(Throwable t) {

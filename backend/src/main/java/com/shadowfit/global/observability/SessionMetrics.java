@@ -26,6 +26,9 @@ public class SessionMetrics {
     /** pose_data 배치 프레임 수 분포. tags: stage(received/stored) — 다운샘플 비율 관측용 */
     private static final String POSE_BATCH_FRAMES = "shadowfit.pose.batch.frames";
 
+    /** AI 분석 중단(StopAnalysis) 응답의 업무 결과. tags: outcome(ok/session-missing) */
+    private static final String AI_STOP_RESULT = "shadowfit.ai.stop.result";
+
     private final MeterRegistry registry;
 
     public SessionMetrics(MeterRegistry registry) {
@@ -46,6 +49,19 @@ public class SessionMetrics {
      */
     public void optimisticLockConflict(String source, String outcome) {
         registry.counter(LOCK_CONFLICTS, "source", source, "outcome", outcome).increment();
+    }
+
+    /**
+     * StopAnalysis 응답의 <b>업무 층</b> 결과. gRPC 전송 성공(onNext)과는 별개 축이다.
+     *
+     * <p>AI는 세션 상태를 못 찾아도 gRPC 에러가 아니라 {@code success=false}인 정상 응답을 준다
+     * (AI 프로세스 재시작 시 in-memory 상태가 사라지므로). 그 경우 CompleteAnalysis가 영영 오지 않아
+     * 결과가 유실되는데, 전송 층만 보면 "성공"으로 보여 사건 자체가 관측되지 않는다.
+     *
+     * @param outcome ok / session-missing
+     */
+    public void aiStopResult(String outcome) {
+        registry.counter(AI_STOP_RESULT, "outcome", outcome).increment();
     }
 
     /** 수신 프레임 수와 다운샘플 후 저장 행수를 함께 기록 — 실측 R값이 의도대로 나오는지 관측. */
