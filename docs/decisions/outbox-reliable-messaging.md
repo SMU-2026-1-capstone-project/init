@@ -11,7 +11,9 @@
 
 > **"사용자는 운동을 끝냈는데, 그 사실을 FastAPI에 알리는 통보가 유실되어 분석 결과가 영영 회수되지 않는 것"을 막는다.**
 
-유실 0(송신 at-least-once) + 멱등 수신(이미 있음) = **effectively exactly-once**.
+유실 0(송신 at-least-once) + 멱등 수신(이미 있음) = **effectively exactly-once — 단, "통보의 전달"에 한해서다.**
+
+> ⚠️ 범위를 좁혀 읽을 것. 이 보장은 **AI 가 그 세션 상태를 들고 살아있는 동안**에만 결과 회수까지 이어진다. AI 프로세스가 재시작하면 통보는 정확히 한 번 전달되지만 **분석 결과는 회수되지 않고 세션은 FAILED 로 남는다**(§3-2). 즉 outbox 가 주는 건 *메시지 전달의 exactly-once* 이지 *분석 결과의 exactly-once* 가 아니다. 네트워크 장애와 AI 재시작은 결과가 다른 사건이므로 §6 측정에서도 구분한다.
 
 ---
 
@@ -26,7 +28,7 @@
 
 현재 흐름 (`SessionService.endSession:192-218`):
 
-```
+```text
 endSession  @Transactional
   session.setEndTime(...); saveAndFlush()      // write 1 — :206-207
   registerSynchronization { afterCommit() {    // :210 — 커밋 확정 후. 순서는 잘 잡음
@@ -42,7 +44,7 @@ endSession  @Transactional
 
 **따라서 통보 1건이 유실되면 실제로 벌어지는 일은 "불일치"가 아니라 연쇄 손실이다:**
 
-```
+```text
 통보 유실
   → AI 는 세션이 끝난 줄 모름 → CompleteAnalysis 영영 안 옴
   → DB 세션은 IN_PROGRESS 로 방치 (end_time 만 찍힌 채)
@@ -159,7 +161,7 @@ getAuthenticatedStub().stopAnalysis(request, CorrelationIds.preserving(new Strea
 
 AI의 세션 상태는 **프로세스 in-memory**다(`session_state.py`, 무-TTL 무-영속). 그래서:
 
-```
+```text
 endSession → outbox INSERT ✅   (신호는 안전하게 보존됨)
        ⋮   AI 프로세스 재시작 (배포·OOM·크래시)
 발행기 재전송 → StopAnalysis 도착
@@ -223,6 +225,15 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 
 **결정(2026-07-29): (a) 주기 DELETE로 시작.** 다만 **소량 반복 DELETE의 파편화 누적은 이 프로젝트에서 아직 미검증**이므로([[project_pending_delete_fragmentation_experiment]]) "DELETE로 충분하다"고 **단정해 쓰지 않는다** — 문서·면접 모두에서 "현 볼륨에선 DELETE로 시작, 파편화가 관측되면 (b) 파티션으로 전환"이라고 말한다. (b)는 에스컬레이션 경로로만 박제하고 지금 구현하지 않는다. (c)는 실패 조사 시 이력이 없어 기각.
 
+**터미널 `FAILED` 행은 다르게 다룬다(2026-07-29 추가).** `retry_count > 10` 으로 포기했거나 `success=false` 로 종결된 행은 **"사람이 봐야 할 사건"** 이라, SENT 와 같은 주기로 지우면 조사할 근거가 사라진다. 정책:
+
+| 상태 | 보존 | 근거 |
+|---|---|---|
+| `SENT` | 짧게(예: 7일) 후 삭제 | 정상 처리 이력, 조사 가치 낮음 |
+| `FAILED` | **길게(예: 90일) 보존 후 삭제** | 결과 유실 사건의 유일한 기록. 지표(`outbox.dispatch{outcome=failed}`)는 건수만 알려주고 **어느 세션이었는지는 이 행에만 있다** |
+
+FAILED 가 무한 누적되는 건 아니다 — 정상 운영에서 이 상태는 드물어야 하고, **꾸준히 쌓인다면 그 자체가 알람 신호**다(§4-4 (2)의 pending gauge 와 같은 성격).
+
 ### 4-2. 코드 변경점 (최소 침습)
 
 | 위치 | 현재 | 변경 |
@@ -256,7 +267,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 | 단계 | 방식 | 깨지는 지점 → 대응 |
 |---|---|---|
 | 1차 | 단일 인스턴스 폴링 | OK — **단, `FOR UPDATE SKIP LOCKED`는 1차부터 넣는다**(아래) |
-| 수평 확장 | 발행기 다중화 | SKIP LOCKED가 이미 있어 **중복 송신 없이 그대로 확장**된다 |
+| 수평 확장 | 발행기 다중화 | SKIP LOCKED 로 **선점은 나뉘지만 그것만으로는 부족하다** — 소유권 이양이 필요(§4-3-1) |
 | 고트래픽 | 폴링 빈조회·지연 | **CDC(Debezium)로 outbox binlog 스트리밍** → 폴링 제거. 운영 복잡도↑, 현 규모선 보류 |
 
 **결정(2026-07-29): SKIP LOCKED는 1차부터, T3(스케줄러 3개)는 별도 카드로 분리.**
@@ -268,11 +279,39 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 
 즉 **T3는 outbox가 새로 만드는 문제가 아니라 이미 있는 공통 갭**이라는 진단은 유효하되, 해법이 달라 한 PR에 묶을 이유가 없다. T3는 별도 카드로 남긴다.
 
+#### 4-3-1. ⚠️ 정정 — SKIP LOCKED 만으로 중복 송신이 막히지 않는다
+
+위 표의 이전 판은 "SKIP LOCKED가 있어 중복 송신 없이 그대로 확장된다"고 적었다. **과장이다.** SKIP LOCKED가 보장하는 건 **"같은 행을 두 트랜잭션이 동시에 선점하지 않는다"** 까지고, 그 뒤가 비어 있다:
+
+```text
+발행기 A: SELECT ... FOR UPDATE SKIP LOCKED  → 행 42 선점
+발행기 A: COMMIT (또는 트랜잭션 종료)         → 락 해제
+발행기 A: gRPC 송신 시작 ... 그 도중 크래시    → 행 42 는 여전히 PENDING
+발행기 B: 같은 행 42 를 집어 다시 송신          → 중복
+```
+
+락은 **트랜잭션 수명**만큼만 살아있는데, 외부 호출(gRPC)은 그 트랜잭션 밖에서 일어난다. 락을 송신 끝까지 잡고 있으면 DB 커넥션을 외부 I/O 시간만큼 점유하게 되어 그것대로 나쁘다.
+
+**필요한 것: 상태로 표현되는 소유권 + 만료.**
+
+| 단계 | 행 상태 | 비고 |
+|---|---|---|
+| 선점 | `PENDING` → **`PROCESSING`** (+`locked_by`, `lock_expires_at`) | SKIP LOCKED 로 고른 뒤 **원자적으로 상태 전이하고 커밋**. 여기서 락을 놓는다 |
+| 송신 | `PROCESSING` | 트랜잭션 밖. 다른 발행기는 이 상태를 안 집는다 |
+| 완료 | → `SENT` / `PENDING`(재시도) / `FAILED` | |
+| **크래시** | `lock_expires_at` 경과 → 회수 대상 | 폴링 쿼리가 `PENDING` + **"만료된 `PROCESSING`"** 을 같이 집어 재시도 |
+
+즉 SKIP LOCKED 는 **작업 분배** 도구이고, 중복 방지는 **PROCESSING + lease 만료**가 한다. 둘은 대체재가 아니라 각자 다른 일을 한다.
+
+> 이 정정으로 §4-1 DDL 에 `locked_by VARCHAR(64) NULL`, `lock_expires_at DATETIME NULL` 이 추가되고 `status` ENUM 에 `PROCESSING` 이 붙는다. 폴링 인덱스도 `(status, next_retry_at)` 에서 만료 조회를 함께 태우는 형태로 재검토가 필요하다 — **착수 시 DDL 을 이 절 기준으로 확정할 것.**
+>
+> 그리고 at-least-once 특성이 여기서 다시 확인된다: 크래시 회수는 **"보냈는지 확실하지 않은 행"** 을 다시 보내는 것이므로 중복이 원리상 남는다. 그래서 수신측 멱등성(§1-3)이 필수 짝이다.
+
 ### 4-4. 관측성(2026-07-28 완료)과의 접점 — 착수 시 같이 설계할 것
 
 #### (1) correlation id를 outbox 행에 실어야 한다 ⚠️
 
-```
+```text
 [요청 스레드]  endSession(cid=a3f9c1d20b84)  →  outbox INSERT
        ⋮  (수 초~수 분 뒤, 인스턴스 재시작을 건널 수도 있음)
 [발행기 스레드]  PENDING 조회 → stopAnalysis 송신     ← 여기 cid 가 없다
@@ -316,7 +355,8 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 
 ## 6. 측정 (구현 시 — 말 아닌 증거)
 
-- **유실 재현(경로 ①)**: FastAPI를 죽인 채 N세션 종료 → 현행은 통보 N건 소실 / outbox는 PENDING N건 적재 → 복구 후 **전건 SENT 수렴** 관찰.
+- **유실 재현(경로 ①-a, 네트워크 단절)**: FastAPI **프로세스는 살려둔 채** 연결만 끊고 N세션 종료 → 현행은 통보 N건 소실 / outbox는 PENDING N건 적재 → 복구 후 **전건 SENT + COMPLETED 수렴** 관찰. AI 가 세션 상태를 그대로 들고 있으므로 결과까지 회수된다.
+- **유실 재현(①-b, AI 프로세스 재시작)**: FastAPI를 **재시작**한 뒤 종료 → outbox는 SENT 가 아니라 **터미널 `FAILED`(`outcome=ai-session-missing`)로 수렴**하고 세션은 FAILED 로 남는다. **①-a 와 결과가 다른 게 정상이며, 이 차이가 §3-2 한계의 실측 증거다.** 둘을 섞어 "전건 SENT" 로 뭉뚱그리지 말 것.
 - **유실 재현(경로 ②, 서킷)**: 연속 실패로 서킷을 OPEN시킨 뒤 종료 → 현행은 `log.warn` 한 줄 남기고 끝(`:258`), outbox는 다음 폴링에 전달. **①보다 이쪽이 데모로 더 선명하다.**
 - **결과 회수율**: 유실 재현 후 **최종 세션 상태 분포**(COMPLETED vs FAILED) 비교 — §1-1대로면 현행은 FAILED로 수렴, outbox는 COMPLETED로 회수. E1의 실제 피해를 그대로 보여주는 지표.
 - **지연**: 폴링 간격별 통보 p99(간격이 하한).
