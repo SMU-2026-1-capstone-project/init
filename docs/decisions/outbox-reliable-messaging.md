@@ -1,7 +1,7 @@
 # 신뢰성 있는 비동기 통보 — 세션 종료 통보 유실(E1) 보강
 
 작성일: 2026-06-12 / **전면 재작성: 2026-07-29**(실코드 재대조 — §1 피해 기술 정정, 서킷 스킵 경로 신설, outbox의 한계 명시)
-상태: **결정 완료 (2026-07-29) / 구현 착수 전** — §7 미결정 8건 전건 확정. 설계는 §4 확정본, 남은 건 구현뿐 ([[feedback_user_decides_not_claude]], [[feedback_decision_doc]])
+상태: **구현·측정 완료 (2026-07-29, PR #60·#63·#67)** — §7 미결정 8건 확정 → 구현 → §6 실측까지 마침. "유실 0"은 이제 주장이 아니라 실측이다 ([[feedback_user_decides_not_claude]], [[feedback_decision_doc]])
 대상: 백엔드(Spring) 신입 포폴 — 헤드라인(세션 분산 정합성) **직접** 강화
 관련: [`portfolio-narrative.md`](../portfolio/portfolio-narrative.md)(§1 헤드라인·§3 보강), [`failure-modes.md`](../portfolio/failure-modes.md)(E1·E2·C4·T3), [`observability-correlation-id.md`](./observability-correlation-id.md), [`db-portfolio-roadmap.md`](./db-portfolio-roadmap.md)
 
@@ -193,23 +193,48 @@ AI가 재시작돼 세션을 잃은 상태에서 Stop이 도착하면 `success=f
 
 프로젝트 스키마 컨벤션 준수: snake_case, **업무 시각은 `DATETIME`·`created_at`만 `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`**(`schema.sql`의 `exercise_sessions:69-79` 패턴), BIGINT PK.
 
+> 📌 **구현 완료(2026-07-29, PR #63).** 아래는 **실제 반영된 DDL**이다. 초안에서 두 군데가 바뀌었고 둘 다 근거가 있다 — `PROCESSING`·`locked_by`·`lock_expires_at` 추가(§4-3-1), 인덱스 2개 → 1개(§4-1-3 실측).
+
 ```sql
 -- 11. 아웃박스 (트랜잭셔널 메시징 — 통보 유실 방지)
 CREATE TABLE IF NOT EXISTS outbox_events (
-    id             BIGINT AUTO_INCREMENT PRIMARY KEY,
-    aggregate_type VARCHAR(50)  NOT NULL,          -- 'SESSION'
-    aggregate_id   BIGINT       NOT NULL,          -- session_id (FK 안 검 — §4-1-1)
-    event_type     VARCHAR(50)  NOT NULL,          -- 'STOP_ANALYSIS'
-    payload        JSON         NOT NULL,          -- { "sessionId": 42 }
-    correlation_id VARCHAR(64)  NULL,              -- §4-4 (1) — 시간·프로세스 경계를 건너는 cid
-    status         ENUM('PENDING','SENT','FAILED') NOT NULL DEFAULT 'PENDING',
-    retry_count    INT          NOT NULL DEFAULT 0,
-    next_retry_at  DATETIME     NULL,              -- 백오프용(선택)
-    sent_at        DATETIME     NULL,
-    created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_outbox_dispatch (status, next_retry_at)  -- 발행기 폴링 쿼리용
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    aggregate_type  VARCHAR(50)  NOT NULL,          -- 'SESSION'
+    aggregate_id    BIGINT       NOT NULL,          -- session_id (FK 안 검 — §4-1-1)
+    event_type      VARCHAR(50)  NOT NULL,          -- 'STOP_ANALYSIS'
+    payload         JSON         NOT NULL,          -- { "sessionId": 42 }
+    correlation_id  VARCHAR(64)  NULL,              -- §4-4 (1) — 시간·프로세스 경계를 건너는 cid
+    status          ENUM('PENDING','PROCESSING','SENT','FAILED') NOT NULL DEFAULT 'PENDING',
+    retry_count     INT          NOT NULL DEFAULT 0,
+    next_retry_at   DATETIME     NULL,              -- 지수 백오프
+    locked_by       VARCHAR(64)  NULL,              -- 선점한 발행기 (§4-3-1)
+    lock_expires_at DATETIME     NULL,              -- 이 시각이 지난 PROCESSING 은 회수 대상
+    sent_at         DATETIME     NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_outbox_dispatch (status, next_retry_at)  -- 인덱스는 하나만 — §4-1-3
 );
 ```
+
+#### 4-1-3. ⚠️ 인덱스를 2개 두려다 실측으로 되돌린 기록
+
+초안대로라면 폴링 두 갈래에 각각 인덱스를 둬야 했다 — `(status, next_retry_at)` 과 `(status, lock_expires_at)`. **실제로 올려보니 정반대로 동작했다.**
+
+MySQL 8.0.46 에 DDL 을 적용하고 EXPLAIN 을 떴다:
+
+| | 인덱스 2개 | `(status, lock_expires_at)` 제거 후 |
+|---|---|---|
+| ① 신규·재시도 (`PENDING`) | `key_len 1`, filtered 40%, `ref` | **`key_len 7`, filtered 100%, `range`+ICP** |
+| ② 유실 회수 (`PROCESSING`) | `key_len 1`, filtered 33% | 동일(개선 없음) |
+
+**원인**: 두 인덱스의 **선두 컬럼이 같아서**(`status`) 옵티마이저가 둘을 동등하게 보고 아무거나 고른다. 그러면 두 번째 컬럼을 못 써서 status 로만 훑고 나머지를 필터링한다. 데이터 분포를 바꿔(PENDING 30% → 0.8%) 다시 재도 **수치가 소수점까지 같아** 합성 분포 탓이 아니라 구조 탓임을 확인했다([[project_synthetic_data_distribution_limit]] 때문에 이 확인이 필요했다).
+
+**②가 인덱스를 못 타는 건 감수한다.** `PROCESSING` 행은 "지금 송신 중 + 크래시로 묶인 것"뿐이라 구조적으로 `배치크기 × 발행기수`(수십 건)를 넘지 않아 좁힐 대상이 애초에 없다. 반면 ①은 **AI 장애 시 수천 건까지 쌓이는** 쿼리라 인덱스가 실제로 필요하다. 필요한 쪽만 고쳤고 쓰기 경로의 인덱스 유지 비용도 절반이 됐다.
+
+> 이 프로젝트는 `session_feedback_logs` 에서도 EXPLAIN 근거로 중복 인덱스를 제거한 적이 있다(2026-07-24). 같은 기준을 적용했다.
+
+**에스컬레이션 경로**: `PROCESSING` 적체가 관측되면 두 시각 컬럼을 `visible_at` 하나로 합쳐 `(status, visible_at)` 단일 인덱스로 가는 안이 있다(SQS visibility timeout 모델). 이 안도 EXPLAIN 으로 확인해 뒀다(`key_len 6`, filtered 100%). 다만 컬럼 하나가 두 의미를 겸하게 되고 상태 전이마다 올바르게 갱신해야 해서, 지금은 채택하지 않는다.
+
+> 정직 체크: **이 문제는 리뷰로 걸러지지 않았다.** `.coderabbit.yaml` 의 `path_filters` 가 `mysql/**` 를 통째로 제외하고 있어 DDL 이 리뷰 대상이 아니었다. 직접 MySQL 에 올려 EXPLAIN 을 떠보고서야 발견했고, 설정은 PR #64 로 고쳤다.
 
 #### 4-1-1. FK를 안 거는 이유와 그 대가
 
@@ -303,7 +328,11 @@ FAILED 가 무한 누적되는 건 아니다 — 정상 운영에서 이 상태�
 
 즉 SKIP LOCKED 는 **작업 분배** 도구이고, 중복 방지는 **PROCESSING + lease 만료**가 한다. 둘은 대체재가 아니라 각자 다른 일을 한다.
 
-> 이 정정으로 §4-1 DDL 에 `locked_by VARCHAR(64) NULL`, `lock_expires_at DATETIME NULL` 이 추가되고 `status` ENUM 에 `PROCESSING` 이 붙는다. 폴링 인덱스도 `(status, next_retry_at)` 에서 만료 조회를 함께 태우는 형태로 재검토가 필요하다 — **착수 시 DDL 을 이 절 기준으로 확정할 것.**
+> ✅ **반영됨(PR #63)**: §4-1 DDL 에 `locked_by`·`lock_expires_at` 이 추가되고 `status` ENUM 에 `PROCESSING` 이 붙었다. 다만 "만료 조회용 인덱스도 함께 둔다"는 부분은 **실측 결과 역효과여서 채택하지 않았다** — §4-1-3 참고.
+>
+> **추가로 얻은 것 — 경량 펜싱(PR #63 리뷰 반영)**: 상태 전이 쿼리(`markSent`/`markForRetry`/`markFailed`)에 `AND locked_by = :me AND status = 'PROCESSING'` 조건을 걸었다. lease 가 만료돼 다른 발행기가 회수해 간 뒤 원래 발행기가 뒤늦게 깨어나 결과를 쓰면 **새 소유자의 진행을 덮어쓰기** 때문이다(특히 아직 송신 중인 행을 `PENDING` 으로 되돌리면 세 번째 발행기가 또 집어 중복이 번진다). 0 행이 반환되면 발행기는 지표도 올리지 않고 물러난다.
+>
+> 이건 **중복 송신을 막지 못한다**(그건 이미 나간 뒤다). 막는 것은 **상태 오염**이다. 아래 §3-2 에 적은 "fencing token 없음" 한계가 사라진 건 아니지만, 조건부 갱신(CAS)으로 상당 부분 좁혔다.
 >
 > 그리고 at-least-once 특성이 여기서 다시 확인된다: 크래시 회수는 **"보냈는지 확실하지 않은 행"** 을 다시 보내는 것이므로 중복이 원리상 남는다. 그래서 수신측 멱등성(§1-3)이 필수 짝이다.
 
@@ -353,7 +382,80 @@ FAILED 가 무한 누적되는 건 아니다 — 정상 운영에서 이 상태�
 
 ---
 
-## 6. 측정 (구현 시 — 말 아닌 증거)
+## 6. 측정 — ✅ 실측 완료 (2026-07-29)
+
+> Docker 로 전체 스택(MySQL + Spring + FastAPI)을 띄우고 실제 HTTP·gRPC 로 세션을 돌려 측정했다.
+> AI 를 죽이는 방식이 시나리오를 가른다 — `docker pause` 는 프로세스를 얼리되 **메모리 상태를 보존**하고
+> (=네트워크 단절), `docker restart` 는 **상태를 잃는다**(=프로세스 재시작). §3-2 의 한계가 이 차이로 드러난다.
+
+### 6-0. 결과 요약
+
+| 시나리오 | AI 조작 | 아웃박스 행 | 세션 최종 | 판정 |
+|---|---|---|---|---|
+| **①-a 네트워크 단절** | `pause` (상태 보존) | 25초간 `PENDING` 유지 → 복구 후 **`SENT`** | **`COMPLETED`** | ✅ 유실 0 + 결과 회수 |
+| **①-b AI 재시작** | `restart` (상태 소실) | **터미널 `FAILED`** (재시도 0회) | `FAILED` | ✅ 의도대로 — §3-2 한계의 실증 |
+| **② 서킷 OPEN** | `pause` 후 서킷 개방 | `PENDING` 유지(**버리지 않음**) → 복구 후 `SENT` | `COMPLETED` | ✅ 이전 설계의 유실 경로 제거 확인 |
+
+### 6-1. ①-a 네트워크 단절 — 유실 0 과 결과 회수
+
+세션 종료 요청은 **HTTP 200, 59~135ms** 로 반환됐다 — AI 가 얼어붙어 있는데도 사용자는 기다리지 않는다(요청 경로에 외부 호출이 없다).
+
+행이 즉시 생성됐고 **`correlation_id` 에 원 요청의 cid 가 실렸다**(`9f969c7c664a`). 이후 AI 가 멈춰 있는 동안:
+
+```text
+ 8초  PROCESSING  retry_count=3
+16초  PENDING     retry_count=4   다음 시도 14초 뒤
+24초  PENDING     retry_count=5   다음 시도 17초 뒤
+40초  PENDING     retry_count=6   다음 시도 37초 뒤
+```
+
+**백오프가 8s → 16s → 32s 로 정확히 2배씩** 늘었고 행은 한 번도 사라지지 않았다. AI 복구 후 **10초 안에 `SENT`**, 세션은 **`COMPLETED`** 로 수렴했다.
+
+### 6-2. ①-b AI 재시작 — 결과가 달라야 정상이다
+
+AI 를 재시작해 세션 상태를 잃게 한 뒤 종료했더니, 발행기는 **재시도 없이(`retry_count=0`) 즉시 터미널 `FAILED`** 로 종결했다. `success=false` 는 재시도가 원리상 무의미하므로 옳은 동작이다.
+
+세션도 **6초 만에 `FAILED`** 가 됐다. 이전 설계라면 타임아웃 스케줄러(`시작시간+예상시간+30분`)를 기다려야 했다 — PR #60 의 즉시 실패 처리가 실측으로 확인된 셈이다.
+
+**①-a 와 결과가 다른 것이 이 문서의 §3-2 한계 그 자체다.** 통보 전달은 exactly-once 지만 분석 결과의 내구성은 별개다.
+
+### 6-3. ② 서킷 OPEN — 이전 설계에서 통보를 버리던 구간
+
+연속 실패로 서킷을 열었다(설정: `minimumNumberOfCalls=5`, `failureRateThreshold=50%`).
+
+```text
+ 7초  CLOSED    failed=1   아웃박스 PROCESSING
+14초  CLOSED    failed=2
+21초  CLOSED    failed=3
+28초  OPEN      failed=4   아웃박스 PENDING  ← 서킷 개방
+```
+
+서킷이 열린 뒤에도 행은 `PENDING` 으로 살아 있었고(`retry_count=6`에서 정지), 백엔드 로그엔 이렇게 남았다:
+
+```text
+WARN [fit-scheduler-3] [41318f1afbd1|805] ExerciseAnalysisService :
+  AI 서버 서킷브레이커 OPEN — 중단 요청 보류 (세션 ID: 805)
+```
+
+**이전 설계에서는 바로 이 지점이 유실의 끝이었다** — `log.warn` 한 줄 남기고 `return` 했다. 지금은 "보류"이고, AI 복구 후 **10초 안에 `SENT` + `COMPLETED`** 로 이어졌다.
+
+> 로그에 cid(`41318f1afbd1`)와 sessionId(`805`)가 함께 찍힌 것도 확인됐다 — 발행기가 행에 저장된 cid 를 복원해 원 요청과 이어붙인다(§4-4).
+
+### 6-4. ⚠️ 측정 중 발견한 별개 버그
+
+첫 측정에서 아웃박스는 `SENT` 인데 세션이 `COMPLETED` 로 가지 않았다. 원인은 아웃박스가 아니라 **`reports` 테이블에 `updated_at` 컬럼이 없어** 리포트 INSERT 가 실패한 것이었다. 리포트 생성이 세션 완료와 같은 트랜잭션이라 세션 COMPLETED 까지 롤백됐고, **모든 세션이 FAILED 로 수렴하고 있었다**(이슈 #66, PR #67 로 수정). 위 표의 결과는 그 수정 후 재측정한 값이다.
+
+> 이게 **E2E 측정을 실제로 돌려본 값어치**다 — 단위 테스트와 코드 리뷰로는 안 잡혔다.
+
+### 6-5. 아직 안 한 것
+
+- **지연 p99**: 폴링 간격별 통보 지연 분포. 단건 측정만 했고 분포는 안 냈다
+- **중복 흡수**: 의도적 2회 송신 → 멱등 수신으로 COMPLETED 1회만 반영. 코드상 보장되지만 실측은 안 함
+- **부하 상태에서의 거동**: 위는 전부 단일 세션 기준이다. 다건 동시 적체·다중 발행기는 미측정
+
+---
+
+### 6-6. 원래 측정 계획 (참고)
 
 - **유실 재현(경로 ①-a, 네트워크 단절)**: FastAPI **프로세스는 살려둔 채** 연결만 끊고 N세션 종료 → 현행은 통보 N건 소실 / outbox는 PENDING N건 적재 → 복구 후 **전건 SENT + COMPLETED 수렴** 관찰. AI 가 세션 상태를 그대로 들고 있으므로 결과까지 회수된다.
 - **유실 재현(①-b, AI 프로세스 재시작)**: FastAPI를 **재시작**한 뒤 종료 → outbox는 SENT 가 아니라 **터미널 `FAILED`(`outcome=ai-session-missing`)로 수렴**하고 세션은 FAILED 로 남는다. **①-a 와 결과가 다른 게 정상이며, 이 차이가 §3-2 한계의 실측 증거다.** 둘을 섞어 "전건 SENT" 로 뭉뚱그리지 말 것.
@@ -378,15 +480,21 @@ FAILED 가 무한 누적되는 건 아니다 — 정상 운영에서 이 상태�
 
 ### 7-1. 구현 순서 (확정 결과 요약)
 
-| 순서 | 내용 | 비고 |
+| 순서 | 내용 | 상태 |
 |---|---|---|
-| 0 (선행 소품) | `onNext`에서 `getSuccess()` 판별 → `log.warn` + 지표 + 서킷 오분류 수정 | outbox와 독립. 작은 PR |
-| 1 | `outbox_events` 테이블 + 엔티티/리포지토리 | §4-1 DDL |
-| 2 | `endSession` afterCommit 제거 → 트랜잭션 내 outbox INSERT(cid 포함) | §4-2 |
-| 3 | `stopAnalysis` blocking 전환 + 결과 3분류 반환 | §4-2-1 |
-| 4 | `OutboxPublisher`(폴링 1s · SKIP LOCKED · 지수 백오프 · 터미널 FAILED) | §4-2-1·§4-3·⑥ |
-| 5 | 지표 3종 + `SessionMetricsRecordingTest` 패턴 검증 | §4-4 |
-| 6 | §6 측정(유실 재현 ①②, 결과 회수율) | 증거 확보 |
+| 0 (선행 소품) | `onNext`에서 `getSuccess()` 판별 → `log.warn` + 지표 + 즉시 FAILED | ✅ **PR #60** (이슈 #58) |
+| 1 | `outbox_events` 테이블 + 엔티티/리포지토리 | ✅ PR #63 |
+| 2 | `endSession` afterCommit 제거 → 트랜잭션 내 outbox INSERT(cid 포함) | ✅ PR #63 |
+| 3 | `stopAnalysis` blocking 전환 + 결과 3분류 반환 | ✅ PR #63 |
+| 4 | `OutboxPublisher`(폴링 1s · SKIP LOCKED · 지수 백오프 · 터미널 FAILED) | ✅ PR #63 |
+| 5 | 지표 3종 + `SessionMetricsRecordingTest` 패턴 검증 | ✅ PR #63 |
+| 6 | §6 측정(유실 재현 ①②, 결과 회수율) | ✅ **완료** — 결과는 §6 |
+
+**0번에서 정정된 것**: "서킷 오분류 수정"으로 적어뒀으나 **`cb.onSuccess()` 는 원래 맞는 동작**이었다. 서킷이 판단하는 건 "AI 서비스가 살아있나"이지 "이 세션이 있었나"가 아니고, 세션을 잃은 AI 도 새 분석은 정상 처리하므로 여기서 서킷을 열면 신규 `startAnalysis` 까지 막혀 더 나빠진다. 실제로 한 건 `getSuccess()` 판별 + WARN + 지표 + 즉시 FAILED 뿐이다.
+
+**구현 중 실측으로 바뀐 것 2가지** — 둘 다 착수 전엔 몰랐던 것이다:
+- 인덱스 2개 → 1개 (§4-1-3). 선두 컬럼이 같아 옵티마이저가 구분하지 못했다
+- 상태 전이에 소유권 조건(CAS) 추가 (§4-3-1 하단). lease 를 잃은 발행기가 새 소유자의 상태를 덮어쓰는 경로가 있었다
 
 ---
 
@@ -396,3 +504,5 @@ FAILED 가 무한 누적되는 건 아니다 — 정상 운영에서 이 상태�
 - 2026-07-29(1차): 줄 번호 갱신 + 관측성 접점(§4-4) 신설.
 - 2026-07-29(재작성): 실코드 전면 재대조. **이전 판의 사실 오류 정정** — ① `endSession`은 `status`를 안 바꾼다(피해는 "불일치"가 아니라 **결과 유실 + FAILED 오분류**, §1-1), ② 유실 경로가 `onError` 말고 **서킷 OPEN 스킵**(`:257-260`)까지 둘이다(§1-2), ③ AI 상태가 in-memory 무-TTL이라 **outbox로도 못 고치는 한계**가 있다(§3-2). 추가: DDL 컨벤션(DATETIME) 정정, FK·정리 정책(§4-1-1·4-1-2), `stopAnalysis` 콜백→Future 전환이 최대 작업량(§4-2), T3는 기존 스케줄러 3개와 공통 갭(§4-3). 미결정 2건 신설. **새 결정 아님 — 방식·착수는 여전히 미결정.**
 - 2026-07-29(**결정**): 착수 전 실코드 재확인에서 **문서를 넘는 사실 3건** 확인 — ⓐ `onNext:265-267`이 `getSuccess()`를 안 읽어 `success=false`가 **지금도 무증상으로 새고 있다**(§3-2-1 신설), ⓑ `deleteSession:230-233`이 IN_PROGRESS 삭제를 막아 **삭제 세션 PENDING 케이스가 문서보다 훨씬 좁다**(§4-1-1 정정), ⓒ `stopAnalysis`가 unary라 **동기 전환은 기계적** — "최대 작업량"은 과대평가였고 실제 덩어리는 발행기 로직이다(§4-2-1 정정). 이 위에서 **§7 미결정 8건 전건 확정**(사용자 confirm): 순수 A / blocking 동기 전환 / best-effort 미유지 / `success=false`는 터미널 FAILED / 삭제세션 무처리·SENT 주기 DELETE / 지수 백오프·retry>10 FAILED·알람은 지표로 대체 / SKIP LOCKED 1차 포함·T3 분리 / cid 컬럼·지표 3종 1차 포함. **구현 순서는 §7-1**, 선행 소품(ⓐ 수정)을 0번으로 분리. 상태: 분석/추천 → **결정 완료·착수 전**.
+- 2026-07-29(**구현 완료**): PR #60(선행) → PR #63(본체) 머지. 문서를 실제 코드 기준으로 동기화 — §4-1 DDL 을 반영본으로 교체, §4-1-3(인덱스 실측 기록) 신설, §4-3-1 에 경량 펜싱(CAS) 추가, §7-1 진행 상태 갱신. **착수 전 설계에서 실측으로 바뀐 것 2건**: ① 인덱스 2개는 역효과라 1개로(선두 컬럼 중복), ② 상태 전이에 `locked_by` 조건을 걸어 lease 상실 시 상태 오염 차단. 남은 것은 §6 측정뿐이며, 그 전까지 "유실 0"은 **설계상 주장이지 실측이 아니다**.
+- 2026-07-29(**측정 완료**): Docker 로 전체 스택을 띄워 §6 실측. ①-a 네트워크 단절(`docker pause`, 상태 보존) → 25초 적체 후 `SENT`+`COMPLETED`, 백오프 8→16→32s 확인. ①-b AI 재시작(상태 소실) → 재시도 0회로 터미널 `FAILED`(§3-2 한계의 실증). ② 서킷 OPEN → 이전 설계가 버리던 구간에서 행이 살아남아 복구 후 전달. **측정 중 별개 버그 발견** — `reports.updated_at` 누락으로 모든 세션 완료가 롤백되고 있었다(#66, PR #67). 단위 테스트·리뷰로는 안 잡히던 것이라, E2E 측정을 실제로 돌린 값어치가 여기서 나왔다. 미측정 잔여: 지연 p99 분포, 중복 흡수 실측, 다건·다중 발행기 거동(§6-5).
