@@ -109,6 +109,9 @@ CREATE TABLE IF NOT EXISTS exercise_sessions (
 CREATE TABLE IF NOT EXISTS pose_data (
                                          id BIGINT AUTO_INCREMENT,
                                          session_id BIGINT NOT NULL,
+    -- 이 프레임이 속한 rep 번호 (1-based, 0=미상). 재부착 시 MAX(rep_number) 로 rep 카운트를 복원한다
+    -- (이슈 #59 2단계, docs/decisions/session-resume-and-ai-state.md §3-3).
+    rep_number INT NOT NULL DEFAULT 0,
                                          timestamp_sec DECIMAL(10,3) NOT NULL, -- [수정] 소수점 타임스탬프 대응을 위해 DECIMAL로 변경
     joint_coordinates JSON NOT NULL,
     sync_rate DECIMAL(5,2) NOT NULL,

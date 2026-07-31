@@ -1,6 +1,7 @@
 package com.shadowfit.service.Exercise;
 
 import com.shadowfit.dto.exercises.VideoRequestDto;
+import com.shadowfit.dto.exercises.session.ReattachSessionResponseDto;
 import com.shadowfit.dto.exercises.session.SessionUpdateRequestDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
@@ -15,6 +16,7 @@ import com.shadowfit.model.member.Member;
 import com.shadowfit.model.outbox.DispatchOutcome;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
+import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -50,6 +52,8 @@ public class ExerciseAnalysisService {
     private final MemberRepository memberRepository;
     private final SessionService sessionService;
     private final ExerciseReferenceRepository referenceRepository;
+    // 재부착 시 MAX(rep_number) 복원 전용 (이슈 #59 2단계)
+    private final PoseDataRepository poseDataRepository;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final SessionMetrics sessionMetrics;
 
@@ -257,6 +261,89 @@ public class ExerciseAnalysisService {
                     log.info("FastAPI 전송 완료");
                 }
             }));
+        }
+    }
+
+    /**
+     * [STEP 3-R: 세션 재부착] 이미 IN_PROGRESS 인 세션의 AI 분석 상태를 DB 값으로 되살린다.
+     * (이슈 #59 2단계, docs/decisions/session-resume-and-ai-state.md)
+     *
+     * <p>[왜 필요한가] 세션 row 는 MySQL 에 있는데 분석 상태는 AI 프로세스 메모리에만 있다. 앱이
+     * 재시작하면 클라가 sessionId 를 잃고(1단계 {@code GET /sessions/active} 로 되찾는다), AI 가
+     * 재시작하면 상태 자체가 증발한다. 둘 중 어느 쪽이든 DB 는 멀쩡히 IN_PROGRESS 라 클라는 이어할 수
+     * 있다고 믿는데 AI 는 프레임을 전부 거부한다.
+     *
+     * <p>[왜 동기인가] {@code sendAnalysisRequestToFastApi}(시작)는 fire-and-forget 이어도 됐다 —
+     * 클라는 어차피 프레임을 보내기 시작하면 되니까. 재부착은 <b>다르다.</b> 클라가 "이어할 수 있는지"를
+     * 알아야 프레임을 보낼지 새로 시작할지 정한다. 성공/실패가 곧 응답이라 블로킹 스텁을 쓴다.
+     * 사용자 요청 스레드가 최대 {@code GRPC_CALL_TIMEOUT_SECONDS} 대기하지만, 재부착은 세션당 드물게
+     * 일어나는 복구 경로라 상시 처리량에 영향을 주지 않는다.
+     *
+     * <p>[실패 시 세션을 FAILED 로 바꾸지 않는 이유] 시작 경로는 AI 가 죽으면 즉시 FAILED 로 돌려
+     * 사용자를 풀어준다(응답 없는 빈 세션을 붙들고 있을 이유가 없으므로). 재부착은 반대다 — 되살릴 수
+     * 있는 rep 이 pose_data 에 이미 쌓여 있는데 일시적 gRPC 실패로 세션을 걷어버리면, <b>이 기능이
+     * 지키려던 것을 이 기능이 없애는</b> 셈이 된다. 503 으로 돌려주고 세션은 그대로 둔다. 재시도는
+     * 멱등하고(AI 쪽 already_active 가드), 방치되더라도 타임아웃 스케줄러가 상한을 준다.
+     *
+     * @return 복원 결과. {@code alreadyActive} 면 AI 상태가 살아있어 아무것도 하지 않은 것이다.
+     * @throws BusinessException 검증 실패는 {@code SessionService.findReattachableSession} 계약을 따르고,
+     *                           AI 연결 실패는 {@code SESSION_REATTACH_UNAVAILABLE}
+     */
+    @Transactional(readOnly = true)
+    public ReattachSessionResponseDto reattachSession(Long sessionId, Long currentMemberId) {
+        try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
+            Session session = sessionService.findReattachableSession(sessionId, currentMemberId);
+            Long exerciseId = session.getExercise().getId();
+
+            // 완료된 rep 은 세션 진행 중에 이미 pose_data 로 넘어와 있다(§3-2). AI 메모리가 날아가도
+            // 여기서 되찾을 수 있다는 것이 재부착이 성립하는 근거다.
+            int restoredRepCount = poseDataRepository.findMaxRepNumberBySessionId(sessionId);
+
+            ReattachRequest.Builder requestBuilder = ReattachRequest.newBuilder()
+                    .setSessionId(sessionId)
+                    .setExerciseId(exerciseId)
+                    .setPersona(session.getMember().getSelectedPersona().name())
+                    .setInitialRepCount(restoredRepCount);
+
+            // 기준 좌표는 AI 가 보관하지 않는다 — 시작 때와 똑같이 Spring 이 DB 에서 읽어 실어 보낸다.
+            for (ExerciseReference ref : referenceRepository.findByExerciseId(exerciseId)) {
+                requestBuilder.addReferencePoses(PoseDataRequest.newBuilder()
+                        .setTimestampSec(ref.getTimestampSec())
+                        .setJointCoordinates(ref.getJointCoordinates())
+                        .build());
+            }
+
+            CircuitBreaker cb = aiCircuitBreaker();
+            if (!cb.tryAcquirePermission()) {
+                log.warn("AI 서버 서킷브레이커 OPEN — 재부착 실패 (세션 ID: {})", sessionId);
+                throw new BusinessException(ErrorCode.SESSION_REATTACH_UNAVAILABLE);
+            }
+
+            long callStart = System.nanoTime();
+            ReattachResponse response;
+            try {
+                response = getAuthenticatedBlockingStub().reattachAnalysis(requestBuilder.build());
+            } catch (StatusRuntimeException e) {
+                cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, e);
+                log.error("재부착 gRPC 통신 장애 - 세션 ID: {}, 사유: {}", sessionId, e.getMessage());
+                throw new BusinessException(ErrorCode.SESSION_REATTACH_UNAVAILABLE);
+            }
+            cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
+
+            if (!response.getSuccess()) {
+                // AI 가 요청은 받았으나 상태를 못 만든 경우(기준 좌표 파싱 실패 등). 통신은 성공했으므로
+                // 서킷에는 실패로 치지 않되, 사용자에겐 같은 "지금은 못 이어한다"로 보인다.
+                log.warn("AI 가 재부착을 거절 - 세션 ID: {}, 사유: {}", sessionId, response.getMessage());
+                throw new BusinessException(ErrorCode.SESSION_REATTACH_UNAVAILABLE);
+            }
+
+            log.info("세션 재부착 완료 - 세션 ID: {}, rep: {}, 이미활성: {}",
+                    sessionId, response.getRepCount(), response.getAlreadyActive());
+
+            // rep 수는 AI 응답을 신뢰한다 — already_active 면 살아있던 상태의 현재 값이 진실이고,
+            // 그때 DB 값은 아직 넘어오지 않은 진행 중 rep 만큼 뒤처져 있을 수 있다.
+            return ReattachSessionResponseDto.of(
+                    sessionId, response.getRepCount(), response.getAlreadyActive());
         }
     }
 

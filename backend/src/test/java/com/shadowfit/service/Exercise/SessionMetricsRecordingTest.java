@@ -13,6 +13,7 @@ import com.shadowfit.model.outbox.DispatchOutcome;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
+import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -103,6 +104,8 @@ SessionMetricsRecordingTest {
         @Mock private MemberRepository memberRepository;
         @Mock private SessionService sessionService;
         @Mock private ExerciseReferenceRepository referenceRepository;
+        // 재부착 시 MAX(rep_number) 복원용 (이슈 #59 2단계). 이 테스트가 보는 경로는 안 쓴다.
+        @Mock private PoseDataRepository poseDataRepository;
 
         private CircuitBreakerRegistry circuitBreakerRegistry;
         private ExerciseServiceGrpc.ExerciseServiceStub stub;
@@ -123,7 +126,8 @@ SessionMetricsRecordingTest {
             when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
 
             service = new ExerciseAnalysisService(webClient, sessionRepository, exercisesRepository,
-                    memberRepository, sessionService, referenceRepository, circuitBreakerRegistry, metrics);
+                    memberRepository, sessionService, referenceRepository, poseDataRepository,
+                    circuitBreakerRegistry, metrics);
             ReflectionTestUtils.setField(service, "internalToken", "test-token");
             ReflectionTestUtils.setField(service, "exerciseAsyncStub", stub);
             ReflectionTestUtils.setField(service, "exerciseBlockingStub", blockingStub);

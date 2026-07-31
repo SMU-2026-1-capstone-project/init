@@ -78,11 +78,11 @@ public class SessionTimeoutScheduler {
             int yieldedCount = 0;
 
             for (Session session : inProgressSessions) {
-                LocalDateTime timeoutThreshold = session.getStartTime()
-                        .plusMinutes(session.getExercise().getExpectedDurationMinutes())
-                        .plusMinutes(defaultBufferMinutes);
+                // 식은 Session 이 갖는다 — 재부착 허용 판정(SessionService.findReattachableSession)이
+                // 같은 식을 써야 두 기준이 어긋나지 않는다(이슈 #59 2단계).
+                LocalDateTime timeoutThreshold = session.timeoutThreshold(defaultBufferMinutes);
 
-                if (!now.isAfter(timeoutThreshold)) {
+                if (!session.isTimedOutAt(now, defaultBufferMinutes)) {
                     continue;
                 }
 

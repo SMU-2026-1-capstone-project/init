@@ -75,4 +75,26 @@ public class Session {
     @CreationTimestamp // INSERT 시 현재 시간 자동 입력
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /**
+     * 이 세션이 타임아웃으로 걷히는 시각 = 시작시간 + 예상 운동시간 + 버퍼.
+     *
+     * <p>{@code SessionTimeoutScheduler}(걷어가는 쪽)와 재부착 허용 판정(이어붙일 수 있는지 보는 쪽)이
+     * <b>같은 식</b>을 써야 한다. 버퍼 값만 공유하고 식을 각자 쓰면 예상 운동시간이 긴 종목에서 두
+     * 기준이 어긋나, "재부착은 성공했는데 곧 스케줄러가 FAILED 로 바꾸는" 창이 생긴다.
+     * (이슈 #59 2단계, 2026-07-31 확정)
+     *
+     * <p>{@code exercise} 는 lazy 라 호출부가 JOIN FETCH 로 가져왔거나 트랜잭션 안이어야 한다 —
+     * open-in-view: false.
+     */
+    public LocalDateTime timeoutThreshold(int bufferMinutes) {
+        return startTime
+                .plusMinutes(exercise.getExpectedDurationMinutes())
+                .plusMinutes(bufferMinutes);
+    }
+
+    /** {@code now} 기준으로 이미 타임아웃 기준을 지났는지. 스케줄러가 아직 안 돌았어도 true 일 수 있다. */
+    public boolean isTimedOutAt(LocalDateTime now, int bufferMinutes) {
+        return now.isAfter(timeoutThreshold(bufferMinutes));
+    }
 }

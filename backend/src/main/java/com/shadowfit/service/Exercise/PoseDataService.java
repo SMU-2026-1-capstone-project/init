@@ -35,8 +35,8 @@ public class PoseDataService {
 
     private static final String INSERT_POSE_SQL =
             "INSERT INTO pose_data " +
-            "(session_id, timestamp_sec, joint_coordinates, sync_rate, is_correct, feedback_message) " +
-            "VALUES (?, ?, ?, ?, ?, ?)";
+            "(session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, is_correct, feedback_message) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
     // 다운샘플 윈도우 크기 — R-sweep 실측(docs/decisions/pose-ingest-downsampling.md §5-1(4))에서
     // R=25→5는 처리량 +126%·저장 5배↓지만 R=5→1은 배치 고정비용 비중이 커져 행당 효율이 오히려
@@ -72,11 +72,14 @@ public class PoseDataService {
             public void setValues(PreparedStatement ps, int i) throws SQLException {
                 PoseDataRequest grpc = downsampled.get(i);
                 ps.setLong(1, sessionId);
-                ps.setDouble(2, grpc.getTimestampSec());
-                ps.setString(3, grpc.getJointCoordinates());
-                ps.setDouble(4, grpc.getSyncRate());
-                ps.setBoolean(5, grpc.getSyncRate() >= 40.0); // 40점 기준 (수정 가능)
-                ps.setString(6, grpc.getFeedbackMessage());
+                // proto3 라 구버전 AI(rep_number 미전송)에서는 0 이 들어온다 — 컬럼 DEFAULT 와 같은 값이라
+                // 배포 순서를 맞추지 않아도 깨지지 않는다. 0 은 "미상"이고, MAX 를 취해도 카운트가 늘지 않는다.
+                ps.setInt(2, grpc.getRepNumber());
+                ps.setDouble(3, grpc.getTimestampSec());
+                ps.setString(4, grpc.getJointCoordinates());
+                ps.setDouble(5, grpc.getSyncRate());
+                ps.setBoolean(6, grpc.getSyncRate() >= 40.0); // 40점 기준 (수정 가능)
+                ps.setString(7, grpc.getFeedbackMessage());
             }
 
             @Override

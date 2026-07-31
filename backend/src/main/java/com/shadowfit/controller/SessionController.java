@@ -1,7 +1,9 @@
 package com.shadowfit.controller;
 
 import com.shadowfit.dto.exercises.session.ActiveSessionResponseDto;
+import com.shadowfit.dto.exercises.session.ReattachSessionResponseDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
+import com.shadowfit.service.Exercise.ExerciseAnalysisService;
 import com.shadowfit.service.Exercise.SessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class SessionController {
     private final SessionService sessionService;
+    // 재부착은 gRPC 송신이라 분석 서비스 몫 — SessionService 는 순환 의존 때문에 gRPC 의존을 갖지 않는다.
+    private final ExerciseAnalysisService exerciseAnalysisService;
 
     @Operation(summary = "진행 중인 세션 조회",
                description = "이 회원의 IN_PROGRESS 세션을 반환. 클라가 앱 재시작 후 sessionId를 복원하는 경로 — "
@@ -31,6 +35,21 @@ public class SessionController {
         return sessionService.getActiveSession(userDetails.getMember().getId())
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @Operation(summary = "세션 재부착 (이어하기)",
+               description = "AI 프로세스 메모리에만 있던 분석 상태를 DB 값으로 되살려, 진행 중이던 세션을 이어할 수 있게 한다. "
+                       + "클라는 GET /sessions/active 로 sessionId를 복원한 뒤 프레임 전송 전에 이 API를 호출한다. "
+                       + "멱등 — AI 상태가 이미 살아있으면 아무것도 하지 않고 alreadyActive=true로 200을 준다(재시도 안전). "
+                       + "본인 세션이 아니거나 이미 끝났거나 종료 요청된 세션은 404, 타임아웃 기준을 지났으면 410, "
+                       + "AI 서버에 연결할 수 없으면 503(세션은 그대로 두므로 잠시 후 재시도 가능). 이슈 #59 2단계.")
+    @PostMapping("/{sessionId}/reattach")
+    public ResponseEntity<ReattachSessionResponseDto> reattachSession(
+            @PathVariable Long sessionId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(
+                exerciseAnalysisService.reattachSession(sessionId, userDetails.getMember().getId()));
     }
 
     @Operation(summary = "세션 종료 (사용자 명시 / 목표 달성 자동)",
