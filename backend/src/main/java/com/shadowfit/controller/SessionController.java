@@ -1,5 +1,6 @@
 package com.shadowfit.controller;
 
+import com.shadowfit.dto.exercises.session.ActiveSessionResponseDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.service.Exercise.SessionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,18 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class SessionController {
     private final SessionService sessionService;
+
+    @Operation(summary = "진행 중인 세션 조회",
+               description = "이 회원의 IN_PROGRESS 세션을 반환. 클라가 앱 재시작 후 sessionId를 복원하는 경로 — "
+                       + "없으면 204 No Content(정상 상태이지 오류가 아니므로 404를 쓰지 않음). 이슈 #59 1단계.")
+    @GetMapping("/active")
+    public ResponseEntity<ActiveSessionResponseDto> getActiveSession(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return sessionService.getActiveSession(userDetails.getMember().getId())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
 
     @Operation(summary = "세션 종료 (사용자 명시 / 목표 달성 자동)",
                description = "클라가 운동 종료 시 호출 → endTime 기록 + AI gRPC 통보. 본인 세션 아니면 403, 이미 종료된 세션 재호출은 멱등 (200 OK).")

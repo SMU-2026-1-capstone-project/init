@@ -10,6 +10,7 @@ import com.shadowfit.dto.report.record.CalendarDayDto;
 import com.shadowfit.dto.report.record.CalendarMainResponseDto;
 import com.shadowfit.dto.report.record.DailyActivityResponseDto;
 import com.shadowfit.dto.report.record.DailyLogSummaryDto;
+import com.shadowfit.dto.exercises.session.ActiveSessionResponseDto;
 import com.shadowfit.dto.report.record.WeeklyActivityResponseDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
@@ -42,6 +43,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -102,6 +104,38 @@ public class SessionService {
                 .build();
 
         return sessionRepository.save(session);
+    }
+
+    /**
+     * [진행 중 세션 조회] 이 회원에게 IN_PROGRESS 세션이 있으면 반환합니다.
+     *
+     * <p>없던 이유가 아니라 <b>있어야 하는 이유</b>: 클라는 세션 id를 화면 상태로만 들고 있어서
+     * 앱 프로세스가 죽으면 잃는다. 그 상태로 다시 "시작"을 누르면 서버엔 IN_PROGRESS가 남아 있어
+     * {@code SESSION_ALREADY_IN_PROGRESS}(409)로 막히고, 재개도 새 시작도 못 하는 상태가 된다
+     * (타임아웃 스케줄러가 걷어갈 때까지). 서버는 {@code existsByMemberIdAndStatus}로 그 사실을
+     * 이미 알면서 409를 던질 때만 썼는데, 이 메서드로 읽기 경로를 열어준다. 이슈 #59 1단계.
+     *
+     * <p>클라가 sessionId를 로컬에 저장했다 복원하는 방식은 택하지 않았다 — 재설치·기기 변경 시
+     * 여전히 갇히고, 저장된 id가 이미 타임아웃으로 FAILED 처리된 낡은 값일 수 있다. 서버가
+     * 진실의 출처다.
+     *
+     * <p><b>"진행 중"의 정의를 {@code status == IN_PROGRESS} 로 잡은 이유</b>: 이 조건이
+     * {@code createSession} 이 409를 던지는 조건({@code existsByMemberIdAndStatus})과 정확히 같다.
+     * 즉 이 API는 "왜 새 세션을 못 만드는가"에 그대로 답한다. 만약 endTime이 null인 것만 골라
+     * 돌려주면, 종료를 눌렀지만 AI 콜백을 기다리는 동안엔 "활성 세션 없음"인데 생성은 409로 막히는
+     * — 좁아졌을 뿐 똑같은 갇힘이 남는다.
+     *
+     * <p>대신 응답에 {@code endTime}을 실어 클라가 두 상태를 구분하게 한다: null이면 이어하기,
+     * 값이 있으면 결과 처리 대기. {@code endSession}은 endTime만 기록하고 status 전환은 AI
+     * 콜백(applyComplete)이 하므로 status만으로는 구분되지 않는다.
+     *
+     * @return 진행 중 세션이 없으면 {@code Optional.empty()} — 이는 정상 상태이며 예외가 아니다.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ActiveSessionResponseDto> getActiveSession(Long currentMemberId) {
+        return sessionRepository
+                .findFirstByMemberIdAndStatusOrderByStartTimeDesc(currentMemberId, Status.IN_PROGRESS)
+                .map(ActiveSessionResponseDto::from);
     }
 
     /**
