@@ -33,6 +33,9 @@ public enum ErrorCode {
     S3_UPLOAD_ERROR(500, "W004", "파일 저장소(S3) 연결에 실패했습니다."),
     SESSION_ALREADY_IN_PROGRESS(409, "W005", "이미 진행 중인 운동 세션이 있습니다."),
     SESSION_DELETE_NOT_ALLOWED(409, "W006", "진행 중인 세션은 삭제할 수 없습니다."),
+    // 종목 행은 있으나 ai-server에 분석기가 아직 없는 경우(런지·플랭크). 409가 아닌 400인 이유는
+    // 세션 "상태" 충돌이 아니라 요청 자체가 처리 불가한 종목이기 때문.
+    EXERCISE_NOT_SUPPORTED(400, "W007", "아직 분석을 지원하지 않는 운동입니다."),
 
     // --- F10-1 Filtering Engine ---
     LOW_SYNC_RATE(400, "V001", "운동 싱크로율이 너무 낮아 기록되지 않았습니다."),

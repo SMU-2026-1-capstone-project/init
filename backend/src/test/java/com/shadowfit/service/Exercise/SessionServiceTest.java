@@ -75,6 +75,7 @@ class SessionServiceTest {
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
                 .name("스쿼트").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
+                .analysisSupported(true)  // 기본값이 false라 명시 필요 — 없으면 createSession이 W007로 막힘
                 .build());
     }
 
@@ -92,6 +93,21 @@ class SessionServiceTest {
             assertThat(result.getId()).isNotNull();
             assertThat(result.getStatus()).isEqualTo(Status.IN_PROGRESS);
             assertThat(result.getMember().getId()).isEqualTo(member.getId());
+        }
+
+        @Test
+        @DisplayName("AI 분석기가 없는 종목이면 EXERCISE_NOT_SUPPORTED — 런지·플랭크가 조용히 빈 결과를 내던 것 차단")
+        void createSession_analysisNotSupported_throws() {
+            Exercise unsupported = exercisesRepository.saveAndFlush(Exercise.builder()
+                    .name("런지").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                    .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
+                    .build());  // analysisSupported 기본값 false
+            VideoRequestDto dto = VideoRequestDto.builder().exerciseId(unsupported.getId()).build();
+
+            assertThatThrownBy(() -> sessionService.createSession(dto, member.getId(), "https://youtu.be/dummy"))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.EXERCISE_NOT_SUPPORTED);
         }
 
         @Test

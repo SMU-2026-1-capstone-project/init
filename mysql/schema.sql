@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS exercises (
     sync_threshold_diet DECIMAL(5,2) DEFAULT 70.00,
     sync_threshold_rehab DECIMAL(5,2) DEFAULT 50.00,
     expected_duration_minutes INT DEFAULT 15,
+    -- AI 서버가 이 종목 분석을 실제로 지원하는지. 기본 FALSE — 종목 행이 먼저 생기고 분석기가
+    -- 나중에 붙는 순서라, 기본을 TRUE로 두면 준비 전에 세션이 열린다(현재 TRUE는 스쿼트뿐).
+    analysis_supported BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- DEFAULT 추가
     );
 
