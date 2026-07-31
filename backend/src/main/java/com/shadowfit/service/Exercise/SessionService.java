@@ -33,6 +33,7 @@ import com.shadowfit.repository.report.ReportRepository;
 import com.shadowfit.service.Report.WorstSectionCalculator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,6 +72,12 @@ public class SessionService {
     // ExerciseAnalysisService 주입은 제거됐다. endSession 이 gRPC 를 직접 부르지 않고 아웃박스 행만
     // 남기게 되면서 유일한 사용처가 사라졌고, 그 결과 SessionService ↔ ExerciseAnalysisService
     // 순환 의존(@Lazy 로 우회하던)도 함께 없어졌다. 아웃박스가 두 서비스 사이의 결합을 끊은 셈.
+
+    // 재부착 허용 시간 상한 — SessionTimeoutScheduler 와 같은 프로퍼티를 읽는다. 상한을 별도 상수로
+    // 두면 두 값이 어긋날 때 "재부착은 됐는데 곧 걷혀가는" 세션이 생긴다(findReattachableSession).
+    // @RequiredArgsConstructor 라 생성자 파라미터로는 못 넣어 필드 주입을 쓴다.
+    @Value("${exercise.session.timeout.default-buffer-minutes:30}")
+    private Integer defaultBufferMinutes;
 
     /**
      * [세션 생성] 새로운 운동 분석 프로세스를 시작하기 위한 초기 레코드를 생성합니다.
@@ -143,6 +150,44 @@ public class SessionService {
         return sessionRepository
                 .findFirstByMemberIdAndStatusOrderByStartTimeDesc(currentMemberId, Status.IN_PROGRESS)
                 .map(ActiveSessionResponseDto::from);
+    }
+
+    /**
+     * [재부착 전제 검증] 이 세션에 다시 붙어도 되는지 확인하고 세션을 돌려준다 (이슈 #59 2단계).
+     *
+     * <p>실제 재부착(gRPC 송신)은 {@code ExerciseAnalysisService.reattachSession} 이 한다 — 이 서비스는
+     * gRPC 의존을 갖지 않는다(위 71행 주석: 아웃박스가 끊어놓은 순환 의존을 되살리지 않기 위함).
+     *
+     * <p>허용 조건 4가지. 앞의 셋은 "이 세션이 이어할 수 있는 상태인가"이고, 마지막 하나가 시간이다.
+     * <ol>
+     *   <li>소유자 일치 — 남의 세션에 붙는 것을 막는다. 없거나 남의 것이면 둘 다 404 로 통일해
+     *       세션 id 존재 여부가 새어나가지 않게 한다({@code findByIdAndMemberId} 계약).</li>
+     *   <li>{@code IN_PROGRESS} — COMPLETED/FAILED 는 이미 끝난 세션이라 이어붙일 대상이 아니다.</li>
+     *   <li>{@code endTime == null} — 사용자가 이미 종료를 눌렀고 AI 결과 콜백을 기다리는 중이면
+     *       status 는 아직 IN_PROGRESS 다(전환은 applyComplete 몫). 이 상태로 재부착하면 끝낸 운동을
+     *       다시 시작시키는 셈이다.</li>
+     *   <li>타임아웃 기준 이전 — 스케줄러가 1분마다 돌기 때문에 기준을 지나고도 아직 IN_PROGRESS 인
+     *       틈이 존재한다. 상태만 믿으면 그 틈에 재부착이 성공하고 곧바로 FAILED 가 된다.
+     *       스케줄러와 <b>같은 식</b>({@code Session.isTimedOutAt})을 쓴다.</li>
+     * </ol>
+     *
+     * @throws BusinessException {@code SESSION_NOT_FOUND}(없음/남의 것/이미 끝남/종료 요청됨),
+     *                           {@code SESSION_REATTACH_EXPIRED}(시간 초과)
+     */
+    @Transactional(readOnly = true)
+    public Session findReattachableSession(Long sessionId, Long currentMemberId) {
+        Session session = sessionRepository.findSessionWithExerciseByIdAndMemberId(sessionId, currentMemberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+
+        if (session.getStatus() != Status.IN_PROGRESS || session.getEndTime() != null) {
+            throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
+        }
+
+        if (session.isTimedOutAt(LocalDateTime.now(), defaultBufferMinutes)) {
+            throw new BusinessException(ErrorCode.SESSION_REATTACH_EXPIRED);
+        }
+
+        return session;
     }
 
     /**

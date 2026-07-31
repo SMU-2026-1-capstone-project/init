@@ -1,7 +1,7 @@
 # 세션 재개(resume)와 AI 분석 상태의 내구성
 
-작성일: 2026-07-29
-상태: **분석/추천 (결정 전)** — 사용자 선호 표명(A+B) 기록됨, 확정은 §6 항목별 confirm 후 ([[feedback_user_decides_not_claude]], [[feedback_decision_doc]])
+작성일: 2026-07-29 (최종 수정 2026-07-31)
+상태: **A+B 확정·구현 완료 (2026-07-31)** — §6-1 확정 표, §6-2 잔여 미결정 3건, §7 남은 격차 3건
 대상: 백엔드(Spring) 신입 포폴 — 기존 UX 기능의 정합성 결함
 관련: [`outbox-reliable-messaging.md`](./outbox-reliable-messaging.md)(§3-2 AI 상태 한계), [`session-lifecycle-checklist.md`](./session-lifecycle-checklist.md), [`pose-ingest-downsampling.md`](./pose-ingest-downsampling.md), 이슈 [#59](https://github.com/Shadowfit/init/issues/59)
 
@@ -179,23 +179,62 @@ AI가 rep마다 중간 보고하고 AI는 stateless를 지향. `pose_data`가 �
 
 ---
 
-## 6. 미결정 (사용자 confirm 필요)
+## 6. 결정 상태
 
-- [x] ~~**선행**: 클라이언트가 복귀 시 무엇을 호출하는지 확인(§2-3)~~ → **완료(2026-07-29). 재개 경로가 아예 없다** — 서버 엔드포인트만으로 안 끝나고 클라 작업(AppState·영속화·재부착 호출)이 반드시 붙는다
-- [ ] A+B 채택 확정 여부 (현재 선호 표명 단계)
-- [ ] `rep_number`를 proto+`pose_data`에 추가할지 — 추가하면 rep 복원이 정확해지지만 스키마·proto 변경 발생
-- [ ] §5-1 갈림길: rep 카운트를 **AI에 주입** vs **Spring이 합산**
-- [ ] 재부착 엔드포인트 형태: `POST /sessions/{id}/reattach` vs 기존 시작 API에 플래그
-- [ ] **(신설)** 재부착의 멱등 처리 방식(§4-B): `StartAnalysis`에 "기존 상태 보존" 분기를 넣을지 vs **재부착 전용 RPC**를 둘지 — 살아있는 상태를 덮어쓰지 않는 게 요구사항
-- [ ] **(신설)** 분석기 내부 상태 손실(§4-0)을 감수할지, "재개 후 첫 rep 집계 제외" 같은 보정을 둘지
-- [ ] **(신설)** C를 가게 된다면 스냅샷에 **어디까지 담을지** — `completed_reps`만이면 B와 실질 차이가 작고, `rep_state`·스무딩 이력까지 담아야 진짜 이어짐이 된다
-- [ ] 재부착 허용 조건: `IN_PROGRESS` + `end_time IS NULL` + 소유자 일치 외에 시간 상한을 둘지(타임아웃 버퍼와 같은 값으로?)
+### 6-1. ✅ 확정 (2026-07-31, 사용자 confirm)
+
+| 항목 | 결정 | 구현 위치 |
+|---|---|---|
+| **선행**: 클라 복귀 시 호출 확인 | 완료(2026-07-29) — 재개 경로가 아예 없다 | 이슈 #59 코멘트 |
+| **A+B 채택** | 확정 | 아래 전부 |
+| `rep_number` 추가 | **추가한다** — proto `PoseDataRequest` + `pose_data` 컬럼 | `exercise.proto`, `mysql/migrations/2026-07-31-add-pose-data-rep-number.sql` |
+| §5-1 rep 카운트 | **AI에 주입** (`ReattachRequest.initial_rep_count`) | `ExerciseAnalysisService.reattachSession` → `SessionStateRegistry.create_if_absent` |
+| 재부착 진입점 | **전용 엔드포인트 + 전용 RPC** — `POST /sessions/{id}/reattach`, `rpc ReattachAnalysis` | `SessionController`, `ExerciseServicer.ReattachAnalysis` |
+| 멱등 처리 | 전용 RPC 안에서 `create_if_absent` — 상태가 있으면 보존하고 `already_active=true` 반환 | `session_state.py` |
+| 분석기 상태 손실 | **감수 + 응답에 명시** — 보정(첫 rep 제외)은 정상 수행한 rep을 버리게 되어 채택 안 함 | `ReattachSessionResponseDto.analyzerStateReset` |
+| 시간 상한 | **타임아웃 스케줄러와 같은 식** — 값만 공유하면 예상 운동시간이 긴 종목에서 어긋난다 | `Session.isTimedOutAt`, 양쪽이 공유 |
+
+**확정 후 구현하며 추가로 정한 것** (같은 결정의 연장이라 별도 confirm 없이 진행, 근거는 코드 주석에 기록):
+
+- **재부착 실패 시 세션을 `FAILED`로 바꾸지 않는다.** 시작 경로는 AI가 죽으면 즉시 FAILED로 돌려 사용자를 풀어주지만, 재부착은 반대다 — 되살릴 수 있는 rep이 `pose_data`에 있는데 일시적 gRPC 실패로 세션을 걷으면 이 기능이 지키려던 것을 이 기능이 없앤다. `503 W009`로 돌리고 세션은 그대로 둔다(재시도 멱등, 타임아웃이 상한).
+- **기준 각도 복원 실패는 재부착 실패로 처리한다.** 시작 경로는 경고만 하고 진행하지만(`sync_rate` 0), 이미 rep을 쌓아둔 세션을 그렇게 이어붙이면 사용자는 이어진 줄 알고 뒷부분 기록만 조용히 망가진다.
+
+### 6-2. 🔶 남은 미결정
+
 - [ ] C(AI 상태 영속화)를 언제 볼지 — 확장 옵션으로 둘지, 별도 카드로 올릴지
+- [ ] C를 가게 된다면 스냅샷에 **어디까지 담을지** — `completed_reps`만이면 B와 실질 차이가 작고, `rep_state`·스무딩 이력까지 담아야 진짜 이어짐이 된다
 - [ ] §2-2의 역설을 근거로 **타임아웃 버퍼 30분 자체를 재검토**할지
+- [ ] §7의 잔여 격차(싱크 통계 구간 불일치)를 메울지
+
+---
+
+## 7. ⚠️ 구현 후 남은 격차 (2026-07-31)
+
+### 7-1. 싱크 통계는 재부착 이후 rep만 반영한다
+
+구현 중 발견한 사실: `total_reps`가 `state.rep_count`가 아니라 **`len(state.completed_reps)`**로 계산되고 있었다(`exercise_servicer.py`). `rep_count`만 주입해서는 최종 집계가 이어지지 않아, `total_reps = state.rep_count`로 함께 고쳤다.
+
+그러나 **싱크 통계(`avg`/`max`/`min`)는 여전히 `completed_reps` 기준**이고, 재부착 이전 rep의 `sync_rate`는 AI 메모리에 없다(Spring의 `pose_data`에는 남아 있다). 그래서 재부착이 일어난 세션의 리포트는:
+
+| 지표 | 정확도 |
+|---|---|
+| `total_reps` | ✅ 정확 (전 구간) |
+| `avg`/`max`/`min` sync | ⚠️ **재부착 이후 구간만** |
+
+즉 "12회 / 평균 싱크 78%"에서 12는 전체지만 78%는 후반 4회 기준일 수 있다. 메우려면 Spring이 `pose_data`의 `sync_rate`로 직접 집계해야 하는데, 이는 리포트 집계 경로(precompute-on-write) 변경이라 이번 범위 밖으로 두었다.
+
+### 7-2. 프론트 연동이 없으면 사용자에게는 아무것도 안 바뀐다
+
+서버는 완성됐지만 `exercise.tsx`가 `AppState` 감지 → `GET /sessions/active` → `POST /sessions/{id}/reattach`를 부르지 않으면 이 기능은 호출되지 않는다. [`../handoff/frontend-session-lifecycle.md`](../handoff/frontend-session-lifecycle.md) 참고.
+
+### 7-3. 실제 AI 서버와의 통합은 미검증
+
+Spring 테스트 12개는 재부착 **허용 판정과 rep 복원**을 보고, ai-server 테스트 5개는 **멱등 가드**를 본다. 둘을 잇는 실제 gRPC 왕복(`ReattachAnalysis` 송수신)은 두 서버를 띄워야 해서 검증하지 않았다.
 
 ---
 
 ## 결정 로그
 - 2026-07-29: 문서 작성. [`outbox-reliable-messaging.md`](./outbox-reliable-messaging.md) §3-2를 파다가 **"AI 상태 in-memory"가 outbox의 한계가 아니라 의도한 재개 UX를 조용히 깨뜨리고 있다**는 것을 발견해 분리. 이슈 [#59](https://github.com/Shadowfit/init/issues/59) 등록. 확인: rep 데이터가 세션 진행 중 이미 `pose_data`에 쌓임(§3-2), 그러나 rep 번호 없음(§3-3). 대안 A~D 비교, **A+B 추천** — 사용자 선호 표명 있음. **확정 아님** — §6 8건 미결정, 특히 클라 동작 확인이 선행.
 - 2026-07-29(리뷰 반영): CodeRabbit 지적으로 **과장 2건 정정** — ① B/C 복원 범위. `initial_rep_count`·`completed_reps` 만으로는 `rep_state`·`frame_index`·스무딩 이력이 복원되지 않아 "C는 거의 완전, B 이후 손실은 rep 하나 분량"은 틀렸다(§4-0 신설). ② 재부착이 `SessionStateRegistry.create` 로 **살아있는 상태를 덮어쓰는 것**을 장점으로 적었으나 반대로 위험이다 — 멱등 가드 필요(§4-B). 미결정 3건 신설. **결정 변경 없음 — 여전히 A+B 추천·확정 전.**
+- 2026-07-31(확정·구현): §6 미결정 중 구현을 막던 4건을 사용자 confirm 으로 확정(§6-1) 후 구현. 범위는 proto 2벌 + pb2 4개 + DB 2 + Spring 10 + ai-server 3 + 테스트 2 = 21 파일. **구현 중 발견**: `total_reps` 가 `state.rep_count` 가 아니라 `len(completed_reps)` 로 계산되고 있어 rep 주입만으로는 최종 집계가 안 이어졌다 — 함께 수정. 싱크 통계는 여전히 재부착 이후 구간만 반영하며 이를 §7-1 로 박제(미해결). 테스트: Spring 12 신규(전체 212 통과), ai-server 5 신규. 실 gRPC 왕복은 미검증(§7-3).
 - 2026-07-29(클라 확인): §2-3 미검증 해소. **재개 경로가 프론트에 아예 없음**을 확인해 진단을 "AI 재시작 시 깨짐"에서 "애초에 미구현"으로 정정. B 비용에 클라 작업이 추가됨(§2-3·§5). §6 선행 항목 종료. §4-C 에 남아있던 "격차는 rep 하나 분량" 잔여 과장도 §4-0 기준으로 정리. 핸드오프: `docs/handoff/frontend-session-lifecycle.md`(PR #62).
