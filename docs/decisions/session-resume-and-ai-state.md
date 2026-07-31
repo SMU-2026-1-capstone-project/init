@@ -1,7 +1,7 @@
 # 세션 재개(resume)와 AI 분석 상태의 내구성
 
 작성일: 2026-07-29 (최종 수정 2026-07-31)
-상태: **A+B 확정·구현 완료 (2026-07-31)** — §6-1 확정 표, §6-2 잔여 미결정 3건, §7 남은 격차 3건
+상태: **A+B 확정·구현·통합검증 완료 (2026-07-31)** — §6-1 확정 표, §6-2 잔여 미결정 4건, §7 남은 격차(7-1 미해결 / 7-2 프론트 대기 / 7-3 검증 완료)
 대상: 백엔드(Spring) 신입 포폴 — 기존 UX 기능의 정합성 결함
 관련: [`outbox-reliable-messaging.md`](./outbox-reliable-messaging.md)(§3-2 AI 상태 한계), [`session-lifecycle-checklist.md`](./session-lifecycle-checklist.md), [`pose-ingest-downsampling.md`](./pose-ingest-downsampling.md), 이슈 [#59](https://github.com/Shadowfit/init/issues/59)
 
@@ -229,7 +229,7 @@ AI가 rep마다 중간 보고하고 AI는 stateless를 지향. `pose_data`가 �
 
 ### 7-3. ✅ 실 gRPC 왕복 검증 완료 (2026-07-31)
 
-Docker(MySQL + Spring + FastAPI)로 띄워 `POST /sessions/{id}/reattach` → `ReattachAnalysis` 왕복을 실제로 몰았다. 검증한 9가지:
+Docker(MySQL + Spring + FastAPI)로 띄워 `POST /sessions/{id}/reattach` → `ReattachAnalysis` 왕복을 실제로 몰았다. 검증한 11가지:
 
 | # | 시나리오 | 결과 |
 |:--:|---|---|
@@ -256,5 +256,6 @@ Docker(MySQL + Spring + FastAPI)로 띄워 `POST /sessions/{id}/reattach` → `R
 ## 결정 로그
 - 2026-07-29: 문서 작성. [`outbox-reliable-messaging.md`](./outbox-reliable-messaging.md) §3-2를 파다가 **"AI 상태 in-memory"가 outbox의 한계가 아니라 의도한 재개 UX를 조용히 깨뜨리고 있다**는 것을 발견해 분리. 이슈 [#59](https://github.com/Shadowfit/init/issues/59) 등록. 확인: rep 데이터가 세션 진행 중 이미 `pose_data`에 쌓임(§3-2), 그러나 rep 번호 없음(§3-3). 대안 A~D 비교, **A+B 추천** — 사용자 선호 표명 있음. **확정 아님** — §6 8건 미결정, 특히 클라 동작 확인이 선행.
 - 2026-07-29(리뷰 반영): CodeRabbit 지적으로 **과장 2건 정정** — ① B/C 복원 범위. `initial_rep_count`·`completed_reps` 만으로는 `rep_state`·`frame_index`·스무딩 이력이 복원되지 않아 "C는 거의 완전, B 이후 손실은 rep 하나 분량"은 틀렸다(§4-0 신설). ② 재부착이 `SessionStateRegistry.create` 로 **살아있는 상태를 덮어쓰는 것**을 장점으로 적었으나 반대로 위험이다 — 멱등 가드 필요(§4-B). 미결정 3건 신설. **결정 변경 없음 — 여전히 A+B 추천·확정 전.**
-- 2026-07-31(확정·구현): §6 미결정 중 구현을 막던 4건을 사용자 confirm 으로 확정(§6-1) 후 구현. 범위는 proto 2벌 + pb2 4개 + DB 2 + Spring 10 + ai-server 3 + 테스트 2 = 21 파일. **구현 중 발견**: `total_reps` 가 `state.rep_count` 가 아니라 `len(completed_reps)` 로 계산되고 있어 rep 주입만으로는 최종 집계가 안 이어졌다 — 함께 수정. 싱크 통계는 여전히 재부착 이후 구간만 반영하며 이를 §7-1 로 박제(미해결). 테스트: Spring 12 신규(전체 212 통과), ai-server 5 신규. 실 gRPC 왕복은 미검증(§7-3).
+- 2026-07-31(확정·구현): §6 미결정 중 구현을 막던 4건을 사용자 confirm 으로 확정(§6-1) 후 구현. 범위는 proto 2벌 + pb2 4개 + DB 2 + Spring 10 + ai-server 3 + 테스트 2 = 21 파일. **구현 중 발견**: `total_reps` 가 `state.rep_count` 가 아니라 `len(completed_reps)` 로 계산되고 있어 rep 주입만으로는 최종 집계가 안 이어졌다 — 함께 수정. 싱크 통계는 여전히 재부착 이후 구간만 반영하며 이를 §7-1 로 박제(미해결). 테스트: Spring 12 신규(전체 212 통과), ai-server 5 신규.
+- 2026-07-31(통합검증): Docker 3컨테이너로 실 gRPC 왕복 11 시나리오 검증 완료(§7-3) — 문서 작성 시점의 "실 gRPC 왕복 미검증"은 해소됐다. 발견해 수정: `W009` 메시지가 두 분기(연결 실패 / AI 거절)를 공유하면서 "연결할 수 없어"라고 원인을 단정해 후자에서 틀린 안내를 하고 있었다. 남은 미검증은 재부착 직후 실제 포즈 프레임 수용 하나뿐(`/pose` 가 실사 이미지를 요구).
 - 2026-07-29(클라 확인): §2-3 미검증 해소. **재개 경로가 프론트에 아예 없음**을 확인해 진단을 "AI 재시작 시 깨짐"에서 "애초에 미구현"으로 정정. B 비용에 클라 작업이 추가됨(§2-3·§5). §6 선행 항목 종료. §4-C 에 남아있던 "격차는 rep 하나 분량" 잔여 과장도 §4-0 기준으로 정리. 핸드오프: `docs/handoff/frontend-session-lifecycle.md`(PR #62).
