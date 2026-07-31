@@ -227,9 +227,29 @@ AI가 rep마다 중간 보고하고 AI는 stateless를 지향. `pose_data`가 �
 
 서버는 완성됐지만 `exercise.tsx`가 `AppState` 감지 → `GET /sessions/active` → `POST /sessions/{id}/reattach`를 부르지 않으면 이 기능은 호출되지 않는다. [`../handoff/frontend-session-lifecycle.md`](../handoff/frontend-session-lifecycle.md) 참고.
 
-### 7-3. 실제 AI 서버와의 통합은 미검증
+### 7-3. ✅ 실 gRPC 왕복 검증 완료 (2026-07-31)
 
-Spring 테스트 12개는 재부착 **허용 판정과 rep 복원**을 보고, ai-server 테스트 5개는 **멱등 가드**를 본다. 둘을 잇는 실제 gRPC 왕복(`ReattachAnalysis` 송수신)은 두 서버를 띄워야 해서 검증하지 않았다.
+Docker(MySQL + Spring + FastAPI)로 띄워 `POST /sessions/{id}/reattach` → `ReattachAnalysis` 왕복을 실제로 몰았다. 검증한 9가지:
+
+| # | 시나리오 | 결과 |
+|:--:|---|---|
+| A | AI 상태 살아있을 때 재부착 | `alreadyActive=true`, 상태 보존 |
+| B | **AI 컨테이너 재시작 후 재부착** | `restoredRepCount=3`, `analyzerStateReset=true` — AI 로그에 "rep 3 부터 이어서 셈" |
+| C | 재부착이 만든 상태가 레지스트리에 남는지 (재호출) | `alreadyActive=true` — `pose.py` 가 보는 `get_registry().get()` 과 같은 경로 |
+| D | **DB 를 5로 올린 뒤 멱등 재호출** | `3` 반환 — 살아있는 AI 상태를 신뢰하고 DB 를 무시하는 설계가 실제로 그렇게 동작 |
+| E | 없는 세션 / 남의 세션(시드 601) | 둘 다 404, 구분 불가 |
+| F | `endTime` 있고 `status=IN_PROGRESS` | 404 |
+| G | 시작 -60분 (기준 15+30=45분) | **410** |
+| H | 시작 -40분 (기준 직전) | 200 — 경계가 스케줄러 식과 일치 |
+| I | **AI 컨테이너 중지 후 재부착** | 503, **세션은 `IN_PROGRESS` 유지**(FAILED 로 안 바뀜) |
+| J | AI 복구 후 재시도 | 200 — 503 이 회복 가능한 실패였음이 증명됨 |
+| K | 기준 좌표 없는 종목으로 재부착 | AI 가 거절, 503. 로그에 "기준 각도 시퀀스가 비어 있음" |
+
+**부수 성과**: 마이그레이션 2건(`rep_number`, `analysis_supported`)을 기존 Docker 볼륨에 실제로 적용해 동작을 확인했다.
+
+**검증에서 발견해 고친 것**: `W009` 메시지가 "분석 서버에 연결할 수 없어…"였는데, 이 코드는 두 분기(연결 실패 / AI 거절)가 공유한다. K 시나리오에서 **사용자에게 틀린 원인**을 알려주고 있어 원인을 단정하지 않는 문구로 교체했다.
+
+**여전히 미검증**: 재부착 직후 실제 포즈 프레임 수용. `/pose` 가 base64 이미지를 받아 MediaPipe 를 돌리는 구조라 사람이 찍힌 실사 이미지가 필요해 합성으로는 몰 수 없었다. C·D 로 "레지스트리에 상태가 있다"까지는 확인했고, `pose.py` 가 보는 것도 정확히 그 값이다.
 
 ---
 
