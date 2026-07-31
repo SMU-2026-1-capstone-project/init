@@ -15,6 +15,7 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.observability.CorrelationIds;
 import com.shadowfit.global.observability.SessionMetrics;
+import com.shadowfit.global.util.SetSummaryFormatter;
 import com.shadowfit.model.outbox.OutboxEvent;
 import com.shadowfit.repository.outbox.OutboxEventRepository;
 import com.shadowfit.model.exercise.Exercise;
@@ -404,8 +405,9 @@ public class SessionService {
         ExerciseSessionDto detail = new ExerciseSessionDto();
         detail.setSessionId(s.getId());
         detail.setExerciseName(s.getExercise().getName());
-        // 세트 정보가 DB에 따로 없어 횟수만 표시 (BE-09 세트 도입 시 확장)
-        detail.setSetSummary(String.format("0세트 x %d회", s.getTotalReps()));
+        // 세트 표기는 SetSummaryFormatter 한 곳에서만 만든다 — 과거 여기만 "0세트"로 어긋나
+        // 같은 세션이 화면마다 0/1세트로 다르게 보였음(#69).
+        detail.setSetSummary(SetSummaryFormatter.format(s.getTotalReps()));
         detail.setSyncRate(s.getAvgSyncRate() != null ? s.getAvgSyncRate().doubleValue() : 0.0);
         return detail;
     }
