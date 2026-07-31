@@ -155,7 +155,18 @@ if (persona != null) jpql += "AND m.selectedPersona = :persona";  // 앞 공백 
 jpql += " ORDER BY m." + sortKey;   // sortKey = 클라이언트 입력
 ```
 
-화이트리스트가 없으면 그대로 주입 지점이 된다. "동적 정렬"은 필터가 1개뿐인 화면에서도 나오는 평범한 요구라 노출 빈도가 높다. QueryDSL은 `OrderSpecifier`가 타입 객체라 **임의 문자열을 넣을 경로 자체가 없다.**
+화이트리스트가 없으면 그대로 주입 지점이 된다. "동적 정렬"은 필터가 1개뿐인 화면에서도 나오는 평범한 요구라 노출 빈도가 높다.
+
+**QueryDSL이 이걸 자동으로 막아주지는 않는다** — 초기 서술("`OrderSpecifier`가 타입 객체라 임의 문자열을 넣을 경로 자체가 없다")은 부정확했다(외부 리뷰로 정정). `PathBuilder`로 요청값에서 경로를 만들면 동적 정렬이 그대로 가능하다:
+
+```java
+// QueryDSL을 써도 이렇게 짜면 같은 문제가 남는다
+new PathBuilder<>(Member.class, "m").getComparable(sortKey, String.class).asc();
+```
+
+QueryDSL이 주는 것은 **차단이 아니라 안전한 기본형**이다. Q타입(`member.createdAt.desc()`)을 쓰면 정렬 키가 컴파일 타임에 고정되므로, 화이트리스트가 자연스러운 작성 방식이 된다. 문자열 조립은 `PathBuilder`를 일부러 꺼내 써야 한다.
+
+> **구현 규칙(적용 시 준수)**: 요청의 정렬 키는 **enum 또는 명시적 Q타입 매핑**으로 변환하고, 매핑에 없는 값은 400으로 거부한다. `PathBuilder`에 요청값을 그대로 넘기지 않는다.
 
 ### ④ 관측·역추적이 어려워진다
 
@@ -169,9 +180,9 @@ jpql += " ORDER BY m." + sortKey;   // sortKey = 클라이언트 입력
 
 ### ⑥ `(:p is null OR col = :p)` 패턴의 옵티마이저 방해
 
-JPQL로 동적 쿼리를 흉내 낼 때 흔히 쓰는 트릭인데, 옵티마이저가 조건을 미리 걷어내지 못해 인덱스 선택이 나빠질 수 있다. QueryDSL은 `null`이면 조건을 **생성하지 않으므로** 이 문제를 회피한다.
+JPQL로 동적 쿼리를 흉내 낼 때 흔히 쓰는 트릭인데, 옵티마이저가 조건을 미리 걷어내지 못해 인덱스 선택이 나빠질 수 있다. QueryDSL은 `null`이면 조건을 **생성하지 않는다.**
 
-> 🔶 **미검증**: ⑥의 인덱스 영향은 이 프로젝트에서 측정한 적 없다. 일반적으로 알려진 패턴이라 적었을 뿐이고, 실제 영향은 관리자 화면 구현 후 `EXPLAIN`으로 확인해야 한다.
+> 🔶 **여기서 확실한 것과 아닌 것을 구분할 것** — "SQL에 그 조건 형태가 안 나온다"는 확실하다(QueryDSL의 동작이므로). 그러나 **그것이 실행계획·인덱스 선택을 개선한다는 건 증명된 바 없다.** `is null OR` 패턴의 인덱스 영향은 일반적으로 알려진 것일 뿐 이 프로젝트에서 측정한 적이 없다. 완결하려면 관리자 쿼리 구현 후 **필터 조합별 `EXPLAIN` 측정**이 필요하다.
 
 ### 정리 — 조립 단계는 고치고, 실행 단계는 못 고친다
 
@@ -179,10 +190,10 @@ JPQL로 동적 쿼리를 흉내 낼 때 흔히 쓰는 트릭인데, 옵티마이
 |---|:--:|
 | ① 조합 폭발 — 테스트 미달 | ❌ 조합 수는 그대로 (문법 사고만 사라짐) |
 | ② 기동 검증 상실 | ✅ 컴파일 타임으로 앞당겨짐 |
-| ③ `ORDER BY` 인젝션 | ✅ 구조적 차단 |
+| ③ `ORDER BY` 인젝션 | 🔶 **부분적** — 안전한 기본형을 주지만 `PathBuilder`로 우회 가능. 화이트리스트는 여전히 구현 책임 |
 | ④ 관측·역추적 | 🔶 부분적 |
 | ⑤ 조합별 실행 계획 편차 | ❌ **그대로 남음** |
-| ⑥ `is null OR` 옵티마이저 방해 | ✅ 조건 미생성으로 회피 |
+| ⑥ `is null OR` 옵티마이저 방해 | 🔶 **조건 형태는 확실히 회피, 실행계획 개선은 미검증** |
 
 **결론: QueryDSL은 조립 단계의 위험을 고치고 실행 단계의 위험은 손대지 않는다.** 따라서 관리자 페이지의 실제 난이도는 QueryDSL 학습이 아니라 ⑤를 어떻게 다룰지([`admin-page-scope.md`](./admin-page-scope.md) §4의 인덱스 대응 3안)에 있다.
 
@@ -270,10 +281,13 @@ annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
 |---|---|
 | `./gradlew clean compileJava` | BUILD SUCCESSFUL |
 | Q타입 생성 확인 | **13개** (`QSession`, `QMember`, `QReport`, `QPoseData`, `QOutboxEvent` 등 전 엔티티) |
-| `./gradlew clean bootJar -x test --no-daemon` | BUILD SUCCESSFUL — **`backend/Dockerfile`이 실행하는 것과 동일한 커맨드** |
+| `./gradlew clean bootJar -x test --no-daemon` | BUILD SUCCESSFUL — **로컬 검증** (아래 단서 참조) |
 | `./gradlew test` (전체) | BUILD SUCCESSFUL — Lombok 애노테이션 프로세서와의 충돌 없음 |
 
-> 🔶 **남은 미검증**: 실제 `docker build`를 컨테이너 안에서 돌려보지는 않았다. Dockerfile이 수행하는 gradle 태스크(`bootJar -x test --no-daemon`)를 로컬에서 동일하게 확인한 데까지다. `gradle:jdk21` 이미지의 Gradle 버전이 로컬과 달라 생길 차이는 배제하지 못했다.
+> 🔶 **남은 미검증 — 위 3행은 전부 로컬 Gradle 실행이며 Docker 이미지 빌드가 아니다.**
+> - `backend/Dockerfile`은 `gradle:jdk21` 이미지 안에서 `./gradlew bootJar -x test --no-daemon`을 돌린다. 위 검증은 여기에 `clean`을 덧붙여 **로컬에서** 돌린 것이라 동일한 실행이 아니다(초기 서술은 "Dockerfile과 동일한 커맨드"였으나 부정확 — 외부 리뷰로 정정).
+> - `gradle:jdk21` 이미지의 Gradle 버전이 로컬과 달라 생길 차이, 컨테이너 내 네트워크·캐시 조건은 배제하지 못했다.
+> - **완결 조건**: 실제 `docker build -f backend/Dockerfile` 1회 성공. 도입 시점에 확인할 것.
 
 **결론: 도입 비용은 당초 예상보다 낮다.** 버전 확정 불필요, 빌드 스크립트 구조 변경 불필요, 의존성 4줄.
 
