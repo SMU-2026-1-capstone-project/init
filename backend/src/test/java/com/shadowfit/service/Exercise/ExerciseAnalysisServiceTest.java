@@ -58,6 +58,7 @@ class ExerciseAnalysisServiceTest {
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
                 .name("스쿼트").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
+                .analysisSupported(true)  // 기본값 false — createSession이 W007로 막히므로 명시 필요
                 .build());
     }
 

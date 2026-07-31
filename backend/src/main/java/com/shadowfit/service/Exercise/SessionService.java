@@ -92,6 +92,13 @@ public class SessionService {
         Exercise exercise = exercisesRepository.findByIdCached(appDto.getExerciseId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.EXERCISE_NOT_FOUND));
 
+        // 종목 행은 시드돼 있어도 ai-server에 분석기가 없으면(런지·플랭크) 세션이 조용히 빈 결과를
+        // 내놓는다 — "선택은 되는데 안 되는" 상태. 여기서 막아 의도적 제한으로 만든다.
+        // 분석기가 붙으면 exercises.analysis_supported 를 TRUE 로 바꾸는 것만으로 열린다.
+        if (!Boolean.TRUE.equals(exercise.getAnalysisSupported())) {
+            throw new BusinessException(ErrorCode.EXERCISE_NOT_SUPPORTED);
+        }
+
         Session session = Session.builder()
                 .member(member)
                 .exercise(exercise)

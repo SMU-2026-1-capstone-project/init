@@ -60,6 +60,15 @@ public class Exercise {
     @Column(nullable = false)
     private Integer expectedDurationMinutes = 15; // 예상 운동시간 (기본값: 15분)
 
+    /**
+     * AI 서버가 이 종목의 자세 분석을 실제로 지원하는지. 기본값 false — 종목 행이 먼저 생기고
+     * 분석기(ai-server)가 나중에 붙는 순서라, 기본을 true로 두면 준비 전에 세션이 열린다.
+     * 현재 true인 건 스쿼트뿐(squat-first 방침). SessionService.createSession 이 이 값을 검사한다.
+     */
+    @Builder.Default
+    @Column(name = "analysis_supported", nullable = false)
+    private Boolean analysisSupported = false;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

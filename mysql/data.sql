@@ -31,8 +31,10 @@ VALUES ('test@test.com', '$2a$10$.mpvpjYHKGukSTvbCukWNusFWU/lHUBCmHjp3Un2mz6qjrO
         'https://www.youtube.com/watch?v=q6hBSSis_60');
 
 -- 2. 운동 종목 데이터 (REPLACE 사용으로 에러 방지)
-REPLACE INTO exercises (id, name, category, preferred_url, created_at)
-VALUES (1, '스쿼트', 'LOWER', 'https://www.youtube.com/watch?v=q6hBSSis_60', NOW());
+-- analysis_supported: AI 분석기가 실제로 붙어 있는 종목만 TRUE. 현재는 스쿼트뿐이며
+-- 런지·플랭크는 행만 있고 분석 불가라 FALSE(기본값) — 세션 생성이 W007로 차단된다.
+REPLACE INTO exercises (id, name, category, preferred_url, analysis_supported, created_at)
+VALUES (1, '스쿼트', 'LOWER', 'https://www.youtube.com/watch?v=q6hBSSis_60', TRUE, NOW());
 
 REPLACE INTO exercises (id, name, category, preferred_url, created_at)
 VALUES (2, '런지', 'LOWER', 'https://www.youtube.com/watch?v=U4s4mEQ5ovM', NOW());
