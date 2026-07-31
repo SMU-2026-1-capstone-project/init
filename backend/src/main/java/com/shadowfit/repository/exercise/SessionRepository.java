@@ -2,6 +2,7 @@ package com.shadowfit.repository.exercise;
 
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -55,6 +56,20 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     // 회원당 활성 세션 1개 제약 — MemberRepository.findByIdForUpdate로 잠근 뒤 체크해야
     // TOCTOU 없이 안전함(단독 호출 시엔 레이스 존재).
     boolean existsByMemberIdAndStatus(Long memberId, Status status);
+
+    // 진행 중 세션 조회(GET /sessions/active) — 클라가 앱 재시작 후 sessionId를 복원하는 경로.
+    //
+    // findFirst...(= SQL LIMIT 1): 회원당 활성 세션은 1개여야 하지만 그 불변식은 DB 제약이 아니라
+    // 애플리케이션 규약(createSession이 회원 row를 잠그고 체크)이다. 단건 시그니처로 받으면 규약이
+    // 깨진 순간 NonUniqueResultException이 나서, 하필 "갇힘을 푸는 API"가 갇힘 때문에 터진다.
+    // LIMIT 1이면 그 경우에도 가장 최근 세션을 돌려주고 조회는 계속 동작한다.
+    //
+    // @EntityGraph 로 exercise를 함께 로딩 — open-in-view: false 라 컨트롤러에서 lazy 접근이
+    // 터진다. @Query + JOIN FETCH 로도 되지만 그러면 LIMIT을 SQL에 못 실어 전 행을 가져와야 한다.
+    // exercise는 @ManyToOne(to-one)이라 join + LIMIT 조합이 안전하다(컬렉션 fetch + 페이징의
+    // 인메모리 처리 문제는 해당 없음). idx_session_member_status (member_id, status) 를 탄다.
+    @EntityGraph(attributePaths = "exercise")
+    Optional<Session> findFirstByMemberIdAndStatusOrderByStartTimeDesc(Long memberId, Status status);
 
     // 회원 탈퇴 시 pose_data 비동기 정리용 — session_id 목록만 가볍게 조회.
     // pose_data의 FK(CASCADE)를 파티셔닝 때문에 제거해서, 탈퇴로 세션이 사라지기 전에

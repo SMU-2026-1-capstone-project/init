@@ -95,6 +95,52 @@ class SessionServiceTest {
         }
 
         @Test
+        @DisplayName("진행 중 세션 조회 — 시작 전 비어있고, 시작 후 조회되며, 종료 요청 뒤엔 endTime이 채워진 채 남는다 (#59 1단계)")
+        void getActiveSession_reflectsLifecycle() {
+            assertThat(sessionService.getActiveSession(member.getId())).isEmpty();
+
+            VideoRequestDto dto = VideoRequestDto.builder().exerciseId(exercise.getId()).build();
+            Session created = sessionService.createSession(dto, member.getId(), "https://youtu.be/dummy");
+
+            // 앱이 죽어 sessionId를 잃은 클라가 이 API로 복원하는 시나리오
+            assertThat(sessionService.getActiveSession(member.getId()))
+                    .get()
+                    .satisfies(active -> {
+                        assertThat(active.getSessionId()).isEqualTo(created.getId());
+                        assertThat(active.getExerciseId()).isEqualTo(exercise.getId());
+                        // open-in-view: false 라 lazy 였다면 여기서 터진다 — @EntityGraph 동작 확인
+                        assertThat(active.getExerciseName()).isEqualTo("스쿼트");
+                        assertThat(active.getStatus()).isEqualTo(Status.IN_PROGRESS);
+                    });
+
+            // endSession 은 endTime 만 기록하고 status 는 IN_PROGRESS 로 둔다(COMPLETED 전환은 AI
+            // 콜백 몫). 이 구간에도 createSession 은 409로 막히므로 조회에서 빼면 안 되고, 대신
+            // endTime 으로 "이어하기 가능"과 "결과 처리 대기"를 구분한다.
+            sessionService.endSession(created.getId(), member.getId());
+
+            assertThat(sessionService.getActiveSession(member.getId()))
+                    .get()
+                    .satisfies(pending -> {
+                        assertThat(pending.getSessionId()).isEqualTo(created.getId());
+                        assertThat(pending.getStatus()).isEqualTo(Status.IN_PROGRESS);
+                        assertThat(pending.getEndTime()).isNotNull();
+                    });
+        }
+
+        @Test
+        @DisplayName("진행 중 세션 조회 — 남의 세션은 보이지 않는다")
+        void getActiveSession_otherMemberSession_notVisible() {
+            Member other = memberRepository.saveAndFlush(Member.builder()
+                    .email("other@test.com").username("other").password("dummy")
+                    .selectedPersona(SelectedPersona.BEGINNER).role(UserRole.USER).build());
+            VideoRequestDto dto = VideoRequestDto.builder().exerciseId(exercise.getId()).build();
+            sessionService.createSession(dto, other.getId(), "https://youtu.be/dummy");
+
+            assertThat(sessionService.getActiveSession(member.getId())).isEmpty();
+            assertThat(sessionService.getActiveSession(other.getId())).isPresent();
+        }
+
+        @Test
         @DisplayName("이미 진행 중인 세션이 있으면 SESSION_ALREADY_IN_PROGRESS")
         void createSession_activeSessionExists_throws() {
             VideoRequestDto dto = VideoRequestDto.builder().exerciseId(exercise.getId()).build();
