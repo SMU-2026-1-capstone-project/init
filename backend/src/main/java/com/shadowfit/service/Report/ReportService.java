@@ -8,6 +8,7 @@ import com.shadowfit.dto.report.detailreport.WorstSectionDto;
 import com.shadowfit.dto.report.PoseFrameProjection;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
+import com.shadowfit.global.util.SetSummaryFormatter;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.report.Report;
@@ -89,11 +90,10 @@ public class ReportService {
 
     private List<ExerciseSyncRateDto> buildSyncRateDetails(Session session) {
         double avgSyncRate = session.getAvgSyncRate() == null ? 0.0 : session.getAvgSyncRate().doubleValue();
-        int totalReps = session.getTotalReps() == null ? 0 : session.getTotalReps();
         ExerciseSyncRateDto detail = new ExerciseSyncRateDto(
                 session.getExercise().getId(),
                 session.getExercise().getName(),
-                String.format("1세트 x %d회", totalReps),
+                SetSummaryFormatter.format(session.getTotalReps()),
                 avgSyncRate
         );
         return List.of(detail);

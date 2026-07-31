@@ -27,7 +27,7 @@ export interface DailyLogSummary {
 export interface ExerciseSession {
   sessionId: number;               // 클릭 시 상세 이동용
   exerciseName: string;            // "스쿼트"
-  setSummary: string;              // "0세트 x 12회"
+  setSummary: string;              // "1세트 x 12회"
   syncRate: number;
 }
 

@@ -64,6 +64,12 @@ public class Exercise {
      * AI 서버가 이 종목의 자세 분석을 실제로 지원하는지. 기본값 false — 종목 행이 먼저 생기고
      * 분석기(ai-server)가 나중에 붙는 순서라, 기본을 true로 두면 준비 전에 세션이 열린다.
      * 현재 true인 건 스쿼트뿐(squat-first 방침). SessionService.createSession 이 이 값을 검사한다.
+     *
+     * <p><b>캐시 주의</b>: 이 엔티티는 {@code ExercisesRepository.findByIdCached} 를 통해 Caffeine에
+     * 캐시된다(expireAfterWrite=1h). 값을 SQL로 직접 바꾸면 최대 1시간 동안 반영되지 않으므로 즉시
+     * 반영하려면 애플리케이션 재시작 또는 캐시 비우기가 필요하다. 향후 이 플래그를 바꾸는 관리자 API를
+     * 만든다면 {@code AdminExerciseService.updateThresholds} 처럼
+     * {@code @CacheEvict(cacheNames = "exercises", key = "#exerciseId")} 를 함께 걸어야 한다.
      */
     @Builder.Default
     @Column(name = "analysis_supported", nullable = false)
