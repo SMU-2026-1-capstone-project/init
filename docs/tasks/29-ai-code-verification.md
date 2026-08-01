@@ -41,9 +41,10 @@
 | [#77](https://github.com/Shadowfit/init/issues/77) | 재부착 검증과 gRPC 사이 잠금 없음 (TOCTOU) | 열림 — **결과 확인이 먼저** |
 | [#78](https://github.com/Shadowfit/init/issues/78) | worst 구간이 프레임 해상도를 가정하는데 `sync_rate` 는 rep 단위 상수 | 열림 — 2026-08-01 코멘트로 **원인 보강** (§2-3) |
 | [#79](https://github.com/Shadowfit/init/issues/79) | 다운샘플의 "worst 프레임 대표추출"이 실행되지 않는다 — 항상 첫 프레임만 남는다 | 열림 (§2-3) |
+| [#80](https://github.com/Shadowfit/init/issues/80) | worst `reason` 이 싱크로율의 동어반복 / `pickDominantFeedback` 죽은 코드 / `is_correct` 읽는 곳 없음 | 열림 — 처리 방향은 [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md) §8-3 에 확정 |
 | — | `Exercise` 캐시 TTL 1시간 vs "플래그만 TRUE 로 바꾸면 열린다" 주석 | 미등록 (영향 낮음) |
 
-**#75·#78·#79 는 뿌리가 하나다**: `sync_rate` 가 rep 단위로 채점돼 프레임마다 복제 저장된다는 것(§5). 같은 사실을 세 곳이 서로 다르게 오해했다 — 집계는 프레임 가중으로(#75), worst 는 프레임 해상도가 있다고(#78), 다운샘플은 프레임마다 값이 다르다고(#79).
+**#75·#78·#79·#80 은 뿌리가 하나다**: `sync_rate` 가 rep 단위로 채점돼 프레임마다 복제 저장된다는 것(§5). 같은 사실을 **네 곳**이 서로 다르게 오해했다 — 집계는 프레임 가중으로(#75), worst 는 프레임 해상도가 있다고(#78), 다운샘플은 프레임마다 값이 다르다고(#79), reason 은 최빈값이 의미 있다고(#80). **하나씩 발견됐다는 게 핵심이다** — 셋을 고칠 때까지 넷째를 못 봤다.
 
 ### 2-1. #75 가 특히 중요했던 이유 — 고친 버그가 다른 문으로 돌아왔다
 

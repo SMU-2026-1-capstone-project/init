@@ -1,9 +1,9 @@
 # Decision: worst 구간을 어느 해상도로 계산할 것인가 (이슈 #78)
 
-상태: **미결 — 분석·권고** (결정 ✅ 는 사용자 confirm 후 박제)
-작성: 2026-08-01
+상태: **✅ ㄱ안(rep 단위 계산) 채택 확정 (2026-08-01 사용자 confirm)** — 하위 결정 4건은 §9 에 열려 있음
+작성: 2026-08-01 / 결정: 2026-08-01
 배경: 코드 검증([`../tasks/29-ai-code-verification.md`](../tasks/29-ai-code-verification.md) §2-2)에서 `WorstSectionCalculator` 가 **프레임마다 `sync_rate` 가 다르다**는 전제로 3프레임 슬라이딩 윈도우를 도는데, 실제 데이터는 **rep 안에서 상수**라는 것이 드러났다. 사용자가 *"rep 구분 안 했지 않았니"* 로 되물어 원인이 하나 더 나왔다 — 읽기 프로젝션에 `rep_number` 가 아예 없다.
-연관: [#78](https://github.com/Shadowfit/init/issues/78) · [#79](https://github.com/Shadowfit/init/issues/79) · [#75](https://github.com/Shadowfit/init/issues/75) · [`./report-read-path.md`](./report-read-path.md) §9(precompute-on-write) · [`./pose-ingest-downsampling.md`](./pose-ingest-downsampling.md) §4 · [`../tasks/28-remaining-work-plan.md`](../tasks/28-remaining-work-plan.md) §4
+연관: [#78](https://github.com/Shadowfit/init/issues/78) · [#79](https://github.com/Shadowfit/init/issues/79) · [#80](https://github.com/Shadowfit/init/issues/80) · [#75](https://github.com/Shadowfit/init/issues/75) · [`./report-read-path.md`](./report-read-path.md) §9(precompute-on-write) · [`./pose-ingest-downsampling.md`](./pose-ingest-downsampling.md) §4 · [`../tasks/28-remaining-work-plan.md`](../tasks/28-remaining-work-plan.md) §4
 
 > 🟢=추천, 🔶=열림, ❌=배제 권고. **시간은 실측이 아니라 추정이다**(§9).
 
@@ -215,14 +215,54 @@ precompute-on-write 로 **이미 `reports.detailed_analysis` 에 저장된 worst
 
 ---
 
+## 8-3. ㄱ안 채택 후 확정된 하위 결정 (2026-08-01)
+
+### 대표 timestamp = **rep 중앙 프레임** ✅
+
+기존 동작(윈도우 중앙)과 가장 가까워 변화가 작다. 검토했으나 배제한 것:
+
+- *rep 시작 프레임* — 되감기 지점으로는 더 자연스럽지만, 지금 바꿀 이유가 약하다
+- *가장 깊었던 지점* — ❌ **무릎각 컬럼이 없다.** `pose_data` 는 `(timestamp_sec, joint_coordinates, sync_rate, is_correct, feedback_message)` 뿐이라 `joint_coordinates`(2.3KB JSON) 를 파싱해야 하는데, 그건 `PoseFrameProjection` 이 애초에 피하려던 off-page I/O 를 되살리는 일이다
+
+### `reason` = **동어반복 제거** ✅ (정확한 문구는 미정)
+
+`reason` 이 지금 **싱크로율을 말만 바꿔 되풀이한다** — 사용자 질문 *"reason 을 어떻게 아는데"* 에서 나왔다. → [#80](https://github.com/Shadowfit/init/issues/80)
+
+```
+"싱크로율 21% · 즉시 자세 수정 필요"
+       └───┬───┘   └────────┬────────┘
+        원본 값        그 값을 임계값과 비교한 결과
+```
+
+`feedback_message` 는 문자열 3개가 전부이고 전부 `sync_rate` 에서 파생된다(`ai-server/app/core/squat_analyzer.py:320-328`). **관절별 진단이 스트리밍 경로에 없다** — 그런 문구는 영상 일괄 분석 경로(`analyze_squat`)에만 있고 영어이며 `pose_data` 로 흘러가지 않는다.
+
+따라서 `pickDominantFeedback`(`WorstSectionCalculator.java:83-95`)의 최빈값 계산은 **#79 와 같은 형태의 죽은 코드**다(rep 안에서 상수라 3개를 세도 항상 같은 값 하나).
+
+**결정**: 동어반복을 걷어내고 `pickDominantFeedback` 을 삭제한다. **최종 문구는 구현 시점에 정한다**(2026-08-01 사용자 판단 보류).
+
+> 진짜 진단(무릎/상체 각도 기반 사유)을 만드는 안은 [#80](https://github.com/Shadowfit/init/issues/80) ㄷ안으로 열려 있다 — §4-ㄷ 와 같은 급의 작업이라 이 범위에 넣지 않는다.
+
+### DTO 구조는 그대로 둔다 (파생)
+
+문구만 바꾸므로 `WorstSectionDto` 의 필드 구조는 유지된다 → **프론트 영향 없음.** 회차는 `reason` 문자열 안에 드러내는 방향이나, 문구가 미정이라 이것도 함께 미정이다.
+
+### 곁가지 — `is_correct` 🔶 미결
+
+`PoseDataService.java:81` 이 `sync_rate >= 40.0` 을 하드코딩해 저장하는데 **읽는 코드가 없다.** 게다가 AI 의 persona 별 임계값(BEGINNER 60 등)과 어긋나 한 행 안에서 두 컬럼이 반대로 말한다. 삭제/정합/유지 미결 → [#80](https://github.com/Shadowfit/init/issues/80).
+
+---
+
 ## 9. 열린 질문 (사용자 결정 필요)
 
-- [ ] **ㄱ / ㄴ / ㄷ 중 무엇** (권고: ㄱ)
-- [ ] ㄱ안 채택 시 **DTO·용어 정리** — `WorstSectionDto` / `worstSection` / "가장 나빴던 구간" 문구를 rep 기준으로 바꿀지, 이름은 두고 의미만 바꿀지 (프론트 영향 있음)
-- [ ] **대표 timestamp** — worst rep 의 시작 / 중앙 / 가장 깊었던 지점 중 무엇
+- [x] ~~**ㄱ / ㄴ / ㄷ 중 무엇**~~ → **✅ ㄱ안 채택** (2026-08-01 사용자 confirm). ㄴ 배제, ㄷ 는 별도 트랙 여부가 아래에 열려 있음
+- [x] ~~ㄱ안 채택 시 **DTO·용어 정리**~~ → **✅ 구조 유지** (문구만 변경, 프론트 영향 없음). §8-3
+- [x] ~~**대표 timestamp**~~ → **✅ rep 중앙 프레임**. §8-3
+- [x] ~~`reason` 처리~~ → **✅ 동어반복 제거 + `pickDominantFeedback` 삭제**. 단 **최종 문구는 구현 시점으로 보류**. §8-3 · [#80](https://github.com/Shadowfit/init/issues/80)
 - [ ] **과거 리포트**(§6) — 방치 / 백필 / 무효화. 결정 전 **영향 규모 카운트 쿼리 1회** 권고
+- [ ] **착수 브랜치** — ㄱ안이 [#75](https://github.com/Shadowfit/init/issues/75) 의 `findRepAverageSyncRates` 를 재사용하는데 그 브랜치(`fix/session-stats-and-tx-boundary`)가 아직 미푸시다. 먼저 PR·머지 / 그 위에 쌓기 / main 에서 독립 구현
+- [ ] `is_correct` 처리 — 삭제 / 임계값 정합 / 유지 ([#80](https://github.com/Shadowfit/init/issues/80))
 - [ ] **ㄷ안을 별도 트랙으로 남길지**, 아예 배제할지
-- [ ] [#79](https://github.com/Shadowfit/init/issues/79) — ㄱ·ㄴ 선택 시 문서 정정만 할지, 비교 기준을 다른 값으로 교체할지
+- [ ] [#79](https://github.com/Shadowfit/init/issues/79) — ㄱ안 선택으로 남게 됐다. 문서 정정만 할지, 비교 기준을 다른 값으로 교체할지
 
 ---
 

@@ -76,7 +76,8 @@
 | ~~[#76](https://github.com/Shadowfit/init/issues/76) 재부착이 트랜잭션 안에서 블로킹 gRPC~~ | ✅ **수정 완료**(2026-08-01, `8bc417f` 미머지) |
 | [#77](https://github.com/Shadowfit/init/issues/77) 재부착 TOCTOU | 결함 제거(방어). **고치기 전에 결과 확인이 먼저** — 창이 아주 좁아 감수로 닫힐 수도 있다 |
 | [#78](https://github.com/Shadowfit/init/issues/78) worst 구간 해상도 | 결함 제거(방어). 고치는 방법 3안 미결. 사용자에게 **틀린 "가장 나빴던 구간"** 을 보여주고 있다. 2026-08-01 보강: 읽기 프로젝션에 `rep_number` 가 없어 **3안 공통으로 프로젝션+쿼리 수정이 선결** |
-| [#79](https://github.com/Shadowfit/init/issues/79) 다운샘플 극값 선택이 죽은 코드 | 결함 제거 + **문서 정정**(`pose-ingest-downsampling.md` §4 의 "평균 vs 대표추출" 비교가 무효). #78 과 같이 결정하면 추가 비용이 거의 없다 |
+| [#79](https://github.com/Shadowfit/init/issues/79) 다운샘플 극값 선택이 죽은 코드 | 결함 제거 + **문서 정정**(`pose-ingest-downsampling.md` §4 의 "평균 vs 대표추출" 비교가 무효). ㄱ안 채택으로 **남게 됐다** |
+| [#80](https://github.com/Shadowfit/init/issues/80) reason 동어반복 · `is_correct` 미사용 | #78 ㄱ안 구현 시 **같이 처리**(`WorstSectionCalculator` 를 어차피 손댄다). `is_correct` 는 별도 미결 |
 | 프론트 연동 (`exercise.tsx` 재부착 호출) | **이 문서 범위 밖**(프론트)이지만, 이게 없으면 #73·#74 의 사용자 체감 효과가 0 이다 |
 | 코드 검증 잔여 | 테스트 3종 상세(552줄) + ai-server 테스트. 8월 계획 ③ 버킷 |
 
