@@ -124,6 +124,8 @@
 
 ## 6. 코드 변경 (미푸시)
 
+> **2026-08-01 갱신 — 아래 "미푸시"는 해소됐다.** `fix/session-stats-and-tx-boundary` → [PR #81](https://github.com/Shadowfit/init/pull/81), 그 위에 스택으로 `feat/worst-rep-resolution` → [PR #82](https://github.com/Shadowfit/init/pull/82)(#78 ㄱ안 + 회차별 추이, 테스트 236개). 문서 브랜치도 푸시됐다.
+
 | 브랜치 | 커밋 | 내용 |
 |---|---|---|
 | `fix/session-stats-and-tx-boundary` | `8bc417f` | #76 — DB 작업을 `loadReattachRequest` 로 분리해 gRPC 를 트랜잭션 밖으로. 애노테이션 배치를 고정하는 회귀 테스트 추가 |
@@ -136,7 +138,7 @@
 
 ## 7. 다음에 이어갈 것
 
-- [ ] 브랜치 2개 **푸시 + PR** (문서 / 수정 分리)
+- [x] ~~브랜치 2개 **푸시 + PR**~~ → 완료. [PR #81](https://github.com/Shadowfit/init/pull/81) · [PR #82](https://github.com/Shadowfit/init/pull/82)(스택, base 가 #81) + 문서 브랜치 푸시
 - [ ] 테스트 3종 상세 검증 (552줄) + ai-server 테스트
 - [ ] [#77](https://github.com/Shadowfit/init/issues/77) — 고치기 전에 **"그때 실제로 무슨 일이 나는지"** 부터 확인
 - [ ] [#78](https://github.com/Shadowfit/init/issues/78) — 고치는 방법 3안 결정. **비교 문서 완료** → [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md)(ㄱ안 추천, ㄴ 배제 권고, ㄷ 별도 트랙). 조사 중 확인한 것: `dtaidistance` 가 워핑 경로 API(`dtw.warping_path`)를 제공하는데 지금은 `dtw.distance()` 로 **거리만 받고 경로를 버린다.** ㄷ안(프레임별 점수)이 새 알고리즘이 아니라 **버리는 중간 산출물을 살리는 일**일 수 있다 — ⚠️ 코드를 읽고 판단한 것이며 돌려보지 않았다

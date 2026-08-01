@@ -75,7 +75,7 @@
 | ~~[#75](https://github.com/Shadowfit/init/issues/75) 싱크 통계 구간 불일치 + max/min 미저장~~ | ✅ **수정 완료**(2026-08-01, `ca17ec0` 미머지) |
 | ~~[#76](https://github.com/Shadowfit/init/issues/76) 재부착이 트랜잭션 안에서 블로킹 gRPC~~ | ✅ **수정 완료**(2026-08-01, `8bc417f` 미머지) |
 | [#77](https://github.com/Shadowfit/init/issues/77) 재부착 TOCTOU | 결함 제거(방어). **고치기 전에 결과 확인이 먼저** — 창이 아주 좁아 감수로 닫힐 수도 있다 |
-| [#78](https://github.com/Shadowfit/init/issues/78) worst 구간 해상도 | 결함 제거(방어). 고치는 방법 3안 미결. 사용자에게 **틀린 "가장 나빴던 구간"** 을 보여주고 있다. 2026-08-01 보강: 읽기 프로젝션에 `rep_number` 가 없어 **3안 공통으로 프로젝션+쿼리 수정이 선결** |
+| ~~[#78](https://github.com/Shadowfit/init/issues/78) worst 구간 해상도~~ | ✅ **ㄱ안 구현 완료**(2026-08-01, [PR #82](https://github.com/Shadowfit/init/pull/82) 리뷰 대기). 회차별 추이 응답 추가가 범위에 딸려왔다 |
 | [#79](https://github.com/Shadowfit/init/issues/79) 다운샘플 극값 선택이 죽은 코드 | 결함 제거 + **문서 정정**(`pose-ingest-downsampling.md` §4 의 "평균 vs 대표추출" 비교가 무효). ㄱ안 채택으로 **남게 됐다** |
 | [#80](https://github.com/Shadowfit/init/issues/80) reason 동어반복 · `is_correct` 미사용 | #78 ㄱ안 구현 시 **같이 처리**(`WorstSectionCalculator` 를 어차피 손댄다). `is_correct` 는 별도 미결 |
 | 프론트 연동 (`exercise.tsx` 재부착 호출) | **이 문서 범위 밖**(프론트)이지만, 이게 없으면 #73·#74 의 사용자 체감 효과가 0 이다 |
@@ -244,7 +244,7 @@ Claude 병행 배율이 항목마다 다른 이유. 아래는 **0% 압축**된�
 - [ ] #3 인덱스 3안 (ㄱ 추가 / ㄴ 감수 / ㄷ 기간 강제) 및 인덱스 실험 수행 여부
 - [ ] #3 화면 범위 — A·B·C 전부 vs 회원 목록만
 - [ ] #6 착수 여부 (= 남은 실험 2건을 할지)
-- [ ] [#78](https://github.com/Shadowfit/init/issues/78) 고치는 방법 3안 — [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md) §9 (→ [#79](https://github.com/Shadowfit/init/issues/79) 처리 방향이 여기 딸려 나온다)
+- [x] ~~[#78](https://github.com/Shadowfit/init/issues/78) 고치는 방법 3안~~ → **✅ ㄱ안 채택·구현 완료.** 남은 하위 미결은 [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md) §9 (`reason` 문구 · `is_correct` · 앱 보고 경로 · 프론트 화면)
 - [ ] [#77](https://github.com/Shadowfit/init/issues/77) 조사 후 감수/수정 판단
 - [ ] #5 외부 통합 — 할지 자체, 한다면 S3 vs OAuth2 ([`../decisions/external-integration-candidates.md`](../decisions/external-integration-candidates.md) §7)
 - [ ] 분업 방식 — 전량 위임 vs §6의 권고 분업

@@ -1,7 +1,7 @@
 # Decision: worst 구간을 어느 해상도로 계산할 것인가 (이슈 #78)
 
-상태: **✅ ㄱ안(rep 단위 계산) 채택 확정 (2026-08-01 사용자 confirm)** — 하위 결정 4건은 §9 에 열려 있음
-작성: 2026-08-01 / 결정: 2026-08-01
+상태: **✅ ㄱ안 채택 확정 + 구현 완료 (2026-08-01)** — [PR #82](https://github.com/Shadowfit/init/pull/82) 리뷰 대기. 남은 미결은 §9
+작성: 2026-08-01 / 결정: 2026-08-01 / 구현: 2026-08-01
 배경: 코드 검증([`../tasks/29-ai-code-verification.md`](../tasks/29-ai-code-verification.md) §2-2)에서 `WorstSectionCalculator` 가 **프레임마다 `sync_rate` 가 다르다**는 전제로 3프레임 슬라이딩 윈도우를 도는데, 실제 데이터는 **rep 안에서 상수**라는 것이 드러났다. 사용자가 *"rep 구분 안 했지 않았니"* 로 되물어 원인이 하나 더 나왔다 — 읽기 프로젝션에 `rep_number` 가 아예 없다.
 연관: [#78](https://github.com/Shadowfit/init/issues/78) · [#79](https://github.com/Shadowfit/init/issues/79) · [#80](https://github.com/Shadowfit/init/issues/80) · [#75](https://github.com/Shadowfit/init/issues/75) · [`./report-read-path.md`](./report-read-path.md) §9(precompute-on-write) · [`./pose-ingest-downsampling.md`](./pose-ingest-downsampling.md) §4 · [`../tasks/28-remaining-work-plan.md`](../tasks/28-remaining-work-plan.md) §4
 
@@ -259,9 +259,40 @@ precompute-on-write 로 **이미 `reports.detailed_analysis` 에 저장된 worst
 
 > 진짜 진단(무릎/상체 각도 기반 사유)을 만드는 안은 [#80](https://github.com/Shadowfit/init/issues/80) ㄷ안으로 열려 있다 — §4-ㄷ 와 같은 급의 작업이라 이 범위에 넣지 않는다.
 
-### DTO 구조는 그대로 둔다 (파생)
+### ~~DTO 구조는 그대로 둔다 (파생)~~ → ⚠️ **되돌렸다** (2026-08-01, 같은 날)
 
-문구만 바꾸므로 `WorstSectionDto` 의 필드 구조는 유지된다 → **프론트 영향 없음.** 회차는 `reason` 문자열 안에 드러내는 방향이나, 문구가 미정이라 이것도 함께 미정이다.
+원문: *"문구만 바꾸므로 `WorstSectionDto` 의 필드 구조는 유지된다 → 프론트 영향 없음."*
+
+**회차별 추이(§8-4)를 응답에 넣으면서 성립하지 않게 됐다.** 추이가 없을 때는 worst 와 이을 대상 자체가 없어 구조를 건드릴 이유가 없었는데, 추이가 생기자 **"추이의 어느 점이 worst 인가"** 를 답할 수단이 필요해졌다.
+
+그 수단이 없으면 클라이언트가 쓸 방법이 둘뿐인데 둘 다 취약하다:
+
+| 방법 | 문제 |
+|---|---|
+| `timeStamp` 문자열 비교 | `mm:ss` 라 같은 초에 걸친 rep 이 둘이면 모호. 포맷이 바뀌면 깨진다 |
+| `reason` 에서 `"2회차"` 파싱 | **`reason` 문구가 잠정이다**(위 §8-3). 확정하는 순간 프론트가 깨진다 |
+
+→ **`WorstSectionDto.repNumber` 추가로 확정**(2026-08-01 사용자 confirm). 검토했으나 배제한 대안은 `RepSyncRateDto.isWorst` 플래그다 — 클라 로직은 0 이 되지만 같은 사실이 두 곳에 저장돼 계산이 어긋나면 응답이 자기모순이 된다.
+
+**교훈**: "프론트 영향 없음"은 그 시점의 응답 모양을 전제로 한 판단이었다. 응답에 필드를 하나 더하는 결정이 이전 결정의 전제를 무너뜨렸는데, 두 결정 사이의 간격은 몇 시간이었다.
+
+### 8-4. 회차별 추이 (`repTrend`) — 범위 추가 (2026-08-01)
+
+ㄱ안 구현 직후 *"rep 별로 구분이 되는 건가"* 라는 확인 과정에서 나왔다. worst 는 **가장 나빴던 한 회차**만 알려주므로 *"3회차부터 계속 떨어졌다"* 같은 흐름을 볼 수 없었고, 데이터는 `pose_data` 에 rep 별로 이미 있었다 — **노출 경로만 없었다.**
+
+```json
+"worstSection": { "repNumber": 2, "exerciseName": "스쿼트", "timeStamp": "01:15", "reason": "2회차 · 싱크로율 75%" },
+"repTrend": [
+  { "repNumber": 1, "syncRate": 80.0, "timeStamp": "00:12" },
+  { "repNumber": 2, "syncRate": 75.0, "timeStamp": "01:15" }
+]
+```
+
+**저장은 precompute-on-write 에 얹었다.** worst 와 재료(rep 그룹핑)가 같아 이미 읽어 온 프레임으로 바로 나온다. 조회 시점 계산으로 두면 **precompute 가 없애려던 `pose_data` 스캔이 추이 때문에 되살아난다**([`./report-read-path.md`](./report-read-path.md) §9 의 목적이 무효가 된다). `reports.detailed_analysis` 에 `{worstSection, repTrend}` 로 함께 넣는다.
+
+그 대가로 그 컬럼의 JSON 모양이 바뀐다. 구버전 형식(`WorstSectionDto` 단독)으로 저장된 행은 재계산으로 흘리는데, **실측 0건**이라(§6-1) 마이그레이션이 필요 없다 — 동시에 그 하위호환 경로가 사실상 죽어 있다는 뜻이기도 하다.
+
+> 🔶 **프론트 화면은 범위 밖.** `frontend/types/report.ts` 타입만 맞췄고 추이 그래프·표는 없다. 지금 상태로는 API 를 직접 호출해야 보인다.
 
 ### 곁가지 — `is_correct` 🔶 미결
 
@@ -269,15 +300,45 @@ precompute-on-write 로 **이미 `reports.detailed_analysis` 에 저장된 worst
 
 ---
 
+---
+
+## 8-5. 구현 결과 (2026-08-01)
+
+[PR #82](https://github.com/Shadowfit/init/pull/82) — base 가 `main` 이 아니라 [PR #81](https://github.com/Shadowfit/init/pull/81)(`fix/session-stats-and-tx-boundary`)인 **스택 PR** 이다. ㄱ안이 #75 의 rep 단위 조회 위에 서기 때문이고, #81 이 먼저 머지돼야 한다.
+
+| 커밋 | 내용 |
+|---|---|
+| `a86621f` | worst 를 rep 단위로. `PoseFrameProjection` 에 `repNumber` 추가·`feedbackMessage` 제거, 정렬 rep 우선, `WORST_WINDOW_SIZE` 삭제, `pickDominantFeedback` 삭제([#80](https://github.com/Shadowfit/init/issues/80) 일부) |
+| `6d5d419` | 회차별 추이 + `WorstSectionDto.repNumber` + 프론트 타입 |
+
+**추정 대비**: §4-ㄱ 에서 3~5h 로 추정했다. 실제 투입 시간을 기록하지 않아 **맞았는지 판단할 수 없다** — [`../tasks/28-remaining-work-plan.md`](../tasks/28-remaining-work-plan.md) §2 가 "#3 착수 시엔 시작·종료 시각을 남기자"고 적어둔 것을 여기서도 못 지켰다. 다만 범위가 추정 당시보다 늘었다(추이 + `repNumber` + 프론트 타입은 §4-ㄱ 에 없던 항목).
+
+**구현하며 정한 것** (문서에 없던 판단):
+
+- **rep 평균을 쓴다.** 지금은 rep 안이 상수라 어느 프레임을 봐도 같지만, ㄷ안이 오면 이 코드를 안 고쳐도 의미가 유지된다
+- **`repNumber <= 0`(미상) 제외 → 미상만 있는 세션은 `null`.** 예전 코드는 뭔가를 내놓긴 했지만 그 값이 어느 rep 의 것인지 말할 수 없었다. 틀린 값을 내놓느니 없다고 하는 편이 낫다는 판단
+- **미상 필터를 쿼리가 아니라 계산기에.** "프레임이 아예 없다"와 "rep 을 알 수 없는 프레임뿐이다"를 계산기가 구분해 다룰 수 있어야 해서
+- **`WorstSectionCalculator` 는 이제 이름이 하는 일보다 좁다**(추이도 계산). 클래스명 정리는 후속 — 미머지 PR 위에 이름 변경 diff 를 겹치면 리뷰가 어려워진다
+
+**검증**: 테스트 236개 통과(#81 기준 223 → +13). `WorstSectionCalculatorTest` 7 → 19 재작성. 통합테스트 픽스처가 마침 `rep1=80.0(3행)` · `rep2=75.0(2행)` 이라 **예전 윈도우로는 rep2 가 밀려 80 이 worst 로 뽑히던 정확히 그 케이스**여서, 실제 쿼리·실제 다운샘플을 거친 end-to-end 회귀로 고정했다.
+
+⚠️ **실데이터 검증이 아니다.** 로컬 `pose_data` 0행(§6-1)이라 전부 테스트 픽스처 기준이다.
+
+---
+
 ## 9. 열린 질문 (사용자 결정 필요)
 
 - [x] ~~**ㄱ / ㄴ / ㄷ 중 무엇**~~ → **✅ ㄱ안 채택** (2026-08-01 사용자 confirm). ㄴ 배제, ㄷ 는 별도 트랙 여부가 아래에 열려 있음
-- [x] ~~ㄱ안 채택 시 **DTO·용어 정리**~~ → **✅ 구조 유지** (문구만 변경, 프론트 영향 없음). §8-3
+- [x] ~~ㄱ안 채택 시 **DTO·용어 정리**~~ → ⚠️ **결정이 바뀌었다.** "구조 유지"로 정했다가 추이(§8-4)를 넣으면서 전제가 무너져 **`WorstSectionDto.repNumber` 추가**로 확정. 클래스명(`WorstSectionCalculator`)만 후속으로 남음. §8-3
 - [x] ~~**대표 timestamp**~~ → **✅ rep 중앙 프레임**. §8-3
 - [x] ~~`reason` 처리~~ → **✅ 동어반복 제거 + `pickDominantFeedback` 삭제**. 단 **최종 문구는 구현 시점으로 보류**. §8-3 · [#80](https://github.com/Shadowfit/init/issues/80)
 - [x] ~~**과거 리포트**(§6) — 방치 / 백필 / 무효화~~ → **✅ 자동 해소.** 2026-08-01 실측 결과 `detailed_analysis` 가 채워진 행 **0건**, `pose_data` **0행**. 실행 대상이 없다(§6-1)
 - [x] ~~**착수 브랜치**~~ → **✅ [#75](https://github.com/Shadowfit/init/issues/75) 먼저.** `fix/session-stats-and-tx-boundary` 푸시 + [PR #81](https://github.com/Shadowfit/init/pull/81) 생성 완료(2026-08-01). 머지 후 그 위에서 ㄱ안 착수
 - [ ] `is_correct` 처리 — 삭제 / 임계값 정합 / 유지 ([#80](https://github.com/Shadowfit/init/issues/80))
+- [ ] `reason` **최종 문구** — 구현은 잠정값(`"2회차 · 싱크로율 75%"`)으로 나갔다. 테스트도 전체 문자열을 고정하지 않았으니 바꿀 여지는 열려 있다
+- [ ] `applyCompleteFromApp`(앱 보고 경로)에 rep 단위 집계를 적용할지 — 지금은 앱이 보낸 dto 값을 그대로 쓴다(`ExerciseAnalysisService.java:510-511`). AI 콜백 경로만 rep 단위다
+- [ ] **프론트 화면** — 추이 그래프·표. 타입만 맞춰뒀고 표시가 없어 지금은 사용자 눈에 안 보인다(범위·추정 미정)
+- [ ] `WorstSectionCalculator` 클래스명 정리 (후속, §8-5)
 - [ ] **ㄷ안을 별도 트랙으로 남길지**, 아예 배제할지
 - [ ] [#79](https://github.com/Shadowfit/init/issues/79) — ㄱ안 선택으로 남게 됐다. 문서 정정만 할지, 비교 기준을 다른 값으로 교체할지
 
