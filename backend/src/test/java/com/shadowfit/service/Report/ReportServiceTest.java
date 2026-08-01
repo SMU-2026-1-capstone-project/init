@@ -137,7 +137,7 @@ class ReportServiceTest {
     void blankAnalysis_fallsBackToPoseDataRecompute() {
         report.setDetailedAnalysis(null); // 시드 데이터처럼 precompute 이전 상태
         when(reportRepository.findBySessionId(SESSION_ID)).thenReturn(Optional.of(report));
-        List<PoseFrameProjection> frames = List.of(new PoseFrameProjection(0.0, 50.0, "KNEE_OUT"));
+        List<PoseFrameProjection> frames = List.of(new PoseFrameProjection(0.0, 50.0, 1));
         when(poseDataRepository.findFramesBySessionId(SESSION_ID)).thenReturn(frames);
         WorstSectionDto recomputed = new WorstSectionDto();
         recomputed.setReason("재계산됨");
@@ -154,7 +154,7 @@ class ReportServiceTest {
     void malformedAnalysis_fallsBackGracefully() {
         report.setDetailedAnalysis("{이건 JSON이 아님");
         when(reportRepository.findBySessionId(SESSION_ID)).thenReturn(Optional.of(report));
-        List<PoseFrameProjection> frames = List.of(new PoseFrameProjection(0.0, 50.0, "KNEE_OUT"));
+        List<PoseFrameProjection> frames = List.of(new PoseFrameProjection(0.0, 50.0, 1));
         when(poseDataRepository.findFramesBySessionId(SESSION_ID)).thenReturn(frames);
         WorstSectionDto recomputed = new WorstSectionDto();
         recomputed.setReason("재계산됨");

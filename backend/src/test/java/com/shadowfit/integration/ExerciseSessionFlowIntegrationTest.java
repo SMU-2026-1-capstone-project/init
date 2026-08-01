@@ -163,9 +163,12 @@ class ExerciseSessionFlowIntegrationTest {
             Session session = createInProgressSession();
             Long sessionId = session.getId();
 
-            // when 1: rep 1 완성 콜백 (AI → Spring) — 15프레임(실제 R=25 배치 규모에 준함, 다운샘플
-            // 윈도우 5개 정확히 채워 3행 남김: WorstSectionCalculator가 worst 구간을 잡으려면
-            // 다운샘플 후에도 최소 WORST_WINDOW_SIZE(3)행이 있어야 함(그 아래면 null, 정상 케이스)
+            // when 1: rep 1 완성 콜백 (AI → Spring) — 15프레임(실제 R=25 배치 규모에 준함,
+            // 다운샘플 윈도우 5개를 정확히 채워 3행 남김)
+            //
+            // ※ 예전 주석은 "worst 를 잡으려면 다운샘플 후 최소 3행이 필요하다"고 적었는데, 그게
+            //   바로 이슈 #78 결함 2 였다 — 짧은 rep 이 구조적으로 worst 후보에서 밀려났다.
+            //   rep 단위 계산으로 바뀌어 행 수 제한이 사라졌고, 아래 rep2(2행)가 그 회귀를 고정한다.
             @SuppressWarnings("unchecked")
             StreamObserver<PoseDataResponse> batchObs1 = mock(StreamObserver.class);
             grpcService.savePoseDataBatch(sampleBatch(sessionId, 1, 15, 80.0), batchObs1);
@@ -222,6 +225,19 @@ class ExerciseSessionFlowIntegrationTest {
             assertThat(report.getMember().getId()).isEqualTo(testMember.getId());
             assertThat(report.getDetailedAnalysis()).isNotBlank();
             assertThat(report.getDetailedAnalysis()).contains("싱크로율");
+
+            // then: worst 는 rep2 다 — 실제 쿼리·실제 다운샘플을 거친 end-to-end 회귀 (이슈 #78)
+            //
+            // rep1 = 80.0 (3행) / rep2 = 75.0 (2행). 더 낮은 건 rep2 인데, 예전 3프레임 슬라이딩
+            // 윈도우로는 rep2 가 자기 값만으로 윈도우를 못 채워 **후보에서 밀려났다.** 남은 유효
+            // 윈도우는 rep1 내부뿐이라 80 이 worst 로 뽑혔다 — 실제로 가장 나쁜 rep 을 놓친 것이다.
+            // 지금은 행 수와 무관하게 rep2 가 잡힌다.
+            //
+            // reason 문구 자체는 잠정이다(#80, decisions/worst-section-rep-resolution.md §8-3).
+            // 회차와 수치만 확인하고 전체 문자열은 고정하지 않는다.
+            assertThat(report.getDetailedAnalysis()).contains("2회차");
+            assertThat(report.getDetailedAnalysis()).contains("75%");
+            assertThat(report.getDetailedAnalysis()).doesNotContain("1회차");
         }
     }
 
