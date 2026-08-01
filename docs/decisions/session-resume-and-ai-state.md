@@ -204,7 +204,7 @@ AI가 rep마다 중간 보고하고 AI는 stateless를 지향. `pose_data`가 �
 - [ ] C(AI 상태 영속화)를 언제 볼지 — 확장 옵션으로 둘지, 별도 카드로 올릴지
 - [ ] C를 가게 된다면 스냅샷에 **어디까지 담을지** — `completed_reps`만이면 B와 실질 차이가 작고, `rep_state`·스무딩 이력까지 담아야 진짜 이어짐이 된다
 - [ ] §2-2의 역설을 근거로 **타임아웃 버퍼 30분 자체를 재검토**할지
-- [ ] §7의 잔여 격차(싱크 통계 구간 불일치)를 메울지
+- [ ] §7의 잔여 격차(싱크 통계 구간 불일치)를 메울지 — 이슈 [#75](https://github.com/Shadowfit/init/issues/75) 로 분리(고치는 방법 3안 비교 포함)
 
 ---
 
@@ -219,9 +219,12 @@ AI가 rep마다 중간 보고하고 AI는 stateless를 지향. `pose_data`가 �
 | 지표 | 정확도 |
 |---|---|
 | `total_reps` | ✅ 정확 (전 구간) |
-| `avg`/`max`/`min` sync | ⚠️ **재부착 이후 구간만** |
+| `avg_sync_rate` | ⚠️ **재부착 이후 구간만** |
+| `max`/`min` sync | ⚠️ 재부착과 무관하게 **항상 NULL** — 아래 정정 |
 
 즉 "12회 / 평균 싱크 78%"에서 12는 전체지만 78%는 후반 4회 기준일 수 있다. 메우려면 Spring이 `pose_data`의 `sync_rate`로 직접 집계해야 하는데, 이는 리포트 집계 경로(precompute-on-write) 변경이라 이번 범위 밖으로 두었다.
+
+**2026-08-01 정정**: 위 표의 `max`/`min` 행은 원래 "재부착 이후 구간만"으로 적혀 있었으나 **틀렸다.** AI가 계산해 proto로 보내지만(`exercise.proto:112-113`) `SessionService.applyComplete:232-234`가 `totalReps`·`avgSyncRate`·`caloriesBurned`만 `set`해서 **`exercise_sessions.max_sync_rate`/`min_sync_rate`는 재부착과 무관하게 항상 NULL**이다. 읽는 코드가 없어 현재 무증상이지만, 이 절을 고칠 때 avg만 고치면 그대로 남는다. 이슈 [#75](https://github.com/Shadowfit/init/issues/75) 문제 2.
 
 ### 7-2. 프론트 연동이 없으면 사용자에게는 아무것도 안 바뀐다
 
