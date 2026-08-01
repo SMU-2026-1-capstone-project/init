@@ -19,22 +19,22 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * WorstSectionCalculator 단위 테스트 — 읽기(ReportService)·쓰기(SessionService.applyComplete,
+ * SessionAnalysisCalculator 단위 테스트 — 읽기(ReportService)·쓰기(SessionService.applyComplete,
  * precompute-on-write) 양쪽이 공유하는 순수 계산 로직(report-read-path.md §9-1).
  *
  * <p>이슈 #78 로 슬라이딩 윈도우 → rep 단위로 바뀌면서 전면 재작성했다. 픽스처는 실제 데이터
  * 형태를 따른다: <b>같은 rep 의 프레임은 sync_rate 가 같다</b>(ai-server 가 rep 단위로 채점해
  * 복제 전송). 조회도 rep 오름차순이므로 입력을 그렇게 만든다.
  */
-@DisplayName("WorstSectionCalculator 테스트")
-class WorstSectionCalculatorTest {
+@DisplayName("SessionAnalysisCalculator 테스트")
+class SessionAnalysisCalculatorTest {
 
-    private WorstSectionCalculator calculator;
+    private SessionAnalysisCalculator calculator;
     private Session session;
 
     @BeforeEach
     void setUp() {
-        calculator = new WorstSectionCalculator();
+        calculator = new SessionAnalysisCalculator();
 
         Exercise exercise = Exercise.builder()
                 .id(1L)

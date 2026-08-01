@@ -66,21 +66,41 @@ class PoseDataServiceTest {
     }
 
     private PoseDataRequest frame(double timestampSec, double syncRate) {
+        return frame(timestampSec, syncRate, 0);
+    }
+
+    private PoseDataRequest frame(double timestampSec, double syncRate, int repNumber) {
         return PoseDataRequest.newBuilder()
                 .setTimestampSec(timestampSec)
                 .setJointCoordinates("{}")
                 .setSyncRate(syncRate)
+                .setRepNumber(repNumber)
                 .setFeedbackMessage("ok")
                 .build();
     }
 
+    /**
+     * 실제 AI 가 보내는 모양의 배치 — <b>한 배치 = 한 rep</b> 이고 그 안의 프레임은 모두 같은
+     * {@code syncRate}·{@code repNumber} 를 갖는다. 싱크로율이 rep 단위로 채점돼 프레임마다
+     * 복제되기 때문이다(ai-server {@code pose.py:111}), 그리고 콜백은 rep 이 완성될 때만 나간다
+     * ({@code pose.py:98-118}).
+     *
+     * <p>이 헬퍼를 따로 둔 이유: 예전 테스트들이 한 배치 안에 서로 다른 sync_rate 를 넣어
+     * <b>실제로는 존재하지 않는 입력</b>으로 다운샘플 로직을 검증하고 있었다(이슈 #79).
+     */
+    private List<PoseDataRequest> realisticBatch(int repNumber, int frameCount, double syncRate) {
+        List<PoseDataRequest> frames = new java.util.ArrayList<>();
+        for (int i = 0; i < frameCount; i++) {
+            frames.add(frame(i * 0.1, syncRate, repNumber));
+        }
+        return frames;
+    }
+
     @Test
-    @DisplayName("정상 batch — 다운샘플 윈도우(5) 안이면 sync_rate 최저(자세 최악) 프레임 1개만 대표로 저장, is_correct는 그 프레임 기준")
+    @DisplayName("정상 batch — is_correct는 저장된 프레임의 sync_rate(40 기준)로 계산")
     void savePoseDataBatch_success_computesIsCorrect() {
-        poseDataService.savePoseDataBatch(session.getId(), List.of(
-                frame(0.0, 50.0),  // is_correct = true, 대표 아님(최악 아님)
-                frame(0.1, 30.0)   // is_correct = false, 윈도우 내 최저 sync_rate → 대표로 저장
-        ));
+        // 한 배치 = 한 rep 이라 sync_rate 는 배치 안에서 상수다(아래 realisticBatch 주석)
+        poseDataService.savePoseDataBatch(session.getId(), realisticBatch(1, 2, 30.0));
 
         List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT sync_rate, is_correct FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
@@ -91,9 +111,30 @@ class PoseDataServiceTest {
     }
 
     @Test
-    @DisplayName("다운샘플 — 윈도우(5)마다 sync_rate 최저 프레임만 남기고 나머지는 버림")
-    void savePoseDataBatch_downsamples_keepsWorstSyncRatePerWindow() {
-        // 첫 윈도우(0~4): 최저 sync_rate=10.0(3번째) / 둘째 윈도우(5~6, 부분): 최저=20.0(2번째)
+    @DisplayName("다운샘플 — 윈도우(5)마다 첫 프레임만 남기는 균등 샘플링 (#79)")
+    void savePoseDataBatch_downsamples_uniformly() {
+        // 7프레임 → 인덱스 0·5 가 남는다(0.0s, 0.5s). 남는 게 "가장 나쁜 프레임"이 아니라
+        // "주기의 첫 프레임"이라는 것을 값으로 고정한다.
+        poseDataService.savePoseDataBatch(session.getId(), realisticBatch(1, 7, 65.0));
+
+        List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT timestamp_sec, sync_rate FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
+
+        assertThat(rows).hasSize(2);
+        assertThat(((Number) rows.get(0).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.0);
+        assertThat(((Number) rows.get(1).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.5);
+        // rep 안에서 sync_rate 는 상수 — 어느 프레임이 남든 이 값은 같다
+        assertThat(rows).allSatisfy(row ->
+                assertThat(((Number) row.get("SYNC_RATE")).doubleValue()).isEqualTo(65.0));
+    }
+
+    @Test
+    @DisplayName("★ 남는 프레임은 sync_rate와 무관하다 — 순서만 바뀌어도 결과가 달라진다 (#79)")
+    void savePoseDataBatch_selectionIsPositional_notWorstSync() {
+        // 이 테스트의 픽스처는 **실제로는 일어나지 않는 모양**이다(한 배치 안 sync_rate 가 제각각).
+        // 예전 테스트가 바로 이런 픽스처를 써서 "최저 프레임을 고른다"를 증명했는데, 그 입력이
+        // 실데이터에 존재하지 않아 죽은 코드가 살아 있는 것처럼 보였다. 여기서는 반대로,
+        // 선택이 값이 아니라 **위치**로 이뤄진다는 것을 드러내는 용도로만 쓴다.
         poseDataService.savePoseDataBatch(session.getId(), List.of(
                 frame(0.0, 90.0), frame(0.1, 80.0), frame(0.2, 10.0), frame(0.3, 70.0), frame(0.4, 60.0),
                 frame(0.5, 50.0), frame(0.6, 20.0)
@@ -103,10 +144,9 @@ class PoseDataServiceTest {
                 "SELECT timestamp_sec, sync_rate FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
 
         assertThat(rows).hasSize(2);
-        assertThat(((Number) rows.get(0).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.2);
-        assertThat(((Number) rows.get(0).get("SYNC_RATE")).doubleValue()).isEqualTo(10.0);
-        assertThat(((Number) rows.get(1).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.6);
-        assertThat(((Number) rows.get(1).get("SYNC_RATE")).doubleValue()).isEqualTo(20.0);
+        // 최저값 10.0(인덱스 2)·20.0(인덱스 6)이 아니라 각 윈도우의 첫 프레임이 남는다
+        assertThat(((Number) rows.get(0).get("SYNC_RATE")).doubleValue()).isEqualTo(90.0);
+        assertThat(((Number) rows.get(1).get("SYNC_RATE")).doubleValue()).isEqualTo(50.0);
     }
 
     @Test

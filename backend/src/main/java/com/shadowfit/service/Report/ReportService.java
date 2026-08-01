@@ -31,7 +31,7 @@ public class ReportService {
     private final ReportRepository reportRepository;
     private final SessionRepository sessionRepository;
     private final PoseDataRepository poseDataRepository;
-    private final WorstSectionCalculator worstSectionCalculator;
+    private final SessionAnalysisCalculator sessionAnalysisCalculator;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -105,8 +105,8 @@ public class ReportService {
         }
         List<PoseFrameProjection> poseFrames = poseDataRepository.findFramesBySessionId(session.getId());
         return new SessionDetailedAnalysis(
-                worstSectionCalculator.calculate(session, poseFrames),
-                worstSectionCalculator.calculateRepTrend(poseFrames));
+                sessionAnalysisCalculator.calculate(session, poseFrames),
+                sessionAnalysisCalculator.calculateRepTrend(poseFrames));
     }
 
     private List<ExerciseSyncRateDto> buildSyncRateDetails(Session session) {

@@ -35,12 +35,12 @@ import java.util.Map;
  * 지금 데이터에서는 rep 안이 상수라 어느 프레임을 봐도 같지만, 나중에 프레임별 채점이 도입되면
  * (decisions/worst-section-rep-resolution.md §4-ㄷ) 이 코드를 고치지 않아도 의미가 유지된다.
  *
- * <p>⚠️ <b>이름이 하는 일보다 좁다.</b> 같은 rep 그룹핑에서 회차별 추이({@link #calculateRepTrend})도
- * 나오므로 이 컴포넌트는 이제 worst 만 계산하지 않는다. 클래스명 정리는 후속으로 남긴다 —
- * 지금 바꾸면 미머지 PR 두 개(#81, #78) 위에 이름 변경 diff 가 겹쳐 리뷰가 어려워진다.
+ * <p>이름이 {@code WorstSectionCalculator} 였다가 바뀌었다 — 같은 rep 그룹핑에서 회차별 추이
+ * ({@link #calculateRepTrend})도 나오면서 worst 만 계산하지 않게 됐기 때문이다. 이 프로젝트는
+ * <b>이름·주석이 하는 일과 어긋난 지점</b>에서 결함이 반복해 나왔으므로(#78·#79·#80) 그대로 두지 않는다.
  */
 @Component
-public class WorstSectionCalculator {
+public class SessionAnalysisCalculator {
 
     public WorstSectionDto calculate(Session session, List<PoseFrameProjection> poseFrames) {
         if (poseFrames == null || poseFrames.isEmpty()) {
