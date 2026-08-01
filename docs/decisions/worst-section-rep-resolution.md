@@ -175,7 +175,24 @@ precompute-on-write 로 **이미 `reports.detailed_analysis` 에 저장된 worst
 | 백필 | `detailed_analysis` 를 재계산해 덮어씀 | 배치 1회. `pose_data` 는 TTL 로 삭제되므로 **원본이 남아 있는 세션만 가능** |
 | 무효화 | 해당 컬럼을 비워 즉석 재계산 경로로 흘림 | 위와 같은 TTL 제약 + 읽기 비용 증가 |
 
-⚠️ **영향 규모를 확인하지 않았다** — 현재 `reports` 에 `detailed_analysis` 가 채워진 행이 몇 개인지, 그중 `pose_data` 가 살아 있는 게 몇 개인지 세지 않았다. 결정 전에 세는 게 맞다(쿼리 1개).
+### 6-1. 실측 (2026-08-01) — **백필 대상 0건**
+
+로컬 개발 DB(`shadowfit-mysql`, Docker)에서 직접 셌다.
+
+| 항목 | 값 |
+|---|:--:|
+| `reports` 전체 | **7** |
+| 그중 `detailed_analysis` 가 채워진 행 | **0** |
+| `pose_data` 전체 행 | **0** |
+| `exercise_sessions` | 7 (전부 `COMPLETED`) |
+
+**틀린 worst 가 박제된 행이 하나도 없다.** `reports` 7건은 전부 시드다 — `mysql/data.sql:92` 의 `REPLACE INTO reports (id, session_id, member_id, report_type, summary, improvement_tips, created_at)` 가 `detailed_analysis` 컬럼을 아예 넣지 않는다. `pose_data` 시드도 없다(0건).
+
+즉 이 DB 에는 **실제 운동 데이터가 없고**, precompute-on-write 가 한 번도 돈 적이 없다. 지금 이 7건을 조회하면 `detailed_analysis` 가 비어 즉석 재계산 경로로 흐르는데(`ReportService.java:87-88`), `pose_data` 가 0행이라 `WorstSectionCalculator` 가 `null` 을 돌려준다 — **틀린 값이 아니라 값이 없는 상태**다.
+
+→ **§6 의 세 선택지(방치/백필/무효화)는 실행 대상이 없어 자동 해소된다.** 결정할 것이 남아 있지 않다.
+
+⚠️ **로컬 DB 기준이다.** EC2 배포분([`../tasks/28-remaining-work-plan.md`](../tasks/28-remaining-work-plan.md) §2-4, 2026-07-25 풀 사이징 재검증)은 확인하지 않았다. 다만 상시 구동이 아니고 실사용자가 0 이라 규모가 다를 근거는 없다. 배포분을 다시 띄울 일이 있으면 같은 쿼리를 한 번 돌려보는 것으로 충분하다.
 
 ---
 
@@ -258,8 +275,8 @@ precompute-on-write 로 **이미 `reports.detailed_analysis` 에 저장된 worst
 - [x] ~~ㄱ안 채택 시 **DTO·용어 정리**~~ → **✅ 구조 유지** (문구만 변경, 프론트 영향 없음). §8-3
 - [x] ~~**대표 timestamp**~~ → **✅ rep 중앙 프레임**. §8-3
 - [x] ~~`reason` 처리~~ → **✅ 동어반복 제거 + `pickDominantFeedback` 삭제**. 단 **최종 문구는 구현 시점으로 보류**. §8-3 · [#80](https://github.com/Shadowfit/init/issues/80)
-- [ ] **과거 리포트**(§6) — 방치 / 백필 / 무효화. 결정 전 **영향 규모 카운트 쿼리 1회** 권고
-- [ ] **착수 브랜치** — ㄱ안이 [#75](https://github.com/Shadowfit/init/issues/75) 의 `findRepAverageSyncRates` 를 재사용하는데 그 브랜치(`fix/session-stats-and-tx-boundary`)가 아직 미푸시다. 먼저 PR·머지 / 그 위에 쌓기 / main 에서 독립 구현
+- [x] ~~**과거 리포트**(§6) — 방치 / 백필 / 무효화~~ → **✅ 자동 해소.** 2026-08-01 실측 결과 `detailed_analysis` 가 채워진 행 **0건**, `pose_data` **0행**. 실행 대상이 없다(§6-1)
+- [x] ~~**착수 브랜치**~~ → **✅ [#75](https://github.com/Shadowfit/init/issues/75) 먼저.** `fix/session-stats-and-tx-boundary` 푸시 + [PR #81](https://github.com/Shadowfit/init/pull/81) 생성 완료(2026-08-01). 머지 후 그 위에서 ㄱ안 착수
 - [ ] `is_correct` 처리 — 삭제 / 임계값 정합 / 유지 ([#80](https://github.com/Shadowfit/init/issues/80))
 - [ ] **ㄷ안을 별도 트랙으로 남길지**, 아예 배제할지
 - [ ] [#79](https://github.com/Shadowfit/init/issues/79) — ㄱ안 선택으로 남게 됐다. 문서 정정만 할지, 비교 기준을 다른 값으로 교체할지
@@ -271,6 +288,7 @@ precompute-on-write 로 **이미 `reports.detailed_analysis` 에 저장된 worst
 - **#78·#79 는 코드 경로 추적으로 판단했고 재현하지 않았다.** §2-2 의 rep1/rep2/rep3 예시는 손으로 만든 것이다
 - **시간 추정은 실측이 아니다.** 특히 ㄷ안은 알고리즘 설계 비중이 커서 신뢰도가 낮다
 - **"ㄴ안의 결과가 ㄱ안과 항상 같다"는 논증이며 테스트하지 않았다**(§4-ㄴ)
-- **§6 의 영향 규모를 세지 않았다** — `reports` 의 실제 행 수를 확인하지 않고 선택지만 나열했다
+- ~~**§6 의 영향 규모를 세지 않았다**~~ → **2026-08-01 실측 완료**(§6-1). 단 **로컬 DB 한정**이며 EC2 배포분은 확인하지 않았다
+- **로컬 DB 에 실제 운동 데이터가 없다**(`pose_data` 0행). 즉 #78·#79·#80 어느 것도 **실제 데이터로 재현해 본 적이 없고**, 구현 후 검증도 테스트 픽스처에 의존하게 된다
 - `dtaidistance==2.3.12` 가 `warping_path` 를 제공한다는 것은 **버전 문자열과 라이브러리 문서 기준**이며, 이 프로젝트에서 호출해 보지 않았다
 - ㄱ안이 #75 의 쿼리를 재사용한다는 것은 **그 브랜치가 머지된다는 전제**다 — 현재 `fix/session-stats-and-tx-boundary` 는 미푸시 상태다
