@@ -1,6 +1,6 @@
 # 남은 작업 계획 — Spring 백엔드 완주까지
 
-작성: 2026-07-31 · 갱신: 2026-08-01 (#72·#73·#74 머지 반영)
+작성: 2026-07-31 · 갱신: 2026-08-01 (#72·#73·#74 머지 반영 + 코드 검증 결함 [#79](https://github.com/Shadowfit/init/issues/79) 추가)
 상태: **분석/추천 — 착수 순서 미확정** (결정 ✅ 는 사용자 confirm 후)
 범위: **Spring 백엔드만.** 프론트(React Native) 전용 항목과 AI 서버(FastAPI) 고유 항목은 제외 — 단 크로스 레포 작업은 그 사실을 명시하고 포함
 목적: "앞으로 뭘 해야 하는가"와 "얼마나 남았는가"를 한 장에서 판단할 수 있게 정리
@@ -14,7 +14,7 @@
 
 **2026-08-01 기준 남은 건 4덩어리, 단독 45~71h / Claude 병행 22~38h.** 최초 6덩어리 중 #1(세션 재개)·#2(종목 가드)가 **Spring 범위에서 끝났다**(#72·#73·#74). 가장 오래 걸리는 건 여전히 코드가 아니라 **결정**이고, 압축되지 않는 결정은 **관리자 인덱스 3안**과 **[#78](https://github.com/Shadowfit/init/issues/78) 고치는 방법 3안** 둘이다.
 
-> 2026-08-01 추가: 어제 머지분 코드 검증([`29-ai-code-verification.md`](./29-ai-code-verification.md))에서 결함 4건이 나왔다. 2건(#75·#76)은 같은 날 수정했고 2건(#77·#78)은 열려 있다.
+> 2026-08-01 추가: 어제 머지분 코드 검증([`29-ai-code-verification.md`](./29-ai-code-verification.md))에서 결함 **5건**이 나왔다. 2건(#75·#76)은 같은 날 수정했고 3건(#77·#78·#79)은 열려 있다. **#75·#78·#79 는 뿌리가 하나**라 셋을 따로 세면 남은 일이 실제보다 커 보인다.
 
 > 최초 작성 시점 판단: 구현 60~65% / 포폴 50~57%, 6덩어리 66~97h. **§1 의 % 는 위 세 PR 이전 기준이라 지금은 과소평가다**(§1-2).
 
@@ -75,7 +75,8 @@
 | ~~[#75](https://github.com/Shadowfit/init/issues/75) 싱크 통계 구간 불일치 + max/min 미저장~~ | ✅ **수정 완료**(2026-08-01, `ca17ec0` 미머지) |
 | ~~[#76](https://github.com/Shadowfit/init/issues/76) 재부착이 트랜잭션 안에서 블로킹 gRPC~~ | ✅ **수정 완료**(2026-08-01, `8bc417f` 미머지) |
 | [#77](https://github.com/Shadowfit/init/issues/77) 재부착 TOCTOU | 결함 제거(방어). **고치기 전에 결과 확인이 먼저** — 창이 아주 좁아 감수로 닫힐 수도 있다 |
-| [#78](https://github.com/Shadowfit/init/issues/78) worst 구간 해상도 | 결함 제거(방어). 고치는 방법 3안 미결. 사용자에게 **틀린 "가장 나빴던 구간"** 을 보여주고 있다 |
+| [#78](https://github.com/Shadowfit/init/issues/78) worst 구간 해상도 | 결함 제거(방어). 고치는 방법 3안 미결. 사용자에게 **틀린 "가장 나빴던 구간"** 을 보여주고 있다. 2026-08-01 보강: 읽기 프로젝션에 `rep_number` 가 없어 **3안 공통으로 프로젝션+쿼리 수정이 선결** |
+| [#79](https://github.com/Shadowfit/init/issues/79) 다운샘플 극값 선택이 죽은 코드 | 결함 제거 + **문서 정정**(`pose-ingest-downsampling.md` §4 의 "평균 vs 대표추출" 비교가 무효). #78 과 같이 결정하면 추가 비용이 거의 없다 |
 | 프론트 연동 (`exercise.tsx` 재부착 호출) | **이 문서 범위 밖**(프론트)이지만, 이게 없으면 #73·#74 의 사용자 체감 효과가 0 이다 |
 | 코드 검증 잔여 | 테스트 3종 상세(552줄) + ai-server 테스트. 8월 계획 ③ 버킷 |
 
@@ -179,6 +180,7 @@ Claude 병행 배율이 항목마다 다른 이유. 아래는 **0% 압축**된�
 | ~~[#75](https://github.com/Shadowfit/init/issues/75)~~ | ~~고치는 방법 3안~~ — **ㄱ안(Spring 직접 집계) 채택·완료**(2026-08-01) |
 | [#77](https://github.com/Shadowfit/init/issues/77) | 고치기 전에 **"그때 실제로 무슨 일이 나는지" 확인**이 선결 |
 | [#78](https://github.com/Shadowfit/init/issues/78) | 고치는 방법 3안(rep 단위 계산 / 짧은 rep 보정 / 프레임별 점수) 결정 |
+| [#79](https://github.com/Shadowfit/init/issues/79) | **[#78](https://github.com/Shadowfit/init/issues/78) 결정에 종속** — ㄷ안(프레임별 점수)이면 코드 수정 없이 해소된다 |
 
 **독립적으로 바로 착수 가능**: #4, #5, 프론트 연동.
 
@@ -226,7 +228,7 @@ Claude 병행 배율이 항목마다 다른 이유. 아래는 **0% 압축**된�
 | 2 | #4 CD | 독립 착수 가능, "돌아간다" 증명 |
 | 3 | #5 외부 통합 1개 | 후보 비교는 [`../decisions/external-integration-candidates.md`](../decisions/external-integration-candidates.md) — **S3 추천, OAuth2 조건부**. 구현 %엔 0 |
 | 4 | #6 관측 스택 | 실험을 하기로 정할 때만 |
-| — | [#77](https://github.com/Shadowfit/init/issues/77)·[#78](https://github.com/Shadowfit/init/issues/78) | 순위 밖 — #77 은 조사부터, #78 은 리포트 집계 경로를 건드릴 때 같이 하는 게 쌈 |
+| — | [#77](https://github.com/Shadowfit/init/issues/77)·[#78](https://github.com/Shadowfit/init/issues/78)·[#79](https://github.com/Shadowfit/init/issues/79) | 순위 밖 — #77 은 조사부터, **#78·#79 는 한 덩어리로** 리포트 집계 경로를 건드릴 때 같이 하는 게 쌈 |
 
 **프론트 연동이냐 #3이냐** — 원래 "#1이냐 #3이냐"였던 갈림길이 서버 완료로 이렇게 옮겨왔다:
 
@@ -241,7 +243,7 @@ Claude 병행 배율이 항목마다 다른 이유. 아래는 **0% 압축**된�
 - [ ] #3 인덱스 3안 (ㄱ 추가 / ㄴ 감수 / ㄷ 기간 강제) 및 인덱스 실험 수행 여부
 - [ ] #3 화면 범위 — A·B·C 전부 vs 회원 목록만
 - [ ] #6 착수 여부 (= 남은 실험 2건을 할지)
-- [ ] [#78](https://github.com/Shadowfit/init/issues/78) 고치는 방법 3안
+- [ ] [#78](https://github.com/Shadowfit/init/issues/78) 고치는 방법 3안 (→ [#79](https://github.com/Shadowfit/init/issues/79) 처리 방향이 여기 딸려 나온다)
 - [ ] [#77](https://github.com/Shadowfit/init/issues/77) 조사 후 감수/수정 판단
 - [ ] #5 외부 통합 — 할지 자체, 한다면 S3 vs OAuth2 ([`../decisions/external-integration-candidates.md`](../decisions/external-integration-candidates.md) §7)
 - [ ] 분업 방식 — 전량 위임 vs §6의 권고 분업

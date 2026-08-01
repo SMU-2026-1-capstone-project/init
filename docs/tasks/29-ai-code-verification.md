@@ -1,6 +1,6 @@
 # AI 작성 코드 전수 검증 로그
 
-작성: 2026-08-01
+작성: 2026-08-01 · 갱신: 2026-08-01 (#79 등록, #78 원인 보강)
 상태: **진행 중** — 어제(2026-07-31) 머지분 중 Spring 재부착 경로·ai-server 경로·#72·#73 완료, 테스트 3종 상세 미완
 목적: [`26-vacation-semester2-portfolio-plan.md`](./26-vacation-semester2-portfolio-plan.md) §3 **8월 항목 ③ "내 AI 코드 전수 검증"** 의 실행 기록
 연관: [`28-remaining-work-plan.md`](./28-remaining-work-plan.md) §6 · [`../decisions/session-resume-and-ai-state.md`](../decisions/session-resume-and-ai-state.md)
@@ -32,15 +32,18 @@
 
 ---
 
-## 2. 나온 결함 — 이슈 5건
+## 2. 나온 결함 — 이슈 6건
 
 | # | 내용 | 상태 |
 |:--:|---|---|
 | [#75](https://github.com/Shadowfit/init/issues/75) | 싱크 통계가 후반 구간만 반영 / max·min 미저장 / **rep 있는데 0.0 저장** | **수정 완료** (`ca17ec0`) |
 | [#76](https://github.com/Shadowfit/init/issues/76) | 재부착이 트랜잭션 안에서 블로킹 gRPC → 커넥션 풀 고갈로 번짐 | **수정 완료** (`8bc417f`) |
 | [#77](https://github.com/Shadowfit/init/issues/77) | 재부착 검증과 gRPC 사이 잠금 없음 (TOCTOU) | 열림 — **결과 확인이 먼저** |
-| [#78](https://github.com/Shadowfit/init/issues/78) | worst 구간이 프레임 해상도를 가정하는데 `sync_rate` 는 rep 단위 상수 | 열림 |
+| [#78](https://github.com/Shadowfit/init/issues/78) | worst 구간이 프레임 해상도를 가정하는데 `sync_rate` 는 rep 단위 상수 | 열림 — 2026-08-01 코멘트로 **원인 보강** (§2-3) |
+| [#79](https://github.com/Shadowfit/init/issues/79) | 다운샘플의 "worst 프레임 대표추출"이 실행되지 않는다 — 항상 첫 프레임만 남는다 | 열림 (§2-3) |
 | — | `Exercise` 캐시 TTL 1시간 vs "플래그만 TRUE 로 바꾸면 열린다" 주석 | 미등록 (영향 낮음) |
+
+**#75·#78·#79 는 뿌리가 하나다**: `sync_rate` 가 rep 단위로 채점돼 프레임마다 복제 저장된다는 것(§5). 같은 사실을 세 곳이 서로 다르게 오해했다 — 집계는 프레임 가중으로(#75), worst 는 프레임 해상도가 있다고(#78), 다운샘플은 프레임마다 값이 다르다고(#79).
 
 ### 2-1. #75 가 특히 중요했던 이유 — 고친 버그가 다른 문으로 돌아왔다
 
@@ -55,6 +58,16 @@
 검증 중 사용자가 **"rep 안의 각 회차마다 sync_rate 가 달라야 하는 거 아니냐"** 고 물었다. 그 질문이 `WorstSectionCalculator` 를 드러냈다 — 3프레임 슬라이딩 윈도우로 worst 구간을 잡는데, `sync_rate` 는 rep 안에서 상수라 **윈도우가 방어한다는 노이즈가 존재하지 않는다.** 게다가 다운샘플로 행이 3개 미만 남은 rep 은 자기 값만으로 윈도우를 못 채워 **실제로 가장 나쁜 rep 인데도 worst 로 안 뽑힌다.**
 
 `session-resume-and-ai-state.md` §3-3 은 이걸 *"고정 프레임 윈도우를 쓰고 **그게 의도된 설계**"* 로 적어뒀는데, 의도는 그랬어도 데이터가 받쳐주지 않는다.
+
+### 2-3. 같은 질문을 한 번 더 밀어서 나온 것 — #79 와 #78 원인 보강
+
+사용자가 **"rep 구분 안 했지 않았니"** 라고 되물어 같은 뿌리를 두 곳 더 확인했다.
+
+**#78 — 증상이 아니라 원인**: 원 이슈는 *"경계를 걸친 윈도우가 뽑히면 실재하지 않는 점수가 나간다"* 로 증상만 적었는데, 실제로는 **읽기 경로가 rep 을 알 수조차 없다.** `PoseFrameProjection`(`PoseFrameProjection.java:4`)이 `(timestampSec, syncRate, feedbackMessage)` 3개뿐이라 `rep_number` 를 안 싣는다. 컬럼은 #74 에서 추가됐지만(`2026-07-31-add-pose-data-rep-number.sql`) 이 프로젝션은 그 전에 만들어졌고 갱신되지 않았다. → **3안 어느 쪽을 골라도 프로젝션+쿼리 수정이 공통 선결**이고, 생성자 프로젝션이라 읽기(`ReportService`)·쓰기(`SessionService.precomputeReport`) 양쪽 호출부가 함께 깨진다.
+
+**#79 — 죽은 비교**: `downsampleByWorstSync`(`PoseDataService.java:104-117`)가 5프레임마다 최저 `sync_rate` 를 고른다는데, 배치 1개가 rep 1개고 그 안의 값이 전부 같아 **엄격 부등호(`<`)가 참이 되지 않는다.** 실제 동작은 매 5프레임 중 첫 프레임만 남기는 균등 샘플링이다. `sync_rate` 값 자체는 상수라 집계에는 영향이 없지만, **`joint_coordinates` 는 프레임마다 다르므로 어느 좌표가 남는지가 달라진다.**
+
+교훈: **하나의 잘못된 전제는 한 곳에서만 틀리지 않는다.** #75 를 고칠 때 "rep 단위 상수"라는 사실을 이미 알고 있었는데, 그 사실을 **다른 소비자들에게 되짚지 않았다.** 결함을 고칠 때 "이 사실을 오해한 곳이 또 어디인가"를 묻는 절차가 없었던 셈이다.
 
 ---
 
@@ -81,6 +94,7 @@
 | `SessionRepository.java:68` | "`@Query + JOIN FETCH` 로도 되지만 그러면 **LIMIT 을 SQL 에 못 실어** 전 행을 가져와야 한다" | **to-one 조인엔 해당 없다.** Hibernate 가 `maxResults` 를 인메모리로 처리하는 건 **컬렉션 fetch join 일 때만**(`HHH000104`). 바로 다음 문장이 스스로 반박한다 | "JPQL 에 `LIMIT` 문법이 없어 `@Query` 로 가면 `Pageable` 을 끼워야 하는데, 파생 쿼리(`findFirst`) + `@EntityGraph` 면 그냥 된다. **못 하는 게 아니라 이게 더 간단하다**" |
 | `SessionService.java:78` | "`@RequiredArgsConstructor` 라 생성자 파라미터로는 **못 넣어** 필드 주입을 쓴다" | 생성자를 직접 쓰거나 `@ConfigurationProperties` 면 된다 | "**Lombok 이** `@Value` 붙은 파라미터를 못 만든다. 필드 주입은 그 대가다" |
 | `WorstSectionCalculator.java:20-22` | "단일 프레임은 **노이즈 영향이 커서** 구간으로 본다" | `sync_rate` 가 rep 안에서 상수라 그 노이즈가 없다 | → [#78](https://github.com/Shadowfit/init/issues/78) |
+| `PoseDataService.java:99-103` | "**평균이 아니라 극값을 남기는 이유**는 리포트가 '가장 안 좋았던 순간'을 필요로 하기 때문" | 비교가 참이 되지 않아 극값 선택이 **실행되지 않는다.** `pose-ingest-downsampling.md` §4 의 "평균 vs 대표추출" 비교도 같은 전제 위라 함께 무효 — 두 선택지가 실제로는 구분되지 않는다 | → [#79](https://github.com/Shadowfit/init/issues/79). 다만 **R≈5 라는 비율 자체는 유효**하다("몇 개를 남기나"의 실험이고 #79 는 "그중 어느 것"의 문제) |
 | `#72` 커밋 메시지 | "분석기가 붙으면 **플래그만 TRUE 로 바꾸면 열린다**" | `Exercise` 캐시가 `expireAfterWrite=1h`(`application.yml:53`). 직접 SQL `UPDATE` 는 `@CacheEvict` 를 안 타서 **최대 1시간 지연 또는 재시작 필요** | "플래그를 바꾸고 캐시를 비우거나 TTL(1시간)을 기다려야 한다" |
 
 ### 4-1. 설명이 잘 준비된 것
@@ -125,13 +139,15 @@
 - [ ] 테스트 3종 상세 검증 (552줄) + ai-server 테스트
 - [ ] [#77](https://github.com/Shadowfit/init/issues/77) — 고치기 전에 **"그때 실제로 무슨 일이 나는지"** 부터 확인
 - [ ] [#78](https://github.com/Shadowfit/init/issues/78) — 고치는 방법 3안 결정. 조사 중 확인한 것: `dtaidistance` 가 워핑 경로 API(`dtw.warping_path`)를 제공하는데 지금은 `dtw.distance()` 로 **거리만 받고 경로를 버린다.** ㄷ안(프레임별 점수)이 새 알고리즘이 아니라 **버리는 중간 산출물을 살리는 일**일 수 있다 — ⚠️ 코드를 읽고 판단한 것이며 돌려보지 않았다
+- [ ] [#79](https://github.com/Shadowfit/init/issues/79) — **#78 과 같이 결정하는 게 싸다.** #78 ㄷ안(프레임별 점수)이 채택되면 #79 는 코드를 고치지 않아도 의도대로 동작한다. 그 전엔 `pose-ingest-downsampling.md` §4 에 최소한 정정 표시가 필요하다(이번 커밋 범위 밖)
 - [ ] `applyCompleteFromApp`(앱 보고 경로)은 여전히 dto 값을 그대로 쓴다 — #75 를 이 경로에도 적용할지
-- [ ] §4 의 부정확한 주석 4건 정정
+- [ ] §4 의 부정확한 주석 5건 정정
+- [ ] **같은 뿌리를 오해한 곳이 더 없는지** — `sync_rate` 를 읽는 소비자를 전수로 훑은 적이 없다(§2-3 교훈)
 
 ---
 
 ## 8. 정직 단서
 
 - **전수가 아니다.** 어제 머지분(#72·#73·#74)만 봤고, 그 이전 코드(아웃박스·파티셔닝·관측성 등)는 이 문서 범위 밖이다
-- #77·#78 은 **코드 경로 추적으로 판단했고 재현하지 않았다.** 각 이슈에 미검증으로 명시
+- #77·#78·#79 는 **코드 경로 추적으로 판단했고 재현하지 않았다.** 각 이슈에 미검증으로 명시. 특히 #79 의 "배치 1개 = rep 1개"는 `ai-server/app/api/endpoints/pose.py` 경로만 확인한 것이다
 - §3 "문제 없던 것"은 **내가 확인한 항목에 한한다** — 확인 안 한 것이 없다는 뜻이 아니다
