@@ -113,10 +113,24 @@ class ExerciseSessionFlowIntegrationTest {
     }
 
     private PoseDataBatchRequest sampleBatch(Long sessionId, int frameCount, double syncRate) {
+        return sampleBatch(sessionId, 1, frameCount, syncRate);
+    }
+
+    /**
+     * AI 는 rep 이 완성될 때마다 그 rep 의 프레임 묶음을 보낸다 — 그래서 한 배치 = 한 rep 이고,
+     * 묶음 안의 프레임은 모두 같은 {@code syncRate}·{@code repNumber} 를 갖는다(ai-server
+     * {@code pose.py}).
+     *
+     * <p>{@code repNumber} 를 실제로 실어 보내는 이유: 세션 완료 시 싱크 통계를 {@code pose_data} 에서
+     * <b>rep 단위로</b> 집계하므로(이슈 #75), 이게 0 이면 집계에서 빠져 구버전 AI 폴백 경로로 새어버린다.
+     * 그러면 이 테스트가 실제 운영 경로를 검증하지 않게 된다.
+     */
+    private PoseDataBatchRequest sampleBatch(Long sessionId, int repNumber, int frameCount, double syncRate) {
         PoseDataBatchRequest.Builder b = PoseDataBatchRequest.newBuilder()
                 .setSessionId(sessionId);
         for (int i = 0; i < frameCount; i++) {
             b.addPoseData(PoseDataRequest.newBuilder()
+                    .setRepNumber(repNumber)
                     .setTimestampSec(i * 0.1)
                     .setJointCoordinates("[{\"index\":11,\"x\":0.5,\"y\":0.5,\"z\":0.0,\"visibility\":1.0}]")
                     .setSyncRate(syncRate)
@@ -154,12 +168,12 @@ class ExerciseSessionFlowIntegrationTest {
             // 다운샘플 후에도 최소 WORST_WINDOW_SIZE(3)행이 있어야 함(그 아래면 null, 정상 케이스)
             @SuppressWarnings("unchecked")
             StreamObserver<PoseDataResponse> batchObs1 = mock(StreamObserver.class);
-            grpcService.savePoseDataBatch(sampleBatch(sessionId, 15, 80.0), batchObs1);
+            grpcService.savePoseDataBatch(sampleBatch(sessionId, 1, 15, 80.0), batchObs1);
 
             // when 2: rep 2 완성 콜백 (10프레임 → 다운샘플 후 2행)
             @SuppressWarnings("unchecked")
             StreamObserver<PoseDataResponse> batchObs2 = mock(StreamObserver.class);
-            grpcService.savePoseDataBatch(sampleBatch(sessionId, 10, 75.0), batchObs2);
+            grpcService.savePoseDataBatch(sampleBatch(sessionId, 2, 10, 75.0), batchObs2);
 
             // when 3: 세션 종료 콜백
             @SuppressWarnings("unchecked")
@@ -192,7 +206,12 @@ class ExerciseSessionFlowIntegrationTest {
             Session finished = sessionRepository.findById(sessionId).orElseThrow();
             assertThat(finished.getStatus()).isEqualTo(Status.COMPLETED);
             assertThat(finished.getTotalReps()).isEqualTo(2);
+            // 싱크 통계는 AI 가 보낸 값이 아니라 pose_data 에서 rep 단위로 집계한 값이다(이슈 #75).
+            // 여기서 두 계산이 갈린다 — rep 가중 (80+75)/2 = 77.5 / 프레임 가중 (80×3+75×2)/5 = 78.0.
+            // 다운샘플로 rep1 은 3행, rep2 는 2행만 남았기 때문에 값이 다르고, 77.5 여야 맞다.
             assertThat(finished.getAvgSyncRate()).isEqualByComparingTo(new BigDecimal("77.5"));
+            assertThat(finished.getMaxSyncRate()).isEqualByComparingTo(new BigDecimal("80.00"));
+            assertThat(finished.getMinSyncRate()).isEqualByComparingTo(new BigDecimal("75.00"));
             assertThat(finished.getEndTime()).isNotNull();
             assertThat(finished.getVersion()).isGreaterThanOrEqualTo(1L);
 

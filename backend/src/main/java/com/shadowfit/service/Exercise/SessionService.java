@@ -230,7 +230,8 @@ public class SessionService {
         session.setEndTime(LocalDateTime.now());
 
         session.setTotalReps(request.getTotalReps());
-        session.setAvgSyncRate(java.math.BigDecimal.valueOf(request.getAvgSyncRate()));
+        // 싱크 통계는 AI 가 보낸 값을 쓰지 않고 pose_data 에서 직접 집계한다 (이슈 #75).
+        applySyncStats(session, request);
         session.setCaloriesBurned(java.math.BigDecimal.valueOf(request.getCaloriesBurned()));
 
         sessionRepository.saveAndFlush(session);
@@ -242,6 +243,67 @@ public class SessionService {
         precomputeReport(session);
 
         sessionMetrics.sessionTransition(Status.COMPLETED, "ai-callback");
+    }
+
+    /**
+     * [싱크 통계 집계] 세션의 avg/max/min sync 를 {@code pose_data} 에서 직접 계산해 채운다 (이슈 #75).
+     *
+     * <p><b>왜 AI 가 보낸 값을 안 쓰는가</b> — 세 가지가 한꺼번에 틀려 있었다.
+     * <ol>
+     *   <li><b>재부착 세션은 후반 구간만 반영됐다.</b> AI 의 통계는 메모리의 {@code completed_reps}
+     *       기준인데, 재부착하면 그게 비어서 시작한다. 재부착 이전 rep 의 sync_rate 는 AI 에 없고
+     *       {@code pose_data} 에만 있다 — 그래서 <b>가진 쪽이 계산해야 한다.</b></li>
+     *   <li><b>max/min 은 아예 저장되지 않았다.</b> AI 가 proto 로 보내는데 여기서 {@code set} 을
+     *       안 해 컬럼이 항상 NULL 이었다.</li>
+     *   <li><b>rep 이 있는데 통계가 비면 0.0 이 실제 값으로 저장됐다.</b> 아래 참고.</li>
+     * </ol>
+     *
+     * <p><b>측정된 rep 이 없으면 0 이 아니라 {@code null} 이다.</b> 0 으로 두면 "측정 안 됨"이
+     * "싱크로율 0%"로 둔갑해 월 평균을 끌어내린다 — 커밋 {@code 0914082} 가 고쳤던 바로 그 증상이고,
+     * 그 방어({@code filter(Objects::nonNull)}, {@link #getCalendarMain} 의 월 평균)는 <b>null 만</b>
+     * 걸러내므로 저장된 0.0 은 못 막는다. 그래서 애초에 0 을 쓰지 않는다.
+     *
+     * <p>읽는 쪽 5곳 중 4곳은 이미 null 을 처리하고 있었고, {@code SessionReportResponseDto.of}
+     * 하나만 {@code .intValue()} 로 바로 까서 NPE 가 났다 — 거기서 함께 막았다.
+     *
+     * <p>rep 가중 평균을 유지하는 이유는 {@code findRepAverageSyncRates} 주석 참고 — 다운샘플 때문에
+     * 프레임 단위로 평균 내면 값이 달라진다.
+     */
+    private void applySyncStats(Session session, SessionCompleteRequest request) {
+        List<Double> repAverages = poseDataRepository.findRepAverageSyncRates(session.getId());
+
+        if (repAverages.isEmpty()) {
+            // rep 단위로 셀 수 있는 프레임이 없다. 두 경우가 섞여 있고 처리가 다르다.
+            if (request.getTotalReps() > 0 && request.getAvgSyncRate() > 0) {
+                // (1) AI 는 rep 을 셌는데 rep_number 가 안 남았다 = rep_number 를 안 보내는 구버전 AI.
+                // proto3 기본값 0 으로 들어와 위 쿼리(repNumber > 0)에 안 걸린다. 배포 순서를 안 맞춰도
+                // 깨지지 않게 하려던 설계인데(PoseDataService 주석), 여기서 null 로 덮으면 그 구간에
+                // 통계가 통째로 사라진다. 우리가 더 잘 계산할 수 없으므로 AI 가 보낸 값을 쓴다.
+                session.setAvgSyncRate(scaleSync(request.getAvgSyncRate()));
+                session.setMaxSyncRate(scaleSync(request.getMaxSyncRate()));
+                session.setMinSyncRate(scaleSync(request.getMinSyncRate()));
+                return;
+            }
+            // (2) 측정된 rep 이 정말 없다(0회 세션 등). 이때 AI 는 0.0 을 보내는데 그걸 저장하면 안 된다.
+            session.setAvgSyncRate(null);
+            session.setMaxSyncRate(null);
+            session.setMinSyncRate(null);
+            return;
+        }
+
+        java.util.DoubleSummaryStatistics stats = repAverages.stream()
+                .mapToDouble(Double::doubleValue)
+                .summaryStatistics();
+
+        session.setAvgSyncRate(scaleSync(stats.getAverage()));
+        session.setMaxSyncRate(scaleSync(stats.getMax()));
+        session.setMinSyncRate(scaleSync(stats.getMin()));
+    }
+
+    /** 컬럼이 {@code DECIMAL(5,2)} 라 저장 전에 맞춰 둔다 — 반올림 위치를 DB 에 맡기지 않는다. */
+    private java.math.BigDecimal scaleSync(double value) {
+        return java.math.BigDecimal.valueOf(value)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     /**
