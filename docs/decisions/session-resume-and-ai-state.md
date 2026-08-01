@@ -204,13 +204,17 @@ AI가 rep마다 중간 보고하고 AI는 stateless를 지향. `pose_data`가 �
 - [ ] C(AI 상태 영속화)를 언제 볼지 — 확장 옵션으로 둘지, 별도 카드로 올릴지
 - [ ] C를 가게 된다면 스냅샷에 **어디까지 담을지** — `completed_reps`만이면 B와 실질 차이가 작고, `rep_state`·스무딩 이력까지 담아야 진짜 이어짐이 된다
 - [ ] §2-2의 역설을 근거로 **타임아웃 버퍼 30분 자체를 재검토**할지
-- [ ] §7의 잔여 격차(싱크 통계 구간 불일치)를 메울지 — 이슈 [#75](https://github.com/Shadowfit/init/issues/75) 로 분리(고치는 방법 3안 비교 포함)
+- [x] ~~§7의 잔여 격차(싱크 통계 구간 불일치)를 메울지~~ → 이슈 [#75](https://github.com/Shadowfit/init/issues/75) 로 분리 후 **ㄱ안(Spring 이 `pose_data` 직접 집계) 채택·수정 완료**(2026-08-01, 커밋 `ca17ec0`, 미머지). §7-1 참고
 
 ---
 
 ## 7. ⚠️ 구현 후 남은 격차 (2026-07-31)
 
-### 7-1. 싱크 통계는 재부착 이후 rep만 반영한다
+### 7-1. ~~싱크 통계는 재부착 이후 rep만 반영한다~~ → ✅ 해결 (2026-08-01, `ca17ec0` 미머지)
+
+> **결론 먼저**: `applyComplete` 가 AI 가 보낸 통계를 쓰지 않고 **`pose_data` 를 `GROUP BY rep_number` 로 직접 집계**하도록 바꿔 해결했다. 재부착 이전 rep 의 `sync_rate` 는 AI 메모리엔 없어도 `pose_data` 에는 남아 있으므로, **가진 쪽이 계산하면 된다**는 것이 답이었다. max/min 미저장과 "rep 이 있는데 0.0 저장"도 같이 해소됐다. 상세는 이슈 [#75](https://github.com/Shadowfit/init/issues/75) 와 [`../tasks/29-ai-code-verification.md`](../tasks/29-ai-code-verification.md) §2-1.
+>
+> 아래는 **당시(2026-07-31) 기록을 보존한 것**이다.
 
 구현 중 발견한 사실: `total_reps`가 `state.rep_count`가 아니라 **`len(state.completed_reps)`**로 계산되고 있었다(`exercise_servicer.py`). `rep_count`만 주입해서는 최종 집계가 이어지지 않아, `total_reps = state.rep_count`로 함께 고쳤다.
 
