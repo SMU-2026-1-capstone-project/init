@@ -2,6 +2,8 @@ package com.shadowfit.service.Report;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shadowfit.dto.report.PoseFrameProjection;
+import com.shadowfit.dto.report.detailreport.RepSyncRateDto;
+import com.shadowfit.dto.report.detailreport.SessionDetailedAnalysis;
 import com.shadowfit.dto.report.detailreport.SessionReportResponseDto;
 import com.shadowfit.dto.report.detailreport.WorstSectionDto;
 import com.shadowfit.global.error.BusinessException;
@@ -118,18 +120,55 @@ class ReportServiceTest {
     @DisplayName("precompute된 detailed_analysis가 있으면 그 값을 읽기만 하고 pose_data는 재조회 안 함")
     void precomputedAnalysis_skipsPoseDataRecompute() throws Exception {
         WorstSectionDto precomputed = new WorstSectionDto();
+        precomputed.setRepNumber(2);
         precomputed.setExerciseName("스쿼트");
         precomputed.setTimeStamp("01:15");
-        precomputed.setReason("싱크로율 40% · KNEE_OUT");
-        report.setDetailedAnalysis(new ObjectMapper().writeValueAsString(precomputed));
+        precomputed.setReason("2회차 · 싱크로율 75%");
+        SessionDetailedAnalysis stored = new SessionDetailedAnalysis(precomputed, List.of(
+                new RepSyncRateDto(1, 80.0, "00:12"),
+                new RepSyncRateDto(2, 75.0, "01:15")
+        ));
+        report.setDetailedAnalysis(new ObjectMapper().writeValueAsString(stored));
         when(reportRepository.findBySessionId(SESSION_ID)).thenReturn(Optional.of(report));
 
         SessionReportResponseDto result = reportService.getSessionReport(SESSION_ID, MEMBER_ID);
 
         assertThat(result.getWorstSection()).isNotNull();
-        assertThat(result.getWorstSection().getReason()).isEqualTo("싱크로율 40% · KNEE_OUT");
+        assertThat(result.getWorstSection().getRepNumber()).isEqualTo(2);
+        assertThat(result.getRepTrend())
+                .extracting(RepSyncRateDto::getRepNumber).containsExactly(1, 2);
+        // 추이를 응답에 넣으면서 pose_data 스캔이 되살아나지 않았는지가 이 테스트의 핵심이다
         verify(poseDataRepository, never()).findFramesBySessionId(anyLong());
         verify(worstSectionCalculator, never()).calculate(any(), any());
+        verify(worstSectionCalculator, never()).calculateRepTrend(any());
+    }
+
+    @Test
+    @DisplayName("구버전 형식(WorstSectionDto 단독)으로 저장된 detailed_analysis는 재계산으로 흘린다")
+    void legacyAnalysisFormat_fallsBackToRecompute() throws Exception {
+        // 예전에는 이 컬럼에 WorstSectionDto 를 그대로 직렬화했다. 그 행을 SessionDetailedAnalysis 로
+        // 읽으면 파싱이 실패하거나(엄격 모드) 전부 null 인 객체가 나온다(관대 모드). 둘 다 재계산이어야
+        // 한다 — 후자만 놓치면 나중에 FAIL_ON_UNKNOWN_PROPERTIES 를 끄는 순간 worst 가 조용히 사라진다.
+        WorstSectionDto legacy = new WorstSectionDto();
+        legacy.setExerciseName("스쿼트");
+        legacy.setTimeStamp("01:15");
+        legacy.setReason("싱크로율 40% · KNEE_OUT");
+        report.setDetailedAnalysis(new ObjectMapper().writeValueAsString(legacy));
+        when(reportRepository.findBySessionId(SESSION_ID)).thenReturn(Optional.of(report));
+
+        List<PoseFrameProjection> frames = List.of(new PoseFrameProjection(0.0, 50.0, 1));
+        when(poseDataRepository.findFramesBySessionId(SESSION_ID)).thenReturn(frames);
+        WorstSectionDto recomputed = new WorstSectionDto();
+        recomputed.setReason("재계산됨");
+        when(worstSectionCalculator.calculate(session, frames)).thenReturn(recomputed);
+        when(worstSectionCalculator.calculateRepTrend(frames))
+                .thenReturn(List.of(new RepSyncRateDto(1, 50.0, "00:00")));
+
+        SessionReportResponseDto result = reportService.getSessionReport(SESSION_ID, MEMBER_ID);
+
+        assertThat(result.getWorstSection().getReason()).isEqualTo("재계산됨");
+        assertThat(result.getRepTrend()).hasSize(1);
+        verify(poseDataRepository, times(1)).findFramesBySessionId(SESSION_ID);
     }
 
     @Test

@@ -22,6 +22,16 @@ public class SessionReportResponseDto {
     private String aiSafetyReport;
 
     private WorstSectionDto worstSection;
+
+    /**
+     * 회차별 싱크로율 추이(rep 오름차순). 측정된 rep 이 없으면 빈 리스트.
+     *
+     * <p>{@code syncRateDetails} 는 이름과 달리 <b>세션당 한 줄</b>이라(운동 종목 단위 요약) 회차
+     * 흐름을 볼 수 없었다. {@code worstSection} 도 가장 나빴던 한 회차만 알려준다. 데이터는
+     * {@code pose_data} 에 rep 별로 이미 있었고 노출 경로만 없었다.
+     */
+    private List<RepSyncRateDto> repTrend;
+
     private List<ExerciseSyncRateDto> syncRateDetails;
 
     private ComparisonWithPreviousDto comparisonWithPrevious;

@@ -1,6 +1,7 @@
 package com.shadowfit.service.Report;
 
 import com.shadowfit.dto.report.PoseFrameProjection;
+import com.shadowfit.dto.report.detailreport.RepSyncRateDto;
 import com.shadowfit.dto.report.detailreport.WorstSectionDto;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.ExerciseCategory;
@@ -83,6 +84,7 @@ class WorstSectionCalculatorTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getExerciseName()).isEqualTo("스쿼트");
+        assertThat(result.getRepNumber()).isEqualTo(2);
         assertThat(result.getReason()).isEqualTo("2회차 · 싱크로율 40%");
     }
 
@@ -244,5 +246,108 @@ class WorstSectionCalculatorTest {
                 .doesNotContain("자세 양호")
                 .doesNotContain("자세 보정 필요")
                 .doesNotContain("즉시 자세 수정 필요");
+    }
+
+    // ── 회차별 추이 (calculateRepTrend) ──────────────────────────────────────
+
+    @Test
+    @DisplayName("추이는 rep 오름차순으로 회차마다 한 점")
+    void repTrend_isOnePointPerRepInOrder() {
+        List<PoseFrameProjection> frames = List.of(
+                frame(1, 0.0, 80.0),
+                frame(1, 0.5, 80.0),
+                frame(2, 1.0, 75.0),
+                frame(3, 2.0, 91.5)
+        );
+
+        List<RepSyncRateDto> trend = calculator.calculateRepTrend(frames);
+
+        assertThat(trend).extracting(RepSyncRateDto::getRepNumber).containsExactly(1, 2, 3);
+        assertThat(trend).extracting(RepSyncRateDto::getSyncRate).containsExactly(80.0, 75.0, 91.5);
+    }
+
+    @Test
+    @DisplayName("★ worstSection.repNumber로 추이의 worst 점을 찾을 수 있다 — 문자열 파싱 불필요")
+    void worstIsLinkedToTrendByRepNumber() {
+        List<PoseFrameProjection> frames = List.of(
+                frame(1, 0.0, 80.0),
+                frame(2, 1.0, 75.0),
+                frame(3, 2.0, 91.5)
+        );
+
+        WorstSectionDto worst = calculator.calculate(session, frames);
+        List<RepSyncRateDto> trend = calculator.calculateRepTrend(frames);
+
+        RepSyncRateDto matched = trend.stream()
+                .filter(point -> point.getRepNumber() == worst.getRepNumber())
+                .findFirst()
+                .orElseThrow();
+
+        // worst 는 정의상 추이의 최솟값이어야 한다 — 두 계산이 같은 그룹핑을 쓰므로 어긋날 수 없다
+        assertThat(matched.getSyncRate())
+                .isEqualTo(trend.stream().mapToDouble(RepSyncRateDto::getSyncRate).min().orElseThrow());
+        assertThat(matched.getTimeStamp()).isEqualTo(worst.getTimeStamp());
+    }
+
+    @Test
+    @DisplayName("추이의 timeStamp는 그 rep의 중앙 프레임")
+    void repTrend_timestampIsMiddleFrame() {
+        List<PoseFrameProjection> frames = List.of(
+                frame(1, 70.0, 50.0),   // 1:10
+                frame(1, 75.0, 50.0),   // 중앙 → 1:15
+                frame(1, 80.0, 50.0)    // 1:20
+        );
+
+        assertThat(calculator.calculateRepTrend(frames))
+                .singleElement()
+                .satisfies(point -> assertThat(point.getTimeStamp()).isEqualTo("01:15"));
+    }
+
+    @Test
+    @DisplayName("syncRate가 전부 null인 rep은 추이에 점을 찍지 않는다 (구멍으로 남김)")
+    void repTrend_skipsRepWithoutSyncRate() {
+        List<PoseFrameProjection> frames = Arrays.asList(
+                frame(1, 0.0, 60.0),
+                frame(2, 1.0, null),    // ← 점 없음
+                frame(3, 2.0, 70.0)
+        );
+
+        assertThat(calculator.calculateRepTrend(frames))
+                .extracting(RepSyncRateDto::getRepNumber).containsExactly(1, 3);
+    }
+
+    @Test
+    @DisplayName("rep_number가 0(미상)인 행은 추이에서도 제외")
+    void repTrend_excludesUnknownRep() {
+        List<PoseFrameProjection> frames = List.of(
+                frame(0, 0.0, 10.0),
+                frame(1, 1.0, 55.0)
+        );
+
+        assertThat(calculator.calculateRepTrend(frames))
+                .extracting(RepSyncRateDto::getRepNumber).containsExactly(1);
+    }
+
+    @Test
+    @DisplayName("측정된 rep이 없으면 빈 리스트 (null 아님)")
+    void repTrend_emptyWhenNothingMeasured() {
+        assertThat(calculator.calculateRepTrend(null)).isEmpty();
+        assertThat(calculator.calculateRepTrend(List.of())).isEmpty();
+        assertThat(calculator.calculateRepTrend(List.of(frame(0, 0.0, 50.0)))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("syncRate는 소수 1자리로 반올림")
+    void repTrend_roundsToOneDecimal() {
+        // rep 안 평균이 (70.0 + 71.0 + 71.0) / 3 = 70.666... → 70.7
+        List<PoseFrameProjection> frames = List.of(
+                frame(1, 0.0, 70.0),
+                frame(1, 0.5, 71.0),
+                frame(1, 1.0, 71.0)
+        );
+
+        assertThat(calculator.calculateRepTrend(frames))
+                .singleElement()
+                .satisfies(point -> assertThat(point.getSyncRate()).isEqualTo(70.7));
     }
 }

@@ -3,6 +3,7 @@ package com.shadowfit.service.Report;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shadowfit.dto.report.detailreport.ComparisonWithPreviousDto;
 import com.shadowfit.dto.report.detailreport.ExerciseSyncRateDto;
+import com.shadowfit.dto.report.detailreport.SessionDetailedAnalysis;
 import com.shadowfit.dto.report.detailreport.SessionReportResponseDto;
 import com.shadowfit.dto.report.detailreport.WorstSectionDto;
 import com.shadowfit.dto.report.PoseFrameProjection;
@@ -62,7 +63,9 @@ public class ReportService {
                                                          Optional<Session> lastSession) {
         SessionReportResponseDto responseDto = SessionReportResponseDto.of(session, report);
 
-        responseDto.setWorstSection(resolveWorstSection(session, report));
+        SessionDetailedAnalysis analysis = resolveDetailedAnalysis(session, report);
+        responseDto.setWorstSection(analysis.getWorstSection());
+        responseDto.setRepTrend(analysis.getRepTrend() == null ? List.of() : analysis.getRepTrend());
         responseDto.setSyncRateDetails(buildSyncRateDetails(session));
         lastSession.ifPresent(last ->
                 responseDto.setComparisonWithPrevious(buildComparisonWithPrevious(session, last))
@@ -71,21 +74,39 @@ public class ReportService {
         return responseDto;
     }
 
-    // precompute-on-write(SessionService.applyComplete)가 세션 완료 시점에 이미 계산해 저장한
-    // detailed_analysis가 있으면 그걸 읽기만 하고 pose_data는 스캔하지 않음(db-deep-dive.md §B-3).
-    // precompute 이전에 생성된 리포트(시드 데이터 등)는 detailed_analysis가 비어 있으므로, 그 경우에만
-    // 예전처럼 pose_data에서 즉석 계산 — 별도 백필 없이 하위호환(report-read-path.md §9-4).
-    private WorstSectionDto resolveWorstSection(Session session, Report report) {
+    /**
+     * precompute-on-write(SessionService.applyComplete)가 세션 완료 시점에 이미 계산해 저장한
+     * detailed_analysis가 있으면 그걸 읽기만 하고 pose_data는 스캔하지 않음(db-deep-dive.md §B-3).
+     * precompute 이전에 생성된 리포트(시드 데이터 등)는 detailed_analysis가 비어 있으므로, 그 경우에만
+     * 예전처럼 pose_data에서 즉석 계산 — 별도 백필 없이 하위호환(report-read-path.md §9-4).
+     *
+     * <p><b>구버전 형식 판정</b>: 예전엔 이 컬럼에 {@link WorstSectionDto} 를 그대로 넣었다. 그 행을
+     * {@link SessionDetailedAnalysis} 로 읽으면 (a) 필드가 안 맞아 파싱 실패하거나 (b) ObjectMapper
+     * 설정에 따라 전부 null 인 객체가 나온다. <b>두 경우를 모두</b> 재계산으로 흘린다 — (a)만 막으면
+     * 나중에 누군가 {@code FAIL_ON_UNKNOWN_PROPERTIES} 를 끄는 순간 worst 가 조용히 사라진다.
+     *
+     * <p>반환은 항상 non-null 이다(필드는 비어 있을 수 있음). 호출부가 null 분기를 지지 않게 하려는 것.
+     */
+    private SessionDetailedAnalysis resolveDetailedAnalysis(Session session, Report report) {
         String detailedAnalysis = report.getDetailedAnalysis();
         if (detailedAnalysis != null && !detailedAnalysis.isBlank()) {
             try {
-                return objectMapper.readValue(detailedAnalysis, WorstSectionDto.class);
+                SessionDetailedAnalysis parsed =
+                        objectMapper.readValue(detailedAnalysis, SessionDetailedAnalysis.class);
+                if (parsed.getWorstSection() != null
+                        || (parsed.getRepTrend() != null && !parsed.getRepTrend().isEmpty())) {
+                    return parsed;
+                }
+                log.warn("세션 {} detailed_analysis 가 구버전 형식으로 판단됨 — pose_data 즉석 재계산으로 대체",
+                        session.getId());
             } catch (Exception e) {
                 log.warn("세션 {} detailed_analysis 파싱 실패 — pose_data 즉석 재계산으로 대체", session.getId(), e);
             }
         }
         List<PoseFrameProjection> poseFrames = poseDataRepository.findFramesBySessionId(session.getId());
-        return worstSectionCalculator.calculate(session, poseFrames);
+        return new SessionDetailedAnalysis(
+                worstSectionCalculator.calculate(session, poseFrames),
+                worstSectionCalculator.calculateRepTrend(poseFrames));
     }
 
     private List<ExerciseSyncRateDto> buildSyncRateDetails(Session session) {

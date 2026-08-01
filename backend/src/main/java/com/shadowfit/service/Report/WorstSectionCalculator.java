@@ -1,6 +1,7 @@
 package com.shadowfit.service.Report;
 
 import com.shadowfit.dto.report.PoseFrameProjection;
+import com.shadowfit.dto.report.detailreport.RepSyncRateDto;
 import com.shadowfit.dto.report.detailreport.WorstSectionDto;
 import com.shadowfit.model.exercise.Session;
 import org.springframework.stereotype.Component;
@@ -33,6 +34,10 @@ import java.util.Map;
  * <p>지금은 rep 으로 묶어 평균이 가장 낮은 rep 을 고른다. <b>평균을 쓰는 것은 의도적이다</b> —
  * 지금 데이터에서는 rep 안이 상수라 어느 프레임을 봐도 같지만, 나중에 프레임별 채점이 도입되면
  * (decisions/worst-section-rep-resolution.md §4-ㄷ) 이 코드를 고치지 않아도 의미가 유지된다.
+ *
+ * <p>⚠️ <b>이름이 하는 일보다 좁다.</b> 같은 rep 그룹핑에서 회차별 추이({@link #calculateRepTrend})도
+ * 나오므로 이 컴포넌트는 이제 worst 만 계산하지 않는다. 클래스명 정리는 후속으로 남긴다 —
+ * 지금 바꾸면 미머지 PR 두 개(#81, #78) 위에 이름 변경 diff 가 겹쳐 리뷰가 어려워진다.
  */
 @Component
 public class WorstSectionCalculator {
@@ -75,10 +80,50 @@ public class WorstSectionCalculator {
         PoseFrameProjection representative = worstFrames.get(worstFrames.size() / 2);
 
         WorstSectionDto worst = new WorstSectionDto();
+        // repTrend 의 어느 점이 worst 인지 잇는 열쇠. reason 문자열에서 파싱하게 두면 잠정 문구(#80)에
+        // 프론트가 묶인다. 같은 groupByRep 결과에서 나오므로 추이의 최솟값과 반드시 일치한다.
+        worst.setRepNumber(worstRep);
         worst.setExerciseName(session.getExercise().getName());
         worst.setTimeStamp(formatTimestamp(representative.timestampSec()));
         worst.setReason(buildWorstReason(worstRep, worstAverage));
         return worst;
+    }
+
+    /**
+     * 회차별 싱크로율 추이 (rep 오름차순).
+     *
+     * <p>{@link #calculate} 와 같은 재료(rep 그룹 + rep 평균)를 쓰지만 <b>고르는 대신 전부</b>
+     * 내놓는다. worst 는 "가장 나빴던 한 회차"만 알려주므로 "3회차부터 계속 떨어졌다" 같은 흐름을
+     * 볼 수 없었고, 데이터는 {@code pose_data} 에 rep 별로 이미 있는데 노출하는 경로만 없었다.
+     *
+     * <p>측정된 rep 이 없으면 <b>빈 리스트</b>다(null 아님) — 응답 계약을 단순하게 두려는 것이고,
+     * "측정 안 됨"은 같은 응답의 {@code totalReps}·{@code avgSyncRate} 로 이미 드러난다.
+     *
+     * <p>rep 하나가 한 점이므로 크기는 세션의 rep 수(수십 규모)다. 이 계산은 조회 때가 아니라
+     * precompute 시점에 한 번 돌고 결과가 {@code reports.detailed_analysis} 에 저장된다.
+     */
+    public List<RepSyncRateDto> calculateRepTrend(List<PoseFrameProjection> poseFrames) {
+        if (poseFrames == null || poseFrames.isEmpty()) {
+            return List.of();
+        }
+
+        List<RepSyncRateDto> trend = new ArrayList<>();
+        for (Map.Entry<Integer, List<PoseFrameProjection>> entry : groupByRep(poseFrames).entrySet()) {
+            Double average = averageSyncRate(entry.getValue());
+            if (average == null) {
+                continue; // syncRate 가 전부 null 인 rep — 추이에 구멍으로 남기고 점을 찍지 않는다
+            }
+            List<PoseFrameProjection> repFrames = entry.getValue();
+            PoseFrameProjection representative = repFrames.get(repFrames.size() / 2);
+            trend.add(new RepSyncRateDto(
+                    entry.getKey(),
+                    // 소수 1자리 반올림 — rep 안 값이 상수라 지금은 나눗셈 오차만 정리하는 수준이지만,
+                    // 프레임별 채점이 도입되면 실제 평균이 되므로 자리수를 미리 고정해 둔다.
+                    Math.round(average * 10.0) / 10.0,
+                    formatTimestamp(representative.timestampSec())
+            ));
+        }
+        return trend;
     }
 
     /**

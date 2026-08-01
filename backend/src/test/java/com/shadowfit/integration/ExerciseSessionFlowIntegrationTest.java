@@ -1,5 +1,8 @@
 package com.shadowfit.integration;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shadowfit.dto.report.detailreport.RepSyncRateDto;
+import com.shadowfit.dto.report.detailreport.SessionDetailedAnalysis;
 import com.shadowfit.dto.report.detailreport.SessionReportResponseDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
@@ -158,7 +161,7 @@ class ExerciseSessionFlowIntegrationTest {
 
         @Test
         @DisplayName("rep 단위 SavePoseDataBatch → CompleteAnalysis 콜백 후 DB 일관 상태")
-        void normal_one_cycle() {
+        void normal_one_cycle() throws Exception {
             // given: IN_PROGRESS 세션 시작
             Session session = createInProgressSession();
             Long sessionId = session.getId();
@@ -238,6 +241,16 @@ class ExerciseSessionFlowIntegrationTest {
             assertThat(report.getDetailedAnalysis()).contains("2회차");
             assertThat(report.getDetailedAnalysis()).contains("75%");
             assertThat(report.getDetailedAnalysis()).doesNotContain("1회차");
+
+            // then: 회차별 추이도 같은 precompute 에 함께 저장된다 — 조회 시점에 pose_data 를 다시
+            // 스캔하지 않기 위해서다. worstSection.repNumber 로 추이의 worst 점을 찾을 수 있어야 한다.
+            SessionDetailedAnalysis analysis = new ObjectMapper()
+                    .readValue(report.getDetailedAnalysis(), SessionDetailedAnalysis.class);
+            assertThat(analysis.getRepTrend())
+                    .extracting(RepSyncRateDto::getRepNumber).containsExactly(1, 2);
+            assertThat(analysis.getRepTrend())
+                    .extracting(RepSyncRateDto::getSyncRate).containsExactly(80.0, 75.0);
+            assertThat(analysis.getWorstSection().getRepNumber()).isEqualTo(2);
         }
     }
 
