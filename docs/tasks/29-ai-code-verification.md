@@ -40,7 +40,8 @@
 | [#76](https://github.com/Shadowfit/init/issues/76) | 재부착이 트랜잭션 안에서 블로킹 gRPC → 커넥션 풀 고갈로 번짐 | **수정 완료** (`8bc417f`) |
 | [#77](https://github.com/Shadowfit/init/issues/77) | 재부착 검증과 gRPC 사이 잠금 없음 (TOCTOU) | 열림 — **결과 확인이 먼저** |
 | [#78](https://github.com/Shadowfit/init/issues/78) | worst 구간이 프레임 해상도를 가정하는데 `sync_rate` 는 rep 단위 상수 | 열림 — 2026-08-01 코멘트로 **원인 보강** (§2-3) |
-| [#79](https://github.com/Shadowfit/init/issues/79) | 다운샘플의 "worst 프레임 대표추출"이 실행되지 않는다 — 항상 첫 프레임만 남는다 | 열림 (§2-3) |
+| [#79](https://github.com/Shadowfit/init/issues/79) | 다운샘플의 "worst 프레임 대표추출"이 실행되지 않는다 — 항상 첫 프레임만 남는다 | **수정 완료** (`2abf49b`, 미푸시) — §2-4 |
+| — | `ExerciseAnalysisService.applyCompleteFromApp` 을 **부르는 프로덕션 코드가 없다** (테스트만 호출) | 미등록 — §2-5 |
 | [#80](https://github.com/Shadowfit/init/issues/80) | worst `reason` 이 싱크로율의 동어반복 / `pickDominantFeedback` 죽은 코드 / `is_correct` 읽는 곳 없음 | 열림 — 처리 방향은 [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md) §8-3 에 확정 |
 | — | `Exercise` 캐시 TTL 1시간 vs "플래그만 TRUE 로 바꾸면 열린다" 주석 | 미등록 (영향 낮음) |
 
@@ -69,6 +70,40 @@
 **#79 — 죽은 비교**: `downsampleByWorstSync`(`PoseDataService.java:104-117`)가 5프레임마다 최저 `sync_rate` 를 고른다는데, 배치 1개가 rep 1개고 그 안의 값이 전부 같아 **엄격 부등호(`<`)가 참이 되지 않는다.** 실제 동작은 매 5프레임 중 첫 프레임만 남기는 균등 샘플링이다. `sync_rate` 값 자체는 상수라 집계에는 영향이 없지만, **`joint_coordinates` 는 프레임마다 다르므로 어느 좌표가 남는지가 달라진다.**
 
 교훈: **하나의 잘못된 전제는 한 곳에서만 틀리지 않는다.** #75 를 고칠 때 "rep 단위 상수"라는 사실을 이미 알고 있었는데, 그 사실을 **다른 소비자들에게 되짚지 않았다.** 결함을 고칠 때 "이 사실을 오해한 곳이 또 어디인가"를 묻는 절차가 없었던 셈이다.
+
+### 2-4. ★ 테스트가 죽은 코드를 살아 있게 보이게 하고 있었다 (#79 수정 중 발견)
+
+#79 를 고치려고 `PoseDataServiceTest` 를 열었더니, 다운샘플의 "최저 프레임을 고른다"를 **증명하는 테스트가 두 개나 있었다.**
+
+```java
+// 예전 픽스처 — 한 배치 안에서 sync_rate 가 제각각이다
+frame(0.0, 90.0), frame(0.1, 80.0), frame(0.2, 10.0), frame(0.3, 70.0), frame(0.4, 60.0),
+frame(0.5, 50.0), frame(0.6, 20.0)
+→ assert: 10.0 과 20.0 이 남는다  ✅ 통과
+```
+
+**그 입력은 실데이터에 존재하지 않는다.** 한 배치가 곧 한 rep 이고 rep 안의 `sync_rate` 는 상수라, 실제로는 `frame(_, 65.0) × 7` 같은 모양만 온다. 테스트는 통과하는데 **프로덕션에서는 그 코드 경로가 한 번도 실행되지 않았다.**
+
+> **테스트가 초록불이라는 것이 그 코드가 도는 것을 뜻하지 않는다** — 픽스처가 실데이터의 제약을 반영하지 않으면, 테스트는 "이 코드가 옳다"가 아니라 "이 코드는 이런 입력을 준다면 이렇게 동작한다"만 증명한다. 그 입력이 오지 않으면 증명은 공허하다.
+
+이건 §4(주석이 사실과 다름)와 **같은 종류의 함정**이다. 주석이 거짓말을 하면 읽다가 속고, 픽스처가 비현실적이면 테스트가 거짓 안심을 준다.
+
+수정 시 `realisticBatch(repNumber, frameCount, syncRate)` 헬퍼를 만들어 **배치 안 `sync_rate`·`repNumber` 가 상수**임을 픽스처 수준에서 강제했다. 비현실적 픽스처는 지우지 않고 *"선택이 값이 아니라 **위치**로 이뤄진다"* 를 드러내는 용도로 한 개만 남겼다.
+
+### 2-5. `applyCompleteFromApp` — 부르는 코드가 없다 (미등록)
+
+[`28-remaining-work-plan.md`](./28-remaining-work-plan.md) 와 §7 이 *"앱 보고 경로에도 rep 단위 집계를 적용할지 미결"* 로 적어뒀는데, 확인해 보니 **그 경로 자체가 없다.**
+
+```
+grep "\.completeSession(" backend/src/main
+→ ExerciseGrpcService.java:97  sessionService.completeSession(request)   ← SessionService(AI gRPC 콜백)
+```
+
+`ExerciseAnalysisService.completeSession(Long, SessionUpdateRequestDto)` 와 `applyCompleteFromApp` 은 **컨트롤러에서도 호출되지 않는다.** 유일한 호출자가 테스트다(`ExerciseAnalysisServiceTest`·`SessionMetricsRecordingTest`).
+
+즉 미결 항목의 **질문 자체가 잘못 세워져 있었다** — "적용할지"가 아니라 "이 코드가 살아 있는 게 맞는지"다. 삭제 / 유지+미사용 명시 / 되살리기 중 미결이며, 삭제하면 테스트 6~7개가 함께 없어진다.
+
+⚠️ **이슈로 등록하지 않았다.** 결함이라기보다 사용되지 않는 코드라 판단했으나, [[feedback_troubleshooting_to_issues]] 기준으로는 등록하는 게 맞을 수 있다 — 결정과 함께 처리한다.
 
 ---
 
@@ -130,9 +165,24 @@
 |---|---|---|
 | `fix/session-stats-and-tx-boundary` | `8bc417f` | #76 — DB 작업을 `loadReattachRequest` 로 분리해 gRPC 를 트랜잭션 밖으로. 애노테이션 배치를 고정하는 회귀 테스트 추가 |
 | | `ca17ec0` | #75 — `pose_data` rep 단위 집계, max/min 저장, 측정없음=null, 구버전 AI 폴백, 잠복 NPE 3개 |
-| `docs/plan-sync-and-integration-candidates` | `adee12b` | 계획 동기화 + [`../decisions/external-integration-candidates.md`](../decisions/external-integration-candidates.md) 신설 |
+| `feat/worst-rep-resolution` ([PR #82](https://github.com/Shadowfit/init/pull/82)) | `a86621f` | #78 ㄱ안 — worst 를 rep 단위로. 프로젝션에 `repNumber` 추가·`feedbackMessage` 제거, `WORST_WINDOW_SIZE`·`pickDominantFeedback` 삭제 |
+| | `6d5d419` | 회차별 추이(`repTrend`) + `WorstSectionDto.repNumber` + 프론트 타입 |
+| **`feat/rep-cleanup`** ⚠️ **미푸시·PR 없음** | `2abf49b` | #79 죽은 극값 선택 제거 + `pose-ingest-downsampling.md` §4 정정 + 비현실 픽스처 교체(§2-4) + `WorstSectionCalculator` → `SessionAnalysisCalculator` |
+| `docs/plan-sync-and-integration-candidates` ([PR #83](https://github.com/Shadowfit/init/pull/83)) | `adee12b` 외 | 계획 동기화 + 결정 문서 2건 신설 + 본 문서 |
 
-**전체 테스트 223개 통과**(신규 6개: 싱크 통계 5 + 트랜잭션 경계 1).
+**테스트 추이**: 223 (#81) → 236 (#82) → **237** (`feat/rep-cleanup`).
+
+### 6-1. 브랜치 스택 (2026-08-01 기준)
+
+```
+main
+ ├─ PR #83  docs/plan-sync-and-integration-candidates   문서만 (독립 머지 가능)
+ └─ PR #81  fix/session-stats-and-tx-boundary           #75 · #76
+     └─ PR #82  feat/worst-rep-resolution                #78 · 회차별 추이
+         └─ (로컬) feat/rep-cleanup                      #79 · 클래스명   ← 미푸시
+```
+
+머지 순서는 #81 → #82 → (`feat/rep-cleanup`) 로 고정된다. #83 은 아무 때나.
 
 ---
 
@@ -142,8 +192,10 @@
 - [ ] 테스트 3종 상세 검증 (552줄) + ai-server 테스트
 - [ ] [#77](https://github.com/Shadowfit/init/issues/77) — 고치기 전에 **"그때 실제로 무슨 일이 나는지"** 부터 확인
 - [ ] [#78](https://github.com/Shadowfit/init/issues/78) — 고치는 방법 3안 결정. **비교 문서 완료** → [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md)(ㄱ안 추천, ㄴ 배제 권고, ㄷ 별도 트랙). 조사 중 확인한 것: `dtaidistance` 가 워핑 경로 API(`dtw.warping_path`)를 제공하는데 지금은 `dtw.distance()` 로 **거리만 받고 경로를 버린다.** ㄷ안(프레임별 점수)이 새 알고리즘이 아니라 **버리는 중간 산출물을 살리는 일**일 수 있다 — ⚠️ 코드를 읽고 판단한 것이며 돌려보지 않았다
-- [ ] [#79](https://github.com/Shadowfit/init/issues/79) — **#78 과 같이 결정하는 게 싸다.** #78 ㄷ안(프레임별 점수)이 채택되면 #79 는 코드를 고치지 않아도 의도대로 동작한다. 그 전엔 `pose-ingest-downsampling.md` §4 에 최소한 정정 표시가 필요하다(이번 커밋 범위 밖)
-- [ ] `applyCompleteFromApp`(앱 보고 경로)은 여전히 dto 값을 그대로 쓴다 — #75 를 이 경로에도 적용할지
+- [x] ~~[#79](https://github.com/Shadowfit/init/issues/79)~~ → **수정 완료**(`2abf49b`, 미푸시). 죽은 비교를 걷어내고 균등 샘플링임을 코드·주석·문서(§4)에 맞췄다. **동작은 안 바뀐다** — 원래 하던 일을 그대로 쓴 것이다. 🔶 남은 것: "가장 나빴던 순간의 좌표"를 남기려면 프레임마다 실제로 다른 값(무릎각 등)이 기준이어야 하는데 종목별 정의가 필요해 열어뒀다
+- [ ] **`feat/rep-cleanup` 푸시 + PR** — 로컬에만 있다(§6-1)
+- [ ] `applyCompleteFromApp` — **질문이 바뀌었다**(§2-5). "적용할지"가 아니라 **부르는 코드가 없는데 어떻게 할지**다. 삭제 / 유지+미사용 명시 / 되살리기
+- [ ] `is_correct` — 읽는 곳이 없고 임계값이 AI persona 기준과 어긋난다. ⚠️ `pose_data` 는 월별 `PARTITION BY RANGE` 라 컬럼 DROP 이 전체 재구성이다. **지금은 0행이라 제일 싼 시점**
 - [ ] §4 의 부정확한 주석 5건 정정
 - [ ] **같은 뿌리를 오해한 곳이 더 없는지** — `sync_rate` 를 읽는 소비자를 전수로 훑은 적이 없다(§2-3 교훈)
 
@@ -154,3 +206,5 @@
 - **전수가 아니다.** 어제 머지분(#72·#73·#74)만 봤고, 그 이전 코드(아웃박스·파티셔닝·관측성 등)는 이 문서 범위 밖이다
 - #77·#78·#79 는 **코드 경로 추적으로 판단했고 재현하지 않았다.** 각 이슈에 미검증으로 명시. 특히 #79 의 "배치 1개 = rep 1개"는 `ai-server/app/api/endpoints/pose.py` 경로만 확인한 것이다
 - §3 "문제 없던 것"은 **내가 확인한 항목에 한한다** — 확인 안 한 것이 없다는 뜻이 아니다
+- **§3 의 신뢰도가 §2-4 만큼 내려간다.** "테스트가 촘촘하다"를 문제 없던 것으로 적었는데, 바로 그 테스트 스위트가 죽은 코드를 초록불로 덮고 있었다. **픽스처가 실데이터의 제약을 반영하는지는 보지 않았다**
+- 수정한 것(#75·#76·#79)도 **실데이터로 재현·검증하지 않았다.** `pose_data` 0행이라 전부 테스트 픽스처 기준이다

@@ -334,13 +334,13 @@ precompute-on-write 로 **이미 `reports.detailed_analysis` 에 저장된 worst
 - [x] ~~`reason` 처리~~ → **✅ 동어반복 제거 + `pickDominantFeedback` 삭제**. 단 **최종 문구는 구현 시점으로 보류**. §8-3 · [#80](https://github.com/Shadowfit/init/issues/80)
 - [x] ~~**과거 리포트**(§6) — 방치 / 백필 / 무효화~~ → **✅ 자동 해소.** 2026-08-01 실측 결과 `detailed_analysis` 가 채워진 행 **0건**, `pose_data` **0행**. 실행 대상이 없다(§6-1)
 - [x] ~~**착수 브랜치**~~ → **✅ [#75](https://github.com/Shadowfit/init/issues/75) 먼저.** `fix/session-stats-and-tx-boundary` 푸시 + [PR #81](https://github.com/Shadowfit/init/pull/81) 생성 완료(2026-08-01). 머지 후 그 위에서 ㄱ안 착수
-- [ ] `is_correct` 처리 — 삭제 / 임계값 정합 / 유지 ([#80](https://github.com/Shadowfit/init/issues/80))
+- [ ] `is_correct` 처리 — 삭제 / 임계값 정합 / 유지 ([#80](https://github.com/Shadowfit/init/issues/80)). ⚠️ `pose_data` 가 월별 `PARTITION BY RANGE` 라 컬럼 DROP 은 전체 재구성이다 — **지금은 0행이라 제일 싼 시점**
 - [ ] `reason` **최종 문구** — 구현은 잠정값(`"2회차 · 싱크로율 75%"`)으로 나갔다. 테스트도 전체 문자열을 고정하지 않았으니 바꿀 여지는 열려 있다
-- [ ] `applyCompleteFromApp`(앱 보고 경로)에 rep 단위 집계를 적용할지 — 지금은 앱이 보낸 dto 값을 그대로 쓴다(`ExerciseAnalysisService.java:510-511`). AI 콜백 경로만 rep 단위다
+- [ ] `applyCompleteFromApp` — ⚠️ **질문이 바뀌었다.** 조사해 보니 **부르는 프로덕션 코드가 없다**(테스트만 호출, [`../tasks/29-ai-code-verification.md`](../tasks/29-ai-code-verification.md) §2-5). "rep 단위 집계를 적용할지"가 아니라 **삭제 / 유지+미사용 명시 / 되살리기**다
 - [ ] **프론트 화면** — 추이 그래프·표. 타입만 맞춰뒀고 표시가 없어 지금은 사용자 눈에 안 보인다(범위·추정 미정)
-- [ ] `WorstSectionCalculator` 클래스명 정리 (후속, §8-5)
 - [ ] **ㄷ안을 별도 트랙으로 남길지**, 아예 배제할지
-- [ ] [#79](https://github.com/Shadowfit/init/issues/79) — ㄱ안 선택으로 남게 됐다. 문서 정정만 할지, 비교 기준을 다른 값으로 교체할지
+- [x] ~~[#79](https://github.com/Shadowfit/init/issues/79)~~ → **✅ 처리 완료**(`2abf49b`, 미푸시). 죽은 비교를 걷어내고 균등 샘플링임을 코드·주석·[`./pose-ingest-downsampling.md`](./pose-ingest-downsampling.md) §4 에 맞췄다. 🔶 "비교 기준을 다른 값(무릎각 등)으로 교체"는 종목별 정의가 필요해 **여전히 열려 있다**
+- [x] ~~`WorstSectionCalculator` 클래스명 정리~~ → **✅ `SessionAnalysisCalculator`** (`2abf49b`)
 
 ---
 
