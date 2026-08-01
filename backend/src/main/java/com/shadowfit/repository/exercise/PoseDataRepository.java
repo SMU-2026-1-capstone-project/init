@@ -12,10 +12,24 @@ import java.util.List;
 
 @Repository
 public interface PoseDataRepository extends JpaRepository<PoseData, Long> {
-    // 리포트 worst 구간 계산에 필요한 3컬럼만 조회. joint_coordinates(2.3KB JSON) 제외 → off-page I/O 회피.
+    /**
+     * 리포트 worst rep 계산용 프레임 조회. joint_coordinates(2.3KB JSON) 제외 → off-page I/O 회피.
+     *
+     * <p><b>rep_number 를 싣는 이유</b>(이슈 #78): {@code sync_rate} 는 rep 안에서 상수라
+     * (ai-server 가 rep 단위로 채점해 프레임마다 복제 전송) rep 을 모르면 계산기가 경계를 넘는
+     * 것을 막을 수 없다. 컬럼은 #74 에서 생겼지만 이 프로젝션은 그 전에 만들어져 갱신되지 않았다.
+     *
+     * <p><b>정렬을 rep 우선으로</b>: 계산기가 rep 별로 묶으므로 같은 rep 의 프레임이 인접해야
+     * 그룹핑이 자연스럽고, 그룹 안의 순서(대표 프레임 선택)도 시간순으로 확정된다. 예전 정렬
+     * ({@code timestampSec} 단독)은 rep 을 안 볼 때만 의미가 있었다.
+     *
+     * <p>{@code repNumber = 0}(미상) 행도 그대로 가져온다 — 필터링은 계산기가 한다. 그래야
+     * "프레임이 아예 없다"와 "rep 을 알 수 없는 프레임뿐이다"를 계산기가 구분해 다룰 수 있다.
+     */
     @Query("SELECT new com.shadowfit.dto.report.PoseFrameProjection(" +
-           "p.timestampSec, p.syncRate, p.feedbackMessage) " +
-           "FROM PoseData p WHERE p.session.id = :sessionId ORDER BY p.timestampSec ASC")
+           "p.timestampSec, p.syncRate, p.repNumber) " +
+           "FROM PoseData p WHERE p.session.id = :sessionId " +
+           "ORDER BY p.repNumber ASC, p.timestampSec ASC")
     List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long sessionId);
 
     // 재부착 시 AI 에 주입할 rep 카운트. AI 메모리가 증발해도 완료된 rep 은 진행 중에 이미

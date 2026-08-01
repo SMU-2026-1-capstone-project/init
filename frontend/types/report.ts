@@ -49,9 +49,23 @@ export interface DailyActivityResponse {
 
 /* ── 세션 상세 보고서 (detailreport/*) ── */
 export interface WorstSection {
+  repNumber: number;               // 2 — repTrend 의 어느 점이 worst 인지 잇는 키
   exerciseName: string;
-  timeStamp: string;               // "22:10"
-  reason: string;                  // "싱크로율 70% · 어깨 승모근 과사용"
+  timeStamp: string;               // "01:15" — 그 회차의 중앙 프레임
+  /**
+   * "2회차 · 싱크로율 75%"
+   *
+   * ⚠️ 문구는 잠정이다(이슈 #80). 회차를 알아야 하면 이 문자열을 파싱하지 말고
+   * repNumber 를 쓸 것 — 문구가 확정되면 파싱은 깨진다.
+   */
+  reason: string;
+}
+
+/** 회차(rep) 하나의 싱크로율 — 추이 그래프의 한 점 */
+export interface RepSyncRate {
+  repNumber: number;               // 1부터, 세션 전체 기준 연번
+  syncRate: number;                // 소수 1자리
+  timeStamp: string;               // "01:15" — 그 회차의 중앙 프레임
 }
 
 export interface ExerciseSyncRate {
@@ -75,6 +89,13 @@ export interface SessionReportResponse {
   caloriesBurned: number;
   aiSafetyReport: string | null;
   worstSection: WorstSection | null;
+  /**
+   * 회차별 싱크로율 추이 (rep 오름차순). 측정된 회차가 없으면 빈 배열.
+   *
+   * syncRateDetails 는 이름과 달리 세션당 한 줄(운동 종목 단위 요약)이라 회차 흐름을 볼 수 없다.
+   * worst 점은 repTrend.find(r => r.repNumber === worstSection?.repNumber) 로 찾는다.
+   */
+  repTrend: RepSyncRate[];
   syncRateDetails: ExerciseSyncRate[];
   comparisonWithPrevious: ComparisonWithPrevious | null;
 }

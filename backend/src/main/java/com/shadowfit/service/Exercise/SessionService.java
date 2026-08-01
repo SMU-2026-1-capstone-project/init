@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shadowfit.dto.exercises.VideoRequestDto;
 import com.shadowfit.dto.report.PoseFrameProjection;
 import com.shadowfit.dto.report.detailreport.ExerciseSessionDto;
+import com.shadowfit.dto.report.detailreport.RepSyncRateDto;
+import com.shadowfit.dto.report.detailreport.SessionDetailedAnalysis;
 import com.shadowfit.dto.report.detailreport.WorstSectionDto;
 import com.shadowfit.dto.report.record.CalendarDayDto;
 import com.shadowfit.dto.report.record.CalendarMainResponseDto;
@@ -307,26 +309,34 @@ public class SessionService {
     }
 
     /**
-     * precompute-on-write (report-read-path.md §9) — 세션 완료 시점에 worst 구간을 1회 계산해
-     * reports에 저장. GET /reports/sessions/{id} 조회 때마다 pose_data를 재계산하던 것을 제거하는
-     * 게 목적(db-deep-dive.md §B-3). applyComplete와 같은 트랜잭션(§9-2)이라 여기서 예외가 나면
-     * 세션 완료 자체가 롤백된다(§9-3) — completeSession의 낙관적 락 재시도, AI 콜백 재전송이 그대로
-     * 재시도 경로가 됨. pose_data가 아직 없는 경우는 WorstSectionCalculator가 null을 돌려주는
+     * precompute-on-write (report-read-path.md §9) — 세션 완료 시점에 worst 회차와 회차별 추이를
+     * 1회 계산해 reports에 저장. GET /reports/sessions/{id} 조회 때마다 pose_data를 재계산하던 것을
+     * 제거하는 게 목적(db-deep-dive.md §B-3). applyComplete와 같은 트랜잭션(§9-2)이라 여기서 예외가
+     * 나면 세션 완료 자체가 롤백된다(§9-3) — completeSession의 낙관적 락 재시도, AI 콜백 재전송이
+     * 그대로 재시도 경로가 됨. pose_data가 아직 없는 경우는 계산기가 null·빈 리스트를 돌려주는
      * 정상 케이스라 예외가 아니다(§9-3에서 실패로 분류하지 않기로 함).
+     *
+     * <p><b>추이를 여기서 같이 계산하는 이유</b>: worst 와 재료(rep 그룹핑)가 같아 이미 읽어 온
+     * 프레임으로 바로 나온다. 조회 시점에 계산하면 precompute 가 없애려던 pose_data 스캔이
+     * 추이 때문에 되살아난다.
      */
     private void precomputeReport(Session session) {
         List<PoseFrameProjection> poseFrames = poseDataRepository.findFramesBySessionId(session.getId());
         WorstSectionDto worstSection = worstSectionCalculator.calculate(session, poseFrames);
+        List<RepSyncRateDto> repTrend = worstSectionCalculator.calculateRepTrend(poseFrames);
 
         Report report = new Report();
         report.setMember(session.getMember());
         report.setSession(session);
         report.setReportType(ReportType.SESSION);
-        if (worstSection != null) {
+        // 둘 다 비면 컬럼을 비워 둔다 — 읽기 경로가 "저장된 게 없다"로 보고 재계산을 시도하는데,
+        // 프레임이 없어서 비었던 것이라면 재계산도 같은 결과라 손해가 없다.
+        if (worstSection != null || !repTrend.isEmpty()) {
             try {
-                report.setDetailedAnalysis(objectMapper.writeValueAsString(worstSection));
+                report.setDetailedAnalysis(objectMapper.writeValueAsString(
+                        new SessionDetailedAnalysis(worstSection, repTrend)));
             } catch (JsonProcessingException e) {
-                throw new IllegalStateException("worst 구간 직렬화 실패 - 세션 " + session.getId(), e);
+                throw new IllegalStateException("리포트 분석 직렬화 실패 - 세션 " + session.getId(), e);
             }
         }
         reportRepository.save(report);
