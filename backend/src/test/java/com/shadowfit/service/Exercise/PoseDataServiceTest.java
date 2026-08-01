@@ -33,8 +33,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * PoseDataService 통합테스트 — savePoseDataBatch(실시간 저장, JdbcTemplate batchUpdate)와
- * saveReferencePoses(관리자용 기준 좌표 저장) 둘 다 실제 DB로 검증. e2e에 곁다리로만 검증되던
- * savePoseDataBatch의 is_correct 임계값(40.0) 로직도 여기서 직접 확인한다.
+ * saveReferencePoses(관리자용 기준 좌표 저장) 둘 다 실제 DB로 검증.
+ *
+ * <p>다운샘플이 <b>어느 프레임을 남기는가</b>가 이 클래스의 핵심 관심사다. 남는 프레임이 달라져도
+ * {@code sync_rate} 는 그대로지만(rep 단위 상수) {@code joint_coordinates} 는 프레임마다 다르므로,
+ * 이 선택이 리포트에 그려질 자세를 결정한다. 버려진 프레임은 DB 에 없어 나중에 되찾을 수 없다.
  */
 @SpringBootTest
 @Transactional
@@ -66,15 +69,21 @@ class PoseDataServiceTest {
     }
 
     private PoseDataRequest frame(double timestampSec, double syncRate) {
-        return frame(timestampSec, syncRate, 0);
+        return frame(timestampSec, syncRate, 0, 0.0);
     }
 
     private PoseDataRequest frame(double timestampSec, double syncRate, int repNumber) {
+        return frame(timestampSec, syncRate, repNumber, 0.0);
+    }
+
+    private PoseDataRequest frame(
+            double timestampSec, double syncRate, int repNumber, double smoothedKneeAngle) {
         return PoseDataRequest.newBuilder()
                 .setTimestampSec(timestampSec)
                 .setJointCoordinates("{}")
                 .setSyncRate(syncRate)
                 .setRepNumber(repNumber)
+                .setSmoothedKneeAngle(smoothedKneeAngle)
                 .setFeedbackMessage("ok")
                 .build();
     }
@@ -87,66 +96,107 @@ class PoseDataServiceTest {
      *
      * <p>이 헬퍼를 따로 둔 이유: 예전 테스트들이 한 배치 안에 서로 다른 sync_rate 를 넣어
      * <b>실제로는 존재하지 않는 입력</b>으로 다운샘플 로직을 검증하고 있었다(이슈 #79).
+     *
+     * <p><b>무릎각은 스쿼트 한 회의 모양대로 넣는다</b> — 서 있다(150°)가 내려가고 바닥(90°)을
+     * 찍고 다시 올라온다. {@code syncRate} 와 달리 이 값은 프레임마다 실제로 다르고, 다운샘플이
+     * 어느 프레임을 남길지가 여기서 갈린다(§4-ㄹ). 상수로 채우면 선택 로직이 동률로 퇴화해
+     * 검증되지 않으므로 그렇게 하지 않는다.
      */
     private List<PoseDataRequest> realisticBatch(int repNumber, int frameCount, double syncRate) {
         List<PoseDataRequest> frames = new java.util.ArrayList<>();
         for (int i = 0; i < frameCount; i++) {
-            frames.add(frame(i * 0.1, syncRate, repNumber));
+            // 앞 절반은 내려가고 뒤 절반은 올라온다 — V 자 궤적의 꼭짓점이 바닥이다.
+            int fromBottom = Math.abs(i - frameCount / 2);
+            double kneeAngle = 90.0 + fromBottom * 15.0;
+            // i * 0.1 은 3 에서 0.30000000000000004 가 되어 리터럴 0.3 과 다른 double 이 된다.
+            frames.add(frame(i / 10.0, syncRate, repNumber, kneeAngle));
         }
         return frames;
     }
 
     @Test
-    @DisplayName("정상 batch — is_correct는 저장된 프레임의 sync_rate(40 기준)로 계산")
-    void savePoseDataBatch_success_computesIsCorrect() {
+    @DisplayName("정상 batch — sync_rate가 그대로 저장된다 (is_correct는 2026-08-01 삭제)")
+    void savePoseDataBatch_success_persistsSyncRate() {
         // 한 배치 = 한 rep 이라 sync_rate 는 배치 안에서 상수다(아래 realisticBatch 주석)
         poseDataService.savePoseDataBatch(session.getId(), realisticBatch(1, 2, 30.0));
 
         List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT sync_rate, is_correct FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
+                "SELECT sync_rate FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
 
         assertThat(rows).hasSize(1);
-        assertThat((Boolean) rows.get(0).get("IS_CORRECT")).isFalse();
         assertThat(((Number) rows.get(0).get("SYNC_RATE")).doubleValue()).isEqualTo(30.0);
     }
 
     @Test
-    @DisplayName("다운샘플 — 윈도우(5)마다 첫 프레임만 남기는 균등 샘플링 (#79)")
-    void savePoseDataBatch_downsamples_uniformly() {
-        // 7프레임 → 인덱스 0·5 가 남는다(0.0s, 0.5s). 남는 게 "가장 나쁜 프레임"이 아니라
-        // "주기의 첫 프레임"이라는 것을 값으로 고정한다.
+    @DisplayName("다운샘플 — 윈도우(5)마다 1행. 행 수는 그대로 1/5 이다 (R≈5 유지)")
+    void savePoseDataBatch_downsamples_keepsRatio() {
+        // 7프레임 → 2행. 어느 프레임이 남는지와 별개로 **몇 개가 남는지**는 안 바뀐다는 것을 고정한다.
         poseDataService.savePoseDataBatch(session.getId(), realisticBatch(1, 7, 65.0));
 
         List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT timestamp_sec, sync_rate FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
 
         assertThat(rows).hasSize(2);
-        assertThat(((Number) rows.get(0).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.0);
-        assertThat(((Number) rows.get(1).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.5);
         // rep 안에서 sync_rate 는 상수 — 어느 프레임이 남든 이 값은 같다
         assertThat(rows).allSatisfy(row ->
                 assertThat(((Number) row.get("SYNC_RATE")).doubleValue()).isEqualTo(65.0));
     }
 
     @Test
-    @DisplayName("★ 남는 프레임은 sync_rate와 무관하다 — 순서만 바뀌어도 결과가 달라진다 (#79)")
-    void savePoseDataBatch_selectionIsPositional_notWorstSync() {
-        // 이 테스트의 픽스처는 **실제로는 일어나지 않는 모양**이다(한 배치 안 sync_rate 가 제각각).
-        // 예전 테스트가 바로 이런 픽스처를 써서 "최저 프레임을 고른다"를 증명했는데, 그 입력이
-        // 실데이터에 존재하지 않아 죽은 코드가 살아 있는 것처럼 보였다. 여기서는 반대로,
-        // 선택이 값이 아니라 **위치**로 이뤄진다는 것을 드러내는 용도로만 쓴다.
+    @DisplayName("★ 다운샘플은 윈도우마다 가장 깊은 프레임을 남긴다 — 첫 프레임이 아니다 (§4-ㄹ)")
+    void savePoseDataBatch_downsampleKeepsDeepestFrame() {
+        // 7프레임 V 자 궤적: 무릎각 135·120·105·90·105·120·135 (인덱스 3 이 바닥).
+        // 윈도우 [0..4] 의 최소는 인덱스 3(0.3s, 90°), 윈도우 [5..6] 의 최소는 인덱스 5(0.5s, 120°).
+        // 예전 균등 샘플링이었다면 0.0s·0.5s 가 남아 **바닥 프레임이 통째로 버려졌다.**
+        poseDataService.savePoseDataBatch(session.getId(), realisticBatch(1, 7, 65.0));
+
+        List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT timestamp_sec, smoothed_knee_angle FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec",
+                session.getId());
+
+        assertThat(rows).hasSize(2);
+        assertThat(((Number) rows.get(0).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.3);
+        assertThat(((Number) rows.get(0).get("SMOOTHED_KNEE_ANGLE")).doubleValue()).isEqualTo(90.0);
+        assertThat(((Number) rows.get(1).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.5);
+    }
+
+    @Test
+    @DisplayName("무릎각이 전부 0(미상)이면 예전처럼 윈도우 첫 프레임 — 구버전 AI 하위호환")
+    void savePoseDataBatch_downsampleFallsBackWhenAngleUnknown() {
+        // proto3 라 구버전 AI 는 이 필드를 보내지 않는다. 고를 근거가 없으면 균등 샘플링으로
+        // 떨어지므로 배포 순서를 맞추지 않아도 동작이 깨지지 않는다.
+        List<PoseDataRequest> legacy = new java.util.ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            legacy.add(frame(i / 10.0, 65.0, 1)); // smoothedKneeAngle = 0.0
+        }
+        poseDataService.savePoseDataBatch(session.getId(), legacy);
+
+        List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT timestamp_sec FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
+
+        assertThat(rows).hasSize(2);
+        assertThat(((Number) rows.get(0).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.0);
+        assertThat(((Number) rows.get(1).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.5);
+    }
+
+    @Test
+    @DisplayName("미상(0)과 유효값이 섞인 윈도우에서는 유효값 중 최소 — 0이 이기지 않는다")
+    void savePoseDataBatch_downsampleIgnoresUnknownAngleWhenValidExists() {
+        // 배포 전환기에 두 세대가 섞일 수 있다. 0 을 그냥 최소값으로 다루면 미상 프레임이 항상
+        // 이겨 실제로 가장 깊은 프레임이 버려진다.
         poseDataService.savePoseDataBatch(session.getId(), List.of(
-                frame(0.0, 90.0), frame(0.1, 80.0), frame(0.2, 10.0), frame(0.3, 70.0), frame(0.4, 60.0),
-                frame(0.5, 50.0), frame(0.6, 20.0)
+                frame(0.0, 65.0, 1, 0.0),     // 미상 — 후보 아님
+                frame(0.1, 65.0, 1, 130.0),
+                frame(0.2, 65.0, 1, 95.0),    // ← 유효값 중 최소
+                frame(0.3, 65.0, 1, 0.0),     // 미상
+                frame(0.4, 65.0, 1, 120.0)
         ));
 
         List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT timestamp_sec, sync_rate FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
+                "SELECT timestamp_sec FROM pose_data WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
 
-        assertThat(rows).hasSize(2);
-        // 최저값 10.0(인덱스 2)·20.0(인덱스 6)이 아니라 각 윈도우의 첫 프레임이 남는다
-        assertThat(((Number) rows.get(0).get("SYNC_RATE")).doubleValue()).isEqualTo(90.0);
-        assertThat(((Number) rows.get(1).get("SYNC_RATE")).doubleValue()).isEqualTo(50.0);
+        assertThat(rows).hasSize(1);
+        assertThat(((Number) rows.get(0).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.2);
     }
 
     @Test

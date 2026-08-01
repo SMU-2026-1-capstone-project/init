@@ -74,10 +74,7 @@ public class SessionAnalysisCalculator {
             return null; // 유효한(syncRate 가 있는) rep 이 하나도 없음
         }
 
-        // 대표 프레임은 그 rep 의 중앙 — 예전 동작(윈도우 중앙)과 같은 성격이라 변화를 최소화했다.
-        // "가장 깊었던 지점"은 무릎각 컬럼이 없어 joint_coordinates(2.3KB JSON) 파싱이 필요한데,
-        // 그건 이 프로젝션이 애초에 피하려던 off-page I/O 라 채택하지 않았다.
-        PoseFrameProjection representative = worstFrames.get(worstFrames.size() / 2);
+        PoseFrameProjection representative = pickRepresentative(worstFrames);
 
         WorstSectionDto worst = new WorstSectionDto();
         // repTrend 의 어느 점이 worst 인지 잇는 열쇠. reason 문자열에서 파싱하게 두면 잠정 문구(#80)에
@@ -113,8 +110,7 @@ public class SessionAnalysisCalculator {
             if (average == null) {
                 continue; // syncRate 가 전부 null 인 rep — 추이에 구멍으로 남기고 점을 찍지 않는다
             }
-            List<PoseFrameProjection> repFrames = entry.getValue();
-            PoseFrameProjection representative = repFrames.get(repFrames.size() / 2);
+            PoseFrameProjection representative = pickRepresentative(entry.getValue());
             trend.add(new RepSyncRateDto(
                     entry.getKey(),
                     // 소수 1자리 반올림 — rep 안 값이 상수라 지금은 나눗셈 오차만 정리하는 수준이지만,
@@ -148,6 +144,42 @@ public class SessionAnalysisCalculator {
             framesByRep.computeIfAbsent(repNumber, key -> new ArrayList<>()).add(frame);
         }
         return framesByRep;
+    }
+
+    /**
+     * rep 을 대표할 프레임 = <b>가장 깊게 앉은 순간</b>({@code smoothedKneeAngle} 최소).
+     *
+     * <p>예전에는 {@code frames.get(size / 2)} 즉 <b>배열 중앙</b>이었다. 슬라이딩 윈도우 시절의
+     * "윈도우 중앙"을 그대로 옮긴 것인데, 그게 스쿼트의 바닥이라는 근거가 없었다 — 바닥에서
+     * 잠깐 멈추거나 내려가는 속도와 올라오는 속도가 다르면 어긋난다. 이 선택은 두 가지를
+     * 결정하므로 근거가 있어야 한다: 리포트의 {@code timeStamp}, 그리고 그 프레임의
+     * {@code jointCoordinates}(= 앱이 그릴 자세).
+     *
+     * <p>기준은 ai-server 가 rep 경계를 판정할 때 쓰는 값과 같다(좌우 무릎각 평균의 3프레임 평활).
+     * 그래야 "이 rep 의 바닥"과 "가장 깊은 프레임"이 서로 다른 근거를 갖지 않는다
+     * (decisions/worst-section-rep-resolution.md §4-ㄹ).
+     *
+     * <p><b>유효값(&gt; 0)이 없으면 중앙으로 떨어진다</b> — 구버전 AI 가 보낸 행과 컬럼 도입 이전
+     * 행이 여기 해당한다. 예전 동작을 그대로 유지한다는 뜻이고, "가장 깊어서"가 아니라
+     * <b>"고를 근거가 없어서"</b> 중앙이라는 것을 명시한다.
+     *
+     * <p>⚠️ 이 선택은 저장 시점의 다운샘플({@code PoseDataService.pickDeepest})이 그 프레임을
+     * 남겼을 때만 의미가 있다. 버려진 프레임은 DB 에 없으므로 여기서 되찾을 수 없다.
+     */
+    private PoseFrameProjection pickRepresentative(List<PoseFrameProjection> frames) {
+        PoseFrameProjection deepest = null;
+        for (PoseFrameProjection frame : frames) {
+            Double kneeAngle = frame.smoothedKneeAngle();
+            if (kneeAngle == null || kneeAngle <= 0.0) {
+                continue; // 미상 — 유효한 무릎각이 아니다
+            }
+            // 엄격 부등호라 동률이면 먼저 나온(= 시간이 이른) 프레임이 남는다. 조회가 시간
+            // 오름차순이라 순서가 확정돼 있어 같은 입력이면 항상 같은 프레임이 나온다.
+            if (deepest == null || kneeAngle < deepest.smoothedKneeAngle()) {
+                deepest = frame;
+            }
+        }
+        return deepest != null ? deepest : frames.get(frames.size() / 2);
     }
 
     /** rep 안의 non-null syncRate 평균. 전부 null 이면 null(= 후보 배제). */

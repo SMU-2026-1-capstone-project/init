@@ -53,8 +53,22 @@ class SessionAnalysisCalculatorTest {
                 .build();
     }
 
+    /**
+     * 무릎각이 rep 안에서 일정한 프레임. <b>어느 rep 이 worst 인가</b>만 보는 테스트용이다.
+     *
+     * <p>각도가 전부 같으면 대표 프레임 선택이 동률이 되어 먼저 나온 프레임이 남는다. 대표 프레임
+     * 선택 자체를 검증하는 테스트는 아래 {@link #frame(int, double, Double, Double)} 로 각도를
+     * 명시해 따로 둔다 — 실데이터를 반영하지 않는 픽스처가 코드 경로를 덮는 일이 이미 한 번
+     * 있었으므로(#79) 두 관심사를 섞지 않는다.
+     */
     private PoseFrameProjection frame(int repNumber, double timestampSec, Double syncRate) {
-        return new PoseFrameProjection(timestampSec, syncRate, repNumber);
+        return frame(repNumber, timestampSec, syncRate, 100.0);
+    }
+
+    /** 무릎각을 명시한 프레임. 작을수록 깊게 앉은 것이다(0 = 미상). */
+    private PoseFrameProjection frame(
+            int repNumber, double timestampSec, Double syncRate, Double smoothedKneeAngle) {
+        return new PoseFrameProjection(timestampSec, syncRate, repNumber, smoothedKneeAngle);
     }
 
     @Test
@@ -201,18 +215,67 @@ class SessionAnalysisCalculatorTest {
     }
 
     @Test
-    @DisplayName("대표 timestamp는 worst rep의 중앙 프레임 기준 mm:ss 포맷")
-    void representativeTimestamp_isMiddleFrameOfWorstRep() {
+    @DisplayName("★ 대표 timestamp는 worst rep에서 가장 깊게 앉은 프레임 (§4-ㄹ)")
+    void representativeTimestamp_isDeepestFrameOfWorstRep() {
+        // 중앙(1:15)이 아니라 무릎각 최소(1:20)가 뽑혀야 한다. 예전 코드는 배열 중앙을 골랐는데
+        // 그게 스쿼트의 바닥이라는 근거가 없었다 — 올라오는 속도가 다르면 중앙은 바닥이 아니다.
         List<PoseFrameProjection> frames = List.of(
-                frame(1, 10.0, 90.0),
-                frame(2, 70.0, 50.0),         // 1:10
-                frame(2, 75.0, 50.0),         // 중앙(대표) → 1:15
-                frame(2, 80.0, 50.0)          // 1:20
+                frame(1, 10.0, 90.0, 150.0),
+                frame(2, 70.0, 50.0, 130.0),  // 1:10 — 내려가는 중
+                frame(2, 75.0, 50.0, 115.0),  // 1:15 — 중앙이지만 바닥 아님
+                frame(2, 80.0, 50.0, 95.0),   // 1:20 — 바닥(대표)
+                frame(2, 85.0, 50.0, 120.0)   // 1:25 — 올라오는 중
+        );
+
+        WorstSectionDto result = calculator.calculate(session, frames);
+
+        assertThat(result.getTimeStamp()).isEqualTo("01:20");
+    }
+
+    @Test
+    @DisplayName("무릎각이 전부 0(미상)이면 예전처럼 중앙 프레임 — 고를 근거가 없을 때는 임의로 고르지 않는다")
+    void representativeTimestamp_fallsBackToMiddleWhenAngleUnknown() {
+        // 구버전 AI 가 보낸 행, 그리고 컬럼 도입 이전 행이 여기 해당한다.
+        List<PoseFrameProjection> frames = List.of(
+                frame(1, 70.0, 50.0, 0.0),    // 1:10
+                frame(1, 75.0, 50.0, 0.0),    // 1:15 ← 중앙
+                frame(1, 80.0, 50.0, 0.0)     // 1:20
         );
 
         WorstSectionDto result = calculator.calculate(session, frames);
 
         assertThat(result.getTimeStamp()).isEqualTo("01:15");
+    }
+
+    @Test
+    @DisplayName("미상(0)과 유효값이 섞이면 유효값 중 최소 — 0이 '가장 깊은 값'으로 이기지 않는다")
+    void representativeTimestamp_ignoresUnknownAngleWhenValidExists() {
+        // 0 을 그냥 최소값으로 다루면 배포 전환기(구버전·신버전 행 혼재)에 미상 프레임이 항상 이겨
+        // 실제로 가장 깊은 프레임이 밀려난다.
+        List<PoseFrameProjection> frames = List.of(
+                frame(1, 70.0, 50.0, 0.0),    // 1:10 — 미상. 후보 아님
+                frame(1, 75.0, 50.0, 95.0),   // 1:15 — 유효값 중 최소(대표)
+                frame(1, 80.0, 50.0, 120.0)   // 1:20
+        );
+
+        WorstSectionDto result = calculator.calculate(session, frames);
+
+        assertThat(result.getTimeStamp()).isEqualTo("01:15");
+    }
+
+    @Test
+    @DisplayName("무릎각이 동률이면 먼저 나온(시간이 이른) 프레임 — 같은 입력이면 결과가 항상 같다")
+    void representativeTimestamp_tiePrefersEarlierFrame() {
+        // 바닥에서 잠깐 멈춰 같은 각도가 이어지는 경우다.
+        List<PoseFrameProjection> frames = List.of(
+                frame(1, 70.0, 50.0, 95.0),   // 1:10 ← 먼저 나온 쪽
+                frame(1, 75.0, 50.0, 95.0),
+                frame(1, 80.0, 50.0, 95.0)
+        );
+
+        WorstSectionDto result = calculator.calculate(session, frames);
+
+        assertThat(result.getTimeStamp()).isEqualTo("01:10");
     }
 
     @Test
@@ -290,17 +353,18 @@ class SessionAnalysisCalculatorTest {
     }
 
     @Test
-    @DisplayName("추이의 timeStamp는 그 rep의 중앙 프레임")
-    void repTrend_timestampIsMiddleFrame() {
+    @DisplayName("추이의 timeStamp도 그 rep에서 가장 깊게 앉은 프레임 — worst와 같은 기준")
+    void repTrend_timestampIsDeepestFrame() {
+        // worst 와 다른 기준을 쓰면 같은 rep 인데 두 곳의 시각이 어긋난다. 같은 헬퍼를 쓴다.
         List<PoseFrameProjection> frames = List.of(
-                frame(1, 70.0, 50.0),   // 1:10
-                frame(1, 75.0, 50.0),   // 중앙 → 1:15
-                frame(1, 80.0, 50.0)    // 1:20
+                frame(1, 70.0, 50.0, 130.0),  // 1:10
+                frame(1, 75.0, 50.0, 115.0),  // 1:15 — 중앙
+                frame(1, 80.0, 50.0, 95.0)    // 1:20 — 바닥(대표)
         );
 
         assertThat(calculator.calculateRepTrend(frames))
                 .singleElement()
-                .satisfies(point -> assertThat(point.getTimeStamp()).isEqualTo("01:15"));
+                .satisfies(point -> assertThat(point.getTimeStamp()).isEqualTo("01:20"));
     }
 
     @Test

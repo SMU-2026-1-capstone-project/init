@@ -35,7 +35,7 @@ public class PoseDataService {
 
     private static final String INSERT_POSE_SQL =
             "INSERT INTO pose_data " +
-            "(session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, is_correct, feedback_message) " +
+            "(session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, smoothed_knee_angle, feedback_message) " +
             "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
     // 다운샘플 윈도우 크기 — R-sweep 실측(docs/decisions/pose-ingest-downsampling.md §5-1(4))에서
@@ -78,7 +78,10 @@ public class PoseDataService {
                 ps.setDouble(3, grpc.getTimestampSec());
                 ps.setString(4, grpc.getJointCoordinates());
                 ps.setDouble(5, grpc.getSyncRate());
-                ps.setBoolean(6, grpc.getSyncRate() >= 40.0); // 40점 기준 (수정 가능)
+                // 구버전 AI 는 이 필드를 안 보내 0(미상)이 들어온다 — rep_number 와 같은 방식이라
+                // 배포 순서를 맞추지 않아도 깨지지 않는다. 스쿼트 무릎각은 0 이 될 수 없으므로
+                // 유효값과 구분되고, 대표 프레임 선택에서 후보에서 빠진다.
+                ps.setDouble(6, grpc.getSmoothedKneeAngle());
                 ps.setString(7, grpc.getFeedbackMessage());
             }
 
@@ -97,32 +100,64 @@ public class PoseDataService {
     }
 
     /**
-     * window개마다 첫 프레임만 남기는 <b>균등 샘플링</b>. 행 수가 1/window 로 줄어든다.
+     * window개마다 <b>가장 깊은 프레임</b>(= {@code smoothedKneeAngle} 최소)을 대표로 남긴다.
+     * 행 수가 1/window 로 줄어드는 것은 같고, 줄어든 뒤 <b>어느 프레임이 남는지</b>가 달라진다.
      *
-     * <p><b>예전엔 "sync_rate 가 가장 낮은 프레임을 대표로 남긴다"고 되어 있었다</b>(이슈 #79).
-     * 그 선택은 <b>실행되지 않았다</b> — 한 배치가 곧 한 rep 이고(ai-server 는 rep 이 완성될 때만
-     * 콜백한다, {@code pose.py:98-118}) rep 안의 {@code sync_rate} 는 상수라(rep 단위로 채점해
-     * 프레임마다 복제, {@code pose.py:111}) 엄격 부등호가 참이 되는 경우가 없었다. 매 window 의
-     * 첫 프레임이 그대로 남았고, 지금 코드는 <b>실제로 일어나던 일을 그대로 적은 것</b>이다.
+     * <p><b>왜 첫 프레임이 아니라 최소값인가.</b> 남는 프레임이 달라져도 {@code syncRate} 는
+     * 그대로지만(rep 단위 상수) <b>{@code jointCoordinates} 는 프레임마다 다르다.</b> 즉 이 선택이
+     * 리포트에 그려질 자세를 결정한다. 스쿼트에서 자세가 무너지는 지점은 바닥이므로 그 순간을
+     * 남긴다(decisions/worst-section-rep-resolution.md §4-ㄹ).
      *
-     * <p>따라서 {@code pose-ingest-downsampling.md} §4 의 "평균 vs 대표추출" 비교도 이 데이터에서는
-     * 성립하지 않는다 — 두 방식이 같은 상수를 돌려주므로 구분되지 않는다. 그 문서 §4 에 정정 표시를
-     * 달아뒀다.
+     * <p><b>이 선택은 여기서 하지 않으면 되돌릴 수 없다.</b> 버려진 프레임은 DB 에 없으므로 리포트가
+     * 나중에 아무리 잘 골라도 복구되지 않는다. 그래서 대표 프레임 선택이 저장 시점에 있다.
      *
-     * <p><b>R≈5 라는 비율 자체는 유효하다.</b> R-sweep 실측(§5-1(4))은 "몇 개를 남기나"의 실험이고
-     * 이 이슈는 "그중 어느 것을 남기나"의 문제라 결론이 뒤집히지 않는다.
+     * <p><b>이슈 #79 와의 관계.</b> 예전 코드는 "{@code sync_rate} 가 가장 낮은 프레임을 남긴다"고
+     * 되어 있었으나 <b>실행되지 않았다</b> — 한 배치가 곧 한 rep 이고(ai-server 는 rep 완성 시에만
+     * 콜백, {@code pose.py:98-118}) rep 안의 {@code sync_rate} 는 상수라 엄격 부등호가 참이 되는
+     * 경우가 없었다. #79 에서 그 죽은 비교를 걷어내고 균등 샘플링으로 정직하게 적었는데,
+     * <b>그 코드가 하려던 일 자체는 유효했다</b> — 비교 기준이 프레임마다 같은 값이었을 뿐이다.
+     * 이제 프레임마다 실제로 다른 값이 생겨 의도대로 동작한다.
      *
-     * <p>⚠️ 남는 프레임이 달라지면 {@code sync_rate} 는 그대로여도(상수) <b>{@code joint_coordinates}
-     * 는 프레임마다 다르다.</b> 즉 어느 좌표가 리포트에 남는지는 이 선택에 달려 있다. "가장 자세가
-     * 안 좋았던 순간의 좌표"를 남기고 싶다면 {@code sync_rate} 가 아니라 프레임마다 실제로 다른 값
-     * (무릎각 등)을 기준으로 삼아야 하는데, 무엇이 "나쁜 자세"인지 종목별 정의가 필요해 열어뒀다(#79).
+     * <p><b>{@code R≈5} 비율은 그대로다.</b> R-sweep 실측
+     * ({@code pose-ingest-downsampling.md} §5-1(4))은 "몇 개를 남기나"의 실험이고 이 변경은
+     * "그중 어느 것을 남기나"라서 결론이 뒤집히지 않는다. 반환 행 수도 동일하다.
+     *
+     * <p><b>0(미상)은 후보에서 뺀다.</b> 구버전 AI 는 이 필드를 안 보내 전부 0 이 되는데, 그때
+     * 최소값을 고르면 사실상 첫 프레임이 남아 기존 동작과 같아진다 — 다만 그것을 "가장 깊어서"가
+     * 아니라 <b>"고를 근거가 없어서"</b> 로 명시한다. 유효값과 0 이 섞인 window 에서 0 이 이기면
+     * 실제로 가장 깊은 프레임이 밀려나므로, 섞임을 방지하는 것이기도 하다.
      */
     private List<PoseDataRequest> downsample(List<PoseDataRequest> frames, int window) {
         List<PoseDataRequest> result = new java.util.ArrayList<>();
         for (int start = 0; start < frames.size(); start += window) {
-            result.add(frames.get(start));
+            int end = Math.min(start + window, frames.size());
+            result.add(pickDeepest(frames, start, end));
         }
         return result;
+    }
+
+    /**
+     * {@code [start, end)} 구간에서 {@code smoothedKneeAngle} 이 가장 작은(= 가장 깊은) 프레임.
+     *
+     * <p>유효값(&gt; 0)이 하나도 없으면 <b>구간의 첫 프레임</b>으로 떨어진다 — 고를 근거가 없을 때
+     * 임의로 고르지 않고 예전 동작(균등 샘플링)을 유지한다는 뜻이다.
+     *
+     * <p>동률이면 먼저 나온 프레임이 남는다(엄격 부등호). 입력이 시간 오름차순이라 순서가 확정돼
+     * 있어 같은 입력이면 항상 같은 프레임이 나온다 — 바닥에서 잠깐 멈춰 같은 각도가 이어질 때
+     * 내려간 직후 프레임이 남는다.
+     */
+    private PoseDataRequest pickDeepest(List<PoseDataRequest> frames, int start, int end) {
+        PoseDataRequest deepest = null;
+        for (int i = start; i < end; i++) {
+            PoseDataRequest candidate = frames.get(i);
+            if (candidate.getSmoothedKneeAngle() <= 0.0) {
+                continue; // 미상 — 유효한 무릎각이 아니다
+            }
+            if (deepest == null || candidate.getSmoothedKneeAngle() < deepest.getSmoothedKneeAngle()) {
+                deepest = candidate;
+            }
+        }
+        return deepest != null ? deepest : frames.get(start);
     }
 
     /**

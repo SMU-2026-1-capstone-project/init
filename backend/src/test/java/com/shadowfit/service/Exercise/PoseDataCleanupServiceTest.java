@@ -77,10 +77,10 @@ class PoseDataCleanupServiceTest {
 
         poseDataRepository.saveAndFlush(PoseData.builder()
                 .session(targetSession).timestampSec(0.0).jointCoordinates("{}")
-                .syncRate(70.0).isCorrect(true).build());
+                .syncRate(70.0).build());
         poseDataRepository.saveAndFlush(PoseData.builder()
                 .session(otherSession).timestampSec(0.0).jointCoordinates("{}")
-                .syncRate(70.0).isCorrect(true).build());
+                .syncRate(70.0).build());
     }
 
     @AfterEach

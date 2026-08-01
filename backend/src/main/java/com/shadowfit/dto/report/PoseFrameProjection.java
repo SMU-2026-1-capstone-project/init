@@ -11,5 +11,15 @@ package com.shadowfit.dto.report;
  * <p>{@code feedbackMessage} 는 <b>제거했다</b>(이슈 #80). 값이 문자열 3개뿐이고 전부
  * {@code sync_rate} 를 임계값과 비교한 결과라, 읽어봐야 싱크로율의 동어반복이었다. 유일한
  * 소비자였던 {@code pickDominantFeedback} 이 사라져 더는 조회할 이유가 없다.
+ *
+ * <p>{@code smoothedKneeAngle} 은 §4-ㄹ 로 추가됐다. {@code syncRate} 는 rep 안에서 상수라
+ * <b>rep 을 고를 수는 있어도 rep 안의 프레임을 고를 수는 없다.</b> 대표 프레임을 "가장 깊었던
+ * 순간"으로 정하려면 프레임마다 실제로 다른 값이 필요하고, 그게 이 컬럼이다.
+ * {@code jointCoordinates} 를 싣지 않는 방침은 유지된다 — 각도는 숫자 하나라 off-page I/O 를
+ * 되살리지 않으면서 프레임을 구분할 수 있다는 것이 이 안의 핵심이다.
  */
-public record PoseFrameProjection(Double timestampSec, Double syncRate, Integer repNumber) {}
+public record PoseFrameProjection(
+        Double timestampSec,
+        Double syncRate,
+        Integer repNumber,
+        Double smoothedKneeAngle) {}
