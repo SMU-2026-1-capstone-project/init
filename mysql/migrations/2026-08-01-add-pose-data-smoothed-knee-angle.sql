@@ -1,20 +1,36 @@
 -- 2026-08-01 — pose_data.smoothed_knee_angle 추가 + is_correct 삭제
 --               (이슈 #79 후속 · #80 일부, docs/decisions/worst-section-rep-resolution.md §4-ㄹ)
 --
--- 두 변경을 한 파일에 묶은 이유:
---   pose_data 는 파티션 테이블이라 ALTER 가 전 파티션을 다시 쓴다. 컬럼 추가와 삭제를 따로
---   적용하면 그 재구성을 두 번 한다. 지금은 pose_data 0 행이라(2026-08-01 실측) 어느 쪽이든
---   싸지만, 행이 쌓인 인스턴스에서는 한 번으로 끝내는 편이 크게 유리하다.
+-- 두 변경을 한 ALTER 문으로 묶은 이유:
+--   pose_data 는 파티션 테이블이다. 문장을 나누면 메타데이터 잠금을 두 번 잡고, INSTANT 가
+--   불가능한 버전에서는 전 파티션 재구성도 두 번 한다. 한 문장이면 한 번으로 끝난다.
+--   (CodeRabbit 리뷰 지적 — 원래 이 파일은 "한 파일에 묶어 재구성을 한 번으로 줄인다"고
+--    적어놓고 정작 ALTER 를 두 문장으로 나눠 뒀다. 파일만 합쳤지 동작은 두 번이었다.)
 --
--- ⚠️ 소요 시간: 위와 같은 이유로 행 수에 비례해 오래 걸린다. 운영 중 적용은 피할 것.
+-- ⚠️ 소요 시간 — 2026-08-01 실측(MySQL 8.0.46, 로컬 docker):
+--   8.0.29 부터는 파티션 테이블에서도 ADD COLUMN(위치 지정 포함) · DROP COLUMN 이 INSTANT 로
+--   처리된다. ALGORITHM=INSTANT 를 명시하지 않아도 자동 선택되는 것을 확인했다
+--   (information_schema.INNODB_TABLES.TOTAL_ROW_VERSIONS 가 1 로 증가 = 재구성 아님).
+--   즉 행 수와 무관하게 메타데이터 변경만 일어난다.
+--
+--   ALGORITHM=INSTANT 를 명시하지 않는 이유: 8.0.29 미만에서는 이 문장이 실패한다. 명시하면
+--   조용한 장시간 재구성 대신 즉시 실패해 눈에 띄지만, 그 버전에서는 재구성이 유일한 방법이라
+--   막을 이유가 없다. 대신 아래 사실을 남긴다 — **8.0.29 미만이면 행 수에 비례해 오래 걸리므로
+--   운영 중 적용을 피할 것.** 버전은 `SELECT VERSION();` 으로 먼저 확인한다.
+--
+--   ⚠️ INSTANT DROP COLUMN 은 공간을 회수하지 않고 row version 을 쌓는다(테이블당 최대 64).
+--   이 프로젝트에서 그 한계에 닿을 일은 없지만, 같은 테이블에 INSTANT DDL 을 반복하면
+--   언젠가 재구성이 강제된다는 것은 알고 있어야 한다.
+--
 -- 멱등성: MySQL 은 ADD/DROP COLUMN IF (NOT) EXISTS 를 지원하지 않는다. 재실행 시
 --         1060(Duplicate column) 또는 1091(Can't DROP; check that column exists)이 나면
---         이미 적용된 것이다.
+--         이미 적용된 것이다. 한 문장이라 부분 적용된 상태로 남지 않는다 —
+--         나눠 뒀을 때는 ADD 만 성공하고 DROP 이 실패하는 중간 상태가 가능했다.
 
 USE shadowfit;
 
 -- ---------------------------------------------------------------------------
--- 1) smoothed_knee_angle 추가 — 프레임을 구분할 수 있는 유일한 값
+-- (1) smoothed_knee_angle 추가 — 프레임을 구분할 수 있는 유일한 값
 -- ---------------------------------------------------------------------------
 -- 왜 필요한가:
 --   sync_rate 는 ai-server 가 rep 단위로 채점해 그 rep 의 모든 프레임에 복제하는 값이라
@@ -43,12 +59,9 @@ USE shadowfit;
 --   조회는 기존 idx_session_timestamp 로 session_id 범위가 이미 좁혀지고, 세션 하나의
 --   pose_data 는 다운샘플(R=5) 후 수백 행 규모다. 쓰기 경로가 이 프로젝트의 병목이라
 --   인덱스를 늘리지 않는 쪽을 택했다(rep_number 때와 같은 판단).
-ALTER TABLE pose_data
-    ADD COLUMN smoothed_knee_angle DECIMAL(5,2) NOT NULL DEFAULT 0.00
-    AFTER sync_rate;
-
+--
 -- ---------------------------------------------------------------------------
--- 2) is_correct 삭제 — 읽는 곳이 없고, 있는 값과 모순된다
+-- (2) is_correct 삭제 — 읽는 곳이 없고, 있는 값과 모순된다
 -- ---------------------------------------------------------------------------
 -- 왜 지우는가:
 --   (1) 프로덕션에서 읽는 코드가 0 이다. 엔티티 필드와 INSERT 문, 그리고 테스트만 참조했다.
@@ -65,5 +78,10 @@ ALTER TABLE pose_data
 --
 -- 되돌리려면: ALTER TABLE pose_data ADD COLUMN is_correct BOOLEAN DEFAULT TRUE AFTER sync_rate;
 --   단 과거 판정값은 복원되지 않는다(어차피 40 기준 파생값이라 sync_rate 로 재계산 가능).
+
+-- ---------------------------------------------------------------------------
+-- 한 문장으로 실행한다 (위 "두 변경을 한 ALTER 문으로 묶은 이유" 참고)
+-- ---------------------------------------------------------------------------
 ALTER TABLE pose_data
+    ADD COLUMN smoothed_knee_angle DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER sync_rate,
     DROP COLUMN is_correct;
