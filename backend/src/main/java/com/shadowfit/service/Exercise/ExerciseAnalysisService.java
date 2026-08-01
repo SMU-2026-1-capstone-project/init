@@ -285,33 +285,22 @@ public class ExerciseAnalysisService {
      * 지키려던 것을 이 기능이 없애는</b> 셈이 된다. 503 으로 돌려주고 세션은 그대로 둔다. 재시도는
      * 멱등하고(AI 쪽 already_active 가드), 방치되더라도 타임아웃 스케줄러가 상한을 준다.
      *
+     * <p>[왜 트랜잭션 밖에서 gRPC 를 하는가] DB 작업은 {@link #loadReattachRequest} 안에서 끝내고
+     * 커넥션을 반납한 뒤에 gRPC 를 호출한다. 한 트랜잭션 안에서 호출하면 커넥션을 쥔 채로 최대
+     * {@code GRPC_CALL_TIMEOUT_SECONDS} 를 기다리게 되어, AI 가 느려지는 순간 <b>재부착과 무관한
+     * 요청까지</b> 풀 고갈로 막힌다(풀 15, connection-timeout 30초). 재부착은 드물지만 <b>몰릴 때
+     * 몰린다</b> — AI 재시작 직후에는 살아있던 세션들이 한꺼번에 들어온다. 이슈 #76.
+     *
      * @return 복원 결과. {@code alreadyActive} 면 AI 상태가 살아있어 아무것도 하지 않은 것이다.
      * @throws BusinessException 검증 실패는 {@code SessionService.findReattachableSession} 계약을 따르고,
      *                           AI 연결 실패는 {@code SESSION_REATTACH_UNAVAILABLE}
      */
-    @Transactional(readOnly = true)
     public ReattachSessionResponseDto reattachSession(Long sessionId, Long currentMemberId) {
         try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
-            Session session = sessionService.findReattachableSession(sessionId, currentMemberId);
-            Long exerciseId = session.getExercise().getId();
-
-            // 완료된 rep 은 세션 진행 중에 이미 pose_data 로 넘어와 있다(§3-2). AI 메모리가 날아가도
-            // 여기서 되찾을 수 있다는 것이 재부착이 성립하는 근거다.
-            int restoredRepCount = poseDataRepository.findMaxRepNumberBySessionId(sessionId);
-
-            ReattachRequest.Builder requestBuilder = ReattachRequest.newBuilder()
-                    .setSessionId(sessionId)
-                    .setExerciseId(exerciseId)
-                    .setPersona(session.getMember().getSelectedPersona().name())
-                    .setInitialRepCount(restoredRepCount);
-
-            // 기준 좌표는 AI 가 보관하지 않는다 — 시작 때와 똑같이 Spring 이 DB 에서 읽어 실어 보낸다.
-            for (ExerciseReference ref : referenceRepository.findByExerciseId(exerciseId)) {
-                requestBuilder.addReferencePoses(PoseDataRequest.newBuilder()
-                        .setTimestampSec(ref.getTimestampSec())
-                        .setJointCoordinates(ref.getJointCoordinates())
-                        .build());
-            }
+            // self 를 거쳐야 프록시를 타고 @Transactional 이 실제로 걸린다(this. 로 부르면 자기호출이라
+            // 트랜잭션 없이 실행됨 — 이 클래스가 @Async 에서 이미 겪은 함정, 2026-07-24).
+            ReattachRequest request = self.loadReattachRequest(sessionId, currentMemberId);
+            // ↑ 여기서 트랜잭션이 끝나고 커넥션이 반납된다. 아래 gRPC 는 커넥션을 쥐지 않는다.
 
             CircuitBreaker cb = aiCircuitBreaker();
             if (!cb.tryAcquirePermission()) {
@@ -322,7 +311,7 @@ public class ExerciseAnalysisService {
             long callStart = System.nanoTime();
             ReattachResponse response;
             try {
-                response = getAuthenticatedBlockingStub().reattachAnalysis(requestBuilder.build());
+                response = getAuthenticatedBlockingStub().reattachAnalysis(request);
             } catch (StatusRuntimeException e) {
                 cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, e);
                 log.error("재부착 gRPC 통신 장애 - 세션 ID: {}, 사유: {}", sessionId, e.getMessage());
@@ -345,6 +334,47 @@ public class ExerciseAnalysisService {
             return ReattachSessionResponseDto.of(
                     sessionId, response.getRepCount(), response.getAlreadyActive());
         }
+    }
+
+    /**
+     * [재부착 준비] 재부착 검증 + gRPC 요청 조립까지의 <b>DB 작업 전부</b>를 한 트랜잭션에 가둔다
+     * (이슈 #76).
+     *
+     * <p>이 메서드가 반환되는 시점에 트랜잭션이 끝나고 커넥션이 풀로 돌아간다. 호출부
+     * {@link #reattachSession} 은 그 뒤에 gRPC 를 호출하므로 외부 지연이 커넥션 점유로 번지지 않는다.
+     *
+     * <p><b>lazy 접근을 여기서 끝내야 한다</b> — {@code session.getExercise()}, {@code getMember()} 는
+     * 지연 로딩이고 {@code open-in-view: false} 라, 트랜잭션 밖으로 엔티티를 들고 나가면
+     * {@code LazyInitializationException} 이 난다. 그래서 엔티티가 아니라 <b>값이 다 채워진</b>
+     * {@code ReattachRequest} 를 반환한다.
+     *
+     * <p>public 인 이유는 {@code self.} 프록시 호출 대상이어야 해서다 — 외부에서 직접 부를 API 가
+     * 아니라 {@link #reattachSession} 의 1단계다.
+     */
+    @Transactional(readOnly = true)
+    public ReattachRequest loadReattachRequest(Long sessionId, Long currentMemberId) {
+        Session session = sessionService.findReattachableSession(sessionId, currentMemberId);
+        Long exerciseId = session.getExercise().getId();
+
+        // 완료된 rep 은 세션 진행 중에 이미 pose_data 로 넘어와 있다(§3-2). AI 메모리가 날아가도
+        // 여기서 되찾을 수 있다는 것이 재부착이 성립하는 근거다.
+        int restoredRepCount = poseDataRepository.findMaxRepNumberBySessionId(sessionId);
+
+        ReattachRequest.Builder requestBuilder = ReattachRequest.newBuilder()
+                .setSessionId(sessionId)
+                .setExerciseId(exerciseId)
+                .setPersona(session.getMember().getSelectedPersona().name())
+                .setInitialRepCount(restoredRepCount);
+
+        // 기준 좌표는 AI 가 보관하지 않는다 — 시작 때와 똑같이 Spring 이 DB 에서 읽어 실어 보낸다.
+        for (ExerciseReference ref : referenceRepository.findByExerciseId(exerciseId)) {
+            requestBuilder.addReferencePoses(PoseDataRequest.newBuilder()
+                    .setTimestampSec(ref.getTimestampSec())
+                    .setJointCoordinates(ref.getJointCoordinates())
+                    .build());
+        }
+
+        return requestBuilder.build();
     }
 
     /**

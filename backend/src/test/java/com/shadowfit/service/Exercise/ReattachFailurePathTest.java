@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -75,6 +76,10 @@ class ReattachFailurePathTest {
                 circuitBreakerRegistry, metrics);
         ReflectionTestUtils.setField(service, "internalToken", "test-token");
         ReflectionTestUtils.setField(service, "exerciseBlockingStub", blockingStub);
+        // reattachSession 은 DB 작업을 self.loadReattachRequest 로 분리해 트랜잭션을 gRPC 앞에서
+        // 닫는다(이슈 #76). 여기선 프록시가 없으니 자기 자신을 넣는다 — 트랜잭션 경계는 단위
+        // 테스트의 관심사가 아니고, 리포지토리가 전부 mock 이라 동작은 같다.
+        ReflectionTestUtils.setField(service, "self", service);
         when(sessionService.findReattachableSession(SESSION_ID, MEMBER_ID)).thenReturn(session());
         when(poseDataRepository.findMaxRepNumberBySessionId(SESSION_ID)).thenReturn(3);
         when(referenceRepository.findByExerciseId(anyLong())).thenReturn(List.of());
@@ -156,5 +161,34 @@ class ReattachFailurePathTest {
         assertThat(captor.getValue().getSessionId()).isEqualTo(SESSION_ID);
         assertThat(result.getRestoredRepCount()).isEqualTo(3);
         assertThat(result.getAnalyzerStateReset()).isTrue();
+    }
+
+    /**
+     * 이슈 #76 회귀 방지.
+     *
+     * <p>여기서 지키는 것은 "gRPC 를 트랜잭션 밖에서 한다"는 <b>경계 자체</b>다. 트랜잭션 안에서
+     * 부르면 커넥션을 쥔 채 최대 5초(gRPC deadline)를 기다리게 되고, AI 가 느려지는 순간 풀(15)이
+     * 마르면서 재부착과 무관한 요청까지 막힌다. 재부착은 드물지만 AI 재시작 직후에 <b>몰려서</b>
+     * 들어오므로 정확히 그때 터진다.
+     *
+     * <p>실제 커넥션 점유는 단위 테스트로 볼 수 없어 <b>애노테이션 배치</b>로 대신 고정한다.
+     * 누군가 두 메서드를 "정리"하며 {@code reattachSession} 에 {@code @Transactional} 을 도로
+     * 붙이면 여기서 깨진다.
+     */
+    @Test
+    @DisplayName("gRPC 는 트랜잭션 밖에서 호출한다 — 커넥션을 쥔 채 AI 를 기다리지 않는다 (#76)")
+    void gRPC는_트랜잭션_밖에서() throws NoSuchMethodException {
+        var reattach = ExerciseAnalysisService.class.getMethod("reattachSession", Long.class, Long.class);
+        var load = ExerciseAnalysisService.class.getMethod("loadReattachRequest", Long.class, Long.class);
+
+        assertThat(reattach.getAnnotation(Transactional.class))
+                .as("reattachSession 에 @Transactional 이 붙으면 gRPC 왕복 내내 커넥션을 점유한다 (#76)")
+                .isNull();
+        assertThat(load.getAnnotation(Transactional.class))
+                .as("DB 작업은 loadReattachRequest 안에서 끝나야 한다")
+                .isNotNull();
+        assertThat(load.getAnnotation(Transactional.class).readOnly())
+                .as("재부착 준비는 읽기 전용이다")
+                .isTrue();
     }
 }
