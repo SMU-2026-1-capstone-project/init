@@ -49,7 +49,7 @@ class ReportServiceTest {
     @Mock private ReportRepository reportRepository;
     @Mock private SessionRepository sessionRepository;
     @Mock private PoseDataRepository poseDataRepository;
-    @Mock private WorstSectionCalculator worstSectionCalculator;
+    @Mock private SessionAnalysisCalculator sessionAnalysisCalculator;
 
     private ReportService reportService;
 
@@ -63,7 +63,7 @@ class ReportServiceTest {
         MockitoAnnotations.openMocks(this);
         // 실제 JSON 직렬화/역직렬화 동작이 검증 대상이라 ObjectMapper는 모킹하지 않고 실사용
         reportService = new ReportService(reportRepository, sessionRepository, poseDataRepository,
-                worstSectionCalculator, new ObjectMapper());
+                sessionAnalysisCalculator, new ObjectMapper());
 
         Member member = Member.builder().id(MEMBER_ID).email("t@t.com").username("u").password("p").build();
         Exercise exercise = Exercise.builder().id(1L).name("스쿼트").category(ExerciseCategory.LOWER)
@@ -139,8 +139,8 @@ class ReportServiceTest {
                 .extracting(RepSyncRateDto::getRepNumber).containsExactly(1, 2);
         // 추이를 응답에 넣으면서 pose_data 스캔이 되살아나지 않았는지가 이 테스트의 핵심이다
         verify(poseDataRepository, never()).findFramesBySessionId(anyLong());
-        verify(worstSectionCalculator, never()).calculate(any(), any());
-        verify(worstSectionCalculator, never()).calculateRepTrend(any());
+        verify(sessionAnalysisCalculator, never()).calculate(any(), any());
+        verify(sessionAnalysisCalculator, never()).calculateRepTrend(any());
     }
 
     @Test
@@ -160,8 +160,8 @@ class ReportServiceTest {
         when(poseDataRepository.findFramesBySessionId(SESSION_ID)).thenReturn(frames);
         WorstSectionDto recomputed = new WorstSectionDto();
         recomputed.setReason("재계산됨");
-        when(worstSectionCalculator.calculate(session, frames)).thenReturn(recomputed);
-        when(worstSectionCalculator.calculateRepTrend(frames))
+        when(sessionAnalysisCalculator.calculate(session, frames)).thenReturn(recomputed);
+        when(sessionAnalysisCalculator.calculateRepTrend(frames))
                 .thenReturn(List.of(new RepSyncRateDto(1, 50.0, "00:00")));
 
         SessionReportResponseDto result = reportService.getSessionReport(SESSION_ID, MEMBER_ID);
@@ -180,7 +180,7 @@ class ReportServiceTest {
         when(poseDataRepository.findFramesBySessionId(SESSION_ID)).thenReturn(frames);
         WorstSectionDto recomputed = new WorstSectionDto();
         recomputed.setReason("재계산됨");
-        when(worstSectionCalculator.calculate(session, frames)).thenReturn(recomputed);
+        when(sessionAnalysisCalculator.calculate(session, frames)).thenReturn(recomputed);
 
         SessionReportResponseDto result = reportService.getSessionReport(SESSION_ID, MEMBER_ID);
 
@@ -197,7 +197,7 @@ class ReportServiceTest {
         when(poseDataRepository.findFramesBySessionId(SESSION_ID)).thenReturn(frames);
         WorstSectionDto recomputed = new WorstSectionDto();
         recomputed.setReason("재계산됨");
-        when(worstSectionCalculator.calculate(session, frames)).thenReturn(recomputed);
+        when(sessionAnalysisCalculator.calculate(session, frames)).thenReturn(recomputed);
 
         SessionReportResponseDto result = reportService.getSessionReport(SESSION_ID, MEMBER_ID);
 
@@ -205,7 +205,7 @@ class ReportServiceTest {
         // (CodeRabbit 지적 — 예전엔 calculate()가 null을 반환해도 통과하는 부실한 테스트였음)
         assertThat(result.getWorstSection().getReason()).isEqualTo("재계산됨");
         verify(poseDataRepository, times(1)).findFramesBySessionId(SESSION_ID);
-        verify(worstSectionCalculator).calculate(session, frames);
+        verify(sessionAnalysisCalculator).calculate(session, frames);
     }
 
     @Test

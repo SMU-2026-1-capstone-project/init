@@ -32,7 +32,7 @@ import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.report.ReportRepository;
-import com.shadowfit.service.Report.WorstSectionCalculator;
+import com.shadowfit.service.Report.SessionAnalysisCalculator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -61,7 +61,7 @@ public class SessionService {
     private final ObjectMapper objectMapper;
     private final com.shadowfit.service.Report.DailyLogService dailyLogService;
     private final PoseDataRepository poseDataRepository;
-    private final WorstSectionCalculator worstSectionCalculator;
+    private final SessionAnalysisCalculator sessionAnalysisCalculator;
     private final ReportRepository reportRepository;
     private final SessionMetrics sessionMetrics;
     private final OutboxEventRepository outboxRepository;
@@ -322,8 +322,8 @@ public class SessionService {
      */
     private void precomputeReport(Session session) {
         List<PoseFrameProjection> poseFrames = poseDataRepository.findFramesBySessionId(session.getId());
-        WorstSectionDto worstSection = worstSectionCalculator.calculate(session, poseFrames);
-        List<RepSyncRateDto> repTrend = worstSectionCalculator.calculateRepTrend(poseFrames);
+        WorstSectionDto worstSection = sessionAnalysisCalculator.calculate(session, poseFrames);
+        List<RepSyncRateDto> repTrend = sessionAnalysisCalculator.calculateRepTrend(poseFrames);
 
         Report report = new Report();
         report.setMember(session.getMember());

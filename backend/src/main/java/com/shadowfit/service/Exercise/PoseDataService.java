@@ -50,7 +50,7 @@ public class PoseDataService {
      * 부하 테스트(§7.5)에서 동시성 100에 p99 4.6s·throughput 천장 확인 → JdbcTemplate.batchUpdate
      * 로 multi-row INSERT 단일화. created_at 은 DB DEFAULT CURRENT_TIMESTAMP 에 위임.
      *
-     * 저장 전 다운샘플(위치 B: Spring 대표추출, pose-ingest-downsampling.md §3-B) — 라이브 분석
+     * 저장 전 다운샘플(위치 B: Spring, pose-ingest-downsampling.md §3-B) — 라이브 분석
      * (DTW·sync·rep 감지)은 이 저장 이전 FastAPI에서 이미 끝난 값이라 저장본을 줄여도 영향 없고,
      * 영향받는 건 리포트 시계열 해상도뿐(같은 문서 §1 안전판).
      */
@@ -65,7 +65,7 @@ public class PoseDataService {
             throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
         }
 
-        List<PoseDataRequest> downsampled = downsampleByWorstSync(grpcList, DOWNSAMPLE_WINDOW);
+        List<PoseDataRequest> downsampled = downsample(grpcList, DOWNSAMPLE_WINDOW);
 
         jdbcTemplate.batchUpdate(INSERT_POSE_SQL, new BatchPreparedStatementSetter() {
             @Override
@@ -97,21 +97,30 @@ public class PoseDataService {
     }
 
     /**
-     * window개 프레임 단위로 묶어 그중 sync_rate가 가장 낮은(자세가 가장 안 좋았던) 프레임만
-     * 대표로 남긴다 — 평균이 아니라 극값을 남기는 이유는 리포트의 worst-rep 분석이 "구간 평균
-     * 자세"가 아니라 "가장 안 좋았던 순간"을 필요로 하기 때문(§4의 평균 vs 대표추출 비교).
+     * window개마다 첫 프레임만 남기는 <b>균등 샘플링</b>. 행 수가 1/window 로 줄어든다.
+     *
+     * <p><b>예전엔 "sync_rate 가 가장 낮은 프레임을 대표로 남긴다"고 되어 있었다</b>(이슈 #79).
+     * 그 선택은 <b>실행되지 않았다</b> — 한 배치가 곧 한 rep 이고(ai-server 는 rep 이 완성될 때만
+     * 콜백한다, {@code pose.py:98-118}) rep 안의 {@code sync_rate} 는 상수라(rep 단위로 채점해
+     * 프레임마다 복제, {@code pose.py:111}) 엄격 부등호가 참이 되는 경우가 없었다. 매 window 의
+     * 첫 프레임이 그대로 남았고, 지금 코드는 <b>실제로 일어나던 일을 그대로 적은 것</b>이다.
+     *
+     * <p>따라서 {@code pose-ingest-downsampling.md} §4 의 "평균 vs 대표추출" 비교도 이 데이터에서는
+     * 성립하지 않는다 — 두 방식이 같은 상수를 돌려주므로 구분되지 않는다. 그 문서 §4 에 정정 표시를
+     * 달아뒀다.
+     *
+     * <p><b>R≈5 라는 비율 자체는 유효하다.</b> R-sweep 실측(§5-1(4))은 "몇 개를 남기나"의 실험이고
+     * 이 이슈는 "그중 어느 것을 남기나"의 문제라 결론이 뒤집히지 않는다.
+     *
+     * <p>⚠️ 남는 프레임이 달라지면 {@code sync_rate} 는 그대로여도(상수) <b>{@code joint_coordinates}
+     * 는 프레임마다 다르다.</b> 즉 어느 좌표가 리포트에 남는지는 이 선택에 달려 있다. "가장 자세가
+     * 안 좋았던 순간의 좌표"를 남기고 싶다면 {@code sync_rate} 가 아니라 프레임마다 실제로 다른 값
+     * (무릎각 등)을 기준으로 삼아야 하는데, 무엇이 "나쁜 자세"인지 종목별 정의가 필요해 열어뒀다(#79).
      */
-    private List<PoseDataRequest> downsampleByWorstSync(List<PoseDataRequest> frames, int window) {
+    private List<PoseDataRequest> downsample(List<PoseDataRequest> frames, int window) {
         List<PoseDataRequest> result = new java.util.ArrayList<>();
         for (int start = 0; start < frames.size(); start += window) {
-            int end = Math.min(start + window, frames.size());
-            PoseDataRequest worst = frames.get(start);
-            for (int i = start + 1; i < end; i++) {
-                if (frames.get(i).getSyncRate() < worst.getSyncRate()) {
-                    worst = frames.get(i);
-                }
-            }
-            result.add(worst);
+            result.add(frames.get(start));
         }
         return result;
     }

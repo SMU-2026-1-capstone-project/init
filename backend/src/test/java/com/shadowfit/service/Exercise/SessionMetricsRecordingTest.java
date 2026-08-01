@@ -354,7 +354,7 @@ SessionMetricsRecordingTest {
                     mock(MemberRepository.class), mock(com.fasterxml.jackson.databind.ObjectMapper.class),
                     mock(com.shadowfit.service.Report.DailyLogService.class),
                     mock(com.shadowfit.repository.exercise.PoseDataRepository.class),
-                    mock(com.shadowfit.service.Report.WorstSectionCalculator.class),
+                    mock(com.shadowfit.service.Report.SessionAnalysisCalculator.class),
                     mock(com.shadowfit.repository.report.ReportRepository.class),
                     metrics,
                     mock(com.shadowfit.repository.outbox.OutboxEventRepository.class));
