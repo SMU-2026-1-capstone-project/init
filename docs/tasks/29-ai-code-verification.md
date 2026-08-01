@@ -138,7 +138,7 @@
 - [ ] 브랜치 2개 **푸시 + PR** (문서 / 수정 分리)
 - [ ] 테스트 3종 상세 검증 (552줄) + ai-server 테스트
 - [ ] [#77](https://github.com/Shadowfit/init/issues/77) — 고치기 전에 **"그때 실제로 무슨 일이 나는지"** 부터 확인
-- [ ] [#78](https://github.com/Shadowfit/init/issues/78) — 고치는 방법 3안 결정. 조사 중 확인한 것: `dtaidistance` 가 워핑 경로 API(`dtw.warping_path`)를 제공하는데 지금은 `dtw.distance()` 로 **거리만 받고 경로를 버린다.** ㄷ안(프레임별 점수)이 새 알고리즘이 아니라 **버리는 중간 산출물을 살리는 일**일 수 있다 — ⚠️ 코드를 읽고 판단한 것이며 돌려보지 않았다
+- [ ] [#78](https://github.com/Shadowfit/init/issues/78) — 고치는 방법 3안 결정. **비교 문서 완료** → [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md)(ㄱ안 추천, ㄴ 배제 권고, ㄷ 별도 트랙). 조사 중 확인한 것: `dtaidistance` 가 워핑 경로 API(`dtw.warping_path`)를 제공하는데 지금은 `dtw.distance()` 로 **거리만 받고 경로를 버린다.** ㄷ안(프레임별 점수)이 새 알고리즘이 아니라 **버리는 중간 산출물을 살리는 일**일 수 있다 — ⚠️ 코드를 읽고 판단한 것이며 돌려보지 않았다
 - [ ] [#79](https://github.com/Shadowfit/init/issues/79) — **#78 과 같이 결정하는 게 싸다.** #78 ㄷ안(프레임별 점수)이 채택되면 #79 는 코드를 고치지 않아도 의도대로 동작한다. 그 전엔 `pose-ingest-downsampling.md` §4 에 최소한 정정 표시가 필요하다(이번 커밋 범위 밖)
 - [ ] `applyCompleteFromApp`(앱 보고 경로)은 여전히 dto 값을 그대로 쓴다 — #75 를 이 경로에도 적용할지
 - [ ] §4 의 부정확한 주석 5건 정정

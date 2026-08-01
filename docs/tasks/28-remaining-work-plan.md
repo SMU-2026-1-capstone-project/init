@@ -179,7 +179,7 @@ Claude 병행 배율이 항목마다 다른 이유. 아래는 **0% 압축**된�
 | #3 인덱스 실험 | #6이 있으면 산출물 품질이 올라감 (필수는 아님) |
 | ~~[#75](https://github.com/Shadowfit/init/issues/75)~~ | ~~고치는 방법 3안~~ — **ㄱ안(Spring 직접 집계) 채택·완료**(2026-08-01) |
 | [#77](https://github.com/Shadowfit/init/issues/77) | 고치기 전에 **"그때 실제로 무슨 일이 나는지" 확인**이 선결 |
-| [#78](https://github.com/Shadowfit/init/issues/78) | 고치는 방법 3안(rep 단위 계산 / 짧은 rep 보정 / 프레임별 점수) 결정 |
+| [#78](https://github.com/Shadowfit/init/issues/78) | 고치는 방법 3안(rep 단위 계산 / 짧은 rep 보정 / 프레임별 점수) 결정 — 비교는 [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md), **ㄱ안 추천(3~5h)** |
 | [#79](https://github.com/Shadowfit/init/issues/79) | **[#78](https://github.com/Shadowfit/init/issues/78) 결정에 종속** — ㄷ안(프레임별 점수)이면 코드 수정 없이 해소된다 |
 
 **독립적으로 바로 착수 가능**: #4, #5, 프론트 연동.
@@ -243,7 +243,7 @@ Claude 병행 배율이 항목마다 다른 이유. 아래는 **0% 압축**된�
 - [ ] #3 인덱스 3안 (ㄱ 추가 / ㄴ 감수 / ㄷ 기간 강제) 및 인덱스 실험 수행 여부
 - [ ] #3 화면 범위 — A·B·C 전부 vs 회원 목록만
 - [ ] #6 착수 여부 (= 남은 실험 2건을 할지)
-- [ ] [#78](https://github.com/Shadowfit/init/issues/78) 고치는 방법 3안 (→ [#79](https://github.com/Shadowfit/init/issues/79) 처리 방향이 여기 딸려 나온다)
+- [ ] [#78](https://github.com/Shadowfit/init/issues/78) 고치는 방법 3안 — [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md) §9 (→ [#79](https://github.com/Shadowfit/init/issues/79) 처리 방향이 여기 딸려 나온다)
 - [ ] [#77](https://github.com/Shadowfit/init/issues/77) 조사 후 감수/수정 판단
 - [ ] #5 외부 통합 — 할지 자체, 한다면 S3 vs OAuth2 ([`../decisions/external-integration-candidates.md`](../decisions/external-integration-candidates.md) §7)
 - [ ] 분업 방식 — 전량 위임 vs §6의 권고 분업
