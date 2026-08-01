@@ -15,6 +15,9 @@ RealMySQL 실험([`../../docs/portfolio/realmysql-experiments.md`](../../docs/po
 
 ②b projection처럼 **JSON off-page 페치 비용**이 변수인 실험용. 템플릿 세션(601, ~750행)을 세션·날짜 분산해 복제.
 
+> ⚠️ **리포트 경로 실험에는 그대로 못 쓴다.** 템플릿 601은 `rep_number`·`smoothed_knee_angle`이 생기기 전에 만들어져 두 컬럼이 전부 **0(미상)**이다. 계산기는 `rep_number <= 0`을 제외하므로 이 데이터로는 worst 구간·회차별 추이가 `null`로 나오고, 대표 프레임 선택도 "고를 근거 없음" 경로로 떨어진다. 조회 비용(JSON 페치·스캔) 실험에는 영향이 없다 — 그게 이 rig의 목적이다.
+> 리포트 경로까지 부하로 돌리려면 템플릿에 rep 경계와 무릎각을 실제 값으로 채워야 하는데, 아직 하지 않았다.
+
 ### 1. 세션 시딩 (5,000개, 2026년 12개월 분산)
 ```bash
 docker exec -i shadowfit-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit' < seed_sessions.sql
@@ -25,13 +28,13 @@ docker exec -i shadowfit-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shad
 docker exec shadowfit-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit -e "
 DROP TABLE IF EXISTS _pose_template;
 CREATE TABLE _pose_template AS
-  SELECT timestamp_sec, joint_coordinates, sync_rate, is_correct, feedback_message
+  SELECT timestamp_sec, joint_coordinates, sync_rate, rep_number, smoothed_knee_angle, feedback_message
   FROM pose_data WHERE session_id=601;"'
 
 for i in $(seq 0 9); do
   docker exec shadowfit-mysql sh -c "mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" shadowfit -e \"
-    INSERT INTO pose_data (session_id, timestamp_sec, joint_coordinates, sync_rate, is_correct, feedback_message, created_at)
-    SELECT s.id, t.timestamp_sec, t.joint_coordinates, t.sync_rate, t.is_correct, t.feedback_message, s.start_time
+    INSERT INTO pose_data (session_id, timestamp_sec, joint_coordinates, sync_rate, rep_number, smoothed_knee_angle, feedback_message, created_at)
+    SELECT s.id, t.timestamp_sec, t.joint_coordinates, t.sync_rate, t.rep_number, t.smoothed_knee_angle, t.feedback_message, s.start_time
     FROM _pose_template t
     CROSS JOIN (SELECT id, start_time FROM exercise_sessions WHERE reference_source='seed' AND id % 10 = $i) s;\""
   echo "청크 $i/9"
