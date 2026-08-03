@@ -57,6 +57,9 @@ class SessionReattachTest {
     @Value("${exercise.session.timeout.default-buffer-minutes:30}")
     private int bufferMinutes;
 
+    @Value("${exercise.session.timeout.idle-minutes:10}")
+    private int idleMinutes;
+
     private static final int EXPECTED_DURATION_MINUTES = 15;
 
     private Member owner;
@@ -180,16 +183,57 @@ class SessionReattachTest {
         }
 
         @Test
-        @DisplayName("허용 판정이 스케줄러와 같은 식을 쓴다")
-        void 스케줄러와_같은_식() {
-            // 두 기준이 어긋나면 "재부착은 됐는데 곧 FAILED" 창이 생긴다. 식을 Session 이 갖는 이유.
+        @DisplayName("활동이 없으면 기존 식(start_time 앵커)을 그대로 쓴다")
+        void 활동_없으면_기존식() {
+            // rep 이 아직 하나도 없는 구간(자세 잡기·준비)에 짧은 유휴 임계를 걸면 시작하자마자
+            // 걷어가게 된다. 그래서 첫 rep 전까지는 종전과 완전히 같은 기준이어야 한다.
             Session s = inProgressSession();
-            LocalDateTime threshold = s.timeoutThreshold(bufferMinutes);
+            LocalDateTime threshold = s.timeoutThreshold(idleMinutes, bufferMinutes);
 
             assertThat(threshold).isEqualTo(
                     s.getStartTime().plusMinutes(EXPECTED_DURATION_MINUTES).plusMinutes(bufferMinutes));
-            assertThat(s.isTimedOutAt(threshold.minusSeconds(1), bufferMinutes)).isFalse();
-            assertThat(s.isTimedOutAt(threshold.plusSeconds(1), bufferMinutes)).isTrue();
+            assertThat(s.isTimedOutAt(threshold.minusSeconds(1), idleMinutes, bufferMinutes)).isFalse();
+            assertThat(s.isTimedOutAt(threshold.plusSeconds(1), idleMinutes, bufferMinutes)).isTrue();
+        }
+
+        @Test
+        @DisplayName("활동이 있으면 마지막 활동 + 유휴 임계로 넘어간다")
+        void 활동_있으면_유휴기준() {
+            Session s = inProgressSession();
+            LocalDateTime lastActive = LocalDateTime.now().minusMinutes(3);
+            s.setLastActiveAt(lastActive);
+
+            LocalDateTime threshold = s.timeoutThreshold(idleMinutes, bufferMinutes);
+
+            assertThat(threshold)
+                    .as("앵커가 start_time 이 아니라 last_active_at 이다")
+                    .isEqualTo(lastActive.plusMinutes(idleMinutes));
+            assertThat(s.isTimedOutAt(threshold.minusSeconds(1), idleMinutes, bufferMinutes)).isFalse();
+            assertThat(s.isTimedOutAt(threshold.plusSeconds(1), idleMinutes, bufferMinutes)).isTrue();
+        }
+
+        @Test
+        @DisplayName("운동 중이면 45분이 지나도 걷히지 않는다")
+        void 장시간_운동은_안걷힌다() {
+            // 종전 식의 조기 종료 회귀 — 프레임이 들어오는 중에도 start_time + 45분이면 죽였다.
+            Session s = session(owner, LocalDateTime.now().minusMinutes(80), Status.IN_PROGRESS, null);
+            s.setLastActiveAt(LocalDateTime.now().minusMinutes(1));
+
+            assertThat(s.isTimedOutAt(LocalDateTime.now(), idleMinutes, bufferMinutes))
+                    .as("80분째지만 1분 전까지 활동했다면 살아있는 세션이다")
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("그만둔 세션은 45분을 기다리지 않고 유휴 임계에서 걷힌다")
+        void 이탈_세션은_빨리_걷힌다() {
+            // 종전 식의 방치 회귀 — 3분 만에 나가도 45분간 IN_PROGRESS 라 새 운동이 409 로 막혔다.
+            Session s = session(owner, LocalDateTime.now().minusMinutes(20), Status.IN_PROGRESS, null);
+            s.setLastActiveAt(LocalDateTime.now().minusMinutes(17));
+
+            assertThat(s.isTimedOutAt(LocalDateTime.now(), idleMinutes, bufferMinutes))
+                    .as("시작 후 20분(종전 기준 45분 미달)이지만 17분간 활동이 없었다")
+                    .isTrue();
         }
     }
 

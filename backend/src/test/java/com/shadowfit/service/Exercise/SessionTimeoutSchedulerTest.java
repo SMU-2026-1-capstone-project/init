@@ -49,7 +49,7 @@ class SessionTimeoutSchedulerTest {
         MockitoAnnotations.openMocks(this);
         meterRegistry = new SimpleMeterRegistry();
         scheduler = new SessionTimeoutScheduler(sessionRepository, sessionService,
-                new SessionMetrics(meterRegistry), 30);
+                new SessionMetrics(meterRegistry), 10, 30);
 
         testMember = Member.builder()
                 .id(1L)

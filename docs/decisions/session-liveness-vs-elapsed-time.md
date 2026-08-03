@@ -13,12 +13,15 @@
 >
 > **아직 안 정한 것**: 유휴 임계 `N`. §5-ㄷ 에 근거와 권고를 적었고 구현 착수 시 확정한다.
 >
-> **박을 코드 (미착수)**:
-> - `exercise_sessions.last_active_at` 컬럼 신설
+> **박힌 코드 (2026-08-03)**:
+> - `mysql/schema.sql` — `exercise_sessions.last_active_at DATETIME` 신설
+> - `Session.lastActiveAt` + `timeoutThreshold(idleMinutes, bufferMinutes)` — 활동이 있으면
+>   `last_active_at + idleMinutes`, 없으면 **기존 식으로 폴백**(아래 정정 참고)
 > - `PoseDataService.savePoseDataBatch` — 기존 `JdbcTemplate` 경로에 `last_active_at` 갱신 추가
-> - `Session.isTimedOutAt` / `timeoutThreshold` — 앵커를 `COALESCE(last_active_at, start_time)` 로
-> - `SessionTimeoutScheduler` · `SessionService.findReattachableSession` — 위 식을 그대로 공유(현행 유지)
-> - 통계는 별도 손대지 않는다 — 앵커가 고쳐지면 `getWeeklyActivity` 의 부풀림이 함께 사라진다
+> - `SessionTimeoutScheduler` · `SessionService.findReattachableSession` — 같은 식을 그대로 공유(현행 유지)
+> - `application.yml` — `exercise.session.timeout.idle-minutes: 10` 신설,
+>   `default-buffer-minutes` 는 **준비 구간 폴백 전용**으로 의미 축소
+> - 통계는 별도로 손대지 않았다 — 앵커가 고쳐지면 `getWeeklyActivity` 의 부풀림이 함께 사라진다
 
 ---
 
@@ -208,7 +211,16 @@ jdbcTemplate.update("UPDATE exercise_sessions SET last_active_at = ? WHERE id = 
 
 - 세트 사이 휴식은 90초까지 관측됐다([#91](https://github.com/Shadowfit/init/issues/91) 재현)
 - **권고: `N = 10분`** — 90초 휴식에 여유가 크고, 이탈한 세션이 45분이 아니라 10분 만에 정리된다. `N` 이 무엇이든 현행 45분보다 낫다는 것이 이 결정의 핵심이라, 값 자체는 착수 시 확정한다
-- rep 이 아직 하나도 없는 세션(준비·자세 잡는 중)은 `last_active_at` 이 null 이다 → `COALESCE(last_active_at, start_time)` 로 폴백하면 **현행과 같은 동작**이라 안전하다
+- rep 이 아직 하나도 없는 세션(준비·자세 잡는 중)은 `last_active_at` 이 null 이다 → **기존 식(`start_time + 예상 운동시간 + 버퍼`)으로 폴백**한다
+
+> **📌 구현 중 정정 (2026-08-03)** — 이 문단은 처음에 *"`COALESCE(last_active_at, start_time)` 로
+> 폴백하면 현행과 같은 동작이라 안전하다"* 고 적었다. **부정확했다.** `COALESCE` 로 앵커만 바꾸면
+> 활동이 없는 세션은 `start_time + N`(=10분)이 되어, 자세를 잡거나 워밍업하느라 첫 rep 이 늦는
+> 사용자를 **시작 10분 만에 걷어간다.** 종전(45분)보다 오히려 공격적이다.
+>
+> 실제로 "현행과 같은 동작"이 되려면 폴백이 **기존 식 전체**여야 한다. 그래서 구현은 두 구간으로
+> 나뉜다 — 첫 rep 전에는 종전과 완전히 동일하고, 첫 rep 이 들어오는 순간 유휴 판정으로 넘어간다.
+> `default-buffer-minutes` 를 지우지 않고 **준비 구간 전용으로 남긴** 이유가 이것이다.
 
 #### 파급 — 재부착 판정도 함께 바뀐다 (의도한 것)
 
@@ -235,6 +247,25 @@ jdbcTemplate.update("UPDATE exercise_sessions SET last_active_at = ? WHERE id = 
 - **ㄷ 의 면적이 초안 평가보다 작다** — §5-ㄷ 정정 1·2 참고. 쓰기 지점이 `savePoseDataBatch` 한 곳으로 정해지고, `@Version` 경쟁도 #92 차단도 없다
 
 ㄷ 는 부수적으로 **재부착 판정까지 옳은 기준으로** 바꾼다(§5-ㄷ 파급).
+
+---
+
+## 6-1. 이미 같은 문제를 국소적으로 우회한 곳이 있다 (구현 중 발견)
+
+**회원 탈퇴 가드가 이 판정을 이미 자기 방식으로 하고 있다.** `MemberService:171` 이
+`poseDataRepository.countSince(inProgressIds, since)` 로 "최근 `active-workout-idle-seconds`(180초)
+동안 `pose_data` 유입이 있었나"를 보고, 없으면 죽은 세션으로 간주해 탈퇴를 허용한다([#87](https://github.com/Shadowfit/init/issues/87)).
+
+설정 주석의 근거가 이 문서와 **같은 진단**이다:
+
+> *"상태값만 보면 좀비 세션 때문에 운동 중이 아닌 사용자가 최대 ~45분간 탈퇴하지 못한다"*
+> *"휴식 중에는 rep 이 완성되지 않아 AI 가 콜백을 안 보내므로 Spring 이 보기엔 죽은 세션과 구분되지 않는다"*
+
+즉 **같은 뿌리(§1)를 한 번 국소적으로 우회한 전례**가 있고, 이번 ㄷ 는 그것을 전역 기준으로 올린 것이다.
+
+**지금 통합하지 않는다.** 탈퇴 가드는 동작 중이고 임계값도 다르다(180초 vs 10분 — 각자 근거가 있다:
+전자는 세트 휴식 90초의 2배, 후자는 유휴 판정 여유). `last_active_at` 으로 바꾸면 `countSince` 조회가
+사라지지만, 그건 **후속 정리**이지 이 변경의 일부가 아니다. 별도 이슈로 남긴다.
 
 ---
 

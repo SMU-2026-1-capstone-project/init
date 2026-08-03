@@ -71,6 +71,11 @@ CREATE TABLE IF NOT EXISTS exercise_sessions (
                                                  reference_source VARCHAR(500),
     start_time DATETIME NOT NULL,
     end_time DATETIME,
+    -- 마지막으로 활동이 관측된 시각 (session-liveness-vs-elapsed-time.md ㄷ안).
+    -- rep 이 완성돼 SavePoseDataBatch 가 들어올 때 갱신된다 — Spring 은 개별 프레임을 받지
+    -- 않으므로 이것이 얻을 수 있는 가장 촘촘한 활동 신호다.
+    -- NULL 이면 "아직 rep 이 하나도 없음"이고, 그때는 기존 식(start_time 앵커)으로 폴백한다.
+    last_active_at DATETIME,
     total_reps INT DEFAULT 0,
     avg_sync_rate DECIMAL(5,2),
     max_sync_rate DECIMAL(5,2),
