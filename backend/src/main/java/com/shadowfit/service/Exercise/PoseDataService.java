@@ -16,9 +16,12 @@ import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -65,6 +68,12 @@ public class PoseDataService {
             throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
         }
 
+        // 위 검증이 통과한 순간부터 이 트랜잭션이 커밋될 때까지가 고아 행이 생길 수 있는 창이다
+        // (이슈 #87). 그 사이에 회원 탈퇴가 세션을 지우고 pose_data 정리까지 끝내버리면, 아래
+        // INSERT 가 정리 뒤에 착지해 아무도 다시 훑지 않는 행으로 남는다. 창의 폭을 알아야
+        // 발생 빈도의 상한을 잡고 수정안을 저울질할 수 있어 여기서 잰다.
+        recordOrphanWindow(System.nanoTime());
+
         List<PoseDataRequest> downsampled = downsample(grpcList, DOWNSAMPLE_WINDOW);
 
         jdbcTemplate.batchUpdate(INSERT_POSE_SQL, new BatchPreparedStatementSetter() {
@@ -97,6 +106,26 @@ public class PoseDataService {
 
         log.info("세션 {} : 포즈 데이터 {}개 수신 → {}개로 다운샘플 후 저장 성공",
                 sessionId, grpcList.size(), downsampled.size());
+    }
+
+    /**
+     * 창의 끝점을 <b>커밋</b>으로 잡는다 (이슈 #87). {@code batchUpdate} 반환이 아니라 커밋인
+     * 이유는, 탈퇴 쪽 정리가 우리 커밋 <i>뒤에</i> 돌면 우리 행까지 같이 지워져 고아가 안 남기
+     * 때문이다 — 위험한 구간은 검증 통과부터 커밋 직전까지다.
+     *
+     * <p>트랜잭션이 없거나(테스트 등) 롤백되면 기록하지 않는다. 롤백된 배치는 행을 남기지
+     * 않으므로 애초에 고아를 만들 수 없다.
+     */
+    private void recordOrphanWindow(long windowStartNanos) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sessionMetrics.poseOrphanWindow(Duration.ofNanos(System.nanoTime() - windowStartNanos));
+            }
+        });
     }
 
     /**

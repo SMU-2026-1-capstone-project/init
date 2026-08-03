@@ -41,6 +41,9 @@ public class SessionMetrics {
     /** 세션이 사라졌는데 남아 있는 pose_data 행 수 게이지 (이슈 #87). */
     private static final String POSE_ORPHANS = "shadowfit.pose.orphan.rows";
 
+    /** 세션 검증 통과부터 커밋까지 — 고아가 생길 수 있는 창의 폭 (이슈 #87). */
+    private static final String POSE_ORPHAN_WINDOW = "shadowfit.pose.orphan.window";
+
     private final MeterRegistry registry;
 
     public SessionMetrics(MeterRegistry registry) {
@@ -120,6 +123,27 @@ public class SessionMetrics {
         io.micrometer.core.instrument.Gauge.builder(POSE_ORPHANS, supplier)
                 .description("세션이 없는데 남아 있는 pose_data 행 수 (최근 갱신값)")
                 .register(registry);
+    }
+
+    /**
+     * 고아가 생길 수 있는 <b>창의 폭</b> — 세션 검증 통과부터 커밋까지 (이슈 #87).
+     *
+     * <p>게이지({@link #registerPoseOrphanGauge})가 "실제로 몇 건 났나"를 센다면 이쪽은
+     * <b>"날 수 있는 구간이 얼마나 넓나"</b>를 잰다. 둘을 곱해야 빈도 상한이 나오고, 그 상한이
+     * 있어야 수정안(락은 비용이 확실한데 이득이 불확실)을 저울질할 수 있다.
+     *
+     * <p><b>끝점이 INSERT 가 아니라 커밋인 이유.</b> 탈퇴 쪽 정리가 우리 커밋 <i>뒤에</i> 돌면
+     * 우리 행까지 같이 지워져 고아가 안 남는다. 위험한 구간은 검증 통과부터 커밋 직전까지다.
+     *
+     * <p>백분위를 함께 발행한다 — 평균은 이 용도에 쓸모없다. 창이 대부분 짧고 가끔 길다면
+     * 확률을 지배하는 건 그 꼬리이지 평균이 아니기 때문이다.
+     */
+    public void poseOrphanWindow(java.time.Duration window) {
+        io.micrometer.core.instrument.Timer.builder(POSE_ORPHAN_WINDOW)
+                .description("세션 검증 통과 → 커밋. 이 구간에 탈퇴가 겹치면 고아 행이 남는다")
+                .publishPercentiles(0.5, 0.9, 0.95, 0.99)
+                .register(registry)
+                .record(window);
     }
 
     /** 수신 프레임 수와 다운샘플 후 저장 행수를 함께 기록 — 실측 R값이 의도대로 나오는지 관측. */
