@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +50,14 @@ class MemberWithdrawalGuardTest {
     @Autowired private SessionRepository sessionRepository;
     @Autowired private ExercisesRepository exercisesRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
+
+    /**
+     * 경계 계산에 쓸 임계값. <b>서비스와 같은 표현식(기본값 포함)</b>을 쓴다 — 그래야 설정을
+     * 바꾸든 안 바꾸든 테스트가 항상 서비스와 같은 값을 본다. 테스트 프로파일에는 이 설정이
+     * 없으므로 양쪽 다 기본값으로 떨어진다.
+     */
+    @Value("${member.withdrawal.active-workout-idle-seconds:180}")
+    private long idleSeconds;
 
     private Member member;
     private Exercise exercise;
@@ -113,6 +122,38 @@ class MemberWithdrawalGuardTest {
 
         assertThatCode(() -> memberService.deleteAccount(member.getEmail()))
                 .as("운동 중이 아닌데 상태값 때문에 막히면 안 된다").doesNotThrowAnyException();
+    }
+
+    /**
+     * 임계값 자체를 고정하는 경계 테스트. 위 두 케이스(3초 / 10분)는 간격이 너무 넓어
+     * 임계값을 60초로 바꾸든 300초로 바꾸든 전부 통과한다 — 값이 무엇이든 테스트가 침묵한다.
+     *
+     * <p><b>"정확히 임계값" 케이스를 쓰지 않는 이유</b>: {@code countSince} 는
+     * {@code createdAt > since} 로 판정하는데, {@code since} 는 서비스가 자기 {@code now} 로
+     * 계산한다. 테스트가 만든 "정확히 N초 전" 프레임은 서비스의 {@code now} 가 항상 조금 뒤라
+     * <b>언제나 엄격히 더 오래된</b> 값이 된다. 그래서 그 케이스는 {@code >} 든 {@code >=} 든
+     * 똑같이 통과해 비교 연산자를 고정해주지 못한다. 대신 임계값 양옆 10초로 값을 고정한다.
+     */
+    @Test
+    @DisplayName("임계값보다 최근 프레임이면 거절된다 (경계 안쪽)")
+    void blocksWithdrawal_justInsideThreshold() {
+        Long sessionId = startedSession();
+        insertFrame(sessionId, LocalDateTime.now().minusSeconds(idleSeconds - 10));
+
+        assertThatThrownBy(() -> memberService.deleteAccount(member.getEmail()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.WITHDRAWAL_BLOCKED_BY_ACTIVE_SESSION);
+    }
+
+    @Test
+    @DisplayName("임계값보다 오래된 프레임이면 탈퇴된다 (경계 바깥쪽)")
+    void allowsWithdrawal_justOutsideThreshold() {
+        Long sessionId = startedSession();
+        insertFrame(sessionId, LocalDateTime.now().minusSeconds(idleSeconds + 10));
+
+        assertThatCode(() -> memberService.deleteAccount(member.getEmail()))
+                .doesNotThrowAnyException();
     }
 
     @Test
