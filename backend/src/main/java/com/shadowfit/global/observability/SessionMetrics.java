@@ -38,6 +38,9 @@ public class SessionMetrics {
     /** 통보 지연 — 행 생성(created_at)부터 전달 성공(sent_at)까지. */
     private static final String OUTBOX_LAG = "shadowfit.outbox.lag";
 
+    /** 세션이 사라졌는데 남아 있는 pose_data 행 수 게이지 (이슈 #87). */
+    private static final String POSE_ORPHANS = "shadowfit.pose.orphan.rows";
+
     private final MeterRegistry registry;
 
     public SessionMetrics(MeterRegistry registry) {
@@ -99,6 +102,24 @@ public class SessionMetrics {
     /** 통보 지연(생성→전달). 폴링 간격이 실제 지연에 얼마나 반영되는지 본다. */
     public void outboxLag(java.time.Duration lag) {
         registry.timer(OUTBOX_LAG).record(lag);
+    }
+
+    /**
+     * 고아 {@code pose_data} 행 수 게이지 (이슈 #87). 세션 검증과 INSERT 사이에 회원 탈퇴가
+     * 끼어들면 정리 경로를 빠져나간 행이 남는데, <b>지금은 그 일이 실제로 나는지 볼 수단이 없다.</b>
+     * 결함의 발생 빈도를 모르면 "핫패스에 상시 락을 얹을 만한가"(수정안 ㄱ)를 판단할 근거가 없어,
+     * 고치기 전에 세는 것부터 한다.
+     *
+     * <p><b>{@link #registerOutboxPendingGauge} 와 달리 supplier 가 DB 를 직접 치지 않는다.</b>
+     * 적체 게이지는 인덱스 조회라 스크레이프마다 물어봐도 되지만, 이쪽은 대용량 테이블
+     * anti-join 이라 스크레이프 주기로 돌리면 그 자체가 부하다. 그래서 supplier 는 스케줄러가
+     * 미리 채워둔 값을 읽기만 한다 — 게이지 값에 <b>최대 갱신 주기만큼의 지연</b>이 있다는 뜻이고,
+     * 드물게 발생하는 사건을 세는 용도라 그 지연은 무해하다.
+     */
+    public void registerPoseOrphanGauge(java.util.function.Supplier<Number> supplier) {
+        io.micrometer.core.instrument.Gauge.builder(POSE_ORPHANS, supplier)
+                .description("세션이 없는데 남아 있는 pose_data 행 수 (최근 갱신값)")
+                .register(registry);
     }
 
     /** 수신 프레임 수와 다운샘플 후 저장 행수를 함께 기록 — 실측 R값이 의도대로 나오는지 관측. */

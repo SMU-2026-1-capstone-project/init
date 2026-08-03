@@ -88,6 +88,7 @@ class PoseDataOrphanRaceTest {
     @Autowired private ExercisesRepository exercisesRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private PoseDataOrphanMonitor orphanMonitor;
 
     // PoseDataService 가 주입받는 그 빈을 스파이로 바꿔치기해 ①의 반환 직후를 붙잡는다.
     @MockitoSpyBean private SessionRepository sessionRepository;
@@ -166,6 +167,13 @@ class PoseDataOrphanRaceTest {
                 .as("결함: 세션이 없는데 pose_data 가 %d행 남았다 — 어느 정리 경로도 다시 훑지 않으므로 "
                         + "파티션 TTL 이 이 달을 드롭할 때까지 살아남는다", orphanRows)
                 .isPositive();
+
+        // 탐지기(PoseDataOrphanMonitor)가 이 고아를 실제로 집어내는지 같은 무대에서 확인한다.
+        // 관측 대상을 만들 수 있는 곳이 여기뿐이라(H2 는 FK 때문에 고아 자체가 안 생긴다),
+        // 탐지 쿼리의 검증도 이 테스트가 겸한다. 다른 고아가 섞여 있을 수 있어 하한만 본다.
+        assertThat(orphanMonitor.countOrphans())
+                .as("탐지기가 방금 만든 고아 %d행을 세야 한다", orphanRows)
+                .isGreaterThanOrEqualTo(orphanRows.longValue());
     }
 
     /**
