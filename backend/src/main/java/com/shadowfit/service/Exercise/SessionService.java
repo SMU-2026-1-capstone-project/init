@@ -404,16 +404,76 @@ public class SessionService {
     }
 
     /**
-     * [타임아웃 처리] 세션이 아직 IN_PROGRESS 상태이면 FAILED로 변경합니다.
+     * [타임아웃 처리] 세션이 아직 IN_PROGRESS 상태이면 FAILED로 변경합니다. <b>AI 통보는 하지 않는다.</b>
      *
-     * 스케줄러 호출용. 별도 트랜잭션으로 실행되어 한 세션의 충돌이 다른 세션 처리에 영향을 주지 않습니다.
+     * 별도 트랜잭션으로 실행되어 한 세션의 충돌이 다른 세션 처리에 영향을 주지 않습니다.
      * FastAPI 완료 콜백과 동시 진행 시 OptimisticLockingFailure가 발생할 수 있으며,
      * 이때는 호출 측이 catch하고 양보합니다(FastAPI 결과 우선).
+     *
+     * <p>AI 에 상태가 남아 있을 수 있는 경로라면 {@link #markAsFailedIfStillInProgress(Long,
+     * LocalDateTime, boolean)} 에 {@code true} 를 넘겨야 한다 — 판단 근거는 그쪽 주석에 있다.
      *
      * @return FAILED로 전환되었으면 true, 이미 다른 상태이거나 세션이 없으면 false
      */
     @Transactional
     public boolean markAsFailedIfStillInProgress(Long sessionId, LocalDateTime endTime) {
+        return failIfInProgress(sessionId, endTime, false);
+    }
+
+    /**
+     * [타임아웃 처리 + AI 통보] 위와 같되, 전환에 성공하면 AI 중단 통보를 <b>같은 트랜잭션에</b>
+     * 아웃박스 행으로 적재한다 (이슈 #98).
+     *
+     * <p><b>왜 필요한가</b> — 지금까지 세션을 FAILED 로 걷어갈 때 AI 에는 아무 말도 하지 않았다.
+     * 그러면 두 가지가 남는다: (1) AI 메모리의 {@code SessionState} 가 프로세스 재시작까지 안 지워지고
+     * (제거하는 곳이 {@code StopAnalysis} 핸들러 하나뿐이다), (2) {@code CompleteAnalysis} 콜백이
+     * 오지 않아 {@code pose_data} 에 rep 이 쌓여 있는데도 리포트가 만들어지지 않는다.
+     *
+     * <p><b>사용자가 종료를 눌러도 못 고친다</b> — {@code endSession} 의 멱등 가드가 {@code endTime
+     * != null} 인데 그 {@code endTime} 을 이 메서드가 이미 채워놨기 때문에 조기 return 하고,
+     * {@code OutboxEvent.stopAnalysis} 를 만드는 유일한 지점을 지나쳐 버린다. 그래서 "지연"이 아니라
+     * "영영"이었다.
+     *
+     * <p><b>왜 같은 트랜잭션인가</b> — 상태 전환과 통보 적재가 갈라지면 이 이슈가 지적한 문제를
+     * 형태만 바꿔 되풀이한다("FAILED 인데 통보는 없는" 상태). 둘 다 MySQL 이라 원자적으로 커밋된다.
+     * 낙관적 락 충돌로 롤백되면 아웃박스 행도 같이 사라지는데, 그게 옳다 — 충돌은 AI 완료 콜백이
+     * 이겼다는 뜻이고 그 경우 AI 는 이미 자기 상태를 지웠으므로 통보할 대상이 없다.
+     *
+     * <p><b>세션이 되살아난다</b> — {@code StopAnalysis} 는 "그만해"가 아니라 "그만하고 결과 보내"다.
+     * AI 가 {@code CompleteAnalysis} 로 답하고, {@code applyComplete} 의 멱등 가드는 COMPLETED 만
+     * 걸러내므로 FAILED 가 COMPLETED 로 덮인다. 의도한 것이다 — 그 덮어쓰기는 실수가 아니라
+     * "사용자가 실제로 운동한 데이터는 어떤 경우에도 유실되면 안 된다"는 기존 방침이고(위 completeSession
+     * 주석), 통보가 안 가서 그 방침이 <b>닿지 못하던 경로에 닿게</b> 하는 것이 이 변경이다.
+     *
+     * <p><b>AI 가 그 세션을 모르면</b> {@code success=false} 인 정상 응답이 오고, 그건
+     * {@code ExerciseAnalysisService.stopAnalysis} 에서 {@code TERMINAL_FAILED} 로 분류돼 재시도 없이
+     * 한 번에 끝난다. 세션은 FAILED 로 남는다. 헛방이어도 폭주하지 않는다.
+     *
+     * <p><b>왜 모든 호출처가 쓰지 않는가</b> — AI 에 상태가 있을 수 있는 경로만 통보해야 한다.
+     * 넷 중 둘뿐이다:
+     * <ul>
+     *   <li>✅ {@code SessionTimeoutScheduler} — 이 이슈의 대상</li>
+     *   <li>✅ {@code ExerciseAnalysisService} 의 StartAnalysis {@code onError} — gRPC 에러는 "실패"가
+     *       아니라 "모름"이다. AI 가 요청을 받아 상태를 만들고 응답만 못 돌아왔을 수 있어, 안 보내면
+     *       같은 누수가 남는다</li>
+     *   <li>❌ 서킷 OPEN — StartAnalysis 를 아예 안 보냈다. 게다가 같은 서킷에 막혀 통보도 도달 못 한다</li>
+     *   <li>❌ {@code failSessionFast} — 방금 보낸 StopAnalysis 가 실패해서 걷어내는 중이다. 여기서
+     *       통보하면 자기가 자기를 부른다. 무한루프는 아니지만(두 번째엔 이미 FAILED 라 false)
+     *       쓸모없는 gRPC 왕복이 한 번 더 생긴다</li>
+     * </ul>
+     *
+     * @param notifyAi 전환 성공 시 AI 중단 통보를 적재할지
+     */
+    @Transactional
+    public boolean markAsFailedIfStillInProgress(Long sessionId, LocalDateTime endTime, boolean notifyAi) {
+        return failIfInProgress(sessionId, endTime, notifyAi);
+    }
+
+    /**
+     * 두 오버로드의 실제 구현. {@code private} 이라 자기호출이 프록시를 우회하는 문제가 없다 —
+     * 트랜잭션 경계는 위 두 public 메서드가 갖는다.
+     */
+    private boolean failIfInProgress(Long sessionId, LocalDateTime endTime, boolean notifyAi) {
         Session session = sessionRepository.findById(sessionId).orElse(null);
         if (session == null || session.getStatus() != Status.IN_PROGRESS) {
             return false;
@@ -421,6 +481,12 @@ public class SessionService {
         session.setStatus(Status.FAILED);
         session.setEndTime(endTime);
         sessionRepository.saveAndFlush(session);
+
+        if (notifyAi) {
+            // endSession 과 같은 형태 — cid 를 행에 실어야 발행기(다른 스레드·다른 시각)에서
+            // 이 전환과 통보가 하나의 흐름으로 이어진다.
+            outboxRepository.save(OutboxEvent.stopAnalysis(sessionId, CorrelationIds.current()));
+        }
         return true;
     }
 

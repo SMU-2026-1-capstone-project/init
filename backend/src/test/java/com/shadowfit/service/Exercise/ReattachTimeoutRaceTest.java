@@ -133,7 +133,9 @@ class ReattachTimeoutRaceTest {
         assertThat(verified.getId()).isEqualTo(s.getId());
 
         // 2. 스케줄러가 끼어든다. gRPC 왕복(≤5초) 중에 타임아웃 기준을 넘었고 틱이 떨어진 상황.
-        boolean changed = sessionService.markAsFailedIfStillInProgress(s.getId(), LocalDateTime.now());
+        //    notifyAi=true 로 부르는 것은 SessionTimeoutScheduler 가 실제로 그렇게 부르기 때문이다
+        //    (이슈 #98 수정). 여기서 2-인자 오버로드를 쓰면 테스트만 옛 동작을 재현하게 된다.
+        boolean changed = sessionService.markAsFailedIfStillInProgress(s.getId(), LocalDateTime.now(), true);
         assertThat(changed)
                 .as("창이 실제로 존재한다 — 검증을 통과한 세션을 스케줄러가 곧바로 걷어갈 수 있다")
                 .isTrue();
@@ -166,18 +168,58 @@ class ReattachTimeoutRaceTest {
     }
 
     @Test
-    @DisplayName("종료를 눌러도 아웃박스 행이 안 생긴다 — AI 에 StopAnalysis 가 영영 안 간다")
-    void 종료해도_AI통보가_발행되지_않는다() {
-        Session s = raceIntoFailed();
+    @DisplayName("스케줄러가 걷어갈 때 AI 통보가 적재된다 — 종료를 눌러도 중복되지 않는다")
+    void 스케줄러가_AI통보를_적재하고_종료는_중복하지_않는다() {
+        // 이슈 #98 이전에는 여기서 아무 행도 생기지 않았고, 그래서 AI 상태가 남고 리포트도
+        // 만들어지지 않았다. 이제 스케줄러가 상태 전환과 같은 트랜잭션에 통보를 적재한다.
         long before = outboxRepository.count();
 
-        // 사용자가 "운동 종료"를 누른다.
+        Session s = raceIntoFailed();
+
+        long afterTimeout = outboxRepository.count();
+        assertThat(afterTimeout)
+                .as("스케줄러가 FAILED 로 전환하면서 StopAnalysis 통보를 같은 트랜잭션에 적재한다")
+                .isEqualTo(before + 1);
+
+        // 사용자가 뒤늦게 "운동 종료"를 누른다. endSession 의 멱등 가드(endTime != null)에 걸려
+        // 조기 return 하는데, 이제는 그게 옳다 — 통보는 이미 적재돼 있다.
         sessionService.endSession(s.getId(), owner.getId());
 
         assertThat(outboxRepository.count())
-                .as("endSession 의 멱등 가드가 endTime != null 인데, 그 endTime 을 스케줄러가 이미 "
-                        + "채워놨다 → 조기 return 이라 OutboxEvent.stopAnalysis 가 적재되지 않는다")
+                .as("이미 적재된 통보가 있으므로 두 번 보내지 않는다")
+                .isEqualTo(afterTimeout);
+    }
+
+    @Test
+    @DisplayName("notifyAi=false 인 호출처는 통보를 적재하지 않는다")
+    void 통보_비대상_호출처는_행을_만들지_않는다() {
+        // 서킷 OPEN(StartAnalysis 를 아예 안 보냄) · failSessionFast(방금 보낸 게 실패해서 걷어내는
+        // 중) 두 경로가 쓰는 오버로드다. 여기서 통보하면 각각 도달 불가한 행이 쌓이거나(서킷)
+        // 자기호출로 왕복이 한 번 더 늘어난다(failSessionFast).
+        Session s = sessionAtTimeoutEdge();
+        long before = outboxRepository.count();
+
+        assertThat(sessionService.markAsFailedIfStillInProgress(s.getId(), LocalDateTime.now())).isTrue();
+
+        assertThat(outboxRepository.count())
+                .as("2-인자 오버로드는 notifyAi=false 로 위임한다 — 기존 호출처의 동작이 바뀌면 안 된다")
                 .isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("이미 FAILED 인 세션은 통보를 다시 적재하지 않는다")
+    void 이미_실패한_세션은_통보를_반복하지_않는다() {
+        Session s = raceIntoFailed();
+        long after = outboxRepository.count();
+
+        // failSessionFast 가 도는 경우를 흉내낸다 — StopAnalysis 가 실패해 다시 걷어내려는 시도.
+        // 상태 가드에 걸려 false 로 빠지므로 통보도 늘지 않는다. 이것이 "자기호출이 한 라운드에서
+        // 멈춘다"의 근거다.
+        assertThat(sessionService.markAsFailedIfStillInProgress(s.getId(), LocalDateTime.now(), true))
+                .as("IN_PROGRESS 가 아니면 아무것도 하지 않는다")
+                .isFalse();
+
+        assertThat(outboxRepository.count()).isEqualTo(after);
     }
 
     @Test
