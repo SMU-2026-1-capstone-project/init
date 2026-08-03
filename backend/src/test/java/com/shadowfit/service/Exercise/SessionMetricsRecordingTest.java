@@ -166,8 +166,12 @@ SessionMetricsRecordingTest {
         @Test
         @DisplayName("gRPC onError로 세션을 걷어내면 FAILED 전이가 source=grpc-error 로 기록된다")
         void grpcError_recordsFailedTransition() {
-            // 서킷은 CLOSED — 호출은 나가고 그 호출이 실패하는 경로
-            when(sessionService.markAsFailedIfStillInProgress(eq(2L), any(LocalDateTime.class))).thenReturn(true);
+            // 서킷은 CLOSED — 호출은 나가고 그 호출이 실패하는 경로.
+            // notifyAi=true 로 스텁하는 이유: 이 경로는 StartAnalysis 를 실제로 보냈으므로 AI 에
+            // 상태가 만들어졌을 수 있다("에러 = 모름"). 위 circuit-open 테스트가 2-인자 그대로인
+            // 것과 대비되고, 그 차이가 이슈 #98 의 호출처 분기다.
+            when(sessionService.markAsFailedIfStillInProgress(eq(2L), any(LocalDateTime.class), eq(true)))
+                    .thenReturn(true);
             doAnswer(invocation -> {
                 StreamObserver<AnalyzeResponse> observer = invocation.getArgument(1);
                 observer.onError(new StatusRuntimeException(io.grpc.Status.fromCode(Code.UNAVAILABLE)));

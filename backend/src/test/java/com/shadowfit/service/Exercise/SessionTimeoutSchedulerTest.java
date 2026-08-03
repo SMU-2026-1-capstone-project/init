@@ -82,13 +82,13 @@ class SessionTimeoutSchedulerTest {
     void testTimeoutSessionMarkedFailed() {
         when(sessionRepository.findByStatus(Status.IN_PROGRESS))
                 .thenReturn(List.of(testSession));
-        when(sessionService.markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class)))
+        when(sessionService.markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class), eq(true)))
                 .thenReturn(true);
 
         scheduler.checkAndTimeoutSessions();
 
         verify(sessionService, times(1))
-                .markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class));
+                .markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class), eq(true));
     }
 
     @Test
@@ -109,8 +109,9 @@ class SessionTimeoutSchedulerTest {
 
         scheduler.checkAndTimeoutSessions();
 
-        verify(sessionService, never())
-                .markAsFailedIfStillInProgress(any(), any());
+        // 오버로드 하나만 never() 로 보면 2-인자 쪽으로 회귀해도 통과한다 — 이 경로는 애초에
+        // SessionService 를 건드리지 않아야 하므로 상호작용 자체를 없음으로 고정한다.
+        verifyNoInteractions(sessionService);
     }
 
     @Test
@@ -121,8 +122,9 @@ class SessionTimeoutSchedulerTest {
 
         scheduler.checkAndTimeoutSessions();
 
-        verify(sessionService, never())
-                .markAsFailedIfStillInProgress(any(), any());
+        // 오버로드 하나만 never() 로 보면 2-인자 쪽으로 회귀해도 통과한다 — 이 경로는 애초에
+        // SessionService 를 건드리지 않아야 하므로 상호작용 자체를 없음으로 고정한다.
+        verifyNoInteractions(sessionService);
     }
 
     @Test
@@ -149,8 +151,9 @@ class SessionTimeoutSchedulerTest {
 
         scheduler.checkAndTimeoutSessions();
 
-        verify(sessionService, never())
-                .markAsFailedIfStillInProgress(any(), any());
+        // 오버로드 하나만 never() 로 보면 2-인자 쪽으로 회귀해도 통과한다 — 이 경로는 애초에
+        // SessionService 를 건드리지 않아야 하므로 상호작용 자체를 없음으로 고정한다.
+        verifyNoInteractions(sessionService);
     }
 
     @Test
@@ -173,13 +176,13 @@ class SessionTimeoutSchedulerTest {
 
         when(sessionRepository.findByStatus(Status.IN_PROGRESS))
                 .thenReturn(List.of(quickSession));
-        when(sessionService.markAsFailedIfStillInProgress(eq(4L), any(LocalDateTime.class)))
+        when(sessionService.markAsFailedIfStillInProgress(eq(4L), any(LocalDateTime.class), eq(true)))
                 .thenReturn(true);
 
         scheduler.checkAndTimeoutSessions();
 
         verify(sessionService, times(1))
-                .markAsFailedIfStillInProgress(eq(4L), any(LocalDateTime.class));
+                .markAsFailedIfStillInProgress(eq(4L), any(LocalDateTime.class), eq(true));
     }
 
     @Test
@@ -205,9 +208,9 @@ class SessionTimeoutSchedulerTest {
         when(sessionRepository.findByStatus(Status.IN_PROGRESS))
                 .thenReturn(List.of(conflictingSession, normalSession));
 
-        when(sessionService.markAsFailedIfStillInProgress(eq(10L), any(LocalDateTime.class)))
+        when(sessionService.markAsFailedIfStillInProgress(eq(10L), any(LocalDateTime.class), eq(true)))
                 .thenThrow(new ObjectOptimisticLockingFailureException(Session.class, 10L));
-        when(sessionService.markAsFailedIfStillInProgress(eq(11L), any(LocalDateTime.class)))
+        when(sessionService.markAsFailedIfStillInProgress(eq(11L), any(LocalDateTime.class), eq(true)))
                 .thenReturn(true);
 
         // 충돌이 발생해도 예외가 외부로 전파되지 않아야 함
@@ -215,9 +218,9 @@ class SessionTimeoutSchedulerTest {
 
         // 두 세션 모두 호출되어야 함 (한 세션의 실패가 다른 세션 처리를 막으면 안 됨)
         verify(sessionService, times(1))
-                .markAsFailedIfStillInProgress(eq(10L), any(LocalDateTime.class));
+                .markAsFailedIfStillInProgress(eq(10L), any(LocalDateTime.class), eq(true));
         verify(sessionService, times(1))
-                .markAsFailedIfStillInProgress(eq(11L), any(LocalDateTime.class));
+                .markAsFailedIfStillInProgress(eq(11L), any(LocalDateTime.class), eq(true));
 
         // 양보한 충돌이 지표로 남아야 함 — 이 경쟁의 실제 발생 빈도를 운영 중 볼 수 있는 유일한 창구
         assertEquals(1.0, meterRegistry.counter("shadowfit.session.optimistic.lock.conflicts",
@@ -233,12 +236,12 @@ class SessionTimeoutSchedulerTest {
         when(sessionRepository.findByStatus(Status.IN_PROGRESS))
                 .thenReturn(List.of(testSession));
         // FastAPI가 한 발 빨라 IN_PROGRESS가 아니게 된 경우
-        when(sessionService.markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class)))
+        when(sessionService.markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class), eq(true)))
                 .thenReturn(false);
 
         assertDoesNotThrow(() -> scheduler.checkAndTimeoutSessions());
 
         verify(sessionService, times(1))
-                .markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class));
+                .markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class), eq(true));
     }
 }

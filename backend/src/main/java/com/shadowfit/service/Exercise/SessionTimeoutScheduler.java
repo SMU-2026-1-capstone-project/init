@@ -88,7 +88,10 @@ public class SessionTimeoutScheduler {
 
                 try (CorrelationIds.Scope perSession = CorrelationIds.withSession(session.getId())) {
                     try {
-                        boolean changed = sessionService.markAsFailedIfStillInProgress(session.getId(), now);
+                        // notifyAi=true — 걷어가는 세션은 AI 에 상태가 살아있을 수 있다. 통보하지
+                        // 않으면 그 상태가 프로세스 재시작까지 남고, CompleteAnalysis 가 오지 않아
+                        // pose_data 에 rep 이 있는데도 리포트가 안 만들어진다 (이슈 #98).
+                        boolean changed = sessionService.markAsFailedIfStillInProgress(session.getId(), now, true);
                         if (changed) {
                             log.warn("세션 타임아웃 처리 - 세션 ID: {}, 멤버: {}, 운동: {}, 시작시간: {}, 타임아웃기준: {}",
                                     session.getId(),
