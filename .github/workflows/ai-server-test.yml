@@ -1,0 +1,81 @@
+name: AI server tests
+
+# ai-server 테스트 스위트를 PR마다 자동 실행한다.
+#
+# 이 워크플로가 없던 동안 ai-server 변경은 자동 검증이 0이었다 — backend-test.yml 은
+# paths 필터가 backend/** 라 걸리지 않고, proto-sync-check.yml 은 proto 파일 diff 만 본다.
+# 그래서 ai-server 만 고친 PR 은 체크 자체가 뜨지 않았다 (이슈 #96).
+#
+# 테스트는 외부 DB·시크릿 없이 러너 단독으로 완결된다 (backend-test.yml 이 H2 로 그런 것과
+# 같은 성질). 무거운 의존성(MediaPipe·gRPC 서버)을 띄우는 테스트는 없고, 레지스트리·분석기
+# 같은 순수 로직만 본다.
+
+on:
+  pull_request:
+    paths:
+      - 'ai-server/**'
+      - '.github/workflows/ai-server-test.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ai-server/**'
+      - '.github/workflows/ai-server-test.yml'
+
+# 같은 브랜치에 연속 푸시하면 이전 실행은 취소 — 러너 시간 낭비 방지
+concurrency:
+  group: ai-server-test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ai-server tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Dockerfile 의 베이스(python:3.12-slim)와 같은 마이너 버전으로 맞춘다 — 운영과 다른
+      # 버전에서만 통과하는 테스트를 만들지 않기 위함.
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: ai-server/requirements.txt
+
+      # 설치가 이 워크플로 시간의 대부분이다 — mediapipe·opencv 가 크다. 캐시가 얼마나
+      # 줄여주는지는 실행 기록으로 확인한다(이슈 #96 미검증 항목).
+      - name: Install dependencies
+        run: pip install -r ai-server/requirements.txt
+
+      # discover 는 ai-server 를 작업 디렉토리로 해야 app 패키지가 import 된다.
+      # 러너를 새로 들이지 않고 unittest 를 쓰는 이유: 저장소에 pytest 설정도 의존성도 없고
+      # 기존 테스트가 전부 unittest(+ 평범한 assert 함수) 형태다.
+      - name: Run ai-server test suite
+        working-directory: ai-server
+        run: |
+          set -o pipefail
+          # unittest 는 결과를 stderr 로 낸다 — 요약 단계에서 읽으려면 합쳐야 한다.
+          python -m unittest discover -s tests 2>&1 | tee test-output.txt
+
+      # 실패 원인을 로그 전체를 뒤지지 않고 PR 화면에서 바로 보기 위한 요약.
+      # 설치 단계에서 죽으면 출력 파일 자체가 없으므로 그 경우도 명시적으로 알린다.
+      - name: 테스트 결과 요약
+        if: always()
+        working-directory: ai-server
+        run: |
+          {
+            echo "## ai-server 테스트 결과"
+            echo ""
+            if [ -f test-output.txt ]; then
+              echo '```'
+              tail -n 15 test-output.txt
+              echo '```'
+            else
+              echo "출력이 없습니다 — 의존성 설치 단계에서 실패했을 가능성이 큽니다. 위 로그를 확인하세요."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
