@@ -81,6 +81,30 @@ class MemberWithdrawalGuardTest {
                 .as("거절됐으므로 회원이 남아 있어야 한다").isPresent();
     }
 
+    /**
+     * 임계값의 기준이 배치 간격이 아니라 <b>세트 간 휴식</b>임을 고정하는 회귀 테스트.
+     *
+     * <p>휴식 중에는 rep 이 완성되지 않아 AI 가 콜백을 보내지 않으므로, Spring 이 보기엔 죽은 세션과
+     * 구분되지 않는다. {@code restTimeSec = max(90 - (level-1)*5, 30)} 이라 초급자는 90초까지 쉰다
+     * (12-persona-difficulty.md:90). 임계값을 배치 간격(~3~4초) 기준으로 짧게 잡으면 <b>쉬는 중인
+     * 사용자가 죽은 것으로 판정돼 정말 운동 중인데 탈퇴가 통과</b>한다 — 막으려던 결함 그 자체다.
+     *
+     * <p>이 프로젝트는 이미 같은 함정으로 ET-C(AI timeout 자동 종료)를 거부한 적이 있다
+     * (tts-design.md §2.A).
+     */
+    @Test
+    @DisplayName("세트 사이 휴식(90초) 중이면 여전히 운동 중이므로 탈퇴가 거절된다")
+    void blocksWithdrawal_duringRestBetweenSets() {
+        Long sessionId = startedSession();
+        insertFrame(sessionId, LocalDateTime.now().minusSeconds(90)); // 초급자 최대 휴식
+
+        assertThatThrownBy(() -> memberService.deleteAccount(member.getEmail()))
+                .as("휴식은 운동의 일부다 — 죽은 세션으로 오판하면 안 된다")
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.WITHDRAWAL_BLOCKED_BY_ACTIVE_SESSION);
+    }
+
     @Test
     @DisplayName("IN_PROGRESS 지만 프레임이 끊긴 좀비 세션은 탈퇴를 막지 않는다")
     void allowsWithdrawal_whenSessionIsZombie() {

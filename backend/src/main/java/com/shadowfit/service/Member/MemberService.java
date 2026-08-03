@@ -40,11 +40,16 @@ public class MemberService{
 
     /**
      * 이 시간 동안 프레임 유입이 없으면 그 세션은 죽은 것으로 본다(탈퇴 가드 판정 기준).
-     * 배치 간격(rep 단위 ~3~4초)보다 넉넉해야 세트 사이 휴식을 죽음으로 오판하지 않는다.
-     * 60초는 초안이며 실측 배치 간격과 대조해 조정할 값이다
-     * (docs/decisions/withdrawal-with-active-session.md §7).
+     *
+     * <p><b>기준은 배치 간격이 아니라 세트 간 휴식이다.</b> 휴식 중에는 rep 이 완성되지 않아 AI 가
+     * 콜백을 보내지 않으므로, Spring 이 보기엔 죽은 세션과 구분되지 않는다. 이 프로젝트는 이미 같은
+     * 이유로 ET-C(AI timeout 자동 종료)를 거부한 적이 있다(tts-design.md §2.A: "세트 사이 휴식
+     * 시간(30~90초)도 frame 안 오는 구간이라 휴식과 종료 구분 불가").
+     *
+     * <p>{@code restTimeSec = max(90 - (level-1)*5, 30)} → 최대 90초(초급자,
+     * 12-persona-difficulty.md:90). 2배 여유를 둬 180초.
      */
-    @Value("${member.withdrawal.active-workout-idle-seconds:60}")
+    @Value("${member.withdrawal.active-workout-idle-seconds:180}")
     private long activeWorkoutIdleSeconds;
     //로그인 로직
     @Transactional
@@ -151,9 +156,9 @@ public class MemberService{
      * 스케줄러가 걷어갈 때까지). 사용자에게는 원인이 안 보이는 형태라 안내 문구로 덮을 수 없다.
      * 살아있는 세션은 rep 단위로 3~4초마다 프레임을 보내므로, 유입이 끊긴 것을 죽었다는 증거로 쓴다.
      *
-     * <p>임계값이 배치 간격(3~4초)보다 넉넉한 이유는 세트 사이 휴식 때문이다 — 짧게 잡으면 쉬는
-     * 중인 사용자를 죽은 것으로 오판해 <b>정말 운동 중인데 탈퇴가 통과</b>한다. 이 방향의 오판이
-     * 반대보다 나쁘므로(그게 막으려던 결함 그 자체다) 여유를 둔다.
+     * <p>임계값의 기준은 배치 간격(~3~4초)이 아니라 <b>세트 간 휴식(최대 90초)</b>이다. 짧게 잡으면
+     * 쉬는 중인 사용자를 죽은 것으로 오판해 <b>정말 운동 중인데 탈퇴가 통과</b>한다 — 그건 막으려던
+     * 결함 그 자체라, 반대 방향 오판(죽은 세션 때문에 몇 분 더 기다림)보다 훨씬 나쁘다.
      */
     private void requireNoActiveWorkout(Long memberId) {
         List<Long> inProgressIds =
