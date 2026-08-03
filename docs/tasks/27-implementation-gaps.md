@@ -21,7 +21,7 @@
 - [x] **관측성** — **1차 완료(2026-07-28)**. correlation id 5단계 전파(HTTP·gRPC 진입점 발급/수용, MDC+`logback-spring.xml` 패턴, `@Async` TaskDecorator, Spring↔FastAPI 양방향 metadata, 스케줄러 tick 자체 발급) + 커스텀 메트릭 3종(상태 전이·낙관락 충돌·배치 행수). 기존 `log.` 호출 70여 건은 한 줄도 수정 안 함. JSON 구조화·분산추적은 규모상 의식적 제외. 설계·근거: [`observability-correlation-id.md`](../decisions/observability-correlation-id.md).
 - [ ] **모니터링/N+1 점검** — 관측성과 함께 🔴로 묶여 있던 항목 중 남은 부분. N+1 점검은 미착수.
 - [x] **테스트 커버리지** — **대폭 확장 완료(2026-07-26, PR #52)**. 5개 → **31개**(서비스 계층 전부 + 컨트롤러/통합 6개 + 보안 2개 + 관측성 4개). 확장 과정에서 **진짜 버그 5건 발견·수정**: `@Async` self-invocation(비동기가 실제로는 동기 실행), `@OnDelete` 누락 2건(entity-schema drift), 그 외 2건. 정직 단서: **커버리지 도구(JaCoCo)를 붙이지 않아 수치(%)는 없다** — "파일 수·계층 커버"까지만 주장할 것.
-- [ ] **외부 통합 다양성 부족** — OAuth2·S3·결제·푸시·검색 등 0개. [`25-portfolio-strategy.md`](./25-portfolio-strategy.md).
+- [ ] **외부 통합 다양성 부족** — OAuth2·S3·결제·푸시·검색 등 0개. [`25-portfolio-strategy.md`](./25-portfolio-strategy.md). **후보 비교(2026-08-01)**: [`external-integration-candidates.md`](../decisions/external-integration-candidates.md) — S3 1순위 / OAuth2 조건부 / 푸시·결제·검색 제외 추천, **1개만 할 것**. 미확정.
 - [ ] **AI→Spring 콜백 방향 장애 보호 없음** — 서킷브레이커/재시도가 Spring→AI 방향에만 있음, 반대 방향은 fire-and-forget(의도적 스코프 제외, `production-signal-checklist.md` §2-3-4-2).
 
 ## 4. 남겨둔 검증 작업(코드 아님, 실험)
@@ -46,7 +46,7 @@
 |---|---|---|
 | Redis 도입 | §2 | 보류 확정(CLOSED) — 트리거 발생 시 재검토 |
 | 모니터링/N+1 점검 | §3 | 관측성 1차가 빠져나가면서 남은 조각. N+1은 미착수 |
-| 외부 통합 다양성(OAuth2·S3·푸시 등) | §3 | 착수 여부 미결정 |
+| 외부 통합 다양성(OAuth2·S3·푸시 등) | §3 | 착수 여부 미결정 — 후보 비교 완료([`external-integration-candidates.md`](../decisions/external-integration-candidates.md)), 선택은 미확정 |
 | AI→Spring 콜백 방향 장애 보호 | §3 | 의도적 스코프 제외 |
 | 소량 DELETE 파편화 실험 | §4 | 미실험 — 검증 전엔 사실처럼 쓰지 말 것 |
 | 다른 운동 종목 확장 / 베타 테스트 | §5 | 2학기 범위 |

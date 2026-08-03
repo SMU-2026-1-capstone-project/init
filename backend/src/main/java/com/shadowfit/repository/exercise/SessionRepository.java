@@ -76,4 +76,11 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     // 미리 확보해둬야 함 (docs/decisions/pose-data-partition-fk-tradeoff.md).
     @Query("SELECT s.id FROM Session s WHERE s.member.id = :memberId")
     List<Long> findIdsByMemberId(@Param("memberId") Long memberId);
+
+    // 탈퇴 가드용 — 특정 상태의 세션 id 만(회원당 활성 세션은 1개 규약이라 보통 0~1건).
+    // 여기서 얻은 id 로 pose_data 유입 여부를 확인해 "실제로 운동 중인지"를 판정한다
+    // (MemberService.deleteAccount, docs/decisions/withdrawal-with-active-session.md §3-2).
+    // idx_session_member_status (member_id, status) 를 탄다.
+    @Query("SELECT s.id FROM Session s WHERE s.member.id = :memberId AND s.status = :status")
+    List<Long> findIdsByMemberIdAndStatus(@Param("memberId") Long memberId, @Param("status") Status status);
 }

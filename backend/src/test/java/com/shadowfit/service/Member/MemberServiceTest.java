@@ -13,6 +13,7 @@ import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.RefreshToken;
 import com.shadowfit.model.member.Sex;
 import com.shadowfit.model.member.UserRole;
+import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.member.RefreshTokenRepository;
@@ -57,6 +58,7 @@ class MemberServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private SessionRepository sessionRepository;
+    @Mock private PoseDataRepository poseDataRepository;
     @Mock private PoseDataCleanupService poseDataCleanupService;
     @Mock private PasswordEncoder passwordEncoder;
 
@@ -70,7 +72,8 @@ class MemberServiceTest {
         MockitoAnnotations.openMocks(this);
         jwtBlacklist = new JwtBlacklist();
         memberService = new MemberService(jwtUtil, memberRepository, refreshTokenRepository,
-                sessionRepository, poseDataCleanupService, passwordEncoder, jwtBlacklist);
+                sessionRepository, poseDataRepository, poseDataCleanupService, passwordEncoder,
+                jwtBlacklist);
     }
 
     @Nested
@@ -223,6 +226,10 @@ class MemberServiceTest {
         void deleteAccount_withSessions_triggersCleanupOnlyAfterCommit() {
             Member member = Member.builder().id(1L).email(EMAIL).username("u").password("p").build();
             when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(member));
+            // 탈퇴 가드가 createSession 과 같은 회원 행 락을 잡는다(이슈 #87). 진행 중 세션 조회는
+            // 스텁하지 않아 빈 목록이 오므로 가드는 통과한다 — 가드 자체의 검증은
+            // MemberWithdrawalGuardTest(실제 DB) 몫이고, 여기 관심사는 정리 트리거 조건이다.
+            when(memberRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(member));
             when(sessionRepository.findIdsByMemberId(1L)).thenReturn(List.of(101L, 102L));
 
             // 실제 트랜잭션 없이도 동기화 등록/발동만 검증하기 위해 동기화 컨텍스트를 직접 활성화
@@ -249,6 +256,7 @@ class MemberServiceTest {
         void deleteAccount_withoutSessions_registersNoSynchronization() {
             Member member = Member.builder().id(1L).email(EMAIL).username("u").password("p").build();
             when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(member));
+            when(memberRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(member));
             when(sessionRepository.findIdsByMemberId(1L)).thenReturn(List.of());
 
             TransactionSynchronizationManager.initSynchronization();
