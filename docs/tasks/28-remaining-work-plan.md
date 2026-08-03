@@ -1,6 +1,6 @@
 # 남은 작업 계획 — Spring 백엔드 완주까지
 
-작성: 2026-07-31 · 갱신: 2026-08-01 (#72·#73·#74 머지 반영 + 코드 검증 결함 [#79](https://github.com/Shadowfit/init/issues/79) 추가)
+작성: 2026-07-31 · 갱신: 2026-08-03 (#77·#91·#93·#96·#98 해소 + ai-server CI 신설 반영 — §1-3)
 상태: **분석/추천 — 착수 순서 미확정** (결정 ✅ 는 사용자 confirm 후)
 범위: **Spring 백엔드만.** 프론트(React Native) 전용 항목과 AI 서버(FastAPI) 고유 항목은 제외 — 단 크로스 레포 작업은 그 사실을 명시하고 포함
 목적: "앞으로 뭘 해야 하는가"와 "얼마나 남았는가"를 한 장에서 판단할 수 있게 정리
@@ -17,6 +17,8 @@
 > 2026-08-01 추가: 어제 머지분 코드 검증([`29-ai-code-verification.md`](./29-ai-code-verification.md))에서 결함 **5건**이 나왔다. 2건(#75·#76)은 같은 날 수정했고 3건(#77·#78·#79)은 열려 있다. **#75·#78·#79 는 뿌리가 하나**라 셋을 따로 세면 남은 일이 실제보다 커 보인다.
 
 > 최초 작성 시점 판단: 구현 60~65% / 포폴 50~57%, 6덩어리 66~97h. **§1 의 % 는 위 세 PR 이전 기준이라 지금은 과소평가다**(§1-2).
+
+> 2026-08-03 갱신: 7건이 더 머지됐으나 **% 는 그대로 둔다** — 전부 결함 수정·설계 개선이라 요구사항 완료 개수(20/28)가 안 움직인다(§1-3). 열려 있던 결함 중 [#77](https://github.com/Shadowfit/init/issues/77)·[#91](https://github.com/Shadowfit/init/issues/91)·[#93](https://github.com/Shadowfit/init/issues/93)·[#96](https://github.com/Shadowfit/init/issues/96)·[#98](https://github.com/Shadowfit/init/issues/98) 해소, [#78](https://github.com/Shadowfit/init/issues/78)·[#79](https://github.com/Shadowfit/init/issues/79) 는 여전히 열림. **압축 안 되는 결정은 이제 관리자 인덱스 3안 하나다.**
 
 ---
 
@@ -43,6 +45,36 @@
 - 테스트 Spring 12 · ai-server 5 신규 (Spring 전체 212 통과)
 
 **% 를 다시 매기지 않았다.** 요구사항 목록에 없던 항목들이라(§1 "요구사항 목록에 없는데 구현된 것" 과 같은 부류) 개수 기반 % 를 올릴 근거가 애매하고, 근거 없이 숫자만 올리면 이 문서의 다른 수치도 못 믿게 된다. **지금 값은 하한으로 읽으면 된다.**
+
+### 1-3. 2026-08-03 작업 — % 를 올리지 않는 이유
+
+이날 **7건이 머지됐다.** 그런데 §1 의 수치는 **그대로 둔다.**
+
+| PR | 내용 | 닫은 이슈 |
+|---|---|---|
+| [#97](https://github.com/Shadowfit/init/pull/97) | `ai-server` 테스트를 PR 마다 실행하는 워크플로 신설 | [#96](https://github.com/Shadowfit/init/issues/96) |
+| [#94](https://github.com/Shadowfit/init/pull/94) | 휴식 중 앉았다 일어나기를 rep 으로 세지 않는다 | [#93](https://github.com/Shadowfit/init/issues/93) |
+| [#95](https://github.com/Shadowfit/init/pull/95) | rep 프레임 버퍼 상한 | [#91](https://github.com/Shadowfit/init/issues/91) |
+| [#99](https://github.com/Shadowfit/init/pull/99) | 재부착-타임아웃 레이스 재현 테스트 | — |
+| [#100](https://github.com/Shadowfit/init/pull/100) | 타임아웃 세션도 AI 에 통보 | [#98](https://github.com/Shadowfit/init/issues/98)·[#77](https://github.com/Shadowfit/init/issues/77) |
+| [#101](https://github.com/Shadowfit/init/pull/101) | 세션 생존 판정 결정 문서 | — |
+| [#102](https://github.com/Shadowfit/init/pull/102) | 생존 판정을 마지막 활동 기준으로 (ㄷ안) | — |
+
+**전부 결함 수정·설계 개선이고 새 요구사항 기능이 아니다.** 요구사항 28개 기준 완료 개수는 **20 그대로**다. §1-2 가 세운 원칙("근거 없이 숫자만 올리면 이 문서의 다른 수치도 못 믿게 된다")을 여기에도 적용한다.
+
+**대신 실제로 두터워진 것** — 개수 % 에는 안 잡히지만 면접에서 말할 거리다:
+
+- **동시성 서사** — TOCTOU 를 스레드 없이 재현해 "창이 존재한다"가 아니라 "걸리면 무슨 일이 나는가"까지 확정([#77](https://github.com/Shadowfit/init/issues/77)). 아웃박스의 통보 유실 경로와 낙관적 락 경쟁이 실제 코드로 엮인 사례가 생겼다
+- **아웃박스 서사 보강** — "행만 있으면 결국 배달된다"는 재시도 기계가 **행 자체가 안 생기는 경로**에서 통째로 무의미해지는 사례([#98](https://github.com/Shadowfit/init/issues/98)). 패턴을 아는 것과 그 전제가 깨지는 지점을 아는 것은 다르다
+- **`ai-server` CI** — 자동 검증이 0 이던 영역에 워크플로가 붙었다. 설치 포함 **1분 56초** 실측
+- **테스트 212 → 257**
+- **결정 문서 2건** — [`../decisions/session-liveness-vs-elapsed-time.md`](../decisions/session-liveness-vs-elapsed-time.md) 신설(ㄷ 채택), [#98](https://github.com/Shadowfit/init/issues/98) 을 [#77](https://github.com/Shadowfit/init/issues/77) 에서 분리
+
+**하나의 뿌리를 찾은 것이 이날의 실질**이다. 좁은 창(#77) 조사 → 재부착과 무관한 실제 결함(#98) 발견·수정 → 그 과정에서 더 근본적인 설계 문제(생존 판정을 활동이 아니라 경과 시간으로 한다) 발견 → 문서로 결정 → 구현([#102](https://github.com/Shadowfit/init/pull/102)). **세 증상(주간 통계 부풀림·이탈 세션 45분 방치·장시간 운동 중 조기 종료)이 한 식에서 나왔다.**
+
+> ⚠️ [#102](https://github.com/Shadowfit/init/pull/102) 는 CodeRabbit 이 `Review rate limited` 라 **실제 리뷰 없이 머지됐다.** CI 와 로컬 257 테스트는 통과했으나, 판정식 하나를 세 곳이 공유하는 변경이라 사후 리뷰를 걸어둘 가치가 있다.
+
+---
 
 ### 1-1. 채점 중 정정된 것 (같은 오류 반복 방지용)
 
@@ -229,7 +261,7 @@ Claude 병행 배율이 항목마다 다른 이유. 아래는 **0% 압축**된�
 | 2 | #4 CD | 독립 착수 가능, "돌아간다" 증명 |
 | 3 | #5 외부 통합 1개 | 후보 비교는 [`../decisions/external-integration-candidates.md`](../decisions/external-integration-candidates.md) — **S3 추천, OAuth2 조건부**. 구현 %엔 0 |
 | 4 | #6 관측 스택 | 실험을 하기로 정할 때만 |
-| — | [#77](https://github.com/Shadowfit/init/issues/77)·[#78](https://github.com/Shadowfit/init/issues/78)·[#79](https://github.com/Shadowfit/init/issues/79) | 순위 밖 — #77 은 조사부터, **#78·#79 는 한 덩어리로** 리포트 집계 경로를 건드릴 때 같이 하는 게 쌈 |
+| — | ~~[#77](https://github.com/Shadowfit/init/issues/77)~~·[#78](https://github.com/Shadowfit/init/issues/78)·[#79](https://github.com/Shadowfit/init/issues/79) | **#77 은 2026-08-03 감수로 닫힘**(§7 미결정 참고). **#78·#79 는 한 덩어리로** 리포트 집계 경로를 건드릴 때 같이 하는 게 쌈 |
 
 **프론트 연동이냐 #3이냐** — 원래 "#1이냐 #3이냐"였던 갈림길이 서버 완료로 이렇게 옮겨왔다:
 
@@ -245,8 +277,10 @@ Claude 병행 배율이 항목마다 다른 이유. 아래는 **0% 압축**된�
 - [ ] #3 화면 범위 — A·B·C 전부 vs 회원 목록만
 - [ ] #6 착수 여부 (= 남은 실험 2건을 할지)
 - [x] ~~[#78](https://github.com/Shadowfit/init/issues/78) 고치는 방법 3안~~ → **✅ ㄱ안 채택·구현 완료.** 남은 하위 미결은 [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md) §9 (`reason` 문구 · `is_correct` · 앱 보고 경로 · 프론트 화면)
-- [ ] [#77](https://github.com/Shadowfit/init/issues/77) 조사 후 감수/수정 판단
+- [x] ~~[#77](https://github.com/Shadowfit/init/issues/77) 조사 후 감수/수정 판단~~ → **✅ 감수로 닫음 (2026-08-03).** 근거는 "드무니까"가 아니라 **"[#100](https://github.com/Shadowfit/init/pull/100) 으로 결과가 무해해져서"** 다 — 창은 남았지만 걸려도 정상 정리된다. 무효가 되는 조건(#100 이 되돌려지면 재개)도 이슈에 박아뒀다
 - [ ] #5 외부 통합 — 할지 자체, 한다면 S3 vs OAuth2 ([`../decisions/external-integration-candidates.md`](../decisions/external-integration-candidates.md) §7)
 - [ ] 분업 방식 — 전량 위임 vs §6의 권고 분업
+- [ ] 유휴 임계 `idle-minutes` 확정 — 현재 10분으로 박아 배포됐다([#102](https://github.com/Shadowfit/init/pull/102)). 하한 근거(세트 휴식 90초)는 있으나 **상한 근거는 재보지 않았다**
+- [ ] 탈퇴 가드의 `countSince` 를 `last_active_at` 으로 통합할지 — 같은 판정을 두 방식이 각자 하고 있다([`../decisions/session-liveness-vs-elapsed-time.md`](../decisions/session-liveness-vs-elapsed-time.md) §6-1). 임계값 근거가 서로 달라(180초 vs 10분) 단순 치환이 아니다
 
-**해소됨**: ~~#1과 #3 중 무엇을 먼저~~(#1 완료) · ~~#1 범위 — A+B 전체 vs 축소안~~(전체안 채택) · ~~#75 고치는 방법 3안~~(ㄱ안 채택·완료)
+**해소됨**: ~~#1과 #3 중 무엇을 먼저~~(#1 완료) · ~~#1 범위 — A+B 전체 vs 축소안~~(전체안 채택) · ~~#75 고치는 방법 3안~~(ㄱ안 채택·완료) · ~~#77 감수/수정~~(감수, 2026-08-03) · ~~세션 생존 판정 4안~~(ㄷ 채택·구현 완료, 2026-08-03)
