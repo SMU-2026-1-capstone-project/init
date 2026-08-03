@@ -135,6 +135,15 @@ exercise:
       # 스케줄러 체크 간격(분) - 매 1분마다 체크
       check-interval-minutes: 1
 
+# [5.5] 회원 탈퇴 가드 (withdrawal-with-active-session.md, 이슈 #87)
+member:
+  withdrawal:
+    # 이 시간 동안 pose_data 유입이 없으면 그 IN_PROGRESS 세션은 죽은 것(앱 종료·네트워크 단절)으로
+    # 보고 탈퇴를 허용한다. 상태값만 보면 좀비 세션 때문에 운동 중이 아닌 사용자가 최대 ~45분간
+    # 탈퇴하지 못한다. 배치 간격(rep 단위 ~3~4초)보다 넉넉해야 세트 사이 휴식을 죽음으로 오판하지
+    # 않는다 — 그 오판은 "정말 운동 중인데 탈퇴가 통과"라서 막으려던 결함 그 자체가 된다.
+    active-workout-idle-seconds: 60
+
 # [6] pose_data 파티션 TTL 설정 (report-read-path.md §9-B, 2026-07-24 확정)
 pose-data:
   partition:
