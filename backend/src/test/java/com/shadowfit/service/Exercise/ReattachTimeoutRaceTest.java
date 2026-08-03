@@ -207,6 +207,29 @@ class ReattachTimeoutRaceTest {
     }
 
     @Test
+    @DisplayName("사용자가 먼저 종료했으면 스케줄러가 통보를 중복 적재하지 않는다")
+    void 종료가_먼저면_통보가_중복되지_않는다() {
+        // endSession 은 endTime 만 찍고 status 는 IN_PROGRESS 로 둔다(전환은 applyComplete 몫).
+        // 그래서 AI 결과가 끝내 오지 않으면 스케줄러가 나중에 같은 세션을 집는다 — 상태 가드를
+        // 그대로 통과하므로, 막지 않으면 같은 세션에 StopAnalysis 통보가 두 건이 된다.
+        Session s = sessionAtTimeoutEdge();
+        long before = outboxRepository.count();
+
+        sessionService.endSession(s.getId(), owner.getId());
+        assertThat(outboxRepository.count())
+                .as("종료가 통보를 적재한다")
+                .isEqualTo(before + 1);
+
+        assertThat(sessionService.markAsFailedIfStillInProgress(s.getId(), LocalDateTime.now(), true))
+                .as("status 는 아직 IN_PROGRESS 라 전환 자체는 일어난다")
+                .isTrue();
+
+        assertThat(outboxRepository.count())
+                .as("통보는 이미 적재돼 있다 — 두 번 보내지 않는다")
+                .isEqualTo(before + 1);
+    }
+
+    @Test
     @DisplayName("이미 FAILED 인 세션은 통보를 다시 적재하지 않는다")
     void 이미_실패한_세션은_통보를_반복하지_않는다() {
         Session s = raceIntoFailed();

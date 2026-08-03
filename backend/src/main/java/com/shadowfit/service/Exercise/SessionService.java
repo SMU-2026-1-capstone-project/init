@@ -478,11 +478,23 @@ public class SessionService {
         if (session == null || session.getStatus() != Status.IN_PROGRESS) {
             return false;
         }
+        // 덮어쓰기 전에 읽어둔다 — 아래 통보 중복 판정의 근거다.
+        boolean hadEndTime = session.getEndTime() != null;
+
         session.setStatus(Status.FAILED);
         session.setEndTime(endTime);
         sessionRepository.saveAndFlush(session);
 
-        if (notifyAi) {
+        // 여기서 endTime 이 이미 있었다면 그건 endSession 이 남긴 것이다 — 이 메서드가 남긴
+        // 것이라면 status 가 FAILED 라 위 가드에서 이미 빠져나갔다. 그리고 endSession 은
+        // endTime 을 찍을 때 통보 행도 함께 남긴다(:379). 즉 통보는 이미 적재돼 있다.
+        //
+        // endSession 이 status 는 IN_PROGRESS 로 두기 때문에(전환은 applyComplete 몫) 이 경로가
+        // 나중에 같은 세션을 다시 집을 수 있다 — 사용자가 종료했는데 AI 결과가 끝내 안 와서
+        // 스케줄러가 걷어가는 경우다. 그때 또 적재하면 같은 세션에 통보가 두 건이 된다.
+        boolean alreadyNotified = hadEndTime;
+
+        if (notifyAi && !alreadyNotified) {
             // endSession 과 같은 형태 — cid 를 행에 실어야 발행기(다른 스레드·다른 시각)에서
             // 이 전환과 통보가 하나의 흐름으로 이어진다.
             outboxRepository.save(OutboxEvent.stopAnalysis(sessionId, CorrelationIds.current()));

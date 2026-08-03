@@ -19,7 +19,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -110,8 +109,9 @@ class SessionTimeoutSchedulerTest {
 
         scheduler.checkAndTimeoutSessions();
 
-        verify(sessionService, never())
-                .markAsFailedIfStillInProgress(any(), any(), anyBoolean());
+        // 오버로드 하나만 never() 로 보면 2-인자 쪽으로 회귀해도 통과한다 — 이 경로는 애초에
+        // SessionService 를 건드리지 않아야 하므로 상호작용 자체를 없음으로 고정한다.
+        verifyNoInteractions(sessionService);
     }
 
     @Test
@@ -122,8 +122,9 @@ class SessionTimeoutSchedulerTest {
 
         scheduler.checkAndTimeoutSessions();
 
-        verify(sessionService, never())
-                .markAsFailedIfStillInProgress(any(), any(), anyBoolean());
+        // 오버로드 하나만 never() 로 보면 2-인자 쪽으로 회귀해도 통과한다 — 이 경로는 애초에
+        // SessionService 를 건드리지 않아야 하므로 상호작용 자체를 없음으로 고정한다.
+        verifyNoInteractions(sessionService);
     }
 
     @Test
@@ -150,8 +151,9 @@ class SessionTimeoutSchedulerTest {
 
         scheduler.checkAndTimeoutSessions();
 
-        verify(sessionService, never())
-                .markAsFailedIfStillInProgress(any(), any(), anyBoolean());
+        // 오버로드 하나만 never() 로 보면 2-인자 쪽으로 회귀해도 통과한다 — 이 경로는 애초에
+        // SessionService 를 건드리지 않아야 하므로 상호작용 자체를 없음으로 고정한다.
+        verifyNoInteractions(sessionService);
     }
 
     @Test
