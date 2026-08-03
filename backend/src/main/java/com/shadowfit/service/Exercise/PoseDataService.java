@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -87,6 +88,19 @@ public class PoseDataService {
                 return downsampled.size();
             }
         });
+
+        // 활동 시각 갱신 — 이 배치가 도착했다는 것 자체가 "사용자가 아직 운동 중"이라는 신호다
+        // (session-liveness-vs-elapsed-time.md ㄷ안). 타임아웃·재부착 판정이 이 값을 앵커로 쓴다.
+        //
+        // JPA 가 아니라 여기서 직접 UPDATE 하는 이유: 엔티티로 갱신하면 @Version 이 따라 올라가고,
+        // 그 낙관적 락은 AI 완료 콜백과 타임아웃 스케줄러의 경쟁을 조율하는 장치다. 운동 중 내내
+        // version 이 바뀌면 지금은 드물어서 지표로 관측하던 그 경쟁이 상시화된다.
+        //
+        // 실패해도 배치를 되돌리지 않는다 — 이 UPDATE 는 판정 보조이고, 사용자가 실제로 한 운동
+        // (위 INSERT)이 그것 때문에 유실되면 주객이 전도된다. 세션이 없으면 위 existsById 에서
+        // 이미 걸러졌으므로 여기서 0 행이 나오는 경우는 그 사이 삭제된 때뿐이다.
+        jdbcTemplate.update("UPDATE exercise_sessions SET last_active_at = ? WHERE id = ?",
+                LocalDateTime.now(), sessionId);
 
         // 수신/저장 행수를 분포로 남겨 실측 다운샘플 비율(R≈5)이 운영 중에도 유지되는지 관측한다.
         // 로그는 배치 1건씩만 보여주지만 지표는 "지난 1시간 평균 몇 프레임이 몇 행이 됐나"에 답한다.

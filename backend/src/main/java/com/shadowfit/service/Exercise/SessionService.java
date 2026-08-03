@@ -78,6 +78,9 @@ public class SessionService {
     // 재부착 허용 시간 상한 — SessionTimeoutScheduler 와 같은 프로퍼티를 읽는다. 상한을 별도 상수로
     // 두면 두 값이 어긋날 때 "재부착은 됐는데 곧 걷혀가는" 세션이 생긴다(findReattachableSession).
     // @RequiredArgsConstructor 라 생성자 파라미터로는 못 넣어 필드 주입을 쓴다.
+    @Value("${exercise.session.timeout.idle-minutes:10}")
+    private Integer idleMinutes;
+
     @Value("${exercise.session.timeout.default-buffer-minutes:30}")
     private Integer defaultBufferMinutes;
 
@@ -185,7 +188,7 @@ public class SessionService {
             throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
         }
 
-        if (session.isTimedOutAt(LocalDateTime.now(), defaultBufferMinutes)) {
+        if (session.isTimedOutAt(LocalDateTime.now(), idleMinutes, defaultBufferMinutes)) {
             throw new BusinessException(ErrorCode.SESSION_REATTACH_EXPIRED);
         }
 
