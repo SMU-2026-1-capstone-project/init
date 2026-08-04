@@ -85,10 +85,21 @@ public class MemberQueryRepositoryImpl implements MemberQueryRepository {
     /**
      * username 또는 email 부분일치.
      *
-     * <p>⚠️ 선행 와일드카드({@code LIKE '%x%'})라 인덱스를 타지 못하고 전수 스캔이 된다.
-     * 검색어만 단독으로 걸면 이번에 추가한 {@code idx_users_created_at} 도 쓰이지 않는다
-     * — 그 인덱스는 가입일 범위·정렬용이다 ({@code admin-page-scope.md} §4-1 의
-     * "필터 조합별 커버리지 미측정"이 가리키는 지점이 여기다).
+     * <p>⚠️ 선행 와일드카드({@code LIKE '%x%'})라 <b>인덱스 탐색</b>에는 쓸 수 없다. 다만
+     * "그러니 인덱스가 아무 소용 없다"는 틀렸다 — 실측 결과 {@code idx_users_created_at} 은
+     * <b>정렬용으로 쓰인다</b>({@code ORDER BY created_at DESC} 를 백워드 인덱스 스캔으로 대체,
+     * {@code filesort} 소멸). {@code admin-page-scope.md} §4-3 ① 참고.
+     *
+     * <p>🔴 대신 여기에 함정이 둘 있다.
+     * <ul>
+     *   <li>{@code EXPLAIN} 의 {@code rows=20} 은 측정이 아니라 <b>낙관적 추정</b>이다.
+     *       매칭이 드물수록 {@code LIMIT 20} 을 채우려 인덱스를 더 훑는다 — 실측으로
+     *       0건 매칭 시 20만 행을 전부 읽었다 (§4-3 ②)</li>
+     *   <li>{@code containsIgnoreCase()} 가 만드는 {@code lower(username)} 은 이 DB 의
+     *       {@code utf8mb4_unicode_ci} 컬레이션에서 <b>결과를 바꾸지 않으면서</b> 컬럼에 함수를
+     *       씌워, 접두 검색({@code LIKE 'kim%'})으로 바꿔도 인덱스를 못 타게 만든다 (§4-3 ④)</li>
+     * </ul>
+     * 둘 다 고칠지는 미결정이다 — §4-3 "이제 갈릴 수 있는 결정".
      */
     private BooleanExpression keywordContains(String keyword) {
         if (!StringUtils.hasText(keyword)) {
