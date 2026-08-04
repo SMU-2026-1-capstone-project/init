@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# 관리자 회원 목록 — 필터 조합별 인덱스 커버리지 실측
-# (docs/decisions/admin-page-scope.md §4-3, 2026-08-04)
+# 관리자 목록(A 회원 · B 세션) — 필터 조합별 인덱스 커버리지 실측
+# (docs/decisions/admin-page-scope.md §4-3 · §4-4, 2026-08-04)
 #
-# 질문: idx_users_created_at 하나를 넣었다. 그런데 필터 5개의 부분집합은 32가지다.
+# 질문 A(회원): idx_users_created_at 하나를 넣었다. 그런데 필터 5개의 부분집합은 32가지다.
 #       "인덱스를 넣었다"가 "모든 조회가 빨라졌다"는 뜻이 아니라면, 정확히 어느 조합이
 #       인덱스를 타고 어느 조합이 20만 행 스캔으로 돌아가는가.
+#
+# 질문 B(세션): 회원 목록에는 없던 변수가 하나 있다 — 검색어가 조인 너머(users.username)에
+#       있어서 옵티마이저가 **어느 테이블부터 읽을지**를 고른다. 세션부터 읽고 회원을 붙일지,
+#       회원을 먼저 걸러 그 회원들의 세션을 찾을지. 코드만 봐서는 알 수 없다.
 #
 # ── 이 장치가 앞선 rig(measure_admin_index.sh)와 다른 점 ────────────────────────
 #
@@ -39,6 +43,7 @@ DB_NAME=shadowfit_explain
 CONTAINER=shadowfit-mysql
 LOGFILE=/tmp/admin_explain_capture.log
 USERS=200000
+SESSIONS=1000000
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d)"
@@ -54,7 +59,7 @@ echo
 # schema.sql 은 CREATE DATABASE shadowfit / USE shadowfit 을 안에 박고 있다. 그대로 파이프하면
 # 실 DB 에 붙는다. 두 줄만 정확히 치환하고, 치환이 실제로 일어났는지 확인한 뒤에만 적용한다
 # — 스키마 파일이 바뀌어 패턴이 안 맞는데 조용히 넘어가면 실 DB 를 건드리게 된다.
-echo "## [1/7] 스크래치 DB 생성 — mysql/schema.sql 원본 적용"
+echo "## [1/8] 스크래치 DB 생성 — mysql/schema.sql 원본 적용"
 sed -e "s/^CREATE DATABASE IF NOT EXISTS shadowfit;/CREATE DATABASE IF NOT EXISTS ${DB_NAME};/" \
     -e "s/^USE shadowfit;/USE ${DB_NAME};/" \
     "${REPO_ROOT}/mysql/schema.sql" > "$WORK/schema.sql"
@@ -74,7 +79,7 @@ DB < "$WORK/schema.sql"
 echo "   테이블 $(DB -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${DB_NAME}';")개"
 
 # ── [2/7] 시딩 ────────────────────────────────────────────────────────────────
-echo "## [2/7] 회원 ${USERS} 시딩"
+echo "## [2-1/8] 회원 ${USERS} 시딩"
 DB "$DB_NAME" -e "
 DROP TABLE IF EXISTS _seq;
 CREATE TABLE _seq (n INT PRIMARY KEY);
@@ -109,11 +114,40 @@ SELECT CASE WHEN n % 100 = 0 THEN CONCAT('kim', n) ELSE CONCAT('u', n) END,
 FROM _seq WHERE n < ${USERS};"
 DB "$DB_NAME" -e "ANALYZE TABLE users;" >/dev/null
 echo "   회원 $(DB -sN "$DB_NAME" -e 'SELECT COUNT(*) FROM users;') / 그중 kim $(DB -sN "$DB_NAME" -e "SELECT COUNT(*) FROM users WHERE username LIKE '%kim%';")"
+
+# ── [2-2/8] 세션 시딩 (B) ─────────────────────────────────────────────────────
+echo "## [2-2/8] 운동 3종 + 세션 ${SESSIONS} 시딩"
+DB "$DB_NAME" -e "
+INSERT INTO exercises (name, category, analysis_supported) VALUES
+  ('스쿼트','LOWER',TRUE), ('푸시업','UPPER',FALSE), ('플랭크','CORE',FALSE);"
+
+# FK 검사를 끄고 넣는다 — 100만 행마다 users/exercises 를 확인하면 시딩이 수 배 느려진다.
+# 값은 위에서 만든 범위 안에서만 만들므로 무결성은 구성으로 보장된다. 끝나면 되돌린다.
+DB "$DB_NAME" -e "
+SET FOREIGN_KEY_CHECKS = 0;
+INSERT INTO exercise_sessions
+  (member_id, exercise_id, start_time, end_time, total_reps, avg_sync_rate, status, created_at)
+SELECT 1 + (n % ${USERS}), 1 + (n % 3),
+       TIMESTAMP('2025-08-01 06:00:00') + INTERVAL (n % 525600) MINUTE,
+       TIMESTAMP('2025-08-01 06:15:00') + INTERVAL (n % 525600) MINUTE,
+       30, 75.00,
+       ELT(1 + (n % 4), 'COMPLETED','COMPLETED','FAILED','IN_PROGRESS'),
+       TIMESTAMP('2025-08-01 06:00:00') + INTERVAL (n % 525600) MINUTE
+FROM _seq a CROSS JOIN (SELECT 0 UNION SELECT 1) b WHERE a.n < ${SESSIONS} LIMIT ${SESSIONS};
+SET FOREIGN_KEY_CHECKS = 1;"
+# ⚠️ status 가 n%4 로 결정된다 = COMPLETED 50% / FAILED 25% / IN_PROGRESS 25%.
+#    실제 분포가 아니다(실제는 COMPLETED 가 대부분이고 FAILED 는 소수일 것). 드라이빙 테이블
+#    선택은 선택도에 민감하므로, 이 균일성이 B 결과 해석의 가장 큰 단서다.
+# ⚠️ CANCELLED 는 시딩하지 않는다 — Java enum 철자가 어긋나 있어(issue #106) 어차피 코드에서
+#    도달할 수 없는 값이다. 있는 척하면 측정이 현실보다 좋아 보인다.
+
+DB "$DB_NAME" -e "ANALYZE TABLE exercise_sessions, exercises;" >/dev/null
+echo "   세션 $(DB -sN "$DB_NAME" -e 'SELECT COUNT(*) FROM exercise_sessions;') / FAILED $(DB -sN "$DB_NAME" -e "SELECT COUNT(*) FROM exercise_sessions WHERE status='FAILED';")"
 echo
 
 # ── [3/7] general log 켜기 ────────────────────────────────────────────────────
 # 파일 경로를 바꾸려면 로그가 꺼져 있어야 한다(켠 채로 바꾸면 반영이 어긋난다).
-echo "## [3/7] general log ON — 서버에 도착한 SQL 을 그대로 받는다"
+echo "## [3/8] general log ON — 서버에 도착한 SQL 을 그대로 받는다"
 DB -e "
 SET GLOBAL general_log = 'OFF';
 SET GLOBAL log_output = 'FILE';
@@ -122,20 +156,20 @@ docker exec "$CONTAINER" sh -c "rm -f ${LOGFILE}"
 DB -e "SET GLOBAL general_log = 'ON';"
 
 # ── [4/7] 실제 리포지토리 실행 ────────────────────────────────────────────────
-echo "## [4/7] AdminMemberExplainCaptureTest 실행 (실제 QueryDSL 코드 경로)"
+echo "## [4/8] 캡처 테스트 실행 (실제 QueryDSL 코드 경로 — 회원·세션)"
 (
   cd "$REPO_ROOT"
   # --rerun 이 없으면 두 번째 실행부터 Gradle 이 UP-TO-DATE 로 건너뛴다. 입력이 같으니
   # Gradle 입장에선 맞는 판단이지만, 이 태스크의 산출물은 build/ 가 아니라 **DB 서버의
   # general log** 라 Gradle 이 볼 수 없다. 캡처가 비면 그대로 측정이 없는 것이므로 강제한다.
-  ./gradlew --quiet :backend:test --tests '*AdminMemberExplainCaptureTest*' \
+  ./gradlew --quiet :backend:test --tests '*ExplainCaptureTest*' \
             -Dexplain.capture=true --rerun
 )
 DB -e "SET GLOBAL general_log = 'OFF';"
 echo
 
 # ── [5/7] 로그에서 조합별 SQL 추출 ────────────────────────────────────────────
-echo "## [5/7] 캡처된 SQL"
+echo "## [5/8] 캡처된 SQL"
 docker exec "$CONTAINER" cat "$LOGFILE" > "$WORK/general.log"
 
 # 마커 사이에 있는 users 대상 SELECT 만 뽑는다. 라벨은 마커에서 가져오므로 어느 조합의
@@ -149,7 +183,7 @@ awk '
   lbl != "" {
     line = $0
     sub(/^.*[ \t]Query[ \t]+/, "", line)
-    if (line ~ /^[Ss][Ee][Ll][Ee][Cc][Tt] / && line ~ /[Ff][Rr][Oo][Mm] users/)
+    if (line ~ /^[Ss][Ee][Ll][Ee][Cc][Tt] / && line ~ /[Ff][Rr][Oo][Mm] (users|exercise_sessions)/)
       printf "%s\t%s\n", lbl, line
   }
 ' "$WORK/general.log" > "$WORK/captured.tsv"
@@ -178,15 +212,23 @@ build_explain() {  # $1=출력파일
 }
 build_explain "$WORK/explain.sql"
 
-echo "## [6/7] AFTER — idx_users_created_at 있음"
+echo "## [6/8] AFTER — 관리자 인덱스 2종 있음"
 docker exec -i "$CONTAINER" mysql -uroot -p$PW --vertical "$DB_NAME" < "$WORK/explain.sql" 2>/dev/null
 echo
 
-echo "## [7/7] BEFORE — idx_users_created_at 제거 후 같은 SQL"
-DB "$DB_NAME" -e "ALTER TABLE users DROP INDEX idx_users_created_at;"
-DB "$DB_NAME" -e "ANALYZE TABLE users;" >/dev/null
+# 둘을 같이 뗀다. 이게 PR #104 이전의 실제 상태이고, 세션 조회가 users 를 조인하므로 한쪽만
+# 떼면 "관리자 인덱스가 없던 시절"이 아니라 있지도 않았던 중간 상태를 재게 된다.
+# ⚠️ member_id 선두 인덱스 3종은 그대로 둔다 — 실테이블에 원래 있던 것들이라, 빼면
+#    before 가 실제보다 나빠 보인다(§4-2 결함 #1 과 같은 실수).
+echo "## [7/8] BEFORE — 관리자 인덱스 2종 제거 후 같은 SQL"
+DB "$DB_NAME" -e "
+ALTER TABLE users DROP INDEX idx_users_created_at;
+ALTER TABLE exercise_sessions DROP INDEX idx_session_status_starttime;"
+DB "$DB_NAME" -e "ANALYZE TABLE users, exercise_sessions;" >/dev/null
 docker exec -i "$CONTAINER" mysql -uroot -p$PW --vertical "$DB_NAME" < "$WORK/explain.sql" 2>/dev/null
-DB "$DB_NAME" -e "ALTER TABLE users ADD INDEX idx_users_created_at (created_at);"
+DB "$DB_NAME" -e "
+ALTER TABLE users ADD INDEX idx_users_created_at (created_at);
+ALTER TABLE exercise_sessions ADD INDEX idx_session_status_starttime (status, start_time);"
 echo
 
 echo "############ 읽는 법 ############"
