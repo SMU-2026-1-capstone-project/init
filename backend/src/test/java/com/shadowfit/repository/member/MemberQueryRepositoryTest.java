@@ -90,6 +90,30 @@ class MemberQueryRepositoryTest {
                     .extracting(AdminMemberListItemDto::username).containsExactly("bob");
         }
 
+        /**
+         * 대소문자 무시가 <b>DB 컬레이션에서 나온다</b>는 것을 못박는 테스트.
+         *
+         * <p>원래 코드는 {@code containsIgnoreCase()} 였고, 그건 {@code lower(username) like ?}
+         * 를 만든다. 그런데 이 프로젝트의 컬레이션은 {@code utf8mb4_unicode_ci} 라 <b>이미
+         * 대소문자를 무시한다</b> — {@code lower()} 는 결과를 바꾸지 않으면서 컬럼에 함수만
+         * 씌워, 접두 검색으로 바꿔도 인덱스를 못 타게 만들고 있었다(issue #105, 실측은
+         * {@code admin-page-scope.md} §4-3 ④).
+         *
+         * <p>그래서 {@code contains()} 로 바꿨는데, 그 순간 <b>대소문자 무시가 코드에서
+         * 사라지고 DB 설정에 의존하게 된다.</b> 컬레이션을 {@code _bin} 이나 {@code _as_cs} 로
+         * 바꾸면 동작이 조용히 달라지므로, 그 전제를 여기서 실행으로 잡는다.
+         */
+        @Test
+        @DisplayName("검색어는 대소문자를 무시한다 — 코드가 아니라 DB 컬레이션이 보장한다")
+        void keyword_isCaseInsensitive_byCollation() {
+            save("Alice", "Alice@T.com", SelectedPersona.BEGINNER, WorkoutLevel.STARTER, true);
+
+            assertThat(search(conditionWithKeyword("alice")).content())
+                    .extracting(AdminMemberListItemDto::username).containsExactly("Alice");
+            assertThat(search(conditionWithKeyword("ALICE")).content())
+                    .extracting(AdminMemberListItemDto::username).containsExactly("Alice");
+        }
+
         @Test
         @DisplayName("페르소나·온보딩 여부를 함께 걸면 둘 다 만족하는 회원만 나온다")
         void multipleConditions_areAnded() {

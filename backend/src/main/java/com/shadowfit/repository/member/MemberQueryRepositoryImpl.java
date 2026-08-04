@@ -95,18 +95,31 @@ public class MemberQueryRepositoryImpl implements MemberQueryRepository {
      *   <li>{@code EXPLAIN} 의 {@code rows=20} 은 측정이 아니라 <b>낙관적 추정</b>이다.
      *       매칭이 드물수록 {@code LIMIT 20} 을 채우려 인덱스를 더 훑는다 — 실측으로
      *       0건 매칭 시 20만 행을 전부 읽었다 (§4-3 ②)</li>
-     *   <li>{@code containsIgnoreCase()} 가 만드는 {@code lower(username)} 은 이 DB 의
-     *       {@code utf8mb4_unicode_ci} 컬레이션에서 <b>결과를 바꾸지 않으면서</b> 컬럼에 함수를
-     *       씌워, 접두 검색({@code LIKE 'kim%'})으로 바꿔도 인덱스를 못 타게 만든다 (§4-3 ④)</li>
+     *   <li>~~{@code containsIgnoreCase()} 가 씌우는 {@code lower()}~~ → <b>제거함</b>
+     *       (issue #105). 아래 "대소문자" 항목 참고</li>
      * </ul>
-     * 둘 다 고칠지는 미결정이다 — §4-3 "이제 갈릴 수 있는 결정".
+     *
+     * <p><b>⚠️ 대소문자 무시는 이 코드가 아니라 DB 컬레이션이 한다.</b> 원래는
+     * {@code containsIgnoreCase()} 였는데, 그건 {@code lower(username) like ?} 를 만들어
+     * <b>결과를 바꾸지 않으면서</b> 컬럼에 함수만 씌웠다 — 컬레이션이 이미
+     * {@code utf8mb4_unicode_ci}(대소문자 무시)이기 때문이다. 함수가 씌워지면 접두 검색
+     * ({@code LIKE 'kim%'})으로 요구사항을 바꿔도 인덱스를 탈 수 없어서 걷어냈다.
+     *
+     * <p>대신 <b>컬레이션 의존이 코드에서 안 보이게 됐다.</b> {@code _bin} 이나 {@code _as_cs}
+     * 로 바꾸면 검색이 조용히 대소문자를 구분하기 시작한다. 그 전제는 테스트가 잡는다 —
+     * {@code MemberQueryRepositoryTest#keyword_isCaseInsensitive_byCollation}, 그리고 테스트
+     * H2 도 같은 규칙이 되도록 {@code IGNORECASE=TRUE} 를 걸어뒀다.
+     *
+     * <p>이 변경만으로 빨라지는 쿼리는 <b>없다.</b> 선행 와일드카드가 그대로라 여전히 인덱스
+     * 탐색은 못 한다 — 접두 검색 전환의 선결 조건일 뿐이고, 그 전환 여부는 미결정이다
+     * (§4-3 "이제 갈릴 수 있는 결정" 3번).
      */
     private BooleanExpression keywordContains(String keyword) {
         if (!StringUtils.hasText(keyword)) {
             return null;
         }
-        return member.username.containsIgnoreCase(keyword)
-                .or(member.email.containsIgnoreCase(keyword));
+        return member.username.contains(keyword)
+                .or(member.email.contains(keyword));
     }
 
     private BooleanExpression personaEq(SelectedPersona persona) {

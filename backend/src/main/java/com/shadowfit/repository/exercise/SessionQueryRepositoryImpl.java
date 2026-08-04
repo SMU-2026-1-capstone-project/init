@@ -154,10 +154,10 @@ public class SessionQueryRepositoryImpl implements SessionQueryRepository {
      * <p>회원 목록과 <b>같은 방식으로 맞췄다.</b> 관리자가 같은 검색어를 두 화면에 쳤을 때
      * 다르게 걸리면 그게 더 혼란스럽다.
      *
-     * <p>⚠️ 회원 목록에서 실측된 두 가지가 여기에도 그대로 적용된다 —
-     * 선행 와일드카드라 인덱스 탐색에 못 쓰고, {@code containsIgnoreCase} 가 씌우는
-     * {@code lower()} 는 이 DB 의 {@code utf8mb4_unicode_ci} 에서 불필요하다(issue #105).
-     * <b>여기서만 다르게 고치지 않는다</b> — #105 을 고칠 때 두 곳을 같이 고쳐야 한다.
+     * <p>⚠️ 선행 와일드카드라 인덱스 탐색에는 쓸 수 없다. {@code lower()} 를 씌우던
+     * {@code containsIgnoreCase} 는 issue #105 로 <b>양쪽에서 같이 걷어냈다</b> — 대소문자
+     * 무시는 이제 {@code utf8mb4_unicode_ci} 컬레이션이 한다. 자세한 사정은
+     * {@code MemberQueryRepositoryImpl#keywordContains} 에 있다.
      *
      * <p>게다가 이쪽은 조인 너머라, 옵티마이저가 세션부터 읽을지 회원부터 읽을지 고른다.
      * 회원 목록에는 없던 변수다 ({@code admin-page-scope.md} §4-4 에서 측정).
@@ -166,8 +166,8 @@ public class SessionQueryRepositoryImpl implements SessionQueryRepository {
         if (!StringUtils.hasText(keyword)) {
             return null;
         }
-        return member.username.containsIgnoreCase(keyword)
-                .or(member.email.containsIgnoreCase(keyword));
+        return member.username.contains(keyword)
+                .or(member.email.contains(keyword));
     }
 
     /**

@@ -103,6 +103,23 @@ class SessionQueryRepositoryTest {
                     .extracting(AdminSessionListItemDto::username).containsExactly("kim");
         }
 
+        /**
+         * 회원 목록과 같은 이유의 가드다 — issue #105 로 {@code containsIgnoreCase()} 를
+         * {@code contains()} 로 바꾸면서 <b>대소문자 무시가 코드에서 DB 컬레이션으로
+         * 옮겨갔다.</b> 두 화면이 같은 검색어에 같게 반응해야 하므로 여기서도 잡는다.
+         */
+        @Test
+        @DisplayName("검색어는 대소문자를 무시한다 — 회원 목록과 같은 규칙")
+        void keyword_isCaseInsensitive() {
+            Member hong = saveMember("Hong", "Hong@T.com");
+            saveSession(hong, squat, DAY.atTime(10, 0), Status.COMPLETED, 30, "75.00");
+
+            assertThat(search(conditionWithKeyword("hong")).content())
+                    .extracting(AdminSessionListItemDto::username).containsExactly("Hong");
+            assertThat(search(conditionWithKeyword("HONG")).content())
+                    .extracting(AdminSessionListItemDto::username).containsExactly("Hong");
+        }
+
         @Test
         @DisplayName("검색어를 걸어도 총건수와 목록이 어긋나지 않는다 — count 의 조건부 조인")
         void count_matchesContent_whenKeywordJoinsMember() {
