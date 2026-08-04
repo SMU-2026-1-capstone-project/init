@@ -21,8 +21,14 @@
 # ⚠️ 로컬 2코어(i3-6100) + MySQL·백엔드 동거 — 절대 수치 신뢰 금지, 상대·델타만.
 # ⚠️ 워밍업 통제: INSERT 측정마다 앞부분을 버린다. (load-test-strategy.md §7.6 "1차 측정은
 #    무효 — 워밍업 미통제" 교훈. 같은 실수를 반복하지 않기 위해 명시적으로 넣는다.)
-set -u
+# set -e 를 켜는 이유: DB 명령이 실패해도 계속 돌면, 마지막 요약이 이전 실행의 남은 결과
+# 파일로 그럴듯한 숫자를 찍는다. 측정 스크립트에서 그건 틀린 결과보다 나쁘다.
+set -euo pipefail
 PW=1234
+# 결과 파일은 전용 임시 디렉터리에 둔다 — /tmp 고정 경로는 심볼릭 링크 선점 여지가 있고,
+# 이전 실행의 잔여 파일이 남아 요약이 옛 숫자를 섞을 수도 있다. (CodeRabbit #104)
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
 DB(){ docker exec shadowfit-mysql mysql -uroot -p$PW shadowfit "$@" 2>/dev/null; }
 
 USERS=200000        # 회원 수
@@ -83,9 +89,13 @@ CREATE TABLE sessions_scale (
   version BIGINT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_scale_member_starttime (member_id, start_time),
+  INDEX idx_scale_member_exercise_status_start (member_id, exercise_id, status, start_time),
   INDEX idx_scale_member_status (member_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
-# ↑ 기존 인덱스 2종을 그대로 둔다. "관리자 인덱스만 없는 상태"가 before 여야 비교가 성립한다.
+# ↑ 실테이블의 세션 인덱스 3종을 전부 재현한다. "관리자 인덱스만 없는 상태"가 before 여야
+#   비교가 성립하는데, 하나라도 빠뜨리면 before 의 INSERT 가 실제보다 싸게 나와 델타가
+#   과장된다. (1차 rig 는 idx_..._member_exercise_status_start 를 빠뜨렸다 — CodeRabbit #104.
+#   그 실행의 델타는 위 사유로 상향 편향돼 있었다.)
 
 echo "## [3/7] 시딩"
 DB -e "
@@ -132,58 +142,72 @@ echo "## [4/7] BEFORE — 관리자 인덱스 없이 실행 계획"
 explain_both
 echo
 
-echo "## [5/7] BEFORE — 세션 INSERT 처리량 (워밍업 ${WARMUP}회 버림)"
-measure_insert() {
-  local label="$1"
-  local i
-  for ((i=1; i<=WARMUP+ROUNDS; i++)); do
-    local t0 t1 ms
-    t0=$(date +%s%3N)
-    DB -e "
-      INSERT INTO sessions_scale (member_id, exercise_id, start_time, end_time, total_reps, avg_sync_rate, status, created_at)
-      SELECT 1 + (n % ${USERS}), 1 + (n % 3),
-             NOW() - INTERVAL (n % 1000) MINUTE, NOW(), 30, 75.00,
-             ELT(1 + (n % 4), 'COMPLETED','COMPLETED','FAILED','IN_PROGRESS'), NOW()
-      FROM _seq WHERE n < ${PER_ROUND};"
-    t1=$(date +%s%3N)
-    ms=$((t1-t0))
-    if (( i <= WARMUP )); then
-      echo "   [${label}] round ${i}: ${ms}ms  (워밍업 — 버림)"
-    else
-      echo "   [${label}] round ${i}: ${ms}ms"
-      echo "${ms}" >> "/tmp/admin_idx_${label}.txt"
-    fi
-  done
-}
-rm -f /tmp/admin_idx_before.txt /tmp/admin_idx_after.txt
-measure_insert before
-echo
-
-echo "## [6/7] 관리자 인덱스 추가"
+echo "## [5/7] 쓰기 비교용 쌍둥이 테이블 — 인덱스 유무 하나만 다르게"
+# ⚠️ 1차 rig 는 한 테이블에서 before 를 재고, 인덱스를 붙인 뒤 after 를 쟀다. 그러면 before 의
+#    측정 라운드가 32만 행을 추가하므로 after 는 "더 큰 테이블 + 다른 버퍼풀 상태"에서 돌아간다.
+#    즉 인덱스 유무와 테이블 크기가 함께 변해 관측된 차이를 인덱스 비용으로 단정할 수 없었다.
+#    (CodeRabbit #104) — 같은 초기 상태의 테이블 두 개로 분리하고, 라운드를 번갈아 돌려
+#    시간에 따른 드리프트(백그라운드 부하·버퍼 상태 변화)가 양쪽에 똑같이 걸리게 한다.
 DB -e "
-ALTER TABLE sessions_scale ADD INDEX idx_scale_status_starttime (status, start_time);
-ALTER TABLE users_scale    ADD INDEX idx_scale_users_created_at (created_at);"
-DB -e "ANALYZE TABLE users_scale, sessions_scale;" >/dev/null
-
-echo "## [7/7] AFTER — 실행 계획 + INSERT 처리량"
-explain_both
+DROP TABLE IF EXISTS sessions_noidx;
+DROP TABLE IF EXISTS sessions_idx;
+CREATE TABLE sessions_noidx LIKE sessions_scale;
+CREATE TABLE sessions_idx   LIKE sessions_scale;
+INSERT INTO sessions_noidx SELECT * FROM sessions_scale;
+INSERT INTO sessions_idx   SELECT * FROM sessions_scale;
+ALTER TABLE sessions_idx ADD INDEX idx_scale_status_starttime (status, start_time);"
+DB -e "ANALYZE TABLE sessions_noidx, sessions_idx;" >/dev/null
+echo "   noidx $(DB -sN -e 'SELECT COUNT(*) FROM sessions_noidx;') / idx $(DB -sN -e 'SELECT COUNT(*) FROM sessions_idx;') — 같은 행에서 출발"
 echo
-measure_insert after
+
+insert_into() {  # $1=테이블
+  DB -e "
+    INSERT INTO $1 (member_id, exercise_id, start_time, end_time, total_reps, avg_sync_rate, status, created_at)
+    SELECT 1 + (n % ${USERS}), 1 + (n % 3),
+           NOW() - INTERVAL (n % 1000) MINUTE, NOW(), 30, 75.00,
+           ELT(1 + (n % 4), 'COMPLETED','COMPLETED','FAILED','IN_PROGRESS'), NOW()
+    FROM _seq WHERE n < ${PER_ROUND};"
+}
+timed() { local t0 t1; t0=$(date +%s%3N); insert_into "$1"; t1=$(date +%s%3N); echo $((t1-t0)); }
+
+echo "## [6/7] 세션 INSERT — 라운드 교대 (워밍업 ${WARMUP}회 버림)"
+: > "$WORK/before.txt"; : > "$WORK/after.txt"
+for ((i=1; i<=WARMUP+ROUNDS; i++)); do
+  # 매 라운드 순서를 뒤집는다 — 한쪽이 항상 먼저 돌면 그 자리의 이점/불이익이 고정된다.
+  if (( i % 2 == 1 )); then
+    b=$(timed sessions_noidx); a=$(timed sessions_idx)
+  else
+    a=$(timed sessions_idx);   b=$(timed sessions_noidx)
+  fi
+  if (( i <= WARMUP )); then
+    echo "   round ${i}: noidx ${b}ms / idx ${a}ms   (워밍업 — 버림)"
+  else
+    echo "   round ${i}: noidx ${b}ms / idx ${a}ms"
+    echo "${b}" >> "$WORK/before.txt"; echo "${a}" >> "$WORK/after.txt"
+  fi
+done
+echo
+
+echo "## [7/7] AFTER — 인덱스 추가 후 실행 계획"
+DB -e "ALTER TABLE users_scale ADD INDEX idx_scale_users_created_at (created_at);"
+DB -e "ALTER TABLE sessions_scale ADD INDEX idx_scale_status_starttime (status, start_time);"
+DB -e "ANALYZE TABLE users_scale, sessions_scale;" >/dev/null
+explain_both
 echo
 
 echo "############ 요약 ############"
 stat(){ sort -n "$1" | awk '{v[n++]=$1; s+=$1}
   END {printf "%s min=%d  p50=%d  avg=%.0f  max=%d\n", lbl, v[0],
        (n%2 ? v[int(n/2)] : (v[n/2-1]+v[n/2])/2), s/n, v[n-1]}' lbl="$2"; }
-stat /tmp/admin_idx_before.txt "before"
-stat /tmp/admin_idx_after.txt  "after "
+stat "$WORK/before.txt" "noidx"
+stat "$WORK/after.txt"  "idx  "
 echo
 # min 을 함께 보는 이유: 2코어 동거 환경에서 상방 이상치는 CPU 경합이지 인덱스 비용이 아니다.
 # min 은 "가장 방해가 적었던 라운드"라 구조적 비용에 가장 가깝다. 반대로 min 끼리도 벌어지면
 # 그 차이는 노이즈로 설명되지 않는다.
-BMIN=$(sort -n /tmp/admin_idx_before.txt | head -1)
-AMIN=$(sort -n /tmp/admin_idx_after.txt  | head -1)
-BMAX=$(sort -n /tmp/admin_idx_before.txt | tail -1)
+BMIN=$(sort -n "$WORK/before.txt" | head -1)
+AMIN=$(sort -n "$WORK/after.txt"  | head -1)
+BMAX=$(sort -n "$WORK/before.txt" | tail -1)
 awk -v bm="$BMIN" -v am="$AMIN" 'BEGIN{printf "min 기준 델타: %+.1f%%  (구조적 비용에 가장 가까운 추정)\n", (am-bm)/bm*100}'
 if [[ "$AMIN" -gt "$BMAX" ]]; then
   echo "분포 판정: ✅ 겹치지 않음 (after 최소 ${AMIN}ms > before 최대 ${BMAX}ms) — 델타가 노이즈로 설명되지 않는다"
@@ -194,4 +218,4 @@ echo
 echo "읽기: 위 EXPLAIN 의 type / key / rows / Extra 변화를 볼 것."
 echo "      ⚠️ 시간 수치는 내지 않는다 — 합성 분포가 균일해 선택도가 현실과 다르다(헤더 참고)."
 echo
-echo "정리: DROP TABLE users_scale, sessions_scale, _seq;"
+echo "정리: DROP TABLE users_scale, sessions_scale, sessions_noidx, sessions_idx, _seq;"
