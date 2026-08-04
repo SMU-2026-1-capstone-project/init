@@ -150,7 +150,7 @@
 | 하위 작업 | 시간 | 상태 |
 |---|:--:|---|
 | ~~**인덱스 3안 결정 + 적용**~~ | ~~3~6h~~ | ✅ **완료** — ㄱ 채택([`admin-page-scope.md`](../decisions/admin-page-scope.md) §4-1), [PR #104](https://github.com/Shadowfit/init/pull/104) |
-| 의존성 + `JPAQueryFactory` 빈 | 1h | **로컬 Gradle 빌드만 검증됨**([`querydsl-adoption.md`](../decisions/querydsl-adoption.md) §7-3). Docker 이미지 빌드는 미검증이라 여기서 막히면 +1~3h |
+| ~~의존성 + `JPAQueryFactory` 빈~~ | ~~1h~~ | ✅ **완료 (2026-08-04)** — Docker 이미지 빌드까지 확인해 **"막히면 +1~3h" 리스크 소멸**([`querydsl-adoption.md`](../decisions/querydsl-adoption.md) §7-3) |
 | A 회원 목록 (필터 5 *(초안)* + 정렬 + 페이징 + count) | 6~8h | |
 | B 세션 목록 (필터 4 *(초안)*, 회원 조인) | 5~7h | |
 | D 대시보드 통계 5종 | 4~6h | 집계 전략(실시간/사전집계/캐시)이 미결이라 폭이 넓다 |
