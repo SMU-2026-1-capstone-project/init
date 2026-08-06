@@ -84,7 +84,17 @@ public class SessionQueryRepositoryImpl implements SessionQueryRepository {
      *
      * <p>⚠️ 조인을 줄여도 이 쿼리는 {@code LIMIT} 이 없어 조건에 맞는 행을 전부 세야 한다.
      * 회원 목록에서 실측된 것과 같은 문제이고, 여기서는 조인까지 얹혀 더 비싸다
-     * ({@code admin-page-scope.md} §4-3 ③ — 처리 방향은 미결정).
+     * ({@code admin-page-scope.md} §4-3 ③).
+     *
+     * <p><b>이 비용은 감수하기로 했다</b>(㉮, 2026-08-06). 근거는 "관리자 트래픽이 드물어서"가
+     * 아니라 <b>되돌리는 비용의 비대칭</b>이다 — 관리자 프론트를 만든다는 것은 정해졌지만
+     * 페이지 번호냐 무한 스크롤이냐가 미정이라, 무한 스크롤로 정해지면 keyset 을 얹으면서
+     * 이 메서드를 안 부르면 되는 반면 지금 지웠다가 페이지 번호로 정해지면 다시 만들어야 한다.
+     *
+     * <p>⚠️ 감수의 구멍: 스캔 <b>폭</b>은 쟀지만(20만 행) <b>시간</b>은 재지 않았다.
+     * {@code EXPLAIN} 은 옵티마이저의 선택이라 코어 수·경합과 무관한 반면, 시간은 로컬
+     * 2코어 동거 환경이라 신뢰하지 않기로 한 값이다. 실사용 데이터가 쌓여 분포가 진짜가 되면
+     * 재검토 대상이다 ({@code admin-page-scope.md} §4-3 "2026-08-06" 절).
      */
     private long countOf(AdminSessionSearchCondition condition) {
         JPAQuery<Long> query = queryFactory

@@ -57,6 +57,10 @@ public class MemberQueryRepositoryImpl implements MemberQueryRepository {
 
         // 총건수는 목록과 같은 whereOf() 를 재사용한다. 조건을 따로 짜면 "전체 N건"과
         // 실제 목록이 어긋난다 (admin-page-scope.md §7).
+        //
+        // ⚠️ 이 쿼리는 LIMIT 이 없어 대부분의 필터 조합에서 20만 행을 전부 센다 —
+        // 한 화면 비용의 대부분이 여기다(§4-3 ③ 실측). 감수하기로 했고(㉮, 2026-08-06)
+        // 그 근거와 구멍은 SessionQueryRepositoryImpl#countOf 주석에 적었다.
         Long total = queryFactory
                 .select(member.count())
                 .from(member)
