@@ -34,6 +34,18 @@ REPS=7
 
 Q(){ docker exec -i "$C" mysql -uroot -p$PW "$DB" "$@" 2>/dev/null; }
 
+# ⚠️ 실패해도 만든 표를 남기지 않는다. set -euo pipefail 이라 EXPLAIN ANALYZE 한 번만
+#    실패해도 마지막 정리 루프에 도달하지 못하고, 그러면 es_50000~es_1000000 이 스크래치
+#    DB 에 그대로 남는다(1M 짜리까지 있어 디스크도 먹는다). 다음 실행이 이전 잔여물 위에서
+#    도는 것은 §4-2 결함 #3 이 지적한 "이전 실행의 잔여 파일로 그럴듯한 요약" 과 같은 계열이다.
+cleanup(){
+  local rc=$?
+  for n in $SIZES; do Q -e "DROP TABLE IF EXISTS es_$n;" >/dev/null 2>&1 || true; done
+  [[ $rc -ne 0 ]] && echo "!! 비정상 종료(exit $rc) — 볼륨별 임시 표를 정리했다." >&2
+  return 0
+}
+trap cleanup EXIT
+
 echo "### 볼륨별 테이블 생성"
 for n in $SIZES; do
   Q -e "

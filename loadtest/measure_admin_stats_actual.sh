@@ -37,7 +37,22 @@ REPS=7
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+
+# ⚠️ 실패해도 서버 상태를 되돌린다. 여기서 특히 중요한 것은 **임시 인덱스**다 —
+#    [3] 이 (start_time, member_id) 를 붙였다 떼는데, 그 사이에 죽으면 스크래치 DB 에
+#    6번째 인덱스가 남는다. 그러면 이후 측정이 **조용히 다른 스키마 위에서** 돌게 되고,
+#    그건 §4-2 가 정리한 "틀렸다는 신호조차 없는" 종류의 오염이다.
+#    general_log 도 켜진 채 남으면 디스크가 차고 다음 측정이 느려진다.
+cleanup(){
+  local rc=$?
+  docker exec "$CONTAINER" mysql -uroot -p$PW -e "SET GLOBAL general_log='OFF';" 2>/dev/null || true
+  docker exec "$CONTAINER" mysql -uroot -p$PW "$DB_NAME" \
+    -e "ALTER TABLE exercise_sessions DROP INDEX idx_tmp_start_member;" 2>/dev/null || true
+  rm -rf "$WORK"
+  [[ $rc -ne 0 ]] && echo "!! 비정상 종료(exit $rc) — general log 를 끄고 임시 인덱스를 제거했다." >&2
+  return 0
+}
+trap cleanup EXIT
 
 DB(){ docker exec "$CONTAINER" mysql -uroot -p$PW "$@" 2>/dev/null; }
 Q(){ DB "$DB_NAME" "$@"; }

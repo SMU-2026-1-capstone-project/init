@@ -47,7 +47,17 @@ SESSIONS=1000000
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# ⚠️ 실패해도 general log 를 끈다. 캡처 테스트(gradle)가 죽으면 set -e 가 즉시 빠져나가는데
+#    로그가 켜진 채 남으면 디스크가 계속 차고 이후 측정이 느려진다 — 측정 장치가 다음 측정을
+#    오염시키는 것이라 §4-2 결함 #4 와 같은 계열이다.
+cleanup(){
+  local rc=$?
+  docker exec "$CONTAINER" mysql -uroot -p$PW -e "SET GLOBAL general_log='OFF';" 2>/dev/null || true
+  rm -rf "$WORK"
+  [[ $rc -ne 0 ]] && echo "!! 비정상 종료(exit $rc) — general log 를 껐다." >&2
+  return 0
+}
+trap cleanup EXIT
 
 DB(){ docker exec -i "$CONTAINER" mysql -uroot -p$PW "$@" 2>/dev/null; }
 

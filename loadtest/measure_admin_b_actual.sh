@@ -38,7 +38,21 @@ WRITE_REPS=5
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+
+# ⚠️ 실패해도 서버 상태를 되돌린다. gradle 이 죽으면 set -e 가 즉시 빠져나가는데, 그때
+#    general_log 가 켜진 채로 남으면 디스크가 계속 차고 **이후의 모든 측정이 느려진다** —
+#    측정 장치가 다음 측정을 오염시키는 것이라 §4-2 결함 #4 와 같은 계열이다.
+#    임시 테이블도 남기지 않는다(다음 실행이 이전 잔여물 위에서 돌면 안 된다).
+cleanup(){
+  local rc=$?
+  docker exec "$CONTAINER" mysql -uroot -p$PW -e "SET GLOBAL general_log='OFF';" 2>/dev/null || true
+  docker exec "$CONTAINER" mysql -uroot -p$PW "$DB_NAME" \
+    -e "DROP TABLE IF EXISTS es_w, src_rand, src_seq;" 2>/dev/null || true
+  rm -rf "$WORK"
+  [[ $rc -ne 0 ]] && echo "!! 비정상 종료(exit $rc) — general log 를 끄고 임시 테이블을 정리했다." >&2
+  return 0
+}
+trap cleanup EXIT
 
 # ⚠️ -i 를 쓰지 않는다. 이 스크립트는 mysql 에 stdin 을 물려줄 일이 없는데, -i 를 붙이면
 #    `while read ... done < file` 루프 안에서 docker exec 가 **그 파일의 나머지를 통째로 먹는다.**
