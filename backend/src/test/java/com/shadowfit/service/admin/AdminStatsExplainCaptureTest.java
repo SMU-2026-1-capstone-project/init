@@ -41,6 +41,14 @@ import java.time.LocalDateTime;
  * <p>⚠️ <b>예측은 예측이다.</b> A·B 측정에서 예측 4건이 반증됐다(§4-3·§4-4). 위 목록은
  * 관측을 대신하지 않는다 — 반증되면 그 사실을 문서에 남기는 것이 이 장치의 목적이다.
  *
+ * <p><b>✅ 2026-08-06 측정 결과 — 위 예측 중 첫 항목이 반증됐다</b>(§4-5). {@code countStartedBetween}
+ * 은 "선두가 {@code status} 인데 상태 조건이 없으니 못 탄다"고 봤는데, MySQL 8.0 의
+ * <b>skip scan</b>({@code Using index for skip scan})이 걸려 100만 → 11만으로 접혔다. 선두
+ * 컬럼의 distinct 값이 적으면 옵티마이저가 값마다 뒤 컬럼 범위 탐색을 반복한다.
+ * {@code countDistinctActiveMembersBetween} 은 비싼 것은 맞았으나 고른 인덱스가 달랐다 —
+ * {@code member_id} 선두를 정렬 순서로 읽어 <b>중복 제거를 공짜로</b> 만드는 쪽을 택했다.
+ * 나머지 셋은 예측대로다. 시간까지 포함한 표는 §4-5.
+ *
  * <p>[안전장치] {@code -Dexplain.capture=true} 없이는 실행되지 않는다. Docker MySQL 과 시딩을
  * 전제하므로 CI 와 일반 {@code ./gradlew test} 에서는 조용히 건너뛴다.
  */

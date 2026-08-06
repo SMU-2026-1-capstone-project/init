@@ -94,9 +94,10 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     /**
      * 기간 내 시작된 세션 수.
      *
-     * <p>⚠️ {@code idx_session_status_starttime (status, start_time)} 은 <b>탈 수 없다</b> —
-     * 선두 컬럼이 {@code status} 인데 여기엔 상태 조건이 없다. 예측은 전수 스캔이고, 실제
-     * 실행 계획은 {@code AdminStatsExplainCaptureTest} 로 확인한다.
+     * <p>✅ <b>실측(2026-08-06): 예측이 틀렸다.</b> "선두가 {@code status} 인데 상태 조건이
+     * 없으니 {@code idx_session_status_starttime} 을 못 탄다"고 봤는데, MySQL 8.0 의
+     * <b>skip scan</b> 이 걸려 {@code range} 로 돈다 — 선두 컬럼의 값이 넷뿐이라 옵티마이저가
+     * 상태값마다 {@code start_time} 범위 탐색을 반복한다. 100만 → 11만 ({@code admin-page-scope.md} §4-5).
      */
     @Query("SELECT COUNT(s) FROM Session s WHERE s.startTime >= :from AND s.startTime < :to")
     long countStartedBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
@@ -129,8 +130,12 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     /**
      * 기간 내 세션을 <b>시작한</b> 서로 다른 회원 수 = 활성 회원.
      *
-     * <p>⚠️ 다섯 위젯 중 가장 비싼 후보다. {@code COUNT(DISTINCT ...)} 는 전수 스캔에 더해
-     * 중복 제거를 해야 한다. 이 예측도 {@code AdminStatsExplainCaptureTest} 에서 확인한다.
+     * <p>✅ <b>실측(2026-08-06): 비싼 것은 맞았고, 고르는 인덱스가 뜻밖이었다.</b> 기간 조건이
+     * 있는데도 {@code idx_session_status_starttime} 이 아니라
+     * {@code idx_session_member_starttime (member_id, start_time)} 을 탄다 — {@code member_id}
+     * 선두를 정렬된 순서로 읽으면 <b>중복 제거가 공짜</b>가 되기 때문이다. 옵티마이저가 범위를
+     * 좁히는 것보다 그쪽을 택했다. 100만 행 인덱스 전체 스캔, <b>0.63초</b> — 상태별 분포와
+     * 둘이 대시보드 전체 비용의 대부분이다 ({@code admin-page-scope.md} §4-5).
      */
     @Query("SELECT COUNT(DISTINCT s.member.id) FROM Session s "
             + "WHERE s.startTime >= :from AND s.startTime < :to")
