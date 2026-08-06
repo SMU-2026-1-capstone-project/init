@@ -83,4 +83,57 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     // idx_session_member_status (member_id, status) 를 탄다.
     @Query("SELECT s.id FROM Session s WHERE s.member.id = :memberId AND s.status = :status")
     List<Long> findIdsByMemberIdAndStatus(@Param("memberId") Long memberId, @Param("status") Status status);
+
+    // ─── 관리자 대시보드 집계 (admin-page-scope.md §3-D) ───────────────────────────
+    //
+    // 목록(A·B)과 성격이 다르다. 목록은 LIMIT 20 이라 인덱스만 타면 20건만 만지고 끝나지만,
+    // 집계는 조건에 걸린 행을 전부 만져야 답이 나온다 — 인덱스로 범위를 줄여도 줄어든 범위
+    // 전체를 읽는다. 그래서 QueryDSL 로 감싸지 않는다. 조건이 고정이라 동적 조립이 필요 없고,
+    // 여기서 드는 비용은 쿼리 빌더가 아니라 집계 자체다 (§3-D "전부 조건 고정 집계").
+
+    /**
+     * 기간 내 시작된 세션 수.
+     *
+     * <p>⚠️ {@code idx_session_status_starttime (status, start_time)} 은 <b>탈 수 없다</b> —
+     * 선두 컬럼이 {@code status} 인데 여기엔 상태 조건이 없다. 예측은 전수 스캔이고, 실제
+     * 실행 계획은 {@code AdminStatsExplainCaptureTest} 로 확인한다.
+     */
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.startTime >= :from AND s.startTime < :to")
+    long countStartedBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    /**
+     * 상태별 세션 분포 (전체 기간).
+     *
+     * <p>결과에는 <b>한 건이라도 있는 상태만</b> 나온다. 0 건인 상태는 행 자체가 없으므로
+     * 화면에서 빠지지 않게 호출부가 채워야 한다({@code AdminStatsService}).
+     *
+     * <p>반환 형태가 {@code Object[]} 인 이유 — {@code (Status, Long)} 두 칸짜리 결과를 받을
+     * 전용 타입을 만들 만큼 쓰이는 곳이 많지 않다. 호출부에서 즉시 맵으로 접는다.
+     */
+    @Query("SELECT s.status, COUNT(s) FROM Session s GROUP BY s.status")
+    List<Object[]> countGroupedByStatus();
+
+    /**
+     * 기간 내 <b>완료된</b> 세션의 평균 싱크로율.
+     *
+     * <p>완료 세션만 세는 이유 — 진행 중이거나 실패한 세션의 {@code avgSyncRate} 는 아직
+     * 확정값이 아니다. 해당 세션이 없으면 {@code null} 이 나온다(0.0 이 아니다) — "0%" 와
+     * "잰 적 없음"은 다르므로 호출부까지 null 로 올린다.
+     */
+    @Query("SELECT AVG(s.avgSyncRate) FROM Session s "
+            + "WHERE s.status = com.shadowfit.model.exercise.Status.COMPLETED "
+            + "AND s.startTime >= :from AND s.startTime < :to")
+    Double averageSyncRateOfCompletedBetween(@Param("from") LocalDateTime from,
+                                             @Param("to") LocalDateTime to);
+
+    /**
+     * 기간 내 세션을 <b>시작한</b> 서로 다른 회원 수 = 활성 회원.
+     *
+     * <p>⚠️ 다섯 위젯 중 가장 비싼 후보다. {@code COUNT(DISTINCT ...)} 는 전수 스캔에 더해
+     * 중복 제거를 해야 한다. 이 예측도 {@code AdminStatsExplainCaptureTest} 에서 확인한다.
+     */
+    @Query("SELECT COUNT(DISTINCT s.member.id) FROM Session s "
+            + "WHERE s.startTime >= :from AND s.startTime < :to")
+    long countDistinctActiveMembersBetween(@Param("from") LocalDateTime from,
+                                           @Param("to") LocalDateTime to);
 }
