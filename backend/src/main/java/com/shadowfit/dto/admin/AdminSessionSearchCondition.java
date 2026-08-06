@@ -22,8 +22,8 @@ import java.time.LocalDate;
 @Schema(description = "관리자 세션 목록 검색 조건 (모든 항목 선택)")
 public record AdminSessionSearchCondition(
 
-        @Schema(description = "세션 상태. ⚠️ CANCELED 는 스키마 ENUM 과 철자가 어긋나 있어 "
-                + "조회 시 조용히 0건이 나온다 (issue #106)")
+        @Schema(description = "세션 상태. CANCELLED 는 대입하는 코드가 없어 항상 0건이다 "
+                + "— 사용자 취소가 API 표면에 없다 (죽은 상태, 존치 여부 미결)")
         Status status,
 
         @Schema(description = "운동 종목 ID", example = "1")

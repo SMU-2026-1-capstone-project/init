@@ -177,11 +177,11 @@ function LoginForm() {
 }
 
 // ─── 회원가입 폼 ──────────────────────────────────
-type SexOption = 'MALE' | 'FEAMALE' | 'NONE';
+type SexOption = 'MALE' | 'FEMALE' | 'NONE';
 
 const SEX_OPTIONS: { key: SexOption; label: string }[] = [
   { key: 'MALE', label: '남성' },
-  { key: 'FEAMALE', label: '여성' },
+  { key: 'FEMALE', label: '여성' },
   { key: 'NONE', label: '선택안함' },
 ];
 

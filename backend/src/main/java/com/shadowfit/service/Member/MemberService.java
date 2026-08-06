@@ -97,11 +97,15 @@ public class MemberService{
             throw new BusinessException(ErrorCode.USERID_DUPLICATION);
         }
         String encodedPassword = passwordEncoder.encode(dto.getPassword());
+        // sex 는 지금까지 DTO 로 받기만 하고 엔티티에 옮기지 않아 조용히 버려졌다 —
+        // Swagger 는 REQUIRED 라고 표기하는데 저장은 안 되던 상태였고, 그래서 members.sex 에
+        // 값이 닿은 적이 없어 Sex enum 의 철자 오류(FEAMALE)도 여태 잠복해 있었다.
         Member member = Member.builder()
                 .username(dto.getUsername())
                 .email(dto.getEmail())
                 .password(encodedPassword)
                 .role(dto.getRole())
+                .sex(dto.getSex())
                 .build();
         memberRepository.save(member);
         return member.getUsername();
