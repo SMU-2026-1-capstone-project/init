@@ -211,6 +211,43 @@ MediaPipe의 33개 관절 포인트에 대한 1초 평균 좌표:
 
 ---
 
+## 인덱스 현황 (2026-08-07)
+
+### `exercise_sessions` — 보조 인덱스 4 + FK 1
+
+| 인덱스 | 컬럼 | 겨냥한 쿼리 | 삽입 성격 |
+|---|---|---|---|
+| `idx_session_member_starttime` | `(member_id, start_time)` | 주간 리포트·캘린더 | 🔴 무작위 |
+| `idx_session_member_status` | `(member_id, status)` | 활성 세션 확인, 관리자 검색 경로 | 🔴 무작위 |
+| `idx_session_member_exercise_status_start` | `(member_id, exercise_id, status, start_time)` | 직전 동일 운동 비교 | 🔴 무작위 |
+| `idx_session_status_starttime` | `(status, start_time)` | 관리자 세션 목록 기본 진입 | 🔶 상태 블록 내 순차 |
+| *(FK)* `exercise_id` | `(exercise_id)` | FK 제약 | — |
+
+**"삽입 성격" 열의 뜻** — 세션은 시간순으로 도착하는데(`SessionService:121` 이 `startTime(now())`),
+인덱스가 **무엇으로 정렬돼 있느냐**에 따라 그게 append 로 보이기도 하고 무작위로 보이기도 한다.
+`member_id` 선두는 "누가 언제 운동할지 모른다"라 무작위다. **보조 인덱스 4개 중 3개가 그렇다.**
+
+> 🔶 **[#110](https://github.com/Shadowfit/init/issues/110) — 그 셋이 겹치는지 미검증.**
+> 2026-08-07 실측에서 양방향 증거가 하나씩 나왔다: 쓰기 부담의 지배 요인이 그 셋이라는 것(무작위
+> 3종 16.6s vs 1종 12.3s)과, `idx_session_member_status` 는 관리자 검색 경로에서 **실제로 쓰인다**는 것.
+> 질문은 "지울까"가 아니라 **"어떻게 합칠까"** 로 남아 있다.
+>
+> 🔶 **6번째 후보 `(start_time, member_id)`** — 대시보드 집계 e 를 355ms → 13.6ms(26배)로 줄이고,
+> `start_time` 이 `now()` 라 **append** 이므로 쓰기 대가가 실측 **1.007배**다. 다만 #110 이 선결이라 미결.
+> 근거: [`decisions/admin-page-scope.md`](./decisions/admin-page-scope.md) §4-5-1.
+
+### `users`
+
+| 인덱스 | 컬럼 | 겨냥한 쿼리 |
+|---|---|---|
+| `idx_users_created_at` | `(created_at)` | 관리자 회원 목록 — 가입일 범위 + 최신순 정렬 |
+
+**이 인덱스가 실제로 한 일**은 예측과 절반만 맞았다 — 필터 조합 6가지 **전부에서 `filesort` 를
+없앴지만**(정렬용), 스캔을 줄인 것은 가입일이 걸린 경우뿐이다(탐색용).
+[`decisions/admin-page-scope.md`](./decisions/admin-page-scope.md) §4-3 ①.
+
+---
+
 ## 코드 동기 메모 (회의록 초안 ↔ 실제 schema.sql 차이)
 
 | 회의록 초안 | 실제 코드 | 사유 |
