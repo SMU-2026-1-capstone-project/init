@@ -4,7 +4,12 @@ spring:
 
   # 테스트는 H2 인메모리 DB 사용 (MySQL 호스트 의존 제거)
   datasource:
-    url: jdbc:h2:mem:shadowfit_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    # IGNORECASE=TRUE 는 취향이 아니라 **운영 컬레이션을 맞추는 설정**이다.
+    # 운영 MySQL 은 utf8mb4_unicode_ci 라 문자열 비교가 대소문자를 무시한다. H2 는 기본이
+    # 구분이므로, 그대로 두면 검색 기능이 테스트와 운영에서 다르게 동작한다.
+    # (issue #105 로 containsIgnoreCase→contains 로 바꾸면서 대소문자 무시가 코드에서
+    #  DB 설정으로 옮겨갔다 — 그 전제를 테스트에서도 성립하게 만들어야 검증이 의미를 갖는다)
+    url: jdbc:h2:mem:shadowfit_test;MODE=MySQL;IGNORECASE=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: sa
     password:
     driver-class-name: org.h2.Driver

@@ -401,7 +401,7 @@ public void applyComplete(SessionCompleteRequest request) {
 | `IN_PROGRESS` | 정상 완료 처리 | 가장 일반적 |
 | `FAILED` | COMPLETED + 기록으로 덮어쓰기 | 시나리오 1-2/1-3 |
 | `COMPLETED` | **즉시 return (no-op)** | **시나리오 2-1/2-2 (재전송)** |
-| `CANCELED` | 현재는 덮어씀 (기존 동작 유지) | 사용자 명시적 취소 — 추후 정책 결정 필요 |
+| `CANCELLED` | 현재는 덮어씀 (기존 동작 유지) | 사용자 명시적 취소 — 추후 정책 결정 필요. 대입하는 코드가 없어 실제로는 진입 불가 (#106) |
 
 #### 효과
 - 첫 완료 시각(`endTime`) 보존

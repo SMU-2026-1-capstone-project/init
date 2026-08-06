@@ -150,14 +150,17 @@
 | 하위 작업 | 시간 | 상태 |
 |---|:--:|---|
 | ~~**인덱스 3안 결정 + 적용**~~ | ~~3~6h~~ | ✅ **완료** — ㄱ 채택([`admin-page-scope.md`](../decisions/admin-page-scope.md) §4-1), [PR #104](https://github.com/Shadowfit/init/pull/104) |
-| 의존성 + `JPAQueryFactory` 빈 | 1h | **로컬 Gradle 빌드만 검증됨**([`querydsl-adoption.md`](../decisions/querydsl-adoption.md) §7-3). Docker 이미지 빌드는 미검증이라 여기서 막히면 +1~3h |
-| A 회원 목록 (필터 5 *(초안)* + 정렬 + 페이징 + count) | 6~8h | |
+| ~~의존성 + `JPAQueryFactory` 빈~~ | ~~1h~~ | ✅ **완료 (2026-08-04)** — Docker 이미지 빌드까지 확인해 **"막히면 +1~3h" 리스크 소멸**([`querydsl-adoption.md`](../decisions/querydsl-adoption.md) §7-3) |
+| ~~A 회원 목록 (필터 5 + 정렬 + 페이징 + count)~~ | ~~6~8h~~ | ✅ **완료 (2026-08-04)** — QueryDSL 동적 조건 6종, DTO 프로젝션, offset+count, 정렬 화이트리스트. 테스트 11건 |
+| 🔴 **A 필터 조합별 EXPLAIN** | 2~4h | **미측정 — 사용자가 다음으로 미룸(2026-08-04).** 인덱스는 가입일 범위 전용이라 검색어·enum 필터는 못 탄다. 절차·측정 대상은 [`admin-page-scope.md`](../decisions/admin-page-scope.md) §4-3 |
 | B 세션 목록 (필터 4 *(초안)*, 회원 조인) | 5~7h | |
 | D 대시보드 통계 5종 | 4~6h | 집계 전략(실시간/사전집계/캐시)이 미결이라 폭이 넓다 |
 | 공통 페이징 DTO·예외·Swagger | 2~3h | |
 | ~~운동/영상 목록 + 수정 + 삭제~~ | ~~4~6h~~ | ⏸ 보류(C) |
 
 **잔여 합계 18~25h** (단독). 인덱스가 끝났고 C 를 뺀 결과다 — 원래 전체안 25~37h 였다.
+
+> 🔴 **2026-08-06 — 이 합계에 안 잡힌 일이 생겼다.** 관리자 화면의 **프론트를 만든다**가 확정됐다([`admin-page-scope.md`](../decisions/admin-page-scope.md) §8-6). 이 문서는 범위가 **Spring 백엔드**라 위 표에 프론트 시간이 없고, 계획 쪽 추정은 [`21-task-assignment.md`](./21-task-assignment.md) FE-13 의 **8h+** 가 유일하다 — 그마저 화면 3종(대시보드·카테고리·영상) 기준이라 **지금 확정된 A·B 와 범위가 다르다.** 게다가 **어디에 만드는지**(별도 웹 vs 기존 Expo 앱 안)가 미결이라, 별도 웹이면 프로젝트 세팅이 통째로 추가된다. **즉 지금은 추정 자체가 없다.** 착수 전에 추정이 필요하고, §7 의 "프론트 연동이냐 #3이냐" 갈림길에도 이 항목이 새로 들어온다.
 
 ⚠️ 위 시간은 [`admin-page-scope.md`](../decisions/admin-page-scope.md) **§3 필터 초안을 그대로 구현한다는 전제**의 조건부 추정이다. 화면 범위는 확정됐지만 **필터 항목은 아직 미확정**(§8 열린 질문 4)이라, 필터가 늘거나 줄면 A·B 시간이 움직인다.
 

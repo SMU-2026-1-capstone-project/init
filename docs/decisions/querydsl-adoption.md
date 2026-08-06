@@ -125,6 +125,13 @@ where(member.id.eq(memberId),
 | 목록 + 필터 + 정렬 + 페이징 | **런타임 조건 조합** | QueryDSL |
 | 단건 상세 조회 | 조건 1개 | 파생 쿼리 |
 
+> ⚠️ **§6-1 의 "동적 조회는 QueryDSL 로 통일"과 이 절은 서로 어긋나지 않는다.** 통일의 대상은
+> 위 표 <b>둘째 줄</b>(필터가 붙는 목록)이고, 뜻은 "같은 동적 조회에 도구를 둘(QueryDSL +
+> `Specification`) 두지 않는다"이다. 첫째 줄은 애초에 동적 조회가 아니라 통일 대상이 아니다.
+> 관리자 페이지를 한 덩어리로 기억하면 통일 쪽만 남아 헷갈리기 쉬워 적어둔다 —
+> 구현 시점의 같은 메모가 [`admin-page-scope.md`](./admin-page-scope.md) §3-D 에도 있다.
+> 실제 구현(2026-08-06)도 이 표대로 갈렸다: A·B 목록은 QueryDSL, D 위젯 5종은 JPQL.
+
 ---
 
 ## 4-2. 동적 조립의 위험 — QueryDSL이 고치는 것과 못 고치는 것
@@ -281,13 +288,25 @@ annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
 |---|---|
 | `./gradlew clean compileJava` | BUILD SUCCESSFUL |
 | Q타입 생성 확인 | **13개** (`QSession`, `QMember`, `QReport`, `QPoseData`, `QOutboxEvent` 등 전 엔티티) |
-| `./gradlew clean bootJar -x test --no-daemon` | BUILD SUCCESSFUL — **로컬 검증** (아래 단서 참조) |
+| `./gradlew clean bootJar -x test --no-daemon` | BUILD SUCCESSFUL — **로컬 검증** |
 | `./gradlew test` (전체) | BUILD SUCCESSFUL — Lombok 애노테이션 프로세서와의 충돌 없음 |
 
-> 🔶 **남은 미검증 — 위 3행은 전부 로컬 Gradle 실행이며 Docker 이미지 빌드가 아니다.**
-> - `backend/Dockerfile`은 `gradle:jdk21` 이미지 안에서 `./gradlew bootJar -x test --no-daemon`을 돌린다. 위 검증은 여기에 `clean`을 덧붙여 **로컬에서** 돌린 것이라 동일한 실행이 아니다(초기 서술은 "Dockerfile과 동일한 커맨드"였으나 부정확 — 외부 리뷰로 정정).
-> - `gradle:jdk21` 이미지의 Gradle 버전이 로컬과 달라 생길 차이, 컨테이너 내 네트워크·캐시 조건은 배제하지 못했다.
-> - **완결 조건**: 실제 `docker build -f backend/Dockerfile` 1회 성공. 도입 시점에 확인할 것.
+#### ✅ Docker 이미지 빌드 — 완결 조건 해소 (2026-08-04)
+
+초판이 **"남은 미검증"** 으로 남겼던 항목이다. 위 3행은 전부 로컬 Gradle 실행이라 `gradle:jdk21` 이미지 안에서 도는 `backend/Dockerfile` 과 동일한 실행이 아니었고(초기 서술 *"Dockerfile과 동일한 커맨드"* 는 부정확해 외부 리뷰로 정정된 이력이 있다), 이미지의 Gradle 버전 차이·컨테이너 내 네트워크·캐시 조건을 배제하지 못했다.
+
+**도입 시점(2026-08-04)에 실제로 확인했다:**
+
+| 실행 | 결과 |
+|---|---|
+| `docker build -f backend/Dockerfile backend` | ✅ **성공** — 이미지 656MB |
+| `./gradlew clean compileJava` (도입 후 재확인) | ✅ BUILD SUCCESSFUL |
+| Q타입 생성 (도입 후 재확인) | ✅ **13개** — §7-3 초판 실측과 동일 |
+| `./gradlew test` 전체 (도입 후 재확인) | ✅ BUILD SUCCESSFUL |
+
+**§7-2 의 "기우였음"도 재확인됐다** — `sourceSets` 블록에 아무것도 추가하지 않았고 protobuf 생성 경로와 충돌하지 않았다. 실제 변경 면적은 **`dependencies` 4줄 + 설정 클래스 1개**였다.
+
+> 이로써 [`../tasks/28-remaining-work-plan.md`](../tasks/28-remaining-work-plan.md) §3 에 달려 있던 **"Docker 이미지 빌드 미검증이라 막히면 +1~3h"** 리스크는 소멸했다.
 
 **결론: 도입 비용은 당초 예상보다 낮다.** 버전 확정 불필요, 빌드 스크립트 구조 변경 불필요, 의존성 4줄.
 

@@ -83,4 +83,62 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     // idx_session_member_status (member_id, status) 를 탄다.
     @Query("SELECT s.id FROM Session s WHERE s.member.id = :memberId AND s.status = :status")
     List<Long> findIdsByMemberIdAndStatus(@Param("memberId") Long memberId, @Param("status") Status status);
+
+    // ─── 관리자 대시보드 집계 (admin-page-scope.md §3-D) ───────────────────────────
+    //
+    // 목록(A·B)과 성격이 다르다. 목록은 LIMIT 20 이라 인덱스만 타면 20건만 만지고 끝나지만,
+    // 집계는 조건에 걸린 행을 전부 만져야 답이 나온다 — 인덱스로 범위를 줄여도 줄어든 범위
+    // 전체를 읽는다. 그래서 QueryDSL 로 감싸지 않는다. 조건이 고정이라 동적 조립이 필요 없고,
+    // 여기서 드는 비용은 쿼리 빌더가 아니라 집계 자체다 (§3-D "전부 조건 고정 집계").
+
+    /**
+     * 기간 내 시작된 세션 수.
+     *
+     * <p>✅ <b>실측(2026-08-06): 예측이 틀렸다.</b> "선두가 {@code status} 인데 상태 조건이
+     * 없으니 {@code idx_session_status_starttime} 을 못 탄다"고 봤는데, MySQL 8.0 의
+     * <b>skip scan</b> 이 걸려 {@code range} 로 돈다 — 선두 컬럼의 값이 넷뿐이라 옵티마이저가
+     * 상태값마다 {@code start_time} 범위 탐색을 반복한다. 100만 → 11만 ({@code admin-page-scope.md} §4-5).
+     */
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.startTime >= :from AND s.startTime < :to")
+    long countStartedBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    /**
+     * 상태별 세션 분포 (전체 기간).
+     *
+     * <p>결과에는 <b>한 건이라도 있는 상태만</b> 나온다. 0 건인 상태는 행 자체가 없으므로
+     * 화면에서 빠지지 않게 호출부가 채워야 한다({@code AdminStatsService}).
+     *
+     * <p>반환 형태가 {@code Object[]} 인 이유 — {@code (Status, Long)} 두 칸짜리 결과를 받을
+     * 전용 타입을 만들 만큼 쓰이는 곳이 많지 않다. 호출부에서 즉시 맵으로 접는다.
+     */
+    @Query("SELECT s.status, COUNT(s) FROM Session s GROUP BY s.status")
+    List<Object[]> countGroupedByStatus();
+
+    /**
+     * 기간 내 <b>완료된</b> 세션의 평균 싱크로율.
+     *
+     * <p>완료 세션만 세는 이유 — 진행 중이거나 실패한 세션의 {@code avgSyncRate} 는 아직
+     * 확정값이 아니다. 해당 세션이 없으면 {@code null} 이 나온다(0.0 이 아니다) — "0%" 와
+     * "잰 적 없음"은 다르므로 호출부까지 null 로 올린다.
+     */
+    @Query("SELECT AVG(s.avgSyncRate) FROM Session s "
+            + "WHERE s.status = com.shadowfit.model.exercise.Status.COMPLETED "
+            + "AND s.startTime >= :from AND s.startTime < :to")
+    Double averageSyncRateOfCompletedBetween(@Param("from") LocalDateTime from,
+                                             @Param("to") LocalDateTime to);
+
+    /**
+     * 기간 내 세션을 <b>시작한</b> 서로 다른 회원 수 = 활성 회원.
+     *
+     * <p>✅ <b>실측(2026-08-06): 비싼 것은 맞았고, 고르는 인덱스가 뜻밖이었다.</b> 기간 조건이
+     * 있는데도 {@code idx_session_status_starttime} 이 아니라
+     * {@code idx_session_member_starttime (member_id, start_time)} 을 탄다 — {@code member_id}
+     * 선두를 정렬된 순서로 읽으면 <b>중복 제거가 공짜</b>가 되기 때문이다. 옵티마이저가 범위를
+     * 좁히는 것보다 그쪽을 택했다. 100만 행 인덱스 전체 스캔, <b>0.63초</b> — 상태별 분포와
+     * 둘이 대시보드 전체 비용의 대부분이다 ({@code admin-page-scope.md} §4-5).
+     */
+    @Query("SELECT COUNT(DISTINCT s.member.id) FROM Session s "
+            + "WHERE s.startTime >= :from AND s.startTime < :to")
+    long countDistinctActiveMembersBetween(@Param("from") LocalDateTime from,
+                                           @Param("to") LocalDateTime to);
 }
