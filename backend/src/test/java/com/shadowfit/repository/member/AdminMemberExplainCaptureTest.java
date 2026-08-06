@@ -46,7 +46,10 @@ import java.time.LocalDate;
         "spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver",
         "spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect",
         "spring.jpa.hibernate.ddl-auto=none",
-        "spring.sql.init.mode=never"
+        "spring.sql.init.mode=never",
+        // 스케줄러가 뜨면 측정 대상 데이터를 UPDATE 한다 (admin-page-scope.md §4-2 결함 #4).
+        // 회원 목록 측정에는 세션이 안 걸리지만, 같은 스크래치 DB 를 B·D 와 공유하므로 여기서도 끈다.
+        "scheduling.enabled=false"
 })
 @DisplayName("[측정 장치] 관리자 회원 목록 — 필터 조합별 실행 SQL 캡처")
 class AdminMemberExplainCaptureTest {

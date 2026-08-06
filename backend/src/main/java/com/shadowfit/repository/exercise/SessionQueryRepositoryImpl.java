@@ -72,6 +72,16 @@ public class SessionQueryRepositoryImpl implements SessionQueryRepository {
      * <p><b>목록 쿼리와 조인 구성이 다르다.</b> 목록은 회원명·운동명을 응답에 실어야 해서 두
      * 조인이 항상 필요하지만, 개수를 세는 데는 <b>거르는 데 쓰이는 조인만</b> 있으면 된다.
      *
+     * <p>🔴 <b>다만 이건 성능 최적화가 아니다</b>(2026-08-06 실측, {@code admin-page-scope.md}
+     * §4-4-1 ③). 조인을 무조건 둘 다 붙인 반사실을 같은 QueryDSL 로 만들어 서버에 도착한 SQL 을
+     * 비교했더니 <b>글자 그대로 같았다</b> — Hibernate 가 결과에 쓰이지 않는 to-one 조인을 SQL
+     * 생성 단계에서 이미 제거하기 때문이다. 즉 아래 {@code if} 가 없어도 나가는 SQL 은 같다.
+     *
+     * <p>그래도 남겨두는 이유는 <b>의도 표현</b>이다. 이 {@code if} 를 지우면 "안 쓰는 조인은
+     * 알아서 사라진다"는 <b>Hibernate 구현에 암묵적으로 기대는</b> 코드가 된다. 그 제거가
+     * 성립하는 것은 두 연관이 to-one 이고 FK 가 NOT NULL 이기 때문이며, 조인이 행을 거를 수
+     * 있게 되면(nullable FK, to-many) 더는 성립하지 않는다.
+     *
      * <ul>
      *   <li>{@code exercise} — 필터가 {@code exerciseId} 이고 그건 {@code session} 이 이미
      *       FK 로 들고 있다. 조인할 이유가 없다</li>
@@ -101,6 +111,7 @@ public class SessionQueryRepositoryImpl implements SessionQueryRepository {
                 .select(session.count())
                 .from(session);
 
+        // 위 주석 참조 — SQL 을 줄이지는 않는다(Hibernate 가 이미 지운다). 의도를 코드에 남긴다.
         if (StringUtils.hasText(condition.keyword())) {
             query.join(session.member, member);
         }

@@ -61,7 +61,10 @@ import java.time.LocalDateTime;
         "spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver",
         "spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect",
         "spring.jpa.hibernate.ddl-auto=none",
-        "spring.sql.init.mode=never"
+        "spring.sql.init.mode=never",
+        // 스케줄러가 뜨면 IN_PROGRESS 세션을 FAILED 로 바꾼다 — 하필 이 장치의 집계 b(상태별
+        // 분포)가 재는 대상이 그 값이다 (admin-page-scope.md §4-2 결함 #4).
+        "scheduling.enabled=false"
 })
 @DisplayName("[측정 장치] 관리자 대시보드 집계 — 실행 SQL 캡처")
 class AdminStatsExplainCaptureTest {

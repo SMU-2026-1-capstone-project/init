@@ -128,21 +128,177 @@ SET FOREIGN_KEY_CHECKS = 0;
 INSERT INTO exercise_sessions
   (member_id, exercise_id, start_time, end_time, total_reps, avg_sync_rate, status, created_at)
 SELECT 1 + (n % ${USERS}), 1 + (n % 3),
-       TIMESTAMP('2025-08-01 06:00:00') + INTERVAL (n % 525600) MINUTE,
-       TIMESTAMP('2025-08-01 06:15:00') + INTERVAL (n % 525600) MINUTE,
+       TIMESTAMP('2025-08-01 06:00:00') + INTERVAL mins MINUTE,
+       TIMESTAMP('2025-08-01 06:15:00') + INTERVAL mins MINUTE,
        30, 75.00,
-       ELT(1 + (n % 4), 'COMPLETED','COMPLETED','FAILED','IN_PROGRESS'),
-       TIMESTAMP('2025-08-01 06:00:00') + INTERVAL (n % 525600) MINUTE
-FROM _seq a CROSS JOIN (SELECT 0 UNION SELECT 1) b WHERE a.n < ${SESSIONS} LIMIT ${SESSIONS};
+       ELT(1 + (st % 4), 'COMPLETED','COMPLETED','FAILED','IN_PROGRESS'),
+       TIMESTAMP('2025-08-01 06:00:00') + INTERVAL mins MINUTE
+FROM (
+  SELECT n,
+         CONV(SUBSTRING(MD5(CONCAT('ts', n)), 1, 8), 16, 10) % 525600 AS mins,
+         CONV(SUBSTRING(MD5(CONCAT('st', n)), 1, 8), 16, 10)          AS st
+  FROM _seq WHERE n < ${SESSIONS}
+) t;
 SET FOREIGN_KEY_CHECKS = 1;"
-# ⚠️ status 가 n%4 로 결정된다 = COMPLETED 50% / FAILED 25% / IN_PROGRESS 25%.
-#    실제 분포가 아니다(실제는 COMPLETED 가 대부분이고 FAILED 는 소수일 것). 드라이빙 테이블
-#    선택은 선택도에 민감하므로, 이 균일성이 B 결과 해석의 가장 큰 단서다.
+# 🔴 CROSS JOIN 을 걷어낸 이유 — 2026-08-06 발견한 세 번째 시딩 결함(§4-2 결함 #6).
+#    이전 판은 `FROM _seq a CROSS JOIN (SELECT 0 UNION SELECT 1) b WHERE a.n < 1000000
+#    LIMIT 1000000` 이었다. _seq 는 이미 100만 행(0~999,999)인데 거기에 2를 곱해 200만을
+#    만들고 앞에서 100만만 잘랐으니, **n 이 0~499,999 만 쓰이고 각 값이 두 번씩** 들어갔다.
+#
+#    관측된 결과:
+#      · 완전히 동일한 세션(id 제외)이 2벌씩 × 500,000 조합
+#      · distinct start_time 이 100만 행에 500,000 개뿐
+#      · member_id = 1+(n%200000) 인데 n 이 절반만 도니 **id ≤ 100,000 회원은 세션 6개,
+#        초과는 4개** — 세션 수마저 member_id 로 결정된다(결함 #5 와 같은 계열)
+#
+#    _seq 가 SESSIONS 를 못 채우면 조용히 적게 들어가므로 아래에서 행 수를 검증한다.
+# ⚠️ status 의 주변분포는 COMPLETED 50% / FAILED 25% / IN_PROGRESS 25% 다. 드라이빙 테이블
+#    선택은 선택도에 민감하므로 이 분포가 B 결과 해석의 가장 큰 단서인데, **이 값에 근거가
+#    없다.** 어디까지가 논증이고 어디부터가 가정인지 갈라 적는다.
+#
+#    [논증됨] IN_PROGRESS 25% 는 **구조적으로 불가능하다.** IN_PROGRESS 는 과도 상태다 —
+#      모든 세션은 분석 완료(COMPLETED)나 타임아웃(FAILED)으로 반드시 빠져나간다
+#      (SessionTimeoutScheduler). 누적 테이블에서 IN_PROGRESS 로 남아 있는 건 "지금 이 순간
+#      운동 중인 사람"뿐이므로, DAU 1,000 · 세션 15분 가정이면 상시 수십 건 규모다.
+#      100만 행 중 25만이 아니라 **사실상 0%** 여야 한다.
+#
+#    [가정, 미검증] COMPLETED 와 FAILED 의 비율. FAILED 는 앱 종료·네트워크 단절·AI 콜백
+#      유실에서 나오는데 그 발생률을 이 프로젝트는 **한 번도 재본 적이 없다.** 실 DB 의
+#      세션은 2026-08-06 기준 7건(전부 COMPLETED)이라 표본이라 할 수 없다. 그러므로
+#      "FAILED 는 소수일 것" 같은 서술을 근거로 쓰지 않는다.
+#
+#    ⇒ 이 시딩은 "현실의 분포"가 아니라 **각 상태에 충분한 행을 주어 계획을 관찰하기 위한
+#      배치**다. 선택도가 현실과 다르므로 결과는 "이 분포에서는 이렇게 고른다"까지다.
+#
+# 🔴 해시를 쓰는 이유 — 2026-08-06 에 발견한 시딩 결함(§4-2 결함 #5)의 수정이다.
+#    이전 판은 status = ELT(1 + (n % 4), ...) 였는데, member_id 도 1 + (n % 200000) 이라
+#    **둘이 같은 n 의 함수**였다. USERS(200,000) 가 4의 배수라 n mod 4 가 member_id 로 완전히
+#    결정되고, 그 결과 **회원 20만 명 중 19만 9,920명이 평생 한 가지 상태의 세션만** 가졌다.
+#
+#    영향이 컸던 곳은 조합 (d) 상태+검색어다. 'kim' 회원의 세션이 전부 COMPLETED 라
+#    FAILED+kim 이 **구조적으로 0건**이었고, 그 조합은 AdminSessionExplainCaptureTest 가
+#    "드라이빙 테이블 선택이 갈리는 지점 = 이 캡처의 핵심"이라고 적어둔 바로 그 조합이다.
+#    즉 §4-4 는 핵심 조합에서 **빈 결과를 재고 있었다.**
+#
+#    ⚠️ 처음엔 CRC32 를 썼는데 **그것도 틀렸다.** CRC32 는 GF(2) 위에서 선형이라 등차 입력의
+#      구조가 하위 비트에 그대로 남는다. 실제로 재보니 종속이 사라진 게 아니라 방향만 뒤집혔다:
+#
+#        오프셋별 "status 가 같은 비율" (무작위면 0.25)
+#          n vs n+1       0.0044      n vs n+2   0.4100
+#          n vs n+200000  0.0000  ← 회원의 연속 세션은 **절대** 같은 상태가 될 수 없었다
+#        값별 개수도 250000 × 4 로 오차 0 — 진짜 해시라면 ±433(σ) 는 흔들려야 한다.
+#
+#      MD5 로 바꾸고 같은 검사를 하면 전 오프셋 0.2476~0.2524, 값별 개수 편차 ±450 이다.
+#      후자가 정상이다. 그래서 CONV(SUBSTRING(MD5(...),1,8),16,10) 을 쓴다 — 100만 행 시딩에서
+#      MD5 의 추가 비용은 무시할 수준이고, 여기서 아껴야 할 것은 시간이 아니라 신뢰다.
+#
+#    주변분포(50/25/25)는 그대로라 §4-4 와의 차이는 "상관"에서만 온다.
+#
+# 🔴 start_time 도 해시로 바꿨다 (2026-08-06, 결함 #5 의 두 번째 축).
+#    이전 판은 `(n % 525600) MINUTE` 이었는데 member_id 도 `n % 200000` 이라 같은 종속이 있었다.
+#    회원 m 의 세션은 (m-1), (m-1)+74400, (m-1)+200000, (m-1)+274400, (m-1)+400000 분에
+#    놓여 전부 (m-1) 만큼 밀린다 — **id 가 작은 회원일수록 이른 시각에 쏠린다.**
+#    기간으로 자르면 회원 부분집합이 편향되므로 대시보드 집계 e(기간 내
+#    COUNT(DISTINCT member_id))가 직접 영향을 받는다.
+#
+#    ⚠️ 분포의 성격이 바뀐 것을 기록해둔다 — 이전엔 1년의 매 분에 세션이 고르게 하나씩
+#      놓이는 **완전 균등 스윕**이었고, 지금은 분 단위로 뽑는 **무작위 균등**이다(분당 건수가
+#      Poisson 처럼 흔들린다). 후자가 덜 인공적이지만, **둘 다 하루·요일 주기가 없다**는
+#      한계는 그대로다. 실제 트래픽은 새벽에 비고 저녁에 몰린다.
+#      부수적으로 distinct start_time 이 525,600 전부에서 약 446,000(= 525600·(1-e^-1.9))
+#      으로 준다. 해시 충돌이라 정상이며, 아래 검증 임계를 그만큼 느슨하게 잡았다.
+#
+#    🔴 **대가 — 삽입 순서가 무작위가 된다.** 시딩은 n 순서(= PK 순서)로 INSERT 하는데,
+#      이전엔 n 이 커지면 start_time 도 커져 (status, start_time) 인덱스에 거의 append
+#      였다. 지금은 PK 순서로 넣어도 start_time 이 사방으로 튀어 **인덱스 페이지가 계속
+#      쪼개진다.** 즉 이 테이블의 인덱스는 이전보다 단편화돼 있고, 그 방향은 **실제 서비스와
+#      반대**다(실제 세션은 시간순으로 쌓이므로 append 에 가깝다).
+#
+#      영향은 갈린다:
+#        · EXPLAIN(계획 선택)  — 영향 없음. 통계는 카디널리티를 보지 페이지 배치를 보지 않는다
+#        · 시간(ms)            — 영향 있음. 흩어진 페이지는 스캔이 느리다
+#      ⇒ **§4-5(08-06 이전 판)의 ms 와 직접 비교하지 말 것.** "상관을 고쳐서 바뀐 것"과
+#        "단편화가 늘어서 바뀐 것"이 섞인다. 상관 제거를 우선한 이유는, 상관은 **계획 선택**을
+#        왜곡하는 반면(집계 e 가 직격) 단편화는 시간만 건드리고 그 시간은 이 장비에서
+#        어차피 절대값을 신뢰하지 않기로 한 값이기 때문이다(load-test-strategy.md 전제).
+#
+# ⚠️ exercise_id 는 `1 + (n % 3)` 으로 남겼다. 여기엔 같은 종류의 해악이 없다 —
+#    200000 mod 3 = 2 라 회원 m 의 다섯 세션이 세 운동에 고루 흩어진다(member_id 가 값을
+#    결정하지 않는다). 검증에서도 이 축은 보지 않는다.
 # ⚠️ CANCELLED 는 시딩하지 않는다 — Java enum 철자가 어긋나 있어(issue #106) 어차피 코드에서
 #    도달할 수 없는 값이다. 있는 척하면 측정이 현실보다 좋아 보인다.
 
 DB "$DB_NAME" -e "ANALYZE TABLE exercise_sessions, exercises;" >/dev/null
 echo "   세션 $(DB -sN "$DB_NAME" -e 'SELECT COUNT(*) FROM exercise_sessions;') / FAILED $(DB -sN "$DB_NAME" -e "SELECT COUNT(*) FROM exercise_sessions WHERE status='FAILED';")"
+echo
+
+# ── [2-3/8] 시딩 자기 검증 ────────────────────────────────────────────────────
+# 2026-08-06 에 하루 동안 시딩 결함 3건(§4-2 #5·#6)이 연달아 나왔고, 셋 다 공통점이 있다 —
+# **시딩이 의도대로 됐는지 아무도 확인하지 않았다.** 스크립트는 매번 성공적으로 끝났고,
+# 행 수도 맞았다. 틀린 것은 행 수가 아니라 **행들 사이의 관계**였다.
+#
+# 그래서 여기서 관계를 검사한다. 실패하면 측정을 시작하지 않는다 — 틀린 데이터 위에서 나온
+# EXPLAIN 은 "결과가 없는 것"보다 나쁘다(그럴듯해 보이므로).
+echo "## [2-3/8] 시딩 자기 검증"
+FAIL=0
+chk(){ # $1=이름 $2=실제 $3=기대설명 $4=판정(0=OK)
+  if [[ "$4" == "0" ]]; then printf "   ✅ %-28s %s\n" "$1" "$2"
+  else printf "   🔴 %-28s %s  (기대: %s)\n" "$1" "$2" "$3"; FAIL=1; fi
+}
+
+N=$(DB -sN "$DB_NAME" -e "SELECT COUNT(*) FROM exercise_sessions;")
+chk "행 수" "$N" "${SESSIONS}" "$([[ "$N" == "$SESSIONS" ]] && echo 0 || echo 1)"
+
+# 중복 행 — 결함 #6. id 를 뺀 모든 컬럼이 같은 행이 무더기로 있으면 CROSS JOIN 실수의 재발이다.
+# ⚠️ 0 을 요구하지 않는다. start_time 이 해시가 된 뒤로는 **우연한 충돌**이 가능하다 —
+#    같은 회원의 다섯 세션 중 둘이 같은 분에 떨어질 수 있다. 결함 #6 은 50만 건이었으므로
+#    0.1%(1,000건) 를 경계로 두면 우연과 구조적 중복은 충분히 갈린다.
+DUP=$(DB -sN "$DB_NAME" -e "SELECT COALESCE(SUM(c-1),0) FROM (
+  SELECT COUNT(*) c FROM exercise_sessions
+  GROUP BY member_id, exercise_id, start_time, status HAVING c > 1) t;")
+DUP_MAX=$(( SESSIONS / 1000 ))
+chk "중복 행" "$DUP" "< ${DUP_MAX}" "$([[ "$DUP" -lt "$DUP_MAX" ]] && echo 0 || echo 1)"
+
+# 회원당 세션 수가 한 가지여야 한다 — 갈리면 member_id 가 세션 수를 결정하고 있다(결함 #6).
+SPREAD=$(DB -sN "$DB_NAME" -e "SELECT COUNT(*) FROM (
+  SELECT COUNT(*) c FROM exercise_sessions GROUP BY member_id) t GROUP BY c;" | wc -l)
+chk "회원당 세션 수 종류" "$SPREAD" "1" "$([[ "$SPREAD" == "1" ]] && echo 0 || echo 1)"
+
+# status ↔ member_id 독립성 — 결함 #5. 회원 5명 중 1명꼴로도 2종 이상이 안 나오면 종속이다.
+# 회원당 세션이 k 개일 때 "전부 같은 상태"일 확률은 0.5^k + 2*0.25^k 로, k=5 면 약 3.3% 다.
+# 여유를 둬 20% 를 넘으면 실패로 본다 — 종속이면 이 값이 100% 에 붙는다.
+ONEKIND=$(DB -sN "$DB_NAME" -e "SELECT ROUND(100*SUM(cnt=1)/COUNT(*),2) FROM (
+  SELECT member_id, COUNT(DISTINCT status) cnt FROM exercise_sessions GROUP BY member_id) t;")
+chk "회원당 status 1종 비율(%)" "$ONEKIND" "< 20" \
+    "$(awk -v v="$ONEKIND" 'BEGIN{exit !(v<20)}' && echo 0 || echo 1)"
+
+# 검색어 × 상태 교차가 비어 있으면 조합 (d) 가 0건을 재게 된다 — 결함 #5 의 직접 증상.
+CROSS=$(DB -sN "$DB_NAME" -e "SELECT COUNT(*) FROM exercise_sessions s
+  JOIN users m ON m.id = s.member_id
+  WHERE s.status='FAILED' AND m.username LIKE '%kim%';")
+chk "FAILED × kim 교차" "$CROSS" "> 0" "$([[ "$CROSS" -gt 0 ]] && echo 0 || echo 1)"
+
+# start_time ↔ member_id 독립성 — 결함 #5 의 두 번째 축.
+# 좁은 기간을 잘랐을 때 그 안의 member_id 가 전 구간에 퍼져 있어야 한다. 종속이면 한 구간에
+# 몰린다. 균등분포 0..USERS 의 표준편차는 USERS/√12 이므로, 하루치의 표준편차를 그 값으로
+# 나눈 비율이 100% 에 가까우면 독립이다. (이전 판은 이 값이 한 자릿수 %였다)
+EXPECTED_SD=$(awk -v u="$USERS" 'BEGIN{printf "%.0f", u/sqrt(12)}')
+SPREAD_PCT=$(DB -sN "$DB_NAME" -e "
+  SELECT ROUND(100 * STDDEV_POP(member_id) / ${EXPECTED_SD}) FROM exercise_sessions
+  WHERE start_time >= '2025-11-01 00:00:00' AND start_time < '2025-11-02 00:00:00';")
+chk "하루치 member_id 퍼짐(%)" "$SPREAD_PCT" "> 80" \
+    "$(awk -v v="$SPREAD_PCT" 'BEGIN{exit !(v>80)}' && echo 0 || echo 1)"
+
+# distinct start_time — 결함 #6 의 다른 증상. 해시라 충돌이 있어 SESSIONS 보다 적은 게 정상이고,
+# 분 해상도가 525,600 뿐이라 100만 행이면 대부분의 분이 채워진다. 절반 이하면 이상하다.
+DSTART=$(DB -sN "$DB_NAME" -e "SELECT COUNT(DISTINCT start_time) FROM exercise_sessions;")
+chk "distinct start_time" "$DSTART" "> 300000" \
+    "$([[ "$DSTART" -gt 300000 ]] && echo 0 || echo 1)"
+
+if [[ "$FAIL" != "0" ]]; then
+  echo "!! 시딩 검증 실패 — 이 데이터 위의 측정은 신뢰할 수 없다. 중단한다." >&2
+  exit 1
+fi
 echo
 
 # ── [3/7] general log 켜기 ────────────────────────────────────────────────────
