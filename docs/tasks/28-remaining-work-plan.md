@@ -3,6 +3,7 @@
 작성: 2026-07-31 · 갱신: 2026-08-07 (관리자 3종 요구사항 편입 — §1. 이전 08-03 갱신은 §1-3)
 상태: **분석/추천 — 착수 순서 미확정** (결정 ✅ 는 사용자 confirm 후)
 범위: **Spring 백엔드만.** 프론트(React Native) 전용 항목과 AI 서버(FastAPI) 고유 항목은 제외 — 단 크로스 레포 작업은 그 사실을 명시하고 포함
+　　　→ **AI 트랙 잔여는 [`30-ai-remaining-work.md`](./30-ai-remaining-work.md)** (2026-08-07 신설). 이 문서의 합계에 AI 항목은 **들어 있지 않다**
 목적: "앞으로 뭘 해야 하는가"와 "얼마나 남았는가"를 한 장에서 판단할 수 있게 정리
 연관: [`29-ai-code-verification.md`](./29-ai-code-verification.md)(코드 검증 로그 — 여기서 나온 결함이 §2 표에 반영됨), [`27-implementation-gaps.md`](./27-implementation-gaps.md)(기존 갭 목록), [`../decisions/querydsl-adoption.md`](../decisions/querydsl-adoption.md), [`../decisions/admin-page-scope.md`](../decisions/admin-page-scope.md), [`../decisions/session-resume-and-ai-state.md`](../decisions/session-resume-and-ai-state.md), [`25-portfolio-strategy.md`](./25-portfolio-strategy.md)
 
