@@ -1,7 +1,7 @@
 # Decision: 동적 쿼리 계층(QueryDSL / Criteria API) 도입 여부
 
-상태: **✅ QueryDSL 채택 확정 (2026-07-31 사용자 confirm)** — 단 적용 범위·착수 시점은 §1-1 참조
-작성: 2026-07-31 / 결정: 2026-07-31
+상태: **✅ 채택 확정(2026-07-31) → ✅ 구현 완료(2026-08-07, [PR #107](https://github.com/Shadowfit/init/pull/107))** — 아래 §0-1
+작성: 2026-07-31 / 결정: 2026-07-31 / 구현: 2026-08-07
 배경: "우리 프로젝트에 QueryDSL이나 Criteria API를 쓰나 / 앞으로 쓸 건가 / 남은 요구사항에 적용해야 하나"라는 질문(2026-07-31 사용자). 코드 감사 결과 **현재 동적 쿼리 빌더 계층이 아예 없고**, 도입 여부가 문서로 논의된 적도 없어 열린 항목으로 정리.
 연관: [`../tasks/27-implementation-gaps.md`](../tasks/27-implementation-gaps.md)(잔여 항목), [`./report-read-path.md`](./report-read-path.md) §0-B ⑬(페이징 전략 미착수), [`./recommendation-algorithm.md`](./recommendation-algorithm.md)(BE-08 스코프 A/B 분리), [`../tasks/25-portfolio-strategy.md`](../tasks/25-portfolio-strategy.md), [`./portfolio-benchmark.md`](./portfolio-benchmark.md)
 
@@ -13,6 +13,42 @@
 ## 0. 한 줄 요약
 
 동적 쿼리 빌더는 **"요청마다 WHERE 절이 늘었다 줄었다" 할 때만** 값을 한다. 남은 요구사항 8개를 코드 기준으로 판정하면 그 조건을 만족하는 건 **현재 시점 기준 `관리자 대시보드` 하나뿐**이다. 따라서 이 문서의 질문은 사실상 기술 선택이 아니라 **"관리자 페이지를 만들 것인가"라는 기능 결정 하나로 환원**된다. Criteria API 직접 사용은 어느 시나리오에서도 권하지 않는다.
+
+---
+
+## 0-1. ✅ 구현 완료 (2026-08-07) — 그리고 채택 근거가 한 단계 세졌다
+
+[PR #107](https://github.com/Shadowfit/init/pull/107) 로 배선·구현·측정이 끝났다.
+
+| | 산출물 |
+|---|---|
+| 배선 | `querydsl-jpa` + APT, `JPAQueryFactory` 빈, Docker 빌드 검증 |
+| A 회원 목록 | `MemberQueryRepositoryImpl` — 필터 5 · 정렬 3 · offset 페이징 |
+| B 세션 목록 | `SessionQueryRepositoryImpl` — 조인 3단 · 필터 4 · 정렬 3 |
+| D 대시보드 | QueryDSL **아님** — 조건 고정 집계라 JPQL (§4-1 의 경계 그대로) |
+
+### 🔴 근거가 "동적 WHERE"에서 "동적 조인"으로 옮겨갔다
+
+이 문서 §1-1 은 *"필터가 1~2개로 확정되면 결정 재검토"* 를 조건으로 달아뒀다. **WHERE 조건 개수는 사실 약한 근거다** — 조건 5개면 JPQL 문자열 조립이나 `@Query` 두세 벌로도 버틴다.
+
+구현하면서 더 센 사례가 나왔다. `SessionQueryRepositoryImpl#countOf` 는 검색어 유무에 따라 **`FROM` 절 구성 자체**를 바꾼다(총건수는 거르는 데 쓰이는 조인만 필요하므로).
+
+| 방식 | 런타임에 조인을 붙였다 뺐다 |
+|---|---|
+| 파생 쿼리 | ❌ 불가능 — 메서드 이름이 조인을 못 정한다 |
+| `@Query` JPQL | 🔶 `FROM` 이 문자열에 박혀 있어 **쿼리를 두 벌** 써야 한다 |
+| **QueryDSL** | ✅ `JPAQuery` 객체에 `if` 로 `.join()` 하나 더하면 끝 |
+
+**두 벌로 가면 총건수와 목록의 조건이 어긋난다** — "전체 N건"과 실제 페이지가 안 맞는 고전적 버그다. QueryDSL 판은 `whereOf()` 하나를 양쪽이 재사용하므로 구조적으로 어긋날 수 없다.
+
+⚠️ **공짜는 아니다.** 조인과 WHERE 조건의 짝은 **사람이 맞춰야 한다.** `keywordContains` 가 검색어 없을 때 `null` 을 돌려주는 것과 `member` 조인이 안 붙는 것이 짝인데, `member` 를 보는 조건을 하나 더 늘리면서 조인 조건을 안 고치면 **참조는 하는데 조인이 없는 쿼리**가 만들어진다. QueryDSL 이 대신 잡아주지 않는다.
+
+📌 **다만 성능 근거는 아니다.** 실측해보니 이 조건부 조인이 **SQL 을 줄이지는 않는다** — Hibernate 가 결과에 안 쓰이는 to-one 조인을 SQL 생성 단계에서 이미 지워서, 조인을 명시한 반사실과 **글자 그대로 같은 SQL** 이 나갔다([`admin-page-scope.md`](./admin-page-scope.md) §4-4-1 ③). QueryDSL 이 값을 하는 지점은 성능이 아니라 **"목록과 총건수가 같은 조건을 공유하면서 조인 구성만 다르게 하는 것을 안전하게 쓸 수 있다"** 는 표현력이다.
+
+### 남은 것
+
+- **C 운동/영상 목록** — 착수하면 원칙은 동일하게 QueryDSL (§4-1). 현재 보류
+- **§9 필터 항목 정의** — ✅ 해소됨([`admin-page-scope.md`](./admin-page-scope.md) §3 에서 A 5개 · B 4개로 확정)
 
 ---
 

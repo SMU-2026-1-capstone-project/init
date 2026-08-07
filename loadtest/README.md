@@ -87,6 +87,50 @@ ramp 가 이미 session 801 에 pose_data 를 대량 적재함(side effect). 이
 
 ---
 
+## measure_*.sh — 실행 계획·비용 측정 (ghz 와 별개)
+
+ghz 는 **처리량**을 재고, 이쪽은 **쿼리 하나의 실행 계획과 비용**을 잰다. 대부분 스크래치 DB
+(`shadowfit_explain`)에서 돌아 실 DB 를 건드리지 않는다.
+
+| 스크립트 | 재는 것 | 근거 문서 |
+|---|---|---|
+| `measure_admin_filter_explain.sh` | **시딩 + A·B 필터 조합별 EXPLAIN.** 다른 admin 측정의 전제 | [`admin-page-scope.md`](../docs/decisions/admin-page-scope.md) §4-3·§4-4 |
+| `measure_admin_b_actual.sh` | B 의 **실제 rows·시간**(EXPLAIN ANALYZE), 조건부 조인 반사실 비교, 인덱스 5개 vs 6개 쓰기 비용 | 같은 문서 §4-4-1 |
+| `measure_admin_stats_actual.sh` | D 대시보드 집계 5종의 추정 vs 실제, e 인덱스 가설 | 같은 문서 §4-5-1 |
+| `measure_admin_stats_curve.sh` | 집계 b 의 볼륨별 비용 곡선(선형성) | 같은 문서 §4-5 ②-1 |
+| `measure_admin_index.sh` | 관리자 인덱스 추가 전후 (초판 rig) | 같은 문서 §4-1 |
+| `measure_pagination.sh` · `measure_partition.sh` · `measure_json.sh` · `measure_bufferpool.sh` · `measure_lock*.sh` · `measure_mvcc.sh` · `measure_redundant_index.sh` | 각 주제별 단독 실험 | [`realmysql-experiments.md`](../docs/portfolio/realmysql-experiments.md) 등 |
+
+**실행 순서** — `measure_admin_filter_explain.sh` 가 스크래치 DB 를 만들고 시딩하므로 **항상 먼저**
+돌린다. `_b_actual` · `_stats_actual` · `_stats_curve` 는 그 DB 를 재사용하고, 규모가 안 맞으면
+스스로 멈춘다.
+
+```bash
+bash loadtest/measure_admin_filter_explain.sh   # 시딩 + 자기검증 + A·B EXPLAIN
+bash loadtest/measure_admin_b_actual.sh         # B 실측
+bash loadtest/measure_admin_stats_actual.sh     # D 실측
+```
+
+### 🔴 시딩 자기검증 (2026-08-07 추가)
+
+`measure_admin_filter_explain.sh` 는 시딩 직후 **7가지를 검사하고, 하나라도 실패하면 측정을
+시작하지 않는다** — 행 수 / 중복 행 / 회원당 세션 수 종류 / status 1종 비율 / `FAILED × kim` 교차 /
+하루치 `member_id` 퍼짐 / distinct `start_time`.
+
+이게 생긴 이유는 2026-08-06 에 시딩 결함 **3건**이 연달아 나왔기 때문이다. 셋 다 **스크립트는
+성공했고 행 수도 맞았다** — 틀린 것은 행 수가 아니라 **행들 사이의 관계**였고, 그 위에서 나온
+실행 계획은 그럴듯해 보였다. 자세한 것은
+[`admin-page-scope.md`](../docs/decisions/admin-page-scope.md) §4-2 결함 #5·#6.
+
+> ⚠️ **측정 스크립트를 고칠 때 주의** — `set -euo pipefail` 이라 `grep` 이 못 찾기만 해도
+> 파이프라인이 실패로 전파돼 스크립트가 즉사한다. 실제로 이 rig 가 그걸로 두 번 죽었다.
+> 값 추출은 `{ ... || true; }` 로 감쌀 것.
+>
+> ⚠️ **실행 중인 스크립트를 편집하지 말 것.** bash 는 파일을 조금씩 읽어가며 실행해서, 주석만
+> 고쳐도 바이트 오프셋이 밀려 엉뚱한 지점부터 읽을 수 있다.
+
+---
+
 ## 주의
 
 - **ramp 는 session 801 에 실제 row 를 누적 INSERT** 한다. 측정 후 정리:
