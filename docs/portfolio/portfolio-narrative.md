@@ -1,7 +1,7 @@
 # 백엔드 포폴 서사 구조 (Spring)
 
 작성일: 2026-06-08
-상태: 서사 구조 확정(이번 세션) — 세부는 진행 중
+상태: 서사 구조 확정 — 세부는 진행 중. **최종 동기화: 2026-08-07**(outbox·회복탄력성 완료 반영, keyset 적용 여부 정정, 빈칸 재정리)
 관련: [`realmysql-experiments.md`](./realmysql-experiments.md), [`db-deep-dive.md`](./db-deep-dive.md), [`db-portfolio-roadmap.md`](../decisions/db-portfolio-roadmap.md), [`reference-style-and-caching.md`](../decisions/reference-style-and-caching.md), [`FINAL-REPORT.md`](../FINAL-REPORT.md)
 
 > 포지셔닝: AI 아닌 **백엔드(Spring) 신입** 지원. MediaPipe·TTS·포즈는 **무대(substrate)** 일 뿐 셀링 포인트가 아니다.
@@ -29,7 +29,9 @@
 
 **증명(실측)**: lost-update 재현·방지 카드(③), MVCC 격리수준 카드(④ — RR/RC/SERIALIZABLE + `data_locks` 관찰). → "동시성·정합성"을 말이 아니라 실험으로.
 
-**보강 여지**(아래 §3): 송신 at-least-once(outbox) + 멱등 수신 = **exactly-once**, gRPC deadline, 관측성.
+**보강**(아래 §3): ~~송신 at-least-once(outbox) + 멱등 수신 = exactly-once, gRPC deadline, 관측성~~ → ✅ **셋 다 완료**(outbox 2026-07-29 / deadline·서킷 / 관측성 2026-07-28). 즉 이 헤드라인은 "여지"가 아니라 **이미 그 폭까지 채워져 있다.**
+
+> 🔴 **이 줄이 2026-08-07 까지 "보강 여지"로 남아 있었다.** outbox 는 07-29 에 구현·측정이 끝났는데 이 문서가 07-28 자라 하루 차이로 낡았고, 그 사이 **다 만든 것을 안 만든 것처럼 적고 있었다.** 서사 문서의 갱신 누락은 기능 누락보다 알아채기 어렵다 — 코드는 안 돌면 티가 나지만 문서는 조용히 틀린다.
 
 ---
 
@@ -56,8 +58,8 @@
 
 | 기둥 | 내용 | 상태 |
 |---|---|---|
-| **신뢰성(전달 의미론)** | 멱등 수신(있음) + **outbox로 at-least-once 송신** = exactly-once. 현재 gRPC 송신은 fire-and-forget(onError 로그만)이라 유실 가능 → 보강 | 🔶 보강 대상 |
-| **회복탄력성** | gRPC **deadline** + Resilience4j **서킷브레이커** ("FastAPI 죽으면?") | 🔶 보강 대상 |
+| **신뢰성(전달 의미론)** | 멱등 수신 + **outbox 로 at-least-once 송신** = exactly-once | 🟢 **구현·측정 완료(2026-07-29, PR #60·#63·#67)** — [문서](../decisions/outbox-reliable-messaging.md). **"통보 유실 0"은 주장이 아니라 실측**이다 |
+| **회복탄력성** | gRPC **deadline**(`withDeadlineAfter`) + Resilience4j **서킷브레이커**(`aiServer` 인스턴스) | 🟢 **있음** — `ExerciseAnalysisService`, `application.yml` `resilience4j.circuitbreaker` |
 | **관측성** | **correlation id 전파**(@Async·gRPC 콜백·스케줄러·FastAPI 왕복) + Actuator + 커스텀 메트릭 3종 | 🟢 1차 완료(2026-07-28, [문서](../decisions/observability-correlation-id.md)) — JSON 구조화는 수집기 도입 시 |
 | **캐싱** | 기준 좌표·TTS 템플릿 = 카탈로그 패턴(유한·불변·공유). 로컬 Caffeine → 다중 인스턴스 시 Redis | 🔶 설계됨 |
 | **보안** | JWT + RefreshToken + blacklist + BCrypt + role | 🟢 있음 |
@@ -77,7 +79,9 @@
 
 ## 5. 30초 엘리베이터 피치
 
-> "운동 세션이 Spring과 FastAPI 두 서비스에 걸쳐 있어서, 세션 종료 시 **타임아웃 스케줄러와 AI 비동기 콜백이 같은 레코드를 두고 경쟁**합니다. 이걸 `@Version` 낙관락 + 멱등 수신(first-write-wins) + afterCommit 외부 호출로 정합성 있게 풀었고, lost-update·MVCC를 직접 재현·관찰해 근거를 만들었습니다. 그 아래 데이터 계층은 1억 행 시계열 substrate에서 **TSDB가 자동화하는 패턴(다운샘플·retention·working-set)을 MySQL로 직접 구현·측정**했습니다 — 배치 적재·파티션 TTL·keyset 페이지네이션을 실측으로 엔지니어링했고, read-ahead가 hit율 공식을 속이는 함정까지 잡았습니다."
+> "운동 세션이 Spring과 FastAPI 두 서비스에 걸쳐 있어서, 세션 종료 시 **타임아웃 스케줄러와 AI 비동기 콜백이 같은 레코드를 두고 경쟁**합니다. 이걸 `@Version` 낙관락 + 멱등 수신(first-write-wins) + afterCommit 외부 호출로 정합성 있게 풀었고, lost-update·MVCC를 직접 재현·관찰해 근거를 만들었습니다. **송신 쪽은 dual-write 라 gRPC 통보가 유실될 수 있었는데, outbox 로 at-least-once 를 만들어 멱등 수신과 합쳐 effectively exactly-once 로 닫았습니다 — 유실 0은 실측입니다.** 그 아래 데이터 계층은 1억 행 시계열 substrate에서 **TSDB가 자동화하는 패턴(다운샘플·retention·working-set)을 MySQL로 직접 구현·측정**했습니다 — 배치 적재·파티션 TTL·인덱스 구성을 실측으로 엔지니어링했고, read-ahead가 hit율 공식을 속이는 함정까지 잡았습니다."
+
+> ⚠️ **원문에 있던 "keyset 페이지네이션을 실측으로 엔지니어링했고"를 뺐다.** keyset 은 OFFSET 과 비교 **측정**만 했고 **앱 코드에는 적용돼 있지 않다**(§6 ⚠️). 피치에서 나란히 읽히면 "쓰고 있다"로 들리는데, 면접에서 "어디에 적용하셨나요"를 들으면 무너지는 자리다. 적용하면 그때 되돌린다. 대신 실제로 한 **인덱스 구성**(#110 통합, 2026-08-07)으로 바꿨다.
 
 ---
 
@@ -85,12 +89,16 @@
 
 | 구분 | 항목 |
 |---|---|
-| ✅ Built·측정 | 세션 정합성(낙관락·멱등·afterCommit), RealMySQL 카드(배치·인덱스·keyset·파티션·락·MVCC·JSON트림·버퍼풀), JWT/보안, **관측성(correlation id·커스텀 메트릭, 2026-07-28)** |
-| 🔶 설계·보강 대상 | outbox(exactly-once), gRPC deadline·서킷브레이커, 캐싱(카탈로그), 선택형 스타일 기준 |
-| 🔴 빈칸 | TestController 점검·N+1 점검, 구조화 로깅(JSON, 수집기 도입 시) |
+| ✅ Built·측정 | 세션 정합성(낙관락·멱등·afterCommit), RealMySQL 카드(배치·인덱스·keyset·파티션·락·MVCC·JSON트림·버퍼풀), JWT/보안, **관측성**(correlation id·커스텀 메트릭, 2026-07-28), **outbox exactly-once**(2026-07-29), **gRPC deadline·서킷브레이커**, **인덱스 구성 통합**(2026-08-07, #110) |
+| 🔶 설계·보강 대상 | 캐싱(카탈로그), 선택형 스타일 기준 |
+| 🔴 빈칸 | TestController 점검·N+1 점검, 구조화 로깅(JSON, 수집기 도입 시), **keyset 페이지네이션**(실험 카드는 있으나 앱 코드엔 없음), **외부 통합 0개**, **CD 워크플로** |
+
+> ⚠️ **"RealMySQL 카드 … keyset"과 아래 🔴 빈칸의 keyset 은 다른 것이다.** 전자는 OFFSET vs keyset 을 **실측한 실험**이고, 후자는 **앱 코드에 적용**을 말한다. 실험은 있고 적용은 없다 — 면접에서 "쓰셨나요"를 들으면 갈리는 지점이라 나눠 적는다. 관리자 목록은 offset 확정이라([`../decisions/admin-page-scope.md`](../decisions/admin-page-scope.md) §5-1) 적용 자리는 리포트 히스토리·캘린더다.
 
 ## 7. 미결정 (사용자 confirm 필요)
 
-- [ ] 보강 착수 순서: ~~관측성~~(2026-07-28 착수·완료) → 남은 건 **outbox(헤드라인 강화) vs 회복탄력성**
+- [x] ~~보강 착수 순서: 관측성 → outbox vs 회복탄력성~~ → **✅ 셋 다 완료.** 관측성(2026-07-28), outbox(2026-07-29), deadline·서킷브레이커. **이 항목은 2026-08-07 까지 답이 난 것을 묻고 있었다**
 - [ ] 캐싱 백엔드: 로컬 Caffeine로 충분 vs Redis(시그널)
-- [ ] §1 보강 실험화: "신뢰성 있는 비동기 메시징(outbox+멱등=exactly-once)" 카드를 만들지
+- [x] ~~§1 보강 실험화: "신뢰성 있는 비동기 메시징(outbox+멱등=exactly-once)" 카드를 만들지~~ → **✅ 만들었다.** [`outbox-reliable-messaging.md`](../decisions/outbox-reliable-messaging.md) §6 에 실측이 있고 "통보 유실 0"이 주장이 아니라 측정이다. 단 **경계도 같이 박제됨** — AI 프로세스 재시작 시 통보는 전달되지만 분석 결과는 회수되지 않는다(§3-2)
+- [ ] **keyset 을 앱에 적용할지** (2026-08-07 신설) — 실험 카드는 있으나 코드엔 없다. 자리는 리포트 히스토리·캘린더. `portfolio-benchmark.md` 판정은 *"없으면 감점"*
+- [ ] **외부 통합 1개** (2026-08-07 신설) — 현재 **0개**. OAuth2 / S3 중 택1
