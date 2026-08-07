@@ -1,0 +1,133 @@
+# 운영용 compose — 빌드하지 않고 GHCR 이미지를 받아 띄운다.
+#
+# ── dev(docker-compose.yml)와 무엇이 다른가 ──────────────────────────────────
+#
+#   1. build → image. 호스트에서 소스를 컴파일하지 않는다. CI 가 만든 이미지를 받는다
+#      (.github/workflows/cd-backend.yml). 배포 호스트에 JDK·Gradle 이 필요 없고,
+#      "테스트를 통과한 그 커밋"이 그대로 뜬다
+#   2. MySQL 포트를 호스트에 노출하지 않는다. dev 는 워크벤치 접속 편의로 열어뒀지만
+#      운영에서 3306 을 인터넷에 여는 것은 그 자체로 사고다. 같은 네트워크의 컨테이너는
+#      서비스 이름으로 붙으므로 노출이 필요 없다
+#   3. 시크릿에 기본값을 두지 않는다. dev 는 JWT_SECRET 에 폴백이 있는데(그래서 실행이
+#      쉽다) 운영에서 그 값이 그대로 뜨면 토큰을 누구나 위조할 수 있다.
+#      아래는 전부 필수 — .env 에 없으면 compose 가 빈 값으로 뜨므로 배포 전에 확인할 것
+#
+# ── 스키마 ────────────────────────────────────────────────────────────────────
+#
+#   initdb 마운트가 없다. 백엔드가 부팅하며 Flyway 로 적용한다 (이슈 #115).
+#   빈 DB 면 V1 → V2 가 순차 적용되고, 기존 DB 면 baseline 이 찍힌 뒤 미적용분만 돈다.
+#   적용 결과는 GET /actuator/flyway 로 확인한다.
+#
+# ── 쓰는 법 ───────────────────────────────────────────────────────────────────
+#
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+#   특정 커밋으로 고정하려면 (권장 — latest 는 이동 태그라 무엇이 떠 있는지 특정 못 한다):
+#   IMAGE_TAG=sha-<full-commit-sha> docker compose -f docker-compose.prod.yml up -d
+#
+#   자세한 절차는 docs/19-deployment.md.
+#
+# ⚠️ 이 파일은 아직 **실제 호스트에서 검증되지 않았다.** 배포 대상이 없어서다
+#    (상시 EC2 인스턴스 없음). 문법·구성은 맞춰뒀지만 "돌려봤다"고 말할 수 없다.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: shadowfit-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?운영 배포에는 필수}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-shadowfit}
+      MYSQL_USER: ${MYSQL_USER:?운영 배포에는 필수}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?운영 배포에는 필수}
+      TZ: Asia/Seoul
+    # ports 없음 — 의도적이다 (위 2번). 호스트에서 붙어야 하면
+    #   docker exec -it shadowfit-mysql mysql -u...
+    # 를 쓰거나, 필요한 동안만 SSH 터널을 뚫는다.
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/conf.d/charset.cnf:ro
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --skip-character-set-client-handshake
+      --innodb-buffer-pool-size=${INNODB_BUFFER_POOL_SIZE:-1G}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - shadowfit-net
+
+  shadowfit-backend:
+    # IMAGE_REPO 를 두는 이유: 포크나 다른 조직에서도 그대로 쓰이게 하기 위해서다.
+    # 기본값은 이 저장소의 GHCR 경로(소문자 — GHCR 요구사항).
+    image: ${BACKEND_IMAGE:-ghcr.io/shadowfit/init/backend}:${IMAGE_TAG:-latest}
+    container_name: shadowfit-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "6565:6565"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      TZ: Asia/Seoul
+      DB_HOST: shadowfit-mysql
+      DB_NAME: ${MYSQL_DATABASE:-shadowfit}
+      DB_USERNAME: ${DB_USERNAME:?운영 배포에는 필수}
+      DB_PASSWORD: ${DB_PASSWORD:?운영 배포에는 필수}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?운영 배포에는 필수}
+      AI_SERVER_HOST: shadowfit-ai
+      AI_SERVER_GRPC_PORT: 8585
+      AI_SERVER_HTTP_PORT: 8000
+      # 폴백 없음 — dev compose 와 의도적으로 다르다 (위 3번)
+      JWT_SECRET: ${JWT_SECRET:?운영 배포에는 필수. Base64 32바이트 이상}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      # 배포 직후 "떴는지"를 compose 가 판정할 수 있게 한다. Flyway 마이그레이션이
+      # 오래 걸릴 수 있어 start_period 를 넉넉히 잡는다 (V1 baseline 은 테이블 12개를 만든다).
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    networks:
+      - shadowfit-net
+
+  shadowfit-ai:
+    image: ${AI_IMAGE:-ghcr.io/shadowfit/init/ai-server}:${IMAGE_TAG:-latest}
+    container_name: shadowfit-ai
+    restart: unless-stopped
+    # gRPC 8585 는 Spring 만 같은 네트워크에서 호출하므로 expose 로 유지(외부 노출 X).
+    # HTTP 8000 은 프론트 직결 경로라 노출한다 — InternalAuthMiddleware 가 보호한다.
+    ports:
+      - "8000:8000"
+    expose:
+      - "8585"
+    environment:
+      DEBUG: "false"
+      TZ: Asia/Seoul
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?운영 배포에는 필수}
+      POSE_MODEL_COMPLEXITY: ${POSE_MODEL_COMPLEXITY:-1}
+      BACKEND_URL: http://shadowfit-backend:8080/api/v1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - shadowfit-net
+
+networks:
+  shadowfit-net:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local

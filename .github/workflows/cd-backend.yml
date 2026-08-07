@@ -1,0 +1,113 @@
+name: CD — backend 이미지
+
+# main 에 백엔드 변경이 들어오면 컨테이너 이미지를 만들어 GHCR 에 올린다.
+#
+# ⚠️ 이 워크플로는 **배포하지 않는다.** 이미지를 만들어 레지스트리에 두는 데서 끝난다.
+#    배포 대상 호스트가 아직 없기 때문이다 (상시 EC2 인스턴스 없음 — 2026-07-25 풀 사이징에
+#    쓴 2대는 실측 후 삭제). 대상이 생기면 이 파일 맨 아래 주석의 자리에 deploy job 을 붙인다.
+#    docs/19-deployment.md §CD 참조.
+#
+# 왜 테스트를 여기서 다시 부르나:
+#   backend-test.yml 을 workflow_call 로 재사용한다 — 테스트 정의를 복제하지 않으면서
+#   "테스트가 통과한 커밋만 이미지가 된다"를 강제하기 위해서다. push 트리거만 걸어두면
+#   두 워크플로가 나란히 돌아 테스트가 깨져도 이미지는 올라간다.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/cd-backend.yml'
+      - '.github/workflows/backend-test.yml'
+  # 코드 변경 없이 이미지를 다시 굽고 싶을 때 (베이스 이미지 보안 패치 등)
+  workflow_dispatch:
+
+# 이미지 푸시는 중간에 끊지 않는다 — 레지스트리에 반쯤 올라간 상태를 만들지 않기 위해
+# cancel-in-progress 를 켜지 않는다. (테스트 워크플로와 반대되는 선택이다)
+concurrency:
+  group: cd-backend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── 게이트 ──────────────────────────────────────────────────────────────────
+  test:
+    name: 테스트 게이트
+    uses: ./.github/workflows/backend-test.yml
+
+  # ── 이미지 빌드·푸시 ────────────────────────────────────────────────────────
+  build-and-push:
+    name: 이미지 빌드·푸시
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: write   # GHCR 푸시에 필요
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # GHCR 은 이미지 경로가 전부 소문자여야 한다. github.repository 는 소유자 표기를
+      # 그대로 주므로(Shadowfit/init) 여기서 낮춰둔다 — 안 하면 push 가 거부된다.
+      - name: 이미지 이름 결정
+        id: image
+        run: |
+          name=$(printf '%s/backend' '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          echo "name=ghcr.io/${name}" >> "$GITHUB_OUTPUT"
+          echo "이미지: ghcr.io/${name}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: GHCR 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # 별도 시크릿을 만들지 않는다 — GITHUB_TOKEN 이 packages:write 로 GHCR 에 붙는다.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # latest 는 "지금 main" 을 가리키는 이동 태그라 배포 대상을 특정하지 못한다.
+      # sha 태그를 항상 같이 붙여 "어느 커밋이 떠 있는지" 되짚을 수 있게 한다.
+      - name: 태그·라벨 생성
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: 빌드·푸시
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 레이어 캐시를 Actions 캐시에 둔다. Gradle 의존성 내려받기가 빌드의 대부분이라
+          # 이게 없으면 매번 처음부터 받는다.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 요약
+        run: |
+          {
+            echo "## backend 이미지 푸시 완료"
+            echo ""
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo ""
+            echo "배포는 아직 자동화돼 있지 않다 — 대상 호스트가 없다."
+            echo "수동 배포 절차는 \`docs/19-deployment.md\` 참조."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── deploy (미구현) ─────────────────────────────────────────────────────────
+  # 배포 대상이 생기면 여기에 붙인다. 필요한 것:
+  #   - 대상 호스트 접속 수단 (SSH 키 또는 SSM). GitHub Secrets 에 등록
+  #   - 호스트에 docker-compose.prod.yml 과 .env 배치
+  #   - docker compose pull && up -d (Flyway 가 부팅 시 스키마를 맞춘다 — 이슈 #115)
+  # 지금 만들어두지 않는 이유: 대상도 자격증명도 없어 검증할 수 없는 코드가 되기 때문이다.

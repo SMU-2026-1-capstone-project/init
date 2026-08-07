@@ -5,6 +5,10 @@ name: Backend tests
 # 더미값을 쓰므로, 외부 DB나 시크릿 없이 러너 단독으로 완결된다.
 
 on:
+  # CD 가 배포 전 게이트로 이 워크플로를 호출한다 (cd-backend.yml).
+  # 테스트를 복제하지 않고 같은 정의를 재사용하기 위한 트리거 — 기존 동작은 그대로다.
+  workflow_call:
+
   pull_request:
     paths:
       - 'backend/**'
