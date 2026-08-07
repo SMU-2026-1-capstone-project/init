@@ -11,6 +11,10 @@ name: AI server tests
 # 같은 순수 로직만 본다.
 
 on:
+  # CD 가 배포 전 게이트로 이 워크플로를 호출한다 (cd-ai-server.yml).
+  # 테스트를 복제하지 않고 같은 정의를 재사용하기 위한 트리거 — 기존 동작은 그대로다.
+  workflow_call:
+
   pull_request:
     paths:
       - 'ai-server/**'
