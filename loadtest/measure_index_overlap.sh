@@ -128,7 +128,7 @@ else
   for F in "${FANOUTS[@]}"; do
     USERS=$(( ROWS / F ))
     echo "   es_f${F} — 회원 ${USERS} × ${F} 세션 = ${ROWS}"
-    # 스키마는 mysql/schema.sql 의 exercise_sessions 에서 인덱스만 뺀 형태.
+    # 스키마는 V1__baseline.sql 의 exercise_sessions 에서 인덱스만 뺀 형태.
     # FK 는 만들지 않는다 — 여기서 재는 것은 보조 인덱스의 비용이고, FK 자동 인덱스는
     # 세 구성안에 공통이라 변수가 아니다. 대신 exercise_id 인덱스는 명시적으로 넣어
     # 현행과 인덱스 개수를 맞춘다.

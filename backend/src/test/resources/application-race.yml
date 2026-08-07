@@ -3,7 +3,7 @@
 # 왜 H2(기본 테스트 프로파일)로는 안 되는가:
 #   기본 테스트는 ddl-auto: create-drop 이라 Hibernate 가 엔티티에서 스키마를 만든다.
 #   PoseData 의 @ManyToOne @JoinColumn(session_id) 가 FK 제약을 생성하므로,
-#   H2 테스트 스키마에는 프로덕션(mysql/schema.sql)에 없는 FK 가 생긴다.
+#   H2 테스트 스키마에는 프로덕션(V1__baseline.sql)에 없는 FK 가 생긴다.
 #   프로덕션은 파티셔닝 때문에 FK 를 뗐다(docs/decisions/pose-data-partition-fk-tradeoff.md).
 #
 #   그래서 orphan INSERT 가 H2 에서는 참조무결성 위반으로 터지고 MySQL 에서는 조용히 들어간다.
@@ -14,7 +14,11 @@
 #   docker run -d --name shadowfit-race-mysql -e MYSQL_ROOT_PASSWORD=racetest \
 #     -e MYSQL_DATABASE=shadowfit -p 3307:3306 mysql:8.0 \
 #     --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-#   docker exec -i shadowfit-race-mysql mysql -uroot -pracetest shadowfit < mysql/schema.sql
+#   docker exec -i shadowfit-race-mysql mysql -uroot -pracetest shadowfit \
+#     < backend/src/main/resources/db/migration/V1__baseline.sql
+#
+#   (경로가 바뀐 이유: Flyway 도입으로 schema.sql 이 V1__baseline.sql 이 됐다.
+#    파일에서 CREATE DATABASE/USE 를 뺐지만 위 명령이 DB 를 지정하므로 그대로 동작한다.)
 #
 # 도는 법 (시스템 프로퍼티가 없으면 테스트 자체가 건너뛰어져 CI 는 영향 없음):
 #   ./gradlew :backend:test --tests '*PoseDataOrphanRaceTest' -Drace.mysql=true
@@ -25,9 +29,15 @@ spring:
     password: racetest
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  # Flyway 를 끈다 — 이 프로파일은 위 수동 절차로 만든 스키마를 **그대로** 관찰하는 게
+  # 목적이다. 스키마를 누가 만들었는지가 재현 결과를 바꾸진 않지만(V1 이 곧 옛 schema.sql),
+  # 재현 harness 는 변수를 늘리지 않는 편이 낫다.
+  flyway:
+    enabled: false
+
   jpa:
-    # 스키마는 mysql/schema.sql 이 만든 것을 그대로 쓴다 — 엔티티에서 생성하면
-    # 위에 적은 FK 문제가 그대로 재현된다.
+    # 스키마는 위 수동 절차(V1__baseline.sql)가 만든 것을 그대로 쓴다 — 엔티티에서
+    # 생성하면 위에 적은 FK 문제가 그대로 재현된다.
     hibernate:
       ddl-auto: none
     database-platform: org.hibernate.dialect.MySQLDialect

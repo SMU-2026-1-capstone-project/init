@@ -19,7 +19,7 @@
 #   (useServerPrepStmts=false)에서 값을 클라이언트 측에서 채워 보내므로 로그에 완성된 SQL 이
 #   남는다 — 이 전제가 깨지면 [5/7] 에서 '?' 가 보이고 스크립트가 멈춘다.
 #
-#   실 스키마를 그대로 쓴다. mysql/schema.sql 을 DB 이름만 바꿔 통째로 적용하므로, 컬럼 타입·
+#   실 스키마를 그대로 쓴다. V1__baseline.sql 을 스크래치 DB 지정만 얹어 통째로 적용하므로, 컬럼 타입·
 #   길이·인덱스가 실테이블과 어긋날 여지가 없다. (앞선 rig 는 스크래치 테이블을 손으로 다시
 #   써서, 실테이블 인덱스 하나를 빠뜨린 채 측정한 이력이 있다 — §4-2 결함 #1)
 #
@@ -66,19 +66,29 @@ echo "스크래치 DB ${DB_NAME} / 회원 ${USERS}"
 echo
 
 # ── [1/7] 실 스키마를 DB 이름만 바꿔 적용 ─────────────────────────────────────
-# schema.sql 은 CREATE DATABASE shadowfit / USE shadowfit 을 안에 박고 있다. 그대로 파이프하면
-# 실 DB 에 붙는다. 두 줄만 정확히 치환하고, 치환이 실제로 일어났는지 확인한 뒤에만 적용한다
-# — 스키마 파일이 바뀌어 패턴이 안 맞는데 조용히 넘어가면 실 DB 를 건드리게 된다.
-echo "## [1/8] 스크래치 DB 생성 — mysql/schema.sql 원본 적용"
-sed -e "s/^CREATE DATABASE IF NOT EXISTS shadowfit;/CREATE DATABASE IF NOT EXISTS ${DB_NAME};/" \
-    -e "s/^USE shadowfit;/USE ${DB_NAME};/" \
-    "${REPO_ROOT}/mysql/schema.sql" > "$WORK/schema.sql"
+# 스키마 정본은 V1__baseline.sql(구 mysql/schema.sql)이다 — Flyway 도입으로 위치가 바뀌었다(이슈 #115).
+#
+# 예전 이 자리는 파일 안의 CREATE DATABASE shadowfit / USE shadowfit 두 줄을 sed 로 치환했다.
+# 이제 그 두 줄이 파일에 없다 — Flyway 는 이미 연결된 DB 위에서 실행하므로 마이그레이션이
+# DB 를 고르면 안 되기 때문이다. 그래서 치환이 아니라 **앞에 붙인다.**
+#
+# 안전장치는 유지한다: 붙인 결과에 실 DB 를 가리키는 줄이 하나라도 있으면 중단한다.
+# 스키마 파일이 바뀌어 USE shadowfit 이 다시 생겼는데 조용히 넘어가면 실 DB 를 건드리게 된다.
+BASELINE="${REPO_ROOT}/backend/src/main/resources/db/migration/V1__baseline.sql"
+echo "## [1/8] 스크래치 DB 생성 — V1__baseline.sql 원본 적용"
 
-if ! grep -q "^CREATE DATABASE IF NOT EXISTS ${DB_NAME};" "$WORK/schema.sql" \
-   || ! grep -q "^USE ${DB_NAME};" "$WORK/schema.sql"; then
-  echo "!! schema.sql 의 DB 지정 라인을 치환하지 못했다. 원본이 바뀌었는지 확인할 것." >&2
+if [ ! -f "$BASELINE" ]; then
+  echo "!! 스키마 정본을 찾지 못했다: $BASELINE" >&2
+  echo "   마이그레이션 파일이 옮겨졌는지 확인할 것." >&2
   exit 1
 fi
+
+{
+  echo "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
+  echo "USE ${DB_NAME};"
+  cat "$BASELINE"
+} > "$WORK/schema.sql"
+
 if grep -qE "^(USE|CREATE DATABASE IF NOT EXISTS) shadowfit;" "$WORK/schema.sql"; then
   echo "!! 실 DB(shadowfit) 를 가리키는 라인이 남아 있다. 중단한다." >&2
   exit 1

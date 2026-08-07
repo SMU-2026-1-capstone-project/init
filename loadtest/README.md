@@ -26,7 +26,12 @@
    ghz 가 reflection 으로 스키마 자동 인식 → proto 파일·import 경로 지정 불필요.
 2. **세션 row 존재** — `batch.json` 의 `sessionId`(기본 801)가 DB 에 있어야 함
    ([`PoseDataService.savePoseDataBatch`](../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java) 가 `findById` 로 세션 먼저 조회 → 없으면 `SESSION_NOT_FOUND`).
-   더미 801 은 [`mysql/data.sql`](../mysql/data.sql) 에 seed 됨.
+   더미 801 은 [`mysql/dev-seed.sql`](../mysql/dev-seed.sql) 에 있다.
+   ⚠️ **자동으로 안 들어간다** — Flyway 도입(이슈 #115) 후 initdb 마운트가 없어졌고, 이 픽스처는
+   마이그레이션에서 일부러 제외했다(배포 환경에 가면 안 되는 데이터라서). 부하테스트 전에 직접 넣을 것:
+   ```bash
+   docker exec -i shadowfit-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit < mysql/dev-seed.sql
+   ```
 3. **`INTERNAL_API_TOKEN`** — 서버와 동일 값. 인증은 메타데이터 `authorization: Bearer <token>`
    ([`InternalAuthInterceptor`](../backend/src/main/java/com/shadowfit/global/config/InternalAuthInterceptor.java)).
 4. **ghz 설치** — 아래.

@@ -12,13 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,9 +35,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p><b>왜 이 테스트가 따로 필요한가.</b> 나머지 테스트는 이 부류를 <b>구조적으로 못 잡는다.</b>
  * 테스트 DB 는 {@code ddl-auto: create-drop}({@code src/test/resources/application.yml}) 이라
- * 스키마를 <b>Java 엔티티에서 생성</b>한다. 즉 Java 와 {@code mysql/schema.sql} 이 어긋나도
+ * 스키마를 <b>Java 엔티티에서 생성</b>한다. 즉 Java 와 마이그레이션 정본({@code V1__baseline.sql})이 어긋나도
  * 테스트 쪽에는 언제나 Java 기준 스키마가 만들어져 초록불이 뜬다. 스키마 소스가 둘인데
- * 테스트는 한쪽만 본다 — 이 테스트만 나머지 한쪽인 {@code schema.sql} 을 직접 읽는다.
+ * 테스트는 한쪽만 본다 — 이 테스트만 나머지 한쪽인 마이그레이션 파일을 직접 읽는다.
  *
  * <p><b>어긋나면 무슨 일이 나는가.</b> 엔티티가 {@code @Enumerated(EnumType.STRING)} 이라
  * 상수 이름이 그대로 저장된다. ENUM 목록에 없는 문자열은
@@ -136,26 +135,31 @@ class SchemaEnumConsistencyTest {
                 .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
     }
 
+    /** 스키마 정본. Flyway 도입 전에는 {@code mysql/schema.sql} 이었다 (이슈 #115). */
+    private static final String BASELINE_RESOURCE = "/db/migration/V1__baseline.sql";
+
     /**
-     * {@code mysql/schema.sql} 을 찾아 읽는다. 테스트 작업 디렉터리는 Gradle 이 {@code backend/} 로
-     * 잡지만 IDE 는 저장소 루트로 잡기도 해서 위로 거슬러 올라가며 찾는다.
+     * 스키마 정본을 <b>클래스패스에서</b> 읽는다.
+     *
+     * <p>예전에는 작업 디렉터리에서 위로 거슬러 올라가며 {@code mysql/schema.sql} 을 찾았다 —
+     * Gradle 은 {@code backend/} 를, IDE 는 저장소 루트를 작업 디렉터리로 잡아서였다.
+     * Flyway 도입으로 정본이 {@code src/main/resources} 아래로 들어오면서 그 탐색이 필요
+     * 없어졌다. 리소스로 잡으면 작업 디렉터리와 무관하게 항상 같은 파일을 읽는다.
      *
      * <p>못 찾으면 <b>실패</b>시킨다 — 조용히 건너뛰면 가드가 사라진 줄도 모른다.
      */
     private static List<String> readSchemaLines() {
-        Path dir = Paths.get("").toAbsolutePath();
-        List<Path> tried = new ArrayList<>();
-        for (int depth = 0; depth < 5 && dir != null; depth++, dir = dir.getParent()) {
-            Path candidate = dir.resolve("mysql").resolve("schema.sql");
-            tried.add(candidate);
-            if (Files.isRegularFile(candidate)) {
-                try {
-                    return Files.readAllLines(candidate, StandardCharsets.UTF_8);
-                } catch (IOException e) {
-                    throw new UncheckedIOException("schema.sql 을 읽지 못했다: " + candidate, e);
-                }
+        try (InputStream in = SchemaEnumConsistencyTest.class.getResourceAsStream(BASELINE_RESOURCE)) {
+            if (in == null) {
+                throw new AssertionError(
+                        BASELINE_RESOURCE + " 을 클래스패스에서 찾지 못했다. 마이그레이션 파일이 옮겨졌거나 "
+                                + "이름이 바뀌었는지 확인할 것 — 이 테스트가 보는 유일한 스키마 소스다.");
             }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                return reader.lines().toList();
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(BASELINE_RESOURCE + " 을 읽지 못했다", e);
         }
-        throw new AssertionError("mysql/schema.sql 을 찾지 못했다. 찾아본 경로: " + tried);
     }
 }

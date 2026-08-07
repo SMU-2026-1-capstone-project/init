@@ -14,10 +14,20 @@ spring:
     password:
     driver-class-name: org.h2.Driver
 
-  # MySQL 전용 schema.sql 실행 비활성화. JPA가 엔티티 기반으로 스키마 생성.
+  # MySQL 전용 초기화 스크립트 비활성화. JPA가 엔티티 기반으로 스키마 생성.
   sql:
     init:
       mode: never
+
+  # Flyway 비활성화 — 테스트는 H2 이고 마이그레이션은 MySQL 전용 DDL(파티셔닝·ENUM·
+  # AUTO_INCREMENT 등)이라 그대로 돌면 깨진다. 테스트 DB 는 종전대로 ddl-auto:
+  # create-drop 이 엔티티에서 만든다.
+  #
+  # ⚠️ 이 구조의 한계는 그대로다 — 테스트는 언제나 "Java 기준" 스키마를 보므로
+  #    엔티티와 마이그레이션이 어긋나도 초록불이 뜬다. 그 틈을 좁히는 게
+  #    SchemaEnumConsistencyTest 다 (ENUM 한정). schema-migration-tracking.md §1 참조.
+  flyway:
+    enabled: false
 
   jpa:
     open-in-view: false

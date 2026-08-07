@@ -17,7 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * pose_data TTL 자동 만료 — 월별 RANGE 파티션(mysql/schema.sql)에서 보존 기간이 지난 과거
+ * pose_data TTL 자동 만료 — 월별 RANGE 파티션(V1__baseline.sql)에서 보존 기간이 지난 과거
  * 파티션을 DROP PARTITION으로 폐기하고(DELETE 대비 ~625배, realmysql-experiments.md §4②d),
  * pfuture가 실데이터를 떠안지 않도록 미래 파티션을 미리 만들어둔다.
  *
