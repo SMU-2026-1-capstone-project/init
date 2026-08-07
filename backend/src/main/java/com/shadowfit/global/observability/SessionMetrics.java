@@ -38,6 +38,12 @@ public class SessionMetrics {
     /** 통보 지연 — 행 생성(created_at)부터 전달 성공(sent_at)까지. */
     private static final String OUTBOX_LAG = "shadowfit.outbox.lag";
 
+    /** 세션이 사라졌는데 남아 있는 pose_data 행 수 게이지 (이슈 #87). */
+    private static final String POSE_ORPHANS = "shadowfit.pose.orphan.rows";
+
+    /** 세션 검증 통과부터 커밋까지 — 고아가 생길 수 있는 창의 폭 (이슈 #87). */
+    private static final String POSE_ORPHAN_WINDOW = "shadowfit.pose.orphan.window";
+
     private final MeterRegistry registry;
 
     public SessionMetrics(MeterRegistry registry) {
@@ -99,6 +105,45 @@ public class SessionMetrics {
     /** 통보 지연(생성→전달). 폴링 간격이 실제 지연에 얼마나 반영되는지 본다. */
     public void outboxLag(java.time.Duration lag) {
         registry.timer(OUTBOX_LAG).record(lag);
+    }
+
+    /**
+     * 고아 {@code pose_data} 행 수 게이지 (이슈 #87). 세션 검증과 INSERT 사이에 회원 탈퇴가
+     * 끼어들면 정리 경로를 빠져나간 행이 남는데, <b>지금은 그 일이 실제로 나는지 볼 수단이 없다.</b>
+     * 결함의 발생 빈도를 모르면 "핫패스에 상시 락을 얹을 만한가"(수정안 ㄱ)를 판단할 근거가 없어,
+     * 고치기 전에 세는 것부터 한다.
+     *
+     * <p><b>{@link #registerOutboxPendingGauge} 와 달리 supplier 가 DB 를 직접 치지 않는다.</b>
+     * 적체 게이지는 인덱스 조회라 스크레이프마다 물어봐도 되지만, 이쪽은 대용량 테이블
+     * anti-join 이라 스크레이프 주기로 돌리면 그 자체가 부하다. 그래서 supplier 는 스케줄러가
+     * 미리 채워둔 값을 읽기만 한다 — 게이지 값에 <b>최대 갱신 주기만큼의 지연</b>이 있다는 뜻이고,
+     * 드물게 발생하는 사건을 세는 용도라 그 지연은 무해하다.
+     */
+    public void registerPoseOrphanGauge(java.util.function.Supplier<Number> supplier) {
+        io.micrometer.core.instrument.Gauge.builder(POSE_ORPHANS, supplier)
+                .description("세션이 없는데 남아 있는 pose_data 행 수 (최근 갱신값)")
+                .register(registry);
+    }
+
+    /**
+     * 고아가 생길 수 있는 <b>창의 폭</b> — 세션 검증 통과부터 커밋까지 (이슈 #87).
+     *
+     * <p>게이지({@link #registerPoseOrphanGauge})가 "실제로 몇 건 났나"를 센다면 이쪽은
+     * <b>"날 수 있는 구간이 얼마나 넓나"</b>를 잰다. 둘을 곱해야 빈도 상한이 나오고, 그 상한이
+     * 있어야 수정안(락은 비용이 확실한데 이득이 불확실)을 저울질할 수 있다.
+     *
+     * <p><b>끝점이 INSERT 가 아니라 커밋인 이유.</b> 탈퇴 쪽 정리가 우리 커밋 <i>뒤에</i> 돌면
+     * 우리 행까지 같이 지워져 고아가 안 남는다. 위험한 구간은 검증 통과부터 커밋 직전까지다.
+     *
+     * <p>백분위를 함께 발행한다 — 평균은 이 용도에 쓸모없다. 창이 대부분 짧고 가끔 길다면
+     * 확률을 지배하는 건 그 꼬리이지 평균이 아니기 때문이다.
+     */
+    public void poseOrphanWindow(java.time.Duration window) {
+        io.micrometer.core.instrument.Timer.builder(POSE_ORPHAN_WINDOW)
+                .description("세션 검증 통과 → 커밋. 이 구간에 탈퇴가 겹치면 고아 행이 남는다")
+                .publishPercentiles(0.5, 0.9, 0.95, 0.99)
+                .register(registry)
+                .record(window);
     }
 
     /** 수신 프레임 수와 다운샘플 후 저장 행수를 함께 기록 — 실측 R값이 의도대로 나오는지 관측. */

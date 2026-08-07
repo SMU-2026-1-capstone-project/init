@@ -126,10 +126,17 @@ sourceSets {
 	tasks.named('test') {
 		useJUnitPlatform()
 
-		// -Dexplain.capture=true 를 테스트 JVM 까지 넘긴다. gradlew 에 준 -D 는 Gradle 자신의
-		// JVM 에만 붙어서, 그대로 두면 @EnabledIfSystemProperty 가 테스트 쪽에서 못 본다.
-		// 기본값이 없으므로 평소에는 프로퍼티 자체가 없고, 해당 측정 장치는 조용히 건너뛴다.
-		// (AdminMemberExplainCaptureTest — loadtest/measure_admin_filter_explain.sh 전용)
+		// 아래 둘은 같은 문제의 서로 다른 사례다 — gradlew 에 준 -D 는 Gradle 자신의 JVM 에만
+		// 붙고 포크된 테스트 JVM 으로 자동 전달되지 않아, 그대로 두면 @EnabledIfSystemProperty 가
+		// 테스트 쪽에서 못 보고 **조용히 스킵**된다. 둘 다 기본값이 없으므로 평소에는 프로퍼티
+		// 자체가 없고 해당 테스트만 건너뛴다.
+
+		// 레이스 재현 테스트(PoseDataOrphanRaceTest)는 실제 MySQL(3307)이 필요하다.
+		if (System.getProperty('race.mysql') != null) {
+			systemProperty 'race.mysql', System.getProperty('race.mysql')
+		}
+
+		// AdminMemberExplainCaptureTest — loadtest/measure_admin_filter_explain.sh 전용.
 		if (System.getProperty('explain.capture') != null) {
 			systemProperty 'explain.capture', System.getProperty('explain.capture')
 		}
