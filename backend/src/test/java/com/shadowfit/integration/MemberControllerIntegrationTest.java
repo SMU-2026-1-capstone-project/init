@@ -71,6 +71,22 @@ class MemberControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("회원가입 — sex 가 실제로 저장된다 (받기만 하고 버리던 것 수정)")
+    void signup_persistsSex() throws Exception {
+        // FEMALE 로 검증한다 — 이 상수가 스키마 ENUM 과 어긋나 있던(FEAMALE) 값이라
+        // 철자 정정이 되돌려지면 여기가 같이 깨진다. 스키마 대조는 SchemaEnumConsistencyTest.
+        MemberRequestDto dto = new MemberRequestDto("sexuser", "sex@test.com", "pw1234", Sex.FEMALE, UserRole.USER);
+
+        mockMvc.perform(post("/member/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk());
+
+        Member saved = memberRepository.findByEmail("sex@test.com").orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(saved.getSex()).isEqualTo(Sex.FEMALE);
+    }
+
+    @Test
     @DisplayName("로그인 성공 — 토큰 반환")
     void login_success_returnsTokens() throws Exception {
         LoginRequestDto dto = new LoginRequestDto(member.getEmail(), "password123");

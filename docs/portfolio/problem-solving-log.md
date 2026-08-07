@@ -1,6 +1,6 @@
 # 포폴: 문제해결 경험 로그 (3~10월)
 
-작성: 2026-06-02
+작성: 2026-06-02 · 갱신: 2026-08-07 (#10·#11 추가, §3 다섯 개 구현 확인)
 대상: 백엔드(Spring) 신입 포폴. 프로젝트 기간(2026-03~10) 동안 **본인이 실제로 해결한 문제**를 problem→root cause→solution→result→면접답변 형식으로 박제.
 연관: [`./db-deep-dive.md`](./db-deep-dive.md), [`../tasks/25-portfolio-strategy.md`](../tasks/25-portfolio-strategy.md), [`../decisions/load-test-strategy.md`](../decisions/load-test-strategy.md)
 
@@ -77,17 +77,70 @@
 ### #9 🟡 LocalDateTime 직렬화
 - `write-dates-as-timestamps=false`로 LocalDateTime ISO string 직렬화 정정 (commit 2026-05-31). 직렬화 계약 일관성. 소형.
 
+### #10 🔴 측정 데이터가 재려던 성질을 갖고 있지 않았다 (2026-08-06~07)
+
+**#6 과 같은 계열이되 한 층 아래다.** #6 은 *절차*(워밍업)가 틀렸고, 여기는 *데이터*가 틀렸다. 절차를 아무리 정확히 해도 안 잡힌다.
+
+- **문제**: 관리자 세션 목록의 필터 조합별 실행 계획을 쟀는데, **"핵심"이라고 지목해둔 조합(상태+검색어)의 결과가 0건**이었다. 계획(`type`·`key`·`Extra`)은 멀쩡해 보였고 스크립트는 매번 성공했다.
+- **Root cause**: 시딩 SQL 두 줄이 같은 변수의 함수였다.
+  ```text
+  member_id = 1 + (n % 200000)
+  status    = ELT(1 + (n % 4), ...)     ← 200000 % 4 == 0
+  ```
+  `n mod 4` 가 `member_id` 로 **완전히 결정**되어 **회원 20만 중 19만 9,920명(99.96%)이 평생 한 가지 상태의 세션만** 가졌다. 검색어에 걸리는 회원 2,000명이 전부 COMPLETED 라 `FAILED × kim` 이 **구조적으로 0건**.
+- **Solution — 한 번에 안 고쳐졌다.** `CRC32` 로 바꿨는데 그것도 틀렸다. CRC32 는 GF(2) 위에서 선형이라 등차 입력의 구조가 하위 비트에 남는다:
+
+  | 오프셋 | CRC32 | MD5 | 무작위 기대 |
+  |---|--:|--:|--:|
+  | n vs n+1 | 0.0044 | 0.2508 | 0.25 |
+  | **n vs n+200,000** | 🔴 **0.0000** | 0.2524 | 0.25 |
+
+  `n vs n+200,000 = 0.0000` — **회원의 연속된 세션이 절대 같은 상태가 될 수 없다.** 종속이 사라진 게 아니라 방향만 뒤집혔다. `MD5` 로 재교체.
+- **Result**:
+  - 시딩 결함 **3건** 정정 (`status`·`start_time` 종속, `CROSS JOIN` 오용으로 모든 행이 2벌)
+  - 재측정으로 **미측정으로 남아 있던 3건**이 닫혔다 — 드라이빙 테이블은 `users`, 조건부 조인은 **SQL 을 줄이지 않음**(Hibernate 가 안 쓰는 to-one 조인을 이미 지운다 — 반사실과 SQL 이 글자 그대로 같았다), 6번째 인덱스의 쓰기 대가는 실제 삽입 패턴에서 **1.007배**
+  - 재발 방지로 **시딩 자기검증 7종** 추가 — 하나라도 실패하면 측정을 시작하지 않는다
+- **면접 (이 카드의 핵심)**:
+  - *"0건을 잡아낸 건 `EXPLAIN` 이 아니라 **결과값에 대한 의심**이었습니다. 계획만 보면 `type`·`key` 가 멀쩡했거든요. 실행 계획을 읽기 전에 결과가 말이 되는지부터 봐야 한다는 걸 그때 배웠습니다."*
+  - *"CRC32 로 고친 판도 틀렸는데, **고쳤는지를 다시 쟀기 때문에** 드러났습니다. '고쳤다'고 선언하기 전에 고쳐졌는지 재는 것까지가 수정이라고 봅니다."*
+  - *"CRC32 가 나쁜 함수라서가 아니라 **목적이 다른 갈래에서 빌려왔기** 때문입니다. 오류 검출용 체크섬을 값 분산에 쓴 거고, 그 선형성이 네트워크에선 장점인데 여기선 정확히 약점이었습니다."* → [`hash-function-selection.md`](../decisions/hash-function-selection.md)
+- **곁가지 — 교과서 값 하나를 반증했다**: *"무작위 삽입은 B+tree 페이지를 50:50 으로 쪼개 채움률이 ln2≈69% 로 떨어진다"* 고 적었다가, 단일 인덱스 20만 행으로 재보니 순차·무작위 **모두 289 페이지**였다. `innodb_change_buffering='none'` 으로 꺼도 같았다. **이유는 규명하지 못해 미규명으로 남겼다** — 다른 메커니즘을 추측해 채우지 않았다.
+- **근거**: [`admin-page-scope.md`](../decisions/admin-page-scope.md) §4-2(결함 #4·#5·#6)·§4-4-1·§4-5-1, [`hash-function-selection.md`](../decisions/hash-function-selection.md), PR [#107](https://github.com/Shadowfit/init/pull/107), 이슈 [#108](https://github.com/Shadowfit/init/issues/108)·[#109](https://github.com/Shadowfit/init/issues/109)·[#110](https://github.com/Shadowfit/init/issues/110)
+
+### #11 🟠 측정 장치가 측정 대상을 바꾸고 있었다 (2026-08-06)
+
+- **문제**: 실행 계획 캡처를 돌릴 때마다 스크래치 DB 의 세션 상태가 조금씩 달라졌다.
+- **Root cause**: 캡처 장치가 `@SpringBootTest` 라 **전체 컨텍스트**가 뜨고, 거기 포함된 `SessionTimeoutScheduler` 가 시딩된 `IN_PROGRESS` 세션을 실제로 `FAILED` 로 UPDATE 했다. 1회 실행에 160건, **오염량은 테스트가 도는 시간에 비례**.
+- **Solution**: `scheduling.enabled` 프로퍼티로 스케줄링을 끌 수 있게 하고(기본값 켜짐 — 운영 동작 불변) 캡처 장치 3종에서 껐다. **주기 프로퍼티로는 못 막는다** — `initialDelay` 가 30초 고정이라 한 번은 반드시 돌고, 그 한 번이 `findByStatus(IN_PROGRESS)` 로 25만 엔티티를 메모리에 올린다.
+- **면접**: *"측정 장치가 측정 대상을 바꾸면 그 결과는 무효인데, 이건 실행이 성공하니까 신호가 없습니다. 로그에 스케줄러 WARN 이 찍힌 걸 보고 알았습니다."*
+- **근거**: [`admin-page-scope.md`](../decisions/admin-page-scope.md) §4-2 결함 #4, 이슈 [#108](https://github.com/Shadowfit/init/issues/108)
+
+> 📌 **#6 · #10 · #11 을 묶으면 하나의 서사가 된다** — "측정을 믿기 전에 측정 장치를 믿을 수 있는지 확인한다." 층이 각각 **절차(워밍업) → 데이터(분포) → 장치(부작용)** 로 내려간다. 세 개를 따로 말하는 것보다 이 순서로 엮는 편이 세다.
+
 ---
 
-## 3. 개발 예정 카드 (6~8월, 만들면 스토리)
+## 3. 개발 예정 카드 → ✅ **다섯 개 전부 구현됨** (2026-08-07 확인)
+
+이 절은 2026-06-02 에 "만들면 스토리"로 적어둔 것인데, **다섯 개가 다 끝났다.** 코드로 확인한 위치를 같이 적는다 — 카드로 승격하려면 각각 *problem → root cause → solution → result* 형식으로 §2 에 옮겨야 한다(아래 ⚠️).
+
+| 카드 | 성격 | 상태 · 코드 위치 |
+|---|---|---|
+| **읽기 최적화 (projection)** | 🔴 헤드라인 | ✅ `PoseDataRepository:29` `PoseFrameProjection`(3컬럼). 실측 payload **−98.7%**, warm 쿼리 8x ([`report-read-path.md`](../decisions/report-read-path.md) ①) |
+| **일일 집계 lost-update** | 🟠 동시성 | ✅ `DailyLogRepository:30` `ON DUPLICATE KEY UPDATE` 원자 upsert. 재현·비교는 `loadtest/measure_lock.sh`(scratch `lock_lab`) |
+| **report 생성 멱등성** | 🟠 정합성 | ✅ `mysql/schema.sql:204` `UNIQUE KEY uk_report_session (session_id)` |
+| **파티셔닝 + TTL** | 시계열 운영 | ✅ `mysql/schema.sql:148` `PARTITION BY RANGE(UNIX_TIMESTAMP(created_at))` + 자동 운영 스케줄러. **DROP PARTITION 625배** 실측 |
+| **Resilience4j** | 운영 신뢰성 | ✅ `ExerciseAnalysisService:83` `aiCircuitBreaker()` + gRPC deadline |
+
+> ⚠️ **"구현됨"과 "카드가 됨"은 다르다.** 위 다섯은 코드가 있다는 것까지만 확인했고, §2 카드들처럼 **문제 → 원인 → 해결 → 수치**로 정리된 상태가 아니다. 특히 *일일 집계 lost-update* 와 *report 멱등성* 은 **"경합이 실제로 일어나 손실이 났다"는 재현 근거**가 카드에 필요한데, 지금은 scratch 테이블 실험(`measure_lock.sh`)만 있고 실코드 경로의 사례가 아니다. 면접에서 "실제로 겪었나"를 물으면 갈린다.
+
+### 3-1. 다음에 만들 카드 (미착수)
 
 | 카드 | 성격 | 비고 |
 |---|---|---|
-| 🔶 **읽기 최적화 (projection)** | 🔴 헤드라인 | `ReportService` JSON blob 헛로드 → 3컬럼 DTO. payload 3MB→0.05MB ([`db-deep-dive §2-B`](./db-deep-dive.md)) |
-| 🔶 **일일 집계 lost-update** | 🟠 동시성 | `DailyLog.updateStats()` 배선 → 동시 종료 경합 → 원자 UPDATE/락 |
-| 🔶 **report 생성 멱등성** | 🟠 정합성 | session_id 유니크/upsert로 중복 리포트 방어 |
-| ⬜ **파티셔닝 + TTL** | 시계열 운영 | 월 Range + DROP PARTITION ([`db-deep-dive §2-D`](./db-deep-dive.md)) |
-| ⬜ **Resilience4j** | 운영 신뢰성 | Spring→FastAPI Circuit Breaker |
+| ⬜ **CD 워크플로 + 배포** | 운영 | 남은 4덩어리 중 하나 ([`../tasks/28-remaining-work-plan.md`](../tasks/28-remaining-work-plan.md) §2) |
+| ⬜ **외부 통합 1개** (S3 / OAuth2) | 키워드 | 〃 |
+| ⬜ **Prometheus + Grafana** | 실험 관측 | 부하 실험 중 시계열을 남길 수단 — [`§1-1`](#1-1-채점-중-정정된-것-같은-오류-반복-방지용) 이 "남는 감점"으로 지목한 항목 |
+| 🔶 **인덱스 구성 재설계** | 🔴 DB 깊이 | `member_id` 선두 3종이 겹치는지 + 6번째를 얹을지. 오늘 양방향 증거가 하나씩 나옴(이슈 [#110](https://github.com/Shadowfit/init/issues/110)) |
 
 ---
 

@@ -261,6 +261,55 @@ AI = 운동 통계의 단일 진실 원천 원칙. (커밋 143a2e4)
 }
 ```
 
+### GET /admin/members - 회원 목록 조회 (2026-08 추가)
+관리자 권한(`ROLE_ADMIN`) 필수. 필터 5종의 **임의 조합**(32가지) + 정렬 3종 + offset 페이징.
+
+| 파라미터 | 기본값 | 설명 |
+|---|---|---|
+| `keyword` | — | `username`/`email` 부분일치. ⚠️ 선행 와일드카드라 인덱스 탐색 불가 |
+| `persona` · `workoutLevel` · `onboardingCompleted` | — | 등치 필터 |
+| `joinedFrom` · `joinedTo` | — | 가입일 범위(`joinedTo` 는 그날 포함) |
+| `sort` | `CREATED_AT` | 화이트리스트 enum |
+| `asc` | `false` | 최신순 기본 |
+| `page` · `size` | `0` · `20` | `size` 최대 100 |
+
+```json
+// Response 200 — PageResponse<AdminMemberListItemDto>
+{ "content": [ { "id": 1, "username": "...", "email": "...", "selectedPersona": "BEGINNER",
+                 "workoutLevel": "STARTER", "onboardingCompleted": true, "createdAt": "..." } ],
+  "page": 0, "size": 20, "totalElements": 1234, "totalPages": 62 }
+```
+
+### GET /admin/sessions - 세션 목록 조회 (2026-08 추가)
+관리자 권한 필수. `exercise_sessions ⋈ users ⋈ exercises` 조인. 필터 4종 + 정렬 3종.
+
+| 파라미터 | 설명 |
+|---|---|
+| `status` | 세션 상태 등치 |
+| `exerciseId` | 운동 종목 |
+| `startedFrom` · `startedTo` | 시작 시각 범위 |
+| `keyword` | **회원** `username`/`email` 부분일치 (조인 너머) |
+| `sort` | `START_TIME`(기본) / `AVG_SYNC_RATE` / `TOTAL_REPS` — 2차 정렬로 `id` 고정 |
+
+### GET /admin/stats/overview - 대시보드 통계 (2026-08 추가)
+관리자 권한 필수. 위젯 5종을 **실시간 집계**로 반환(사전집계·캐시 없음).
+
+```json
+// Response 200
+{ "todaySessionCount": 2653, "sessionStatusDistribution": { "COMPLETED": 500000, "FAILED": 249554, "IN_PROGRESS": 250446 },
+  "averageSyncRate": 75.0, "newMemberCount": 548, "activeMemberCount": 19019 }
+```
+
+> 📌 **세 API 의 설계 근거·실측은 [`decisions/admin-page-scope.md`](./decisions/admin-page-scope.md).**
+> 인덱스 커버리지(§4-3), 드라이빙 테이블(§4-4-1), 집계 비용(§4-5) 이 거기 있다.
+>
+> 🔶 **총건수(`totalElements`)는 `LIMIT` 이 없어 조건에 맞는 행을 전부 센다.** 대부분의 필터
+> 조합에서 전수 스캔이고, 이건 **감수하기로 한 것**(㉮)이다 — 페이지 번호 UI 를 그리려면
+> 필요하고, 무한 스크롤로 정해지면 keyset 을 얹으면서 안 부르면 된다(§4-3 "2026-08-06").
+>
+> 🔶 **대시보드는 b(상태별 분포)·e(활성 회원) 둘이 비용의 대부분**이다(실측 각각 ~357ms /
+> ~307ms, 나머지 셋 합쳐 5ms 미만). 캐시·인덱스 도입은 미결(§4-5-1 ④).
+
 ## 내부 API (AI ↔ Spring, gRPC 단일 채널)
 
 > **2026-05-26 갱신**: AI → Spring 내부 호출은 *전부 gRPC* 로 통일. `Authorization: Bearer {INTERNAL_API_TOKEN}` (metadata) 로 인증. REST `/internal/*` endpoint 는 폐기됨 (기존 `POST /internal/feedback/batch` → `ExerciseService.ReportFeedbackBatch`). proto 정의는 `backend/src/main/proto/exercise.proto`. 박제: [`./decisions/tts-design.md`](./decisions/tts-design.md) 상단 박스.

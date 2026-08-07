@@ -31,15 +31,18 @@ public class SessionTimeoutScheduler {
     private final SessionRepository sessionRepository;
     private final SessionService sessionService;
     private final SessionMetrics sessionMetrics;
+    private final Integer idleMinutes;
     private final Integer defaultBufferMinutes;
 
     public SessionTimeoutScheduler(SessionRepository sessionRepository,
                                    SessionService sessionService,
                                    SessionMetrics sessionMetrics,
+                                   @Value("${exercise.session.timeout.idle-minutes:10}") Integer idleMinutes,
                                    @Value("${exercise.session.timeout.default-buffer-minutes:30}") Integer bufferMinutes) {
         this.sessionRepository = sessionRepository;
         this.sessionService = sessionService;
         this.sessionMetrics = sessionMetrics;
+        this.idleMinutes = idleMinutes;
         this.defaultBufferMinutes = bufferMinutes;
     }
 
@@ -80,15 +83,18 @@ public class SessionTimeoutScheduler {
             for (Session session : inProgressSessions) {
                 // 식은 Session 이 갖는다 — 재부착 허용 판정(SessionService.findReattachableSession)이
                 // 같은 식을 써야 두 기준이 어긋나지 않는다(이슈 #59 2단계).
-                LocalDateTime timeoutThreshold = session.timeoutThreshold(defaultBufferMinutes);
+                LocalDateTime timeoutThreshold = session.timeoutThreshold(idleMinutes, defaultBufferMinutes);
 
-                if (!session.isTimedOutAt(now, defaultBufferMinutes)) {
+                if (!session.isTimedOutAt(now, idleMinutes, defaultBufferMinutes)) {
                     continue;
                 }
 
                 try (CorrelationIds.Scope perSession = CorrelationIds.withSession(session.getId())) {
                     try {
-                        boolean changed = sessionService.markAsFailedIfStillInProgress(session.getId(), now);
+                        // notifyAi=true — 걷어가는 세션은 AI 에 상태가 살아있을 수 있다. 통보하지
+                        // 않으면 그 상태가 프로세스 재시작까지 남고, CompleteAnalysis 가 오지 않아
+                        // pose_data 에 rep 이 있는데도 리포트가 안 만들어진다 (이슈 #98).
+                        boolean changed = sessionService.markAsFailedIfStillInProgress(session.getId(), now, true);
                         if (changed) {
                             log.warn("세션 타임아웃 처리 - 세션 ID: {}, 멤버: {}, 운동: {}, 시작시간: {}, 타임아웃기준: {}",
                                     session.getId(),

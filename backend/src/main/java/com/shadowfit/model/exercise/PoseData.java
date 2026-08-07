@@ -61,4 +61,16 @@ public class PoseData {
 
     @Column(length = 500)
     private String feedbackMessage; // AI가 주는 실시간 피드백
+
+    /**
+     * DB가 채우는 적재 시각({@code DEFAULT CURRENT_TIMESTAMP}). 월별 RANGE 파티션의 키이자,
+     * "이 세션이 실제로 살아있는가"의 판정 근거다(MemberService.deleteAccount — 유입이 끊기면
+     * 죽은 세션으로 본다, docs/decisions/withdrawal-with-active-session.md §3-2).
+     *
+     * <p>{@code insertable=false, updatable=false} — 실제 쓰기는 {@code PoseDataService} 의
+     * JdbcTemplate 배치가 담당하고 값은 DB DEFAULT 가 채운다. JPA 가 쓰지 못하게 막아 두 경로가
+     * 어긋나지 않게 한다. 이 매핑은 <b>읽기 전용</b>이다.
+     */
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private java.time.LocalDateTime createdAt;
 }

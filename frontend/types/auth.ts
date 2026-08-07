@@ -1,7 +1,7 @@
 // 백엔드 DTO 기준 (com.shadowfit.dto.login, com.shadowfit.model.member.UserRole, Sex)
 
 export type UserRole = 'ADMIN' | 'USER';
-export type Sex = 'MALE' | 'FEAMALE' | 'NONE'; // 백엔드 enum 오타 그대로 사용
+export type Sex = 'MALE' | 'FEMALE' | 'NONE'; // 백엔드 enum 오타(FEAMALE) 수정에 맞춰 정정 — issue #106 계열
 
 // 백엔드 LoginRequestDto
 export interface LoginRequest {

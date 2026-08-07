@@ -66,4 +66,23 @@ public interface PoseDataRepository extends JpaRepository<PoseData, Long> {
     @Modifying
     @Query("DELETE FROM PoseData p WHERE p.session.id IN :sessionIds")
     void deleteBySessionIdIn(@Param("sessionIds") List<Long> sessionIds);
+
+    /**
+     * 이 세션들에 {@code since} 이후 들어온 프레임이 있는지 — <b>"실제로 운동 중인가"</b>의 판정
+     * (MemberService.deleteAccount, docs/decisions/withdrawal-with-active-session.md §3-2).
+     *
+     * <p><b>왜 세션 상태가 아니라 이걸 보나.</b> {@code IN_PROGRESS} 는 앱이 죽으면 갱신되지 않아
+     * 최대 "예상 운동시간 + 버퍼"(스쿼트 ~45분) 동안 남는다. 그 상태값으로 탈퇴를 막으면 운동 중이
+     * 아닌 사용자가 이유도 모른 채 막힌다. 반면 살아있는 세션은 rep 단위로 3~4초마다 프레임을
+     * 보내므로, <b>유입이 끊긴 것은 세션이 죽었다는 직접 증거</b>다.
+     *
+     * <p><b>비용</b>: {@code created_at} 하한이 있어 파티션 pruning 이 걸려 최근 파티션만 본다.
+     * 대상 세션도 회원당 0~1건이라 가볍다. 탈퇴는 드문 경로이므로 이 쿼리 1회는 감수 가능하다
+     * — 반대로 세션에 {@code last_activity_at} 을 두는 방식은 배치 저장마다 UPDATE 가 붙어
+     * <b>핫패스</b>에 비용을 얹으므로 택하지 않았다(같은 문서 §3-2).
+     */
+    @Query("SELECT COUNT(p) FROM PoseData p " +
+           "WHERE p.session.id IN :sessionIds AND p.createdAt > :since")
+    long countSince(@Param("sessionIds") List<Long> sessionIds,
+                    @Param("since") java.time.LocalDateTime since);
 }

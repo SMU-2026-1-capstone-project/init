@@ -252,7 +252,13 @@ public class ExerciseAnalysisService {
                     log.error("gRPC 통신 장애: {}", t.getMessage());
                     // 이 한 번의 호출이 실패한 것(장애가 죽 이어져 서킷이 OPEN 되기 전이라도)도
                     // 사용자 입장에선 응답 없는 세션이므로 동일하게 즉시 FAILED 처리.
-                    if (sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now())) {
+                    //
+                    // notifyAi=true — gRPC 에러는 "실패"가 아니라 "모름"이다. 연결이 아예 안 됐을
+                    // 수도 있지만, AI 가 요청을 받아 SessionState 를 만들고 응답만 못 돌아왔을 수도
+                    // 있다. 후자면 통보하지 않는 한 그 상태가 그대로 남는다 (이슈 #98). 헛방이어도
+                    // AI 가 success=false 를 주고 TERMINAL_FAILED 로 한 번에 끝나므로 안전한 쪽이다.
+                    // (서킷 OPEN 분기는 반대다 — 거긴 아예 보내지 않았으므로 통보하지 않는다.)
+                    if (sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now(), true)) {
                         sessionMetrics.sessionTransition(Status.FAILED, "grpc-error");
                     }
                 }
