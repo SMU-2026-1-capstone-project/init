@@ -92,8 +92,13 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     // (2026-08-07 통합 전에는 idx_session_member_status 였다 — 이 쿼리에는 등치 둘뿐이라
     // 통합으로 달라지는 것이 없다. 세 번째 컬럼이 붙어도 seek 범위는 같다).
     //
-    // 컬럼 순서가 뒤집힌 (member_id, start_time, status) 였다면 status 로 못 좁혀 정확히 2배를
-    // 읽는다 — 이 쿼리가 통합 인덱스의 컬럼 순서를 정한 근거 중 하나다(session-index-composition.md §4-3).
+    // 컬럼 순서가 뒤집힌 (member_id, start_time, status) 였다면 status 로 좁히지 못해, member_id
+    // 로 찾은 뒤 그 회원의 세션을 훑으며 status 를 필터로 확인해야 한다 — 읽는 행이 찾는 status 의
+    // 선택도만큼 늘어난다. 이 쿼리가 통합 인덱스의 컬럼 순서를 정한 근거 중 하나다
+    // (session-index-composition.md §4-3).
+    //
+    // ⚠️ 그 문서의 실측치(팬아웃 2000 에서 1000 → 2001행, 약 2배)는 **rig 의 status 분포가
+    //    COMPLETED 50% 일 때의 값**이다. 배수는 선택도에 따라 달라지므로 일반 수치로 쓰지 말 것.
     @Query("SELECT s.id FROM Session s WHERE s.member.id = :memberId AND s.status = :status")
     List<Long> findIdsByMemberIdAndStatus(@Param("memberId") Long memberId, @Param("status") Status status);
 
@@ -152,9 +157,22 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
      *
      * <p>🔀 <b>2026-08-07 해소</b> — 위 인덱스는 이제 없다(#110 통합으로 삭제). 대신 이 쿼리
      * 전용으로 {@code idx_session_starttime_member (start_time, member_id)} 를 얹었다:
-     * {@code start_time} 이 선두라 기간으로 <b>seek</b> 하고, 그 범위 안에서 {@code member_id}
-     * 가 정렬돼 있어 중복 제거도 그대로 공짜다. 100만 행 스캔이 사라지고 <b>355ms → 13.6ms
-     * (26배)</b> ({@code admin-page-scope.md} §4-5-1).
+     * {@code start_time} 이 선두라 기간으로 <b>seek</b> 하고, {@code member_id} 가 인덱스에
+     * 실려 있어 <b>커버링</b>이다. 100만 행 스캔이 사라지고 <b>355ms → 13.6ms (26배)</b>
+     * ({@code admin-page-scope.md} §4-5-1).
+     *
+     * <p>⚠️ <b>중복 제거는 공짜가 아니다.</b> {@code (start_time, member_id)} 에서
+     * {@code member_id} 는 <b>같은 {@code start_time} 안에서만</b> 정렬돼 있다. 기간 범위
+     * 전체를 놓고 보면 전역 정렬이 아니므로 {@code DISTINCT} 는 여전히 별도 처리가 필요하다.
+     * 이득의 출처는 <b>seek 으로 범위를 좁힌 것 + 커버링</b>이지 중복 제거가 아니다.
+     *
+     * <p>즉 이 인덱스는 <b>맞바꾼 것</b>이다. 옛 {@code (member_id, start_time)} 은 선두가
+     * {@code member_id} 라 정렬된 순서로 읽으면 중복 제거가 <b>진짜로</b> 공짜였지만, 기간으로
+     * seek 를 못 해 100만 행을 읽고 98%를 버렸다. 공짜 중복 제거를 포기하고 seek 을 산 결과가
+     * 26배다.
+     *
+     * <p>🔶 <b>미검증</b>: MySQL 이 남은 {@code DISTINCT} 를 임시 테이블로 처리하는지 다른
+     * 방식인지는 확인하지 않았다. 확인하려면 {@code EXPLAIN ANALYZE} 의 실제 연산자를 봐야 한다.
      *
      * <p>순서를 뒤집으면 안 되는 이유가 위 실측 그 자체다 — 범위 조건이 뒤에 실리면 seek 를
      * 못 해 인덱스 전체를 읽고 98%를 버린다.

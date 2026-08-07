@@ -245,7 +245,13 @@ MediaPipe의 33개 관절 포인트에 대한 1초 평균 좌표:
 > 근거: [`decisions/session-index-composition.md`](./decisions/session-index-composition.md).
 >
 > ✅ **그 위에 `(start_time, member_id)` 를 얹었다** — 대시보드 집계 e 를 355ms → 13.6ms(26배)로 줄이고,
-> `start_time` 이 `now()` 라 **append** 이므로 쓰기 대가가 실측 **1.007배**다.
+> `start_time` 이 `now()` 라 **append** 이므로 쓰기 대가가 작다 — 실측 **1.007배**.
+>
+> ⚠️ **이 수치를 최종 구성의 쓰기 대가로 읽으면 안 된다.** 1.007배는 *"기존 5개 위에 이 인덱스를
+> 하나 더 얹으면"* 을 잰 값이다(통합 전 기준, `admin-page-scope.md` §4-5-1). 지금 구성은
+> **2개를 빼고 2개를 넣은 4개**라 기준선이 다르다. 통합 전·후 구성으로 재측정한 값은 **없다.**
+> 참고로 `session-index-composition.md` §4-4 는 통합 자체가 인덱스 개수를 줄여 `base` 보다
+> 싸다는 **방향**까지만 신뢰하고 배수는 근거로 쓰지 않기로 했다.
 > #110 이 선결이었던 이유는 예산이다: 통합으로 4 → 3 이 된 뒤에 얹어 **총 4개로 이전과 같다.**
 > 근거: [`decisions/admin-page-scope.md`](./decisions/admin-page-scope.md) §4-5-1.
 >
