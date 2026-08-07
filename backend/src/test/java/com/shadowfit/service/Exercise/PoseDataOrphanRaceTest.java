@@ -57,7 +57,7 @@ import static org.mockito.Mockito.doAnswer;
  * 이라 Hibernate 가 {@code PoseData} 엔티티의 {@code @ManyToOne @JoinColumn(session_id)} 에서
  * FK 를 만들어버린다. 프로덕션에는 없는 FK 다. 그러면 ②가 참조무결성 위반으로 <b>터져서</b>
  * 고아가 안 생긴다 — 재현이 안 되는 게 아니라 결과가 반대로 나온다. "FK 가 없다"는 전제 위에
- * 세워진 결함이라 실제 MySQL 스키마({@code mysql/schema.sql}) 위에서만 관측된다.
+ * 세워진 결함이라 실제 MySQL 스키마({@code V1__baseline.sql}) 위에서만 관측된다.
  * 그래서 {@code application-race.yml}(3307 일회용 컨테이너)을 쓴다.
  *
  * <p><b>실행법</b> — 시스템 프로퍼티가 없으면 통째로 건너뛰므로 CI 는 영향받지 않는다:
@@ -65,7 +65,7 @@ import static org.mockito.Mockito.doAnswer;
  *   docker run -d --name shadowfit-race-mysql -e MYSQL_ROOT_PASSWORD=racetest \
  *     -e MYSQL_DATABASE=shadowfit -p 3307:3306 mysql:8.0 \
  *     --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
- *   docker exec -i shadowfit-race-mysql mysql -uroot -pracetest shadowfit &lt; mysql/schema.sql
+ *   docker exec -i shadowfit-race-mysql mysql -uroot -pracetest shadowfit \n *     &lt; backend/src/main/resources/db/migration/V1__baseline.sql
  *   ./gradlew :backend:test --tests '*PoseDataOrphanRaceTest' -Drace.mysql=true
  * </pre>
  *

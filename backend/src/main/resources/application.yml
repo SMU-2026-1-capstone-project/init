@@ -24,15 +24,36 @@ spring:
       # docs/decisions/pose-ingest-downsampling.md §5-1(7)(8)). 30까지 늘려도 이득 없어 15로 설정.
       maximum-pool-size: 15
 
-  sql:
-    init:
-      mode: always
+  # [1-1] Flyway — 스키마 마이그레이션 (이슈 #115, schema-migration-tracking.md §8)
+  #
+  # 무엇이 달라졌나: 예전엔 docker initdb 가 schema.sql 을 한 번 실행하는 게 전부라
+  # "이 DB 가 어디까지 갔는지" 아무 데도 안 남았다. 이제 Flyway 가 적용 이력을
+  # flyway_schema_history 테이블에 기록하고, 미적용분이 있으면 부팅 시 적용한다.
+  #
+  # 이력 확인: SELECT * FROM flyway_schema_history  또는  GET /actuator/flyway
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+    # ⚠️ baseline-version 이 2 인 이유 (§3-1 baseline 함정)
+    #   기존 DB 는 이미 V1(스키마)·V2(마스터 시드)에 해당하는 상태다. 여기에 Flyway 를
+    #   처음 붙이면 baseline-on-migrate 가 "이 버전까지는 이미 됐다"고 도장을 찍는데,
+    #   그 값이 1 이면 V2 가 실제로 실행돼 시드가 중복 INSERT 된다.
+    #   2 로 찍어야 둘 다 건너뛰고 V3 부터 적용된다. 신규 설치는 빈 DB 라
+    #   baseline 자체가 안 걸리고 V1→V2 가 정상 실행된다.
+    baseline-on-migrate: true
+    baseline-version: 2
+    baseline-description: "existing schema before flyway"
+
+    # 이미 적용된 파일이 바뀌면 부팅을 실패시킨다(기본값). 끄지 말 것 —
+    # "누가 마이그레이션을 사후 수정했다"를 잡아주는 게 이 도구의 핵심 중 하나다.
+    validate-on-migrate: true
 
   jpa:
      open-in-view: false # 2026-07-15: lazy 필드 접근이 뷰 렌더링 단계까지 조용히 숨겨지는 것 방지, 코드 작을 때 끔
      hibernate:
-       ddl-auto: none # 혹은 none (도커에서 schema.sql을 실행하므로)
-     defer-datasource-initialization: true
+       # Flyway 가 스키마를 소유한다. Hibernate 는 만들지도 검증하지도 않는다.
+       ddl-auto: none
      properties:
        hibernate:
          jdbc:
@@ -89,7 +110,9 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,caches,metrics,circuitbreakers,circuitbreakerevents
+        # flyway: 이 서버가 어느 버전까지 적용했는지 HTTP 로 확인한다 (GET /actuator/flyway).
+        # 배포 후 "스키마가 코드보다 뒤처졌나"를 DB 에 붙지 않고 볼 수 있어 CD 와 맞물린다.
+        include: health,caches,metrics,circuitbreakers,circuitbreakerevents,flyway
   endpoint:
     health:
       show-details: always

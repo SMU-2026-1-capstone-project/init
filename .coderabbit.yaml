@@ -17,12 +17,15 @@ reviews:
     - "!ai-server/exercise_pb2_grpc.py"
     - "!ai-server/app/proto/exercise_pb2.py"
     - "!ai-server/app/proto/exercise_pb2_grpc.py"
-    # data.sql 만 제외한다 — 대량 시드 INSERT 는 리뷰 가치가 없고 노이즈만 만든다.
+    # dev 픽스처만 제외한다 — 대량 시드 INSERT 는 리뷰 가치가 없고 노이즈만 만든다.
     # 이전에는 "!mysql/**" 로 mysql 전체를 막아 두었는데, 그러면 아래 path_instructions 의
-    # "mysql/*.sql" 지침이 영원히 발동하지 않는 죽은 설정이 된다. 실제로 outbox_events DDL 이
+    # 스키마 지침이 영원히 발동하지 않는 죽은 설정이 된다. 실제로 outbox_events DDL 이
     # 리뷰를 한 번도 못 받았다(2026-07-29, PR #63). 스키마는 되돌리기 어려운 변경이라 오히려
     # 리뷰가 더 필요한 영역이다.
-    - "!mysql/data.sql"
+    #
+    # 마이그레이션(db/migration/**)은 제외하지 않는다 — 한 번 적용되면 checksum 이 박혀
+    # 사후 수정이 막히므로 머지 전 리뷰가 사실상 유일한 교정 기회다.
+    - "!mysql/dev-seed.sql"
   path_instructions:
     - path: "backend/**/*.java"
       instructions: >
@@ -35,10 +38,17 @@ reviews:
     - path: "frontend/**/*.{ts,tsx}"
       instructions: >
         React Native 프론트엔드. API 계약 일치 여부, 에러 처리, 불필요한 리렌더링을 본다.
+    - path: "backend/src/main/resources/db/migration/*.sql"
+      instructions: >
+        Flyway 마이그레이션. 한 번 적용되면 checksum 이 박혀 사후 수정이 막히므로 머지 전
+        리뷰가 유일한 교정 기회다. 컬럼 정의가 JPA 엔티티와 어긋나지 않는지, FK의 ON DELETE
+        정책이 실제 삭제 흐름과 맞는지, 그리고 **기존 데이터가 있는 DB 에 적용해도 안전한지**
+        (파괴적 DDL·TRUNCATE·DELETE, NOT NULL 컬럼을 기본값 없이 추가 등)를 중점적으로 본다.
+        버전 번호가 기존 파일과 겹치지 않는지도 확인한다.
     - path: "mysql/*.sql"
       instructions: >
-        스키마/시드 데이터. schema.sql과 data.sql의 컬럼 정의가 어긋나지 않는지,
-        FK의 ON DELETE 정책이 실제 삭제 흐름과 맞는지 확인한다.
+        dev 전용 스크립트(픽스처 등). 마이그레이션이 아니므로 배포 환경에 영향은 없지만,
+        운영에도 필요한 마스터 데이터가 여기 섞여 들어오지 않았는지 확인한다.
 
 chat:
   auto_reply: true

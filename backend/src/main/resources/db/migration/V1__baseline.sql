@@ -1,9 +1,24 @@
+-- ============================================================================
+-- V1 baseline — 스키마 정본 (이슈 #115, docs/decisions/schema-migration-tracking.md)
+-- ============================================================================
+--
+-- 이 파일은 예전 `mysql/schema.sql` 이다. Flyway 도입(§8 결정)으로 위치만 옮겼고
+-- 테이블 정의는 그대로다 — git mv 로 옮겨 이력이 이어진다.
+--
+-- ⚠️ 이 파일을 고치지 말 것. 이미 적용된 마이그레이션이라 Flyway 가 checksum 으로
+--    감시한다. 내용을 바꾸면 다음 부팅이 실패한다.
+--    스키마를 바꾸려면 V3, V4 … 새 파일을 추가한다.
+--
+-- ⚠️ CREATE DATABASE / USE 를 뺐다. Flyway 는 이미 연결된 DB(spring.datasource.url
+--    의 스키마) 위에서 실행하므로 파일이 DB 를 고르면 안 된다. DB 생성은 각 환경이
+--    담당한다 — docker-compose 는 MYSQL_DATABASE 로, 실측 rig 는 자체 CREATE 로.
+--
+-- 기존 인스턴스는 baselineVersion=2 로 도장을 찍어 이 파일을 건너뛴다(이미 그 상태다).
+-- 신규 설치만 실제로 실행된다.
+-- ============================================================================
+
 -- 인코딩 강제 (한글 깨짐 방지). 클라이언트 charset이 latin1 이어도 utf8mb4 로 협상.
 SET NAMES utf8mb4;
-
--- 1. 데이터베이스 생성 및 선택
-CREATE DATABASE IF NOT EXISTS shadowfit;
-USE shadowfit;
 
 -- 2. 사용자 테이블 (Member)
 CREATE TABLE IF NOT EXISTS users (

@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p><b>왜 세기만 하고 지우지 않나.</b> {@code PoseDataService.savePoseDataBatch} 는 세션 존재
  * 검증과 배치 INSERT 사이에 보호가 없어, 그 틈에 회원 탈퇴가 커밋되면 정리
  * ({@code PoseDataCleanupService})가 지나간 뒤에 INSERT 가 착지해 고아 행이 남는다. FK 를 뗀
- * 상태라 DB 도 막지 않는다({@code mysql/schema.sql:104}, 이슈 #41).
+ * 상태라 DB 도 막지 않는다({@code V1__baseline.sql} 의 pose_data 정의, 이슈 #41).
  *
  * <p>수정안은 세 갈래다 — 비관적 락(예방) / sweep(사후 청소) / 감수. 그런데 <b>셋 중 무엇이
  * 맞는지는 이 결함이 실제로 얼마나 나는지에 달려 있고, 그 숫자가 지금 없다.</b> 락은 비용이

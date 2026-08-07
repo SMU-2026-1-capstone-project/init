@@ -192,7 +192,7 @@ class MemberWithdrawalGuardTest {
     private void insertFrame(Long sessionId, LocalDateTime createdAt) {
         // smoothed_knee_angle 을 명시한다. 엔티티에 @Builder.Default = 0.0 이 있지만 그것은
         // **자바 객체를 만들 때** 채워지는 값이라 이 raw SQL 경로에는 오지 않는다. 운영
-        // 스키마(mysql/schema.sql)는 DEFAULT 0.00 이 있어 생략해도 통과하지만, 테스트의 H2
+        // 스키마(V1__baseline.sql)는 DEFAULT 0.00 이 있어 생략해도 통과하지만, 테스트의 H2
         // DDL 은 @Column(nullable=false) 만 보고 NOT NULL 을 만들 뿐 DEFAULT 를 만들지 않는다.
         // 즉 이 컬럼은 운영에서는 생략 가능하고 테스트에서는 아니다 — 그 차이가 여기서 드러난다.
         jdbcTemplate.update(
