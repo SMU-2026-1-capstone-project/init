@@ -93,24 +93,40 @@ CREATE TABLE IF NOT EXISTS exercise_sessions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- DEFAULT 추가
     FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (exercise_id) REFERENCES exercises(id),
-    -- 캘린더/주간활동 조회(member_id + start_time 범위)가 FK 단일 인덱스로는
-    -- member_id로 찾은 뒤 range를 filesort/filter 하는 게 EXPLAIN으로 확인돼 추가
-    -- (report-read-path.md §4 인덱스 갭 ④, production-signal-checklist.md §2-2 관련 조사)
-    INDEX idx_session_member_starttime (member_id, start_time),
+    -- 🔀 2026-08-07 통합 — 원래 여기엔 인덱스가 둘이었다(이슈 #110, session-index-composition.md).
+    --    idx_session_member_starttime      (member_id, start_time)  — 캘린더/주간활동
+    --    idx_session_member_status         (member_id, status)      — 활성 세션 확인·탈퇴 가드
+    --
+    -- 왜 합쳤나 — (member_id, status) 가 "일하는 척"만 하고 있었다.
+    --   GET /sessions/active 의 findFirstByMemberIdAndStatusOrderByStartTimeDesc 는 등치 둘에
+    --   ORDER BY start_time LIMIT 1 인데, (member_id, status) 는 정렬을 못 받친다. 그래서
+    --   옵티마이저가 정렬 비용을 보고 idx_session_member_exercise_status_start 로 도망가
+    --   **회원의 전 세션을 읽고 정렬했다.** 회원당 세션 2000건이면 2001행을 읽는다.
+    --
+    --   (member_id, status, start_time) 이면 앞 둘이 등치로 고정된 뒤 남은 구간이 이미
+    --   start_time 순이라 LIMIT 1 이 **진짜 1행**이 된다. 팬아웃과 무관한 상수다.
+    --
+    -- 컬럼 순서 — status 가 앞인 이유(반사실 (member_id, start_time, status) 도 실측했다):
+    --   뒤집으면 status 로 못 좁혀 탈퇴 가드가 정확히 2배를 읽는다. 그리고 뒤집은 쪽이
+    --   GET /sessions/active 에서 선방한 것은 인덱스가 아니라 **분포 덕**이었다 — 최신순으로
+    --   훑으며 status 를 필터로 확인하므로 찾는 값이 흔할수록 빨리 멈춘다. 실제로 찾는
+    --   IN_PROGRESS 는 회원당 많아야 1건이라 그 최악은 rig 가 재지 않았다. 이쪽은 status 가
+    --   아무리 드물어도 1행이라 그 위험이 없다.
+    --
+    -- 대가: 주간 리포트(member_id + start_time 범위)가 status 를 건너뛰어야 해 읽는 행이
+    --   14 → 20 으로 는다(팬아웃 500 기준, 절대 0.03ms). GET /sessions/active 보다 훨씬
+    --   덜 뜨거운 쿼리라 감수한다.
+    INDEX idx_session_member_status_start (member_id, status, start_time),
     -- 직전 동일 운동 조회(findFirstByMemberIdAndExerciseIdAndStatusOrderByStartTimeDesc, 이전 기록
     -- 비교용)가 위 인덱스만으론 member_id로 찾은 뒤 exercise_id·status를 filter(Using where,
     -- filtered 5.19%)하는 게 EXPLAIN으로 확인돼 추가 (2026-07-15, filtered 100%로 개선)
     INDEX idx_session_member_exercise_status_start (member_id, exercise_id, status, start_time),
-    -- 회원당 활성 세션 체크(existsByMemberIdAndStatus, createSession 매 호출마다 실행)가 위
-    -- 인덱스로는 exercise_id가 중간에 껴서 status까지 seek 못 하고 member_id로 찾은 뒤 status를
-    -- filter(filtered 10%, rows 1675)하는 게 EXPLAIN으로 확인돼 추가 — (member_id, status)만으로
-    -- 바로 seek해 rows 1, filtered 100%로 개선 (2026-07-16).
-    INDEX idx_session_member_status (member_id, status),
     -- 관리자 세션 목록 전용 (admin-page-scope.md §4 ㄱ안, 2026-08-03).
-    -- 위 세 인덱스는 전부 member_id 선두다 — 지금까지의 모든 조회가 "내 데이터"였으므로
+    -- 위 두 인덱스는 전부 member_id 선두다 — 지금까지의 모든 조회가 "내 데이터"였으므로
     -- 올바른 설계였다. 관리자 목록은 member_id 조건 없이 상태·기간으로 전체를 거르므로
-    -- 선두 컬럼이 안 맞아 셋 다 타지 않는다. 같은 테이블에 읽기 주체가 둘이면 인덱스
+    -- 선두 컬럼이 안 맞아 둘 다 타지 않는다. 같은 테이블에 읽기 주체가 둘이면 인덱스
     -- 전략이 갈린다.
+    -- (이 주석을 쓸 당시엔 셋이었다 — 2026-08-07 통합(#110)으로 둘이 됐고 논지는 그대로다.)
     --
     -- (status, start_time) 순서인 이유: status 는 등치, start_time 은 범위·정렬이다.
     -- 등치를 선두에 두어야 범위 조건이 인덱스 순서를 그대로 쓴다. 뒤집으면 status 가
@@ -118,7 +134,22 @@ CREATE TABLE IF NOT EXISTS exercise_sessions (
     --
     -- ⚠️ 쓰기 비용이 공짜가 아니다 — 세션 INSERT 는 이 프로젝트의 핵심 쓰기 축이다.
     -- 실측은 loadtest/measure_admin_index.sh.
-    INDEX idx_session_status_starttime (status, start_time)
+    INDEX idx_session_status_starttime (status, start_time),
+    -- 대시보드 활성 회원 집계 e 전용 (admin-page-scope.md §4-5-1 후보 ㉲, 2026-08-07 추가).
+    -- COUNT(DISTINCT member_id) WHERE start_time >= ? 인데, 이걸 붙이기 전에는 옵티마이저가
+    -- (member_id, start_time) 을 골랐다 — COUNT(DISTINCT member_id) 의 중복 제거는 공짜가
+    -- 되지만 **기간으로 seek 를 못 해 100만 행을 읽고 98%를 버렸다.** 355ms → 13.6ms(26배).
+    --
+    -- (start_time, member_id) 순서인 이유: start_time 이 범위 조건이고 member_id 는 집계
+    -- 대상일 뿐 조건이 아니다. 범위를 선두에 둬야 seek 가 되고, member_id 는 뒤에 실려
+    -- 커버링만 만족시키면 된다.
+    --
+    -- ⚠️ 위 통합(#110)이 선결이었다. 통합 전이면 보조 인덱스가 5개가 되는데, 이 테이블은
+    -- 인덱스가 데이터의 2배라(138.9MB vs 69.6MB, 100만 행) 개수를 늘리는 대가가 크다.
+    -- 통합으로 4 → 3 이 된 뒤에 얹어 **총 4개로 이전과 같다.**
+    --
+    -- start_time 은 now() 로 들어와 append 라 쓰기 대가가 실측 1.007배다(§4-5-1).
+    INDEX idx_session_starttime_member (start_time, member_id)
     );
 
 -- 6. 자세 데이터

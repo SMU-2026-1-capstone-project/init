@@ -67,7 +67,15 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     // @EntityGraph 로 exercise를 함께 로딩 — open-in-view: false 라 컨트롤러에서 lazy 접근이
     // 터진다. @Query + JOIN FETCH 로도 되지만 그러면 LIMIT을 SQL에 못 실어 전 행을 가져와야 한다.
     // exercise는 @ManyToOne(to-one)이라 join + LIMIT 조합이 안전하다(컬렉션 fetch + 페이징의
-    // 인메모리 처리 문제는 해당 없음). idx_session_member_status (member_id, status) 를 탄다.
+    // 인메모리 처리 문제는 해당 없음).
+    //
+    // 🔀 2026-08-07 — idx_session_member_status_start (member_id, status, start_time) 을 탄다.
+    // 그 전까지 이 쿼리가 (member_id, status) 를 탄다고 적어뒀는데 **틀렸다.** 등치 둘에
+    // ORDER BY start_time LIMIT 1 인데 (member_id, status) 는 정렬을 못 받쳐, 옵티마이저가
+    // 정렬 비용을 보고 idx_session_member_exercise_status_start 로 도망가 회원의 전 세션을
+    // 읽고 정렬했다 — 회원당 세션 2000건이면 2001행이다. 통합 인덱스는 앞 둘이 등치로 고정된
+    // 뒤 남은 구간이 이미 start_time 순이라 LIMIT 1 이 **진짜 1행**이 된다. 팬아웃과 무관한
+    // 상수다 (이슈 #110, docs/decisions/session-index-composition.md §4).
     @EntityGraph(attributePaths = "exercise")
     Optional<Session> findFirstByMemberIdAndStatusOrderByStartTimeDesc(Long memberId, Status status);
 
@@ -80,7 +88,12 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     // 탈퇴 가드용 — 특정 상태의 세션 id 만(회원당 활성 세션은 1개 규약이라 보통 0~1건).
     // 여기서 얻은 id 로 pose_data 유입 여부를 확인해 "실제로 운동 중인지"를 판정한다
     // (MemberService.deleteAccount, docs/decisions/withdrawal-with-active-session.md §3-2).
-    // idx_session_member_status (member_id, status) 를 탄다.
+    // idx_session_member_status_start (member_id, status, start_time) 의 앞 두 컬럼을 탄다
+    // (2026-08-07 통합 전에는 idx_session_member_status 였다 — 이 쿼리에는 등치 둘뿐이라
+    // 통합으로 달라지는 것이 없다. 세 번째 컬럼이 붙어도 seek 범위는 같다).
+    //
+    // 컬럼 순서가 뒤집힌 (member_id, start_time, status) 였다면 status 로 못 좁혀 정확히 2배를
+    // 읽는다 — 이 쿼리가 통합 인덱스의 컬럼 순서를 정한 근거 중 하나다(session-index-composition.md §4-3).
     @Query("SELECT s.id FROM Session s WHERE s.member.id = :memberId AND s.status = :status")
     List<Long> findIdsByMemberIdAndStatus(@Param("memberId") Long memberId, @Param("status") Status status);
 
@@ -132,10 +145,19 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
      *
      * <p>✅ <b>실측(2026-08-06): 비싼 것은 맞았고, 고르는 인덱스가 뜻밖이었다.</b> 기간 조건이
      * 있는데도 {@code idx_session_status_starttime} 이 아니라
-     * {@code idx_session_member_starttime (member_id, start_time)} 을 탄다 — {@code member_id}
+     * {@code idx_session_member_starttime (member_id, start_time)} 을 탔다 — {@code member_id}
      * 선두를 정렬된 순서로 읽으면 <b>중복 제거가 공짜</b>가 되기 때문이다. 옵티마이저가 범위를
      * 좁히는 것보다 그쪽을 택했다. 100만 행 인덱스 전체 스캔, <b>0.63초</b> — 상태별 분포와
-     * 둘이 대시보드 전체 비용의 대부분이다 ({@code admin-page-scope.md} §4-5).
+     * 둘이 대시보드 전체 비용의 대부분이었다 ({@code admin-page-scope.md} §4-5).
+     *
+     * <p>🔀 <b>2026-08-07 해소</b> — 위 인덱스는 이제 없다(#110 통합으로 삭제). 대신 이 쿼리
+     * 전용으로 {@code idx_session_starttime_member (start_time, member_id)} 를 얹었다:
+     * {@code start_time} 이 선두라 기간으로 <b>seek</b> 하고, 그 범위 안에서 {@code member_id}
+     * 가 정렬돼 있어 중복 제거도 그대로 공짜다. 100만 행 스캔이 사라지고 <b>355ms → 13.6ms
+     * (26배)</b> ({@code admin-page-scope.md} §4-5-1).
+     *
+     * <p>순서를 뒤집으면 안 되는 이유가 위 실측 그 자체다 — 범위 조건이 뒤에 실리면 seek 를
+     * 못 해 인덱스 전체를 읽고 98%를 버린다.
      */
     @Query("SELECT COUNT(DISTINCT s.member.id) FROM Session s "
             + "WHERE s.startTime >= :from AND s.startTime < :to")

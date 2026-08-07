@@ -92,7 +92,7 @@ GET /reports/sessions/{id}
 | ① | ~~**fat 컬럼 over-fetch** — 풀엔티티 로드, worst 계산은 `syncRate`·`timestampSec`·`feedbackMessage` 3개만 씀. `joint_coordinates`는 **한 번도 안 씀**~~ | **✅ 해결(2026-07-15)** | `findFramesBySessionId`(3컬럼 projection, §7)로 교체. 실측(§②b): payload −98.7%, warm 쿼리 8x |
 | ② | **재계산-on-read** — precompute 없이 매 GET마다 worst 구간 재계산 | ✅ 실재 | `selectWorstSection` 매 호출 |
 | ③ | **REPORT_NOT_FOUND 갭** — `completeAnalysis`가 `session`만 UPDATE, `reports`엔 안 씀 → 실제 세션은 Report 행 없음 → 404 | ✅ 실재(기능 끊김) | `applyCompleteFromApp`([`ExerciseAnalysisService.java:217`](../../backend/src/main/java/com/shadowfit/service/Exercise/ExerciseAnalysisService.java)) session만 UPDATE / `reports`는 [`data.sql:168`](../../mysql/data.sql) 시드뿐 |
-| ④ | ~~**exercise_sessions 인덱스 갭** — `(member_id, start_time)` 등 복합 인덱스 없음(FK 단일뿐) → 캘린더·이전세션 쿼리 filesort~~ | **✅ 해결(2026-07-11)** | `idx_session_member_starttime` 추가([`schema.sql:71`](../../mysql/schema.sql)), 실측: 월간 조회 1675행 Filter → 143행 Index range scan(cost 91.4→64.6), 연간 조회는 Covering index scan으로 전환. 커밋 `dbb0fec` |
+| ④ | ~~**exercise_sessions 인덱스 갭** — `(member_id, start_time)` 등 복합 인덱스 없음(FK 단일뿐) → 캘린더·이전세션 쿼리 filesort~~ | **✅ 해결(2026-07-11)** | `idx_session_member_starttime` 추가([`schema.sql:71`](../../mysql/schema.sql)), 실측: 월간 조회 1675행 Filter → 143행 Index range scan(cost 91.4→64.6), 연간 조회는 Covering index scan으로 전환. 커밋 `dbb0fec`<br>🔀 **2026-08-07**: 이 인덱스는 `idx_session_member_status_start (member_id, status, start_time)` 로 통합돼 이름이 사라졌다([#110](https://github.com/Shadowfit/init/issues/110), [`session-index-composition.md`](./session-index-composition.md)). 갭 자체는 여전히 해결 상태 — 다만 `status` 를 건너뛰어야 해 읽는 행이 14 → 20 으로 늘었다(절대 0.03ms) |
 | ④-1 | ~~**"직전 동일 운동" 조회는 ④의 인덱스로 안 커버됨** — `findFirstByMemberIdAndExerciseIdAndStatusOrderByStartTimeDesc`(이전 기록 비교용)는 `member_id, exercise_id, status`로 필터하는데 `idx_session_member_starttime(member_id, start_time)`엔 `exercise_id`·`status`가 없어 member_id로 찾은 뒤 filter~~ | **✅ 해결(2026-07-15)** | 실측: 기존 인덱스만 있을 때 `rows=1675, filtered=5.19%, Using where`. `idx_session_member_exercise_status_start(member_id, exercise_id, status, start_time)` 추가 후 `filtered=100%`, filter 단계 제거(`schema.sql` `exercise_sessions`) |
 | ⑤ | **버퍼풀 오염** — cold 거대 raw를 서빙 경로가 건드려 핫 데이터 evict | 🔶 메커니즘 실재, 규모 미발동 | DAU 작아 리포트 조회 드묾 |
 | ⑥ | **무제한 프레임 극단** — R(프레임/세션)이 위로 열림(fps 미강제) → 극단 세션이 수십~수백 MB 로드·O(N) 루프·OOM 위험 | 🔶 가능성 실재, 미발동 | 정상 750행, [`load-test-strategy.md`](./load-test-strategy.md) §4.5 "R 위로 열림" |
@@ -199,7 +199,7 @@ List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long session
 
 - [x] projection 코드 적용 여부 (위 §7) — **적용 완료 2026-07-15**
 - [x] precompute 착수 — **완료(2026-07-24)**. `SessionService.applyComplete`가 세션 완료 시 `WorstSectionCalculator`로 계산해 `reports.detailed_analysis`에 저장(③·⑥ 동시 해결). 세부 결정 4가지는 §9
-- [x] exercise_sessions 복합 인덱스 추가 — **완료(2026-07-11)**, `mysql/schema.sql:83` `idx_session_member_starttime(member_id, start_time)` (§2 ④ 참고). 체크박스 갱신 누락 발견(2026-07-15)
+- [x] exercise_sessions 복합 인덱스 추가 — **완료(2026-07-11)**, `mysql/schema.sql:83` `idx_session_member_starttime(member_id, start_time)` (§2 ④ 참고). 체크박스 갱신 누락 발견(2026-07-15). 🔀 2026-08-07 `idx_session_member_status_start` 로 통합(#110)
 - [x] 착수 순서 — **precompute 먼저 완료**(2026-07-24), projection은 이미 그 이전(2026-07-15)에 적용 완료라 사실상 둘 다 완료
 - [x] pose_data 파티션 스키마 자체 반영 — **완료(2026-07-20, PR #43)**. FK 제거 대체(B5) 포함. [`pose-data-partition-fk-tradeoff.md`](./pose-data-partition-fk-tradeoff.md)
 - [x] raw TTL(보존 정책) **자동화**(DROP PARTITION 스케줄러) — **완료(2026-07-24)**. `PoseDataPartitionScheduler` 신설. 설계 정리는 §9-B

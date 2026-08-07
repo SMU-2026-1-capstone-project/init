@@ -131,6 +131,8 @@
 | `idx_session_timestamp (session_id, timestamp_sec)` | `session_id` |
 | `users` 테이블 | **보조 인덱스 없음** (PK + username/email UNIQUE만) |
 
+> 📌 **위 표는 2026-08-03 시점의 스냅숏이다.** `idx_session_member_starttime` 과 `idx_session_member_status` 는 2026-08-07 에 `idx_session_member_status_start (member_id, status, start_time)` 하나로 통합돼 **더 이상 이 이름으로 존재하지 않는다**([#110](https://github.com/Shadowfit/init/issues/110), [`session-index-composition.md`](./session-index-composition.md)). 아래 논지("전부 `member_id` 선두라 관리자 조회에 안 듣는다")는 통합 후에도 그대로 성립하므로 당시 표를 남겨둔다. 현행 구성은 [`05-database-design.md`](../05-database-design.md) "인덱스 현황" 을 볼 것.
+
 **모든 세션 인덱스가 `member_id` 선두다.** 이는 지금까지의 모든 조회가 "내 데이터"였기 때문에 올바른 설계였다. 그런데 관리자 목록은 **`member_id` 조건 없이 전체를 훑으며 상태·기간으로 거른다** → 위 복합 인덱스는 선두 컬럼이 안 맞아 **전혀 타지 않는다.** 회원 목록도 `users`에 보조 인덱스가 없어 정렬·필터가 전부 풀스캔 + filesort가 된다.
 
 > 이건 QueryDSL로 해결되는 문제가 **아니다.** 쿼리 빌더는 SQL을 조립할 뿐 실행 계획을 바꾸지 않는다. ([`querydsl-adoption.md`](./querydsl-adoption.md) §4-2 ⑤ — 동적 조립 위험 중 QueryDSL이 못 고치는 항목)
@@ -694,6 +696,8 @@ A 에서는 총건수가 병목이었다(§4-3 ③). B 의 (c) 검색어만 조�
 **"세션 100만부터 읽고 회원을 붙인다"가 아니라 "회원 20만을 훑고 세션을 집는다"** 가 답이다. 선행 와일드카드 `LIKE '%kim%'` 는 인덱스로 못 좁히지만, **좁히지 못하는 쪽을 드라이빙으로 두는 것이 오히려 싸다** — 반대로 하면 세션 100만 행마다 회원을 확인해야 한다.
 
 > 📌 부수 소득: **`idx_session_member_status` 가 실제로 쓰이는 것이 관측됐다.** [#110](https://github.com/Shadowfit/init/issues/110) 이 "겹치는 인덱스 아니냐"고 의심한 셋 중 하나인데, 검색어가 걸린 조합의 세션 조회를 이게 받는다. 제거 후보에서 내려가는 근거다.
+>
+> 🔀 **2026-08-07 후속**: 이 관측이 #110 의 결론을 *"떼기"가 아니라 "합치기"* 로 돌린 근거 중 하나였다. 실제로 떼지 않고 `idx_session_member_status_start (member_id, status, start_time)` 로 통합했으므로 **이 경로는 그 인덱스의 앞 두 컬럼으로 그대로 받는다** — 등치 둘뿐인 조회라 세 번째 컬럼이 붙어도 seek 범위가 같다.
 
 ##### ② 추정 vs 실제 — **상태 필터에서만 정확히 2배 부풀려진다**
 
@@ -788,6 +792,8 @@ Filter: start_time >= ... < ...      (actual time=857..994  rows=20160  loops=1)
 ```
 
 선두가 `member_id` 라 **기간으로 seek 할 수가 없다.** 전체 인덱스를 훑고 필터로 98%를 버린다. 중복 제거를 공짜로 얻는 대신 스캔을 100만 행 치른 것이고, 옵티마이저 입장에서는 그게 임시 테이블을 쓰는 것보다 쌌다는 뜻이다.
+
+> 📌 **이 관측은 통합 전(2026-08-06)의 것이다.** 옵티마이저가 골랐던 `idx_session_member_starttime` 은 2026-08-07 통합으로 사라졌고, 아래 "가설"이던 `(start_time, member_id)` 가 `idx_session_starttime_member` 로 실제 채택됐다(§4-5-1 말미). 즉 **이 절이 진단한 문제는 지금 해결돼 있다** — 남겨두는 이유는 "왜 그 인덱스가 필요했나"의 근거가 여기이기 때문이다.
 
 **둘 다 얻는 인덱스가 있다** — `(start_time, member_id)` 면 기간으로 seek 하고, 그 범위 안에서 `member_id` 가 정렬돼 있어 중복 제거도 공짜다. 스크래치 DB 에 임시로 만들어 확인했다.
 
@@ -969,6 +975,20 @@ warm cache, 3회 실행 중 안정 구간(1회차는 콜드라 b 가 1.33s).
 > 🔶 **그래도 결정하지 않는다.** ㉲ 를 넣으면 `exercise_sessions` 인덱스가 6종이 되는데, **[#110](https://github.com/Shadowfit/init/issues/110) 이 "기존 5종 중 겹치는 게 있지 않나"를 아직 검증하지 않았다.** 겹치는 것을 정리하면서 ㉲ 를 넣는 것과, 그냥 6번째를 얹는 것은 다른 결정이다. 순서는 **#110 → ㉲** 다.
 >
 > **결정은 사용자 confirm 후.**
+
+##### ✅ 2026-08-07 — ㉲ 채택 확정 (#110 선결 완료)
+
+위 순서대로 갔다. [#110](https://github.com/Shadowfit/init/issues/110) 을 팬아웃 변수로 실측한 결과 `member_id` 선두 3종 중 둘이 **`(member_id, status, start_time)` 하나로 통합**됐고([`session-index-composition.md`](./session-index-composition.md)), 보조 인덱스가 4 → 3 이 되면서 예산이 났다. 그 위에 ㉲ 를 얹어 **총 4개 — 통합 전과 같다.**
+
+| | 통합 전 | 통합 후 + ㉲ |
+|---|--:|--:|
+| 보조 인덱스 수 | 4 | **4** |
+| 대시보드 e | 355ms | **13.6ms** |
+| `GET /sessions/active` (팬아웃 2000) | 2001행 | **1행** |
+
+> 📌 **"6번째를 얹어도 되나"의 답은 "5번째를 4번째로 만들고 얹어라"였다.** 인덱스 예산을 총량으로 보면 추가는 늘 손해로만 보이는데, 구성이 낭비되고 있으면 **정리가 곧 예산**이 된다. 겹침 검증(#110)이 성능 개선(㉲)의 **비용을 대신 낸 것**이지 그저 선행 조건이었던 게 아니다.
+
+마이그레이션: `mysql/migrations/2026-08-07-consolidate-session-member-indexes.sql` (한 ALTER 문, `ALGORITHM=INPLACE, LOCK=NONE`).
 
 #### ⑤ 곁가지 — 교과서 값 하나를 반증했다
 
