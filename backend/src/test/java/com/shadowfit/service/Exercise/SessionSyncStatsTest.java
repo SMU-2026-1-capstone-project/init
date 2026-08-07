@@ -78,7 +78,6 @@ class SessionSyncStatsTest {
                     .timestampSec(repNumber * 10.0 + i)
                     .jointCoordinates("{}")
                     .syncRate(syncRate)
-                    .isCorrect(syncRate >= 40.0)
                     .build());
         }
         poseDataRepository.flush();

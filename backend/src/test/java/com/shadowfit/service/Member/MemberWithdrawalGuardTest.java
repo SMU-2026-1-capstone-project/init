@@ -190,9 +190,15 @@ class MemberWithdrawalGuardTest {
      * (쓰기는 PoseDataService 의 JdbcTemplate 배치 담당) SQL 로 직접 넣어야 나이를 통제할 수 있다.
      */
     private void insertFrame(Long sessionId, LocalDateTime createdAt) {
+        // smoothed_knee_angle 을 명시한다. 엔티티에 @Builder.Default = 0.0 이 있지만 그것은
+        // **자바 객체를 만들 때** 채워지는 값이라 이 raw SQL 경로에는 오지 않는다. 운영
+        // 스키마(mysql/schema.sql)는 DEFAULT 0.00 이 있어 생략해도 통과하지만, 테스트의 H2
+        // DDL 은 @Column(nullable=false) 만 보고 NOT NULL 을 만들 뿐 DEFAULT 를 만들지 않는다.
+        // 즉 이 컬럼은 운영에서는 생략 가능하고 테스트에서는 아니다 — 그 차이가 여기서 드러난다.
         jdbcTemplate.update(
                 "INSERT INTO pose_data (session_id, rep_number, timestamp_sec, joint_coordinates, "
-                        + "sync_rate, feedback_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                sessionId, 1, 1.0, "{}", 72.5, "ok", createdAt);
+                        + "sync_rate, smoothed_knee_angle, feedback_message, created_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                sessionId, 1, 1.0, "{}", 72.5, 0.0, "ok", createdAt);
     }
 }

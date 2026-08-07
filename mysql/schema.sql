@@ -139,7 +139,14 @@ CREATE TABLE IF NOT EXISTS pose_data (
                                          timestamp_sec DECIMAL(10,3) NOT NULL, -- [수정] 소수점 타임스탬프 대응을 위해 DECIMAL로 변경
     joint_coordinates JSON NOT NULL,
     sync_rate DECIMAL(5,2) NOT NULL,
-    is_correct BOOLEAN DEFAULT TRUE,
+    -- 좌우 무릎각 평균을 최근 3프레임으로 평활한 값(도, 0=미상). 작을수록 깊게 앉은 것이다.
+    -- sync_rate 는 rep 단위 상수라 프레임을 구분하지 못하는데 joint_coordinates 는 프레임마다
+    -- 다르므로, 다운샘플에서 남길 프레임과 리포트 대표 프레임을 고르는 기준이 이 값이다
+    -- (docs/decisions/worst-section-rep-resolution.md §4-ㄹ).
+    smoothed_knee_angle DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+    -- is_correct 는 2026-08-01 삭제했다 — 읽는 곳이 없었고, sync_rate 에서 파생된 값인데
+    -- 임계값(40)을 쓰기 시점에 굳혀 저장해 AI 의 persona 임계값과 한 행 안에서 모순됐다.
+    -- migrations/2026-08-01-add-pose-data-smoothed-knee-angle.sql
     feedback_message VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id, created_at),

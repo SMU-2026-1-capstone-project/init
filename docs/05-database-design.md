@@ -94,18 +94,24 @@ CREATE TABLE exercise_sessions (
 ### pose_data (자세 데이터 - 1초당 평균값 저장)
 ```sql
 CREATE TABLE pose_data (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT,
     session_id BIGINT NOT NULL,
+    rep_number INT NOT NULL DEFAULT 0,    -- 이 프레임이 속한 rep (1-based, 0=미상). 재부착 시 MAX로 복원
     timestamp_sec DECIMAL(10,3) NOT NULL, -- 소수점 타임스탬프 (코드상 DECIMAL)
     joint_coordinates JSON NOT NULL,      -- 관절 좌표 평균값 (33개 포인트)
-    sync_rate DECIMAL(5,2) NOT NULL,      -- 해당 초의 싱크로율
-    is_correct BOOLEAN DEFAULT TRUE,
+    sync_rate DECIMAL(5,2) NOT NULL,      -- 해당 rep의 싱크로율 (rep 단위 채점 후 프레임마다 복제 → rep 안에서 상수)
+    smoothed_knee_angle DECIMAL(5,2) NOT NULL DEFAULT 0.00, -- 좌우 무릎각 평균의 3프레임 평활(0=미상). 작을수록 깊다
     feedback_message VARCHAR(500),        -- 실시간 피드백 메시지 (한국어, [project-korean-only])
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (session_id) REFERENCES exercise_sessions(id) ON DELETE CASCADE,
+    PRIMARY KEY (id, created_at),         -- 파티션 키가 모든 유니크키에 포함돼야 하는 제약
     INDEX idx_session_timestamp (session_id, timestamp_sec)
-);
+) PARTITION BY RANGE (UNIX_TIMESTAMP(created_at)) (...);
 ```
+
+> **이 표의 이력** — 실제 정의는 `mysql/schema.sql` 이 기준이다.
+> - **FK 없음**: 파티셔닝을 위해 제거했다(2026-07-20). 참조무결성은 `PoseDataService` 의 세션 존재 검증이 담당한다 → [`decisions/pose-data-partition-fk-tradeoff.md`](./decisions/pose-data-partition-fk-tradeoff.md)
+> - **`rep_number` 추가**(2026-07-31): 재부착 시 rep 카운트 복원 근거 → [`decisions/session-resume-and-ai-state.md`](./decisions/session-resume-and-ai-state.md) §3-3
+> - **`smoothed_knee_angle` 추가 · `is_correct` 삭제**(2026-08-01): `sync_rate` 는 rep 안에서 상수라 프레임을 구분하지 못해 대표 프레임 선택 기준이 필요했고, `is_correct` 는 읽는 곳이 없으면서 임계값 40 을 쓰기 시점에 굳혀 AI 의 persona 임계값과 모순됐다 → [`decisions/worst-section-rep-resolution.md`](./decisions/worst-section-rep-resolution.md) §4-ㄹ
 
 ### daily_logs (달력 일지)
 ```sql

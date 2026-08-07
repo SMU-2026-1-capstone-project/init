@@ -27,7 +27,7 @@ public interface PoseDataRepository extends JpaRepository<PoseData, Long> {
      * "프레임이 아예 없다"와 "rep 을 알 수 없는 프레임뿐이다"를 계산기가 구분해 다룰 수 있다.
      */
     @Query("SELECT new com.shadowfit.dto.report.PoseFrameProjection(" +
-           "p.timestampSec, p.syncRate, p.repNumber) " +
+           "p.timestampSec, p.syncRate, p.repNumber, p.smoothedKneeAngle) " +
            "FROM PoseData p WHERE p.session.id = :sessionId " +
            "ORDER BY p.repNumber ASC, p.timestampSec ASC")
     List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long sessionId);
