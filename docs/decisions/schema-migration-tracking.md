@@ -99,9 +99,18 @@ JPA 경로였다면 `ddl-auto: validate` 로 부팅 시 막을 수 있었다(현
 
 ### 5-1. ㄹ 이 이 프로젝트에서 유독 비싼 이유
 
-일반론("dev 는 되지만 데이터 있는 환경엔 못 씀")보다 구체적인 문제가 있다. dev 볼륨에는 **부하 실험 자산이 들어 있다** — 1억 행 / ~11GB 시딩([`realmysql-experiments.md §3`](../portfolio/realmysql-experiments.md), `loadtest/seed/seed_pose_scale.sh`). 볼륨을 날리는 것을 표준 절차로 삼으면 **스키마를 고칠 때마다 그 재시딩 비용을 낸다.**
+일반론("dev 는 되지만 데이터 있는 환경엔 못 씀")보다 구체적인 문제가 있다. 이 프로젝트에서 **볼륨을 날린다는 것은 부하 실험 기반을 날린다는 뜻**이고, 그 재구축 비용이 크다 — 1억 행 시딩은 **로컬에서 16~48분**이 걸린 작업이다([`realmysql-experiments.md §3`](../portfolio/realmysql-experiments.md), `loadtest/seed/seed_pose_scale.sh`). 볼륨 폐기를 표준 절차로 삼으면 **스키마를 고칠 때마다 그 비용을 낸다.**
 
-게다가 이 프로젝트의 실험은 대부분 "적재된 상태 위에서 재는 것"이라([`db-portfolio-roadmap.md §7`](./db-portfolio-roadmap.md)), 볼륨 폐기는 측정 기반 자체를 지우는 행위다.
+> 📌 **2026-08-07 실측 정정.** 이 문서 초판은 *"dev 볼륨에 1억 행 / ~11GB 가 들어 있다"* 고 현재형으로 썼는데 **사실이 아니다.** 지금 볼륨의 실제 상태는 이렇다:
+>
+> | 스키마 | 크기 | 내용 |
+> |---|:--:|---|
+> | `shadowfit` | **0.00 GB** | `pose_data` 0행. 애플리케이션 데이터만 소량(세션 7행) |
+> | `shadowfit_idx110` | 0.88 GB | [#110](https://github.com/Shadowfit/init/issues/110) 팬아웃 rig (`es_f5`/`es_f500`/`es_f2000` 각 ~100만 행) |
+>
+> 1억 행은 `pose_data` 가 아니라 **`pose_data_scale` 이라는 별도 테이블**에 있었고(2026-06-03), 이미 삭제된 상태다. 즉 ㄹ 의 대가는 *"지금 들어 있는 것을 잃는다"*가 아니라 **"다시 만드는 데 드는 시간"**이다. 결론(ㄹ 비추천)은 그대로지만 근거의 성격이 다르다.
+
+게다가 이 프로젝트의 실험은 대부분 "적재된 상태 위에서 재는 것"이라([`db-portfolio-roadmap.md §7`](./db-portfolio-roadmap.md)), 볼륨 폐기는 측정 기반 자체를 지우는 행위다. 위 `shadowfit_idx110` 이 그 예다 — **지금 실제로 볼륨에 살아 있는 실험 자산**이고, ㄹ 을 표준으로 삼으면 이것이 매번 날아간다.
 
 ### 5-2. ⚠️ ㄴ 을 고르면 비교 범위를 먼저 못박아야 한다
 
@@ -129,7 +138,7 @@ Flyway 는 이 파일을 그대로 **`V1__baseline.sql` 로 캡처**해 쓸 수 
 
 **#115 는 그 미이행 계획이 실제 결함으로 나타난 것이다.** 그래서 "할까 말까"보다 **"2학기 Week 1 로 미룰까, 지금 당길까"** 가 실제 질문에 가깝다.
 
-- 당길 근거: #4 CD 가 착수 2순위고 순서상 앞에 두는 게 싸다(§4). 지금 dev DB 가 실제로 깨져 있다
+- 당길 근거: #4 CD 가 착수 2순위고 순서상 앞에 두는 게 싸다(§4). dev DB 가 실제로 깨졌던 전력이 있다(§8-1 에서 해소 확인 — 다만 **적용된 것을 확인했을 뿐 누가 언제 했는지는 여전히 모른다**)
 - 미룰 근거: 지금 아픈 환경이 1대뿐이고, 그 1대는 §6 수동 적용으로 즉시 해결된다. 4~7h 를 남은 4덩어리에서 빼야 한다
 
 ---
@@ -138,13 +147,15 @@ Flyway 는 이 파일을 그대로 **`V1__baseline.sql` 로 캡처**해 쓸 수 
 
 > 아래는 작성 시점의 **추천**이었고, 2026-08-07 사용자 confirm 으로 **그대로 채택**됐다. 확정 내역과 그때 함께 못박은 조건들은 §8 참조.
 
-**0단계 (선택과 무관하게 먼저)** — 이슈 §6 의 수동 적용 3건. §3-1 때문에 ㄱ 을 고르면 **반드시 선행**이고, 안 골라도 지금 dev DB 는 깨져 있다.
+**0단계 (선택과 무관하게 먼저) — ✅ 완료 확인 (2026-08-07)** — 이슈 §6 의 수동 적용 3건. §3-1 때문에 ㄱ 을 고르면 **반드시 선행**이다.
 
 ```
 mysql/migrations/2026-08-03-add-admin-list-indexes.sql
 mysql/migrations/2026-08-03-add-sessions-last-active-at.sql
 mysql/migrations/2026-08-07-consolidate-session-member-indexes.sql   # 반드시 마지막
 ```
+
+dev DB 를 실측한 결과 **3건 모두 이미 반영돼 있었다.** 검증 내역은 §8-1.
 
 **추천: ㄱ (Flyway), 단 #4 CD 착수 직전에.** 근거 셋:
 
@@ -167,3 +178,32 @@ mysql/migrations/2026-08-07-consolidate-session-member-indexes.sql   # 반드시
   - **`schema.sql` 은 유지**한다(§5-3). 지우면 initdb·`SchemaEnumConsistencyTest`·관리자 필터 실측 rig 세 곳이 깨진다. `V1__baseline.sql` 로 캡처하는 방식을 쓰되, 신규 설치(initdb)와 기존(Flyway) 중 어느 쪽을 정본으로 삼을지는 **구현 시 결정**한다 — 4~7h 추정 폭이 여기서 나온다
   - **ㄴ(드리프트 탐지)은 채택하지 않는다.** 기각이 아니라 **별건으로 열어둔다**(§3) — ㄱ 을 넣어도 "손으로 바꾼 DB"는 여전히 안 보이지만, 그 구멍이 지금 아프다는 근거가 없다
   - **범위 밖**: OP-04 를 앞당기는 것이지 범위를 늘리는 게 아니다(§6). 이 결정에 CD 자체나 드리프트 탐지 구현은 포함되지 않는다
+- 2026-08-07: **✅ 0단계(수동 적용 3건) 완료 확인** — 실측 결과 3건 모두 이미 반영. 상세는 §8-1. **Flyway baseline 의 선행 조건이 풀렸다.**
+
+### 8-1. 0단계 검증 내역 (2026-08-07, 로컬 `shadowfit-mysql`)
+
+`information_schema` 로 최종 상태를 대조했다. **DDL 을 새로 실행하지는 않았다** — 이 3건은 `IF NOT EXISTS` 를 못 써 멱등하지 않으므로(각 파일의 "멱등성" 주석) 상태 확인이 선행이었고, 확인 결과 실행할 것이 없었다.
+
+| 마이그레이션 | 기대 | 실측 |
+|---|---|:--:|
+| `add-sessions-last-active-at` | `exercise_sessions.last_active_at` | ✅ |
+| `add-admin-list-indexes` | `idx_session_status_starttime` | ✅ |
+| ″ | `idx_users_created_at` | ✅ |
+| `consolidate-session-member-indexes` | `idx_session_member_status_start` 추가 | ✅ |
+| ″ | `idx_session_starttime_member` 추가 | ✅ |
+| ″ | 옛 `idx_session_member_starttime` 제거 | ✅ 없음 |
+| ″ | 옛 `idx_session_member_status` 제거 | ✅ 없음 |
+
+`exercise_sessions` 보조 인덱스 최종 구성 = `exercise_id`(FK) · `member_exercise_status_start` · `member_status_start` · `starttime_member` · `status_starttime` — §5-3 의 목표 상태와 일치한다.
+
+그리고 **§2 에서 깨지던 UPDATE 를 직접 실행해 확인했다:**
+
+```sql
+UPDATE exercise_sessions SET last_active_at = NOW() WHERE id = -1;   -- affected 0, 에러 없음
+```
+
+`Unknown column` 이 나지 않는다. #115 에서 **관측된 피해는 해소된 상태다.**
+
+> 🔶 **여전히 미검증**: §2 의 단서는 그대로 남는다. 확인한 것은 *"이 문장이 파싱·실행된다"* 까지고, **앱을 띄워 실제 요청 경로로 흘려본 것은 아니다.**
+
+> 📌 **누가 언제 적용했는지는 모른다.** `users` 의 `CREATE_TIME` 이 2026-08-07 15:41, `exercise_sessions` 가 16:32 로 마이그레이션 순서와 정합적이지만, `CREATE_TIME` 은 `ALTER` 로도 갱신되므로 근거로는 약하다. **이것이 정확히 §3 이 말한, `flyway_schema_history` 한 줄이면 끝났을 질문이다** — 결과적으로 이번 확인 자체가 ㄱ 의 도입 근거를 한 번 더 보여준 셈이다.
