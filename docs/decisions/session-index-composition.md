@@ -1,7 +1,7 @@
 # `exercise_sessions` 인덱스 구성 — 떼기가 아니라 합치기
 
 작성: 2026-08-07
-상태: **분석 완료 · 🟢 추천 있음 · 채택 미확정** (결정은 사용자 confirm 후 박제)
+상태: **✅ 채택 확정 (2026-08-07 confirm)** — ㄴ안 통합 + 6번째 ㉲ 동시 적용. 결정 내역은 §8
 발단: [이슈 #110](https://github.com/Shadowfit/init/issues/110) — "`member_id` 선두 인덱스 3종이 겹친다. 6번째를 얹기 전에 재검토해야"
 측정 장치: [`loadtest/measure_index_overlap.sh`](../../loadtest/measure_index_overlap.sh) (PR #112)
 연관: [`admin-page-scope.md`](./admin-page-scope.md) §4-5-1(6번째 인덱스 후보 ㉲) · [`pose-data-partition-fk-tradeoff.md`](./pose-data-partition-fk-tradeoff.md) · [`load-test-glossary.md`](./load-test-glossary.md)
@@ -253,7 +253,7 @@ exercise_sessions     ▁▂▃▄▅▆▇█    ← 계속 쌓임. 상한 없�
 
 ---
 
-## 6. 🟢 추천 (미확정)
+## 6. ✅ 추천 → 채택됨 (2026-08-07 confirm, §8)
 
 **ㄴ안 채택** — `(m,st)` · `(m,status)` 를 **`(m, status, start_time)`** 하나로 통합.
 
@@ -283,9 +283,13 @@ exercise_sessions     ▁▂▃▄▅▆▇█    ← 계속 쌓임. 상한 없�
 5. **DAU 1,000 은 가정이지 관측이 아니다.** 다만 §5-4 대로 DAU 는 팬아웃을 바꾸지 않으므로, 이 가정이 틀려도 결론은 잘 안 흔들린다. 흔들리는 것은 §5-1 의 **운동 빈도** 가정이다
 6. **버퍼풀 점유는 재지 않았다**(이슈 체크박스 3번). 인덱스 공간 점유로 갈음했다
 
-## 8. 🔶 미결 (사용자 confirm 필요)
+## 8. ✅ 결정 (2026-08-07 confirm)
 
-- [ ] **ㄴ안 채택 여부** — 채택 시 마이그레이션 1건(`(m,status,st)` 추가 + `(m,st)`·`(m,status)` 삭제)
-- [ ] 채택 시 **6번째 ㉲ `(start_time, member_id)` 를 같이 얹을지** (§6-1)
-- [ ] Q4 주간 리포트의 skip scan 불안정성(§4-2)을 감수할지, `(m,st)` 를 남겨 4개로 갈지
+- [x] **ㄴ안 채택** — `(m,st)`·`(m,status)` 를 `(m, status, st)` 하나로 통합. 마이그레이션 `mysql/migrations/2026-08-07-consolidate-session-member-indexes.sql`
+- [x] **6번째 ㉲ `(start_time, member_id)` 를 같이 얹는다** (§6-1) — 통합으로 4 → 3 이 된 뒤 얹어 **총 4개, 이전과 같다**
+- [x] **Q4 주간 리포트의 skip scan 불안정성(§4-2)을 감수한다** — `(m,st)` 를 남겨 4개로 가지 않는다.
+      근거: 최악(팬아웃 50, skip scan 미선택)이 51행 / 0.04ms 로 절대치가 작고, 그 대가로 사는 것은
+      `GET /sessions/active` 의 **팬아웃 무관 상수 1행**이다. 앱 실행·복귀마다 불리는 쪽을 산다.
+      🔶 다만 "옵티마이저의 선택이 팬아웃에 따라 갈린다"는 성질 자체는 남아 있다 — 팬아웃이 커진 뒤
+      주간 리포트가 느려지면 여기를 먼저 볼 것
 - [x] ~~`exercise_sessions` 보존 정책(TTL)을 넣을지~~ → **🟢 넣지 않는 것을 추천. 근거는 §5-5.** 연 ~67MB(`pose_data` 의 1/450)라 부피가 문제가 아니고, 팬아웃 문제는 ㄴ안이 Q3 를 상수 1행으로 만들어 해소하며, 세션 요약은 사용자 자산이라 제품적으로 지울 수 없다. **이것도 추천이지 확정은 아니다**

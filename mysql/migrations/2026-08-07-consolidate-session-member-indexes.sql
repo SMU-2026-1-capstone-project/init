@@ -1,0 +1,99 @@
+-- 2026-08-07 — exercise_sessions 의 member_id 선두 인덱스 통합 + 대시보드용 6번째 추가
+--               (이슈 #110, docs/decisions/session-index-composition.md)
+--
+-- ── 무엇을 하는가 ────────────────────────────────────────────────────────────
+--
+--   DROP  idx_session_member_starttime      (member_id, start_time)
+--   DROP  idx_session_member_status         (member_id, status)
+--   ADD   idx_session_member_status_start   (member_id, status, start_time)   ← 위 둘의 통합
+--   ADD   idx_session_starttime_member      (start_time, member_id)           ← 대시보드 e 전용
+--
+--   보조 인덱스 개수는 **4개 그대로**다(FK 자동 인덱스 별도). 개수가 아니라 구성이 바뀐다.
+--
+-- ── 왜 하는가 ────────────────────────────────────────────────────────────────
+--
+--   이슈는 "member_id 선두 3종이 겹치니 일부를 떼도 되나"를 물었는데, 실측 결과 답은
+--   **"떼면 안 되고 합쳐야 한다"** 였다. 그리고 합치면 겹침 해소가 아니라 새 이득이 나온다.
+--
+--   (member_id, status) 가 GET /sessions/active 에서 "일하는 척"만 하고 있었다.
+--   findFirstByMemberIdAndStatusOrderByStartTimeDesc 는 등치 둘 + ORDER BY start_time LIMIT 1
+--   인데 이 인덱스가 정렬을 못 받쳐, 옵티마이저가 정렬 비용을 보고 다른 인덱스로 도망가
+--   **회원의 전 세션을 읽고 정렬했다.**
+--
+--     팬아웃(회원당 세션 수)  현행 읽은 행 / 시간      통합 후
+--       50                     51행 / 0.050ms          1행 / 0.025ms
+--      500                    501행 / 0.427ms          1행 / 0.041ms
+--     2000                   2001행 / 1.02ms           1행 / 0.052ms
+--
+--   통합하면 앞 두 컬럼이 등치로 고정된 뒤 남은 구간이 이미 start_time 순이라 LIMIT 1 이
+--   진짜 1행이 된다 — **팬아웃과 무관한 상수**다. (Handler 카운터 실측. EXPLAIN 의 rows 는
+--   이 rig 에서 38배 부풀려진 전력이 있어 쓰지 않는다.)
+--
+--   DAU 1,000 가정에서 활성 회원의 1년차 팬아웃은 주 2회면 104, 주 3회면 156 이라
+--   꺾이는 지점(약 100)을 넘는다. 그리고 exercise_sessions 는 삭제 스케줄러가 없어
+--   팬아웃이 단조 증가한다 — 되돌아오지 않는다. (문서 §5)
+--
+-- ── 대가 ─────────────────────────────────────────────────────────────────────
+--
+--   주간 리포트(findWeeklySessionsWithExercise, member_id + start_time 범위)가 status 를
+--   건너뛰어야 해 읽는 행이 14 → 20 으로 는다(팬아웃 500, 절대 0.03ms).
+--   ⚠️ 팬아웃 50 에서는 옵티마이저가 skip scan 을 고르지 않아 2 → 51행이 된다. 절대 시간은
+--      0.04ms 지만 선택이 팬아웃에 따라 갈리는 것은 불안정 요소로 남는다(문서 §4-2).
+--   GET /sessions/active 는 앱 실행·복귀마다 불리고 주간 리포트는 화면을 열어야 불린다 —
+--   더 뜨거운 쪽을 산다.
+--
+-- ── 컬럼 순서 (반사실을 재고 골랐다) ─────────────────────────────────────────
+--
+--   (member_id, start_time, status) 도 같은 실행 안에서 측정했다. 뒤집으면 status 로 못 좁혀
+--   탈퇴 가드가 정확히 2배를 읽는다(1000 → 2001행). 그리고 뒤집은 쪽이 GET /sessions/active
+--   에서 선방한 것은 인덱스가 아니라 **분포 덕**이었다 — 최신순으로 훑으며 status 를 필터로
+--   확인하므로 찾는 값이 흔할수록 빨리 멈춘다. rig 의 COMPLETED 는 50% 라 한두 행에 걸린다.
+--   그런데 실제로 찾는 IN_PROGRESS 는 회원당 많아야 1건이라 **그 최악을 rig 가 재지 않았다.**
+--   이 순서는 status 가 아무리 드물어도 1행이라 그 위험이 없다.
+--
+-- ── 소요 시간 · 잠금 ─────────────────────────────────────────────────────────
+--
+--   ⚠️ 인덱스 DDL 은 INSTANT 가 아니다. ADD/DROP INDEX 는 ALGORITHM=INPLACE 로 처리되며
+--      **테이블 재구성은 없지만 인덱스 자체는 실제로 만든다** — 행 수에 비례한다.
+--      LOCK=NONE 이므로 온라인 DDL 이고 읽기·쓰기가 계속되지만, 실행 중 DML 은 온라인 로그에
+--      쌓였다가 마지막에 적용되므로 **쓰기가 몰리는 시간대는 피할 것.**
+--
+--      실측(로컬 docker MySQL 8.0.46, 100만 행): 인덱스 1개 생성 약 3~6초.
+--      이 문장은 2개를 만들고 2개를 지우므로 100만 행 기준 10초 내외를 예상한다.
+--      ⚠️ 이 수치는 2코어 동거 장비의 것이라 운영 환경의 추정치로 쓰지 말 것.
+--
+--   한 ALTER 문으로 묶는 이유: 메타데이터 잠금을 한 번만 잡고, 옵티마이저가 중간 상태
+--   (통합 인덱스는 없는데 옛 인덱스는 지워진 상태)를 보지 않게 한다. 나눠 실행하면 그 사이
+--   GET /sessions/active 가 최악의 계획으로 떨어진다.
+--
+-- ── 멱등성 / 되돌리기 ────────────────────────────────────────────────────────
+--
+--   MySQL 은 ADD/DROP INDEX IF (NOT) EXISTS 를 지원하지 않는다. 재실행 시
+--     1061 (Duplicate key name)        → ADD 가 이미 적용됨
+--     1091 (Can't DROP ...; check that it exists) → DROP 이 이미 적용됨
+--   둘 중 하나가 나면 이미 적용된 것이다. 한 문장이라 부분 적용 상태로 남지 않는다.
+--
+--   적용 전후 확인:
+--     SELECT INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) cols
+--     FROM information_schema.STATISTICS
+--     WHERE TABLE_SCHEMA='shadowfit' AND TABLE_NAME='exercise_sessions'
+--     GROUP BY INDEX_NAME;
+--
+--   되돌리려면:
+--     ALTER TABLE exercise_sessions
+--         DROP INDEX idx_session_member_status_start,
+--         DROP INDEX idx_session_starttime_member,
+--         ADD INDEX idx_session_member_starttime (member_id, start_time),
+--         ADD INDEX idx_session_member_status (member_id, status);
+
+USE shadowfit;
+
+-- ---------------------------------------------------------------------------
+-- 한 문장으로 실행한다 (위 "한 ALTER 문으로 묶는 이유" 참고)
+-- ---------------------------------------------------------------------------
+ALTER TABLE exercise_sessions
+    ADD INDEX idx_session_member_status_start (member_id, status, start_time),
+    ADD INDEX idx_session_starttime_member (start_time, member_id),
+    DROP INDEX idx_session_member_starttime,
+    DROP INDEX idx_session_member_status,
+    ALGORITHM=INPLACE, LOCK=NONE;

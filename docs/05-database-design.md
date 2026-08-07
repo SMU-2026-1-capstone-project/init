@@ -223,24 +223,41 @@ MediaPipe의 33개 관절 포인트에 대한 1초 평균 좌표:
 
 | 인덱스 | 컬럼 | 겨냥한 쿼리 | 삽입 성격 |
 |---|---|---|---|
-| `idx_session_member_starttime` | `(member_id, start_time)` | 주간 리포트·캘린더 | 🔴 무작위 |
-| `idx_session_member_status` | `(member_id, status)` | 활성 세션 확인, 관리자 검색 경로 | 🔴 무작위 |
+| `idx_session_member_status_start` | `(member_id, status, start_time)` | 활성 세션 확인, 탈퇴 가드, 주간 리포트·캘린더, 관리자 검색 경로 | 🔴 무작위 |
 | `idx_session_member_exercise_status_start` | `(member_id, exercise_id, status, start_time)` | 직전 동일 운동 비교 | 🔴 무작위 |
 | `idx_session_status_starttime` | `(status, start_time)` | 관리자 세션 목록 기본 진입 | 🔶 상태 블록 내 순차 |
+| `idx_session_starttime_member` | `(start_time, member_id)` | 관리자 대시보드 활성 회원 집계 | 🟢 append |
 | *(FK)* `exercise_id` | `(exercise_id)` | FK 제약 | — |
 
 **"삽입 성격" 열의 뜻** — 세션은 시간순으로 도착하는데(`SessionService:121` 이 `startTime(now())`),
 인덱스가 **무엇으로 정렬돼 있느냐**에 따라 그게 append 로 보이기도 하고 무작위로 보이기도 한다.
-`member_id` 선두는 "누가 언제 운동할지 모른다"라 무작위다. **보조 인덱스 4개 중 3개가 그렇다.**
+`member_id` 선두는 "누가 언제 운동할지 모른다"라 무작위다. **보조 인덱스 4개 중 2개가 그렇다.**
 
-> 🔶 **[#110](https://github.com/Shadowfit/init/issues/110) — 그 셋이 겹치는지 미검증.**
-> 2026-08-07 실측에서 양방향 증거가 하나씩 나왔다: 쓰기 부담의 지배 요인이 그 셋이라는 것(무작위
-> 3종 16.6s vs 1종 12.3s)과, `idx_session_member_status` 는 관리자 검색 경로에서 **실제로 쓰인다**는 것.
-> 질문은 "지울까"가 아니라 **"어떻게 합칠까"** 로 남아 있다.
+> ✅ **[#110](https://github.com/Shadowfit/init/issues/110) 해소 (2026-08-07)** — `member_id` 선두 3종이
+> 겹치는지가 질문이었고, 답은 **"떼면 안 되고 합쳐야 한다"** 였다.
+> `(member_id, start_time)` 와 `(member_id, status)` 를 **`(member_id, status, start_time)`** 하나로 통합했다.
 >
-> 🔶 **6번째 후보 `(start_time, member_id)`** — 대시보드 집계 e 를 355ms → 13.6ms(26배)로 줄이고,
-> `start_time` 이 `now()` 라 **append** 이므로 쓰기 대가가 실측 **1.007배**다. 다만 #110 이 선결이라 미결.
+> 겹침 해소가 목적이었는데 **새 이득이 나왔다.** `(member_id, status)` 가 `GET /sessions/active` 에서
+> "일하는 척"만 하고 있었다 — 등치 둘 + `ORDER BY start_time LIMIT 1` 인데 정렬을 못 받쳐 옵티마이저가
+> 다른 인덱스로 도망가 **회원의 전 세션을 읽고 정렬했다.** 통합 후엔 팬아웃(회원당 세션 수)과 무관하게
+> **상수 1행**이다: 팬아웃 2000 에서 2001행 → 1행.
+> 대가는 주간 리포트가 `status` 를 건너뛰어야 해 읽는 행이 14 → 20 으로 느는 것(절대 0.03ms).
+> 근거: [`decisions/session-index-composition.md`](./decisions/session-index-composition.md).
+>
+> ✅ **그 위에 `(start_time, member_id)` 를 얹었다** — 대시보드 집계 e 를 355ms → 13.6ms(26배)로 줄이고,
+> `start_time` 이 `now()` 라 **append** 이므로 쓰기 대가가 작다 — 실측 **1.007배**.
+>
+> ⚠️ **이 수치를 최종 구성의 쓰기 대가로 읽으면 안 된다.** 1.007배는 *"기존 5개 위에 이 인덱스를
+> 하나 더 얹으면"* 을 잰 값이다(통합 전 기준, `admin-page-scope.md` §4-5-1). 지금 구성은
+> **2개를 빼고 2개를 넣은 4개**라 기준선이 다르다. 통합 전·후 구성으로 재측정한 값은 **없다.**
+> 참고로 `session-index-composition.md` §4-4 는 통합 자체가 인덱스 개수를 줄여 `base` 보다
+> 싸다는 **방향**까지만 신뢰하고 배수는 근거로 쓰지 않기로 했다.
+> #110 이 선결이었던 이유는 예산이다: 통합으로 4 → 3 이 된 뒤에 얹어 **총 4개로 이전과 같다.**
 > 근거: [`decisions/admin-page-scope.md`](./decisions/admin-page-scope.md) §4-5-1.
+>
+> 🔶 **남은 불안 요소** — 주간 리포트가 `status` 를 건너뛰는 skip scan 은 **팬아웃에 따라 선택이 갈린다**
+> (팬아웃 500 에선 고르고, 50 에선 안 골라 2 → 51행). 절대 시간은 0.04ms 라 감수했지만 불안정성은 남는다
+> (`session-index-composition.md` §4-2).
 
 ### `users`
 
