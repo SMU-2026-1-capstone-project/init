@@ -23,7 +23,13 @@ CREATE TABLE IF NOT EXISTS users (
     tts_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     tts_speed DECIMAL(3,1) NOT NULL DEFAULT 1.0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- DATETIME 대신 TIMESTAMP 권장 (타임존 대응)
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- 자동 갱신 설정
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 자동 갱신 설정
+    -- 관리자 회원 목록 전용 (admin-page-scope.md §4 ㄱ안, 2026-08-03).
+    -- 이 테이블에는 보조 인덱스가 없었다 — 지금까지 users 조회가 전부 PK/UNIQUE 단건이었기
+    -- 때문이다. 관리자 목록은 반대로 member_id 조건 없이 전체를 기간·정렬로 훑는다.
+    -- 기본 정렬이 가입일 최신순이고 기간 필터가 유일한 범위 조건이라 created_at 단일로 잡는다.
+    -- 다른 필터(페르소나·레벨·온보딩)는 선택도가 낮은 enum/boolean 이라 선두로 세울 값이 없다.
+    INDEX idx_users_created_at (created_at)
     );
 
 -- 2-1. 리프레시 토큰 (RefreshToken.java — 기존에 ddl-auto=update로 암묵 생성되던 테이블, 2026-07-15 명시화)
@@ -71,6 +77,11 @@ CREATE TABLE IF NOT EXISTS exercise_sessions (
                                                  reference_source VARCHAR(500),
     start_time DATETIME NOT NULL,
     end_time DATETIME,
+    -- 마지막으로 활동이 관측된 시각 (session-liveness-vs-elapsed-time.md ㄷ안).
+    -- rep 이 완성돼 SavePoseDataBatch 가 들어올 때 갱신된다 — Spring 은 개별 프레임을 받지
+    -- 않으므로 이것이 얻을 수 있는 가장 촘촘한 활동 신호다.
+    -- NULL 이면 "아직 rep 이 하나도 없음"이고, 그때는 기존 식(start_time 앵커)으로 폴백한다.
+    last_active_at DATETIME,
     total_reps INT DEFAULT 0,
     avg_sync_rate DECIMAL(5,2),
     max_sync_rate DECIMAL(5,2),
@@ -94,7 +105,20 @@ CREATE TABLE IF NOT EXISTS exercise_sessions (
     -- 인덱스로는 exercise_id가 중간에 껴서 status까지 seek 못 하고 member_id로 찾은 뒤 status를
     -- filter(filtered 10%, rows 1675)하는 게 EXPLAIN으로 확인돼 추가 — (member_id, status)만으로
     -- 바로 seek해 rows 1, filtered 100%로 개선 (2026-07-16).
-    INDEX idx_session_member_status (member_id, status)
+    INDEX idx_session_member_status (member_id, status),
+    -- 관리자 세션 목록 전용 (admin-page-scope.md §4 ㄱ안, 2026-08-03).
+    -- 위 세 인덱스는 전부 member_id 선두다 — 지금까지의 모든 조회가 "내 데이터"였으므로
+    -- 올바른 설계였다. 관리자 목록은 member_id 조건 없이 상태·기간으로 전체를 거르므로
+    -- 선두 컬럼이 안 맞아 셋 다 타지 않는다. 같은 테이블에 읽기 주체가 둘이면 인덱스
+    -- 전략이 갈린다.
+    --
+    -- (status, start_time) 순서인 이유: status 는 등치, start_time 은 범위·정렬이다.
+    -- 등치를 선두에 두어야 범위 조건이 인덱스 순서를 그대로 쓴다. 뒤집으면 status 가
+    -- 인덱스로 안 걸러져 filesort 가 남는다.
+    --
+    -- ⚠️ 쓰기 비용이 공짜가 아니다 — 세션 INSERT 는 이 프로젝트의 핵심 쓰기 축이다.
+    -- 실측은 loadtest/measure_admin_index.sh.
+    INDEX idx_session_status_starttime (status, start_time)
     );
 
 -- 6. 자세 데이터

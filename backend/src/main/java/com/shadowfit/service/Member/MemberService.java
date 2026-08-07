@@ -5,20 +5,24 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.security.jwt.JwtBlacklist;
 import com.shadowfit.global.security.jwt.JwtUtil;
+import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.RefreshToken;
 import com.shadowfit.model.member.UserRole;
+import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.member.RefreshTokenRepository;
 import com.shadowfit.service.Exercise.PoseDataCleanupService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -29,9 +33,24 @@ public class MemberService{
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final SessionRepository sessionRepository;
+    private final PoseDataRepository poseDataRepository;
     private final PoseDataCleanupService poseDataCleanupService;
     private final PasswordEncoder passwordEncoder;
     private final JwtBlacklist jwtBlacklist;
+
+    /**
+     * 이 시간 동안 프레임 유입이 없으면 그 세션은 죽은 것으로 본다(탈퇴 가드 판정 기준).
+     *
+     * <p><b>기준은 배치 간격이 아니라 세트 간 휴식이다.</b> 휴식 중에는 rep 이 완성되지 않아 AI 가
+     * 콜백을 보내지 않으므로, Spring 이 보기엔 죽은 세션과 구분되지 않는다. 이 프로젝트는 이미 같은
+     * 이유로 ET-C(AI timeout 자동 종료)를 거부한 적이 있다(tts-design.md §2.A: "세트 사이 휴식
+     * 시간(30~90초)도 frame 안 오는 구간이라 휴식과 종료 구분 불가").
+     *
+     * <p>{@code restTimeSec = max(90 - (level-1)*5, 30)} → 최대 90초(초급자,
+     * 12-persona-difficulty.md:90). 2배 여유를 둬 180초.
+     */
+    @Value("${member.withdrawal.active-workout-idle-seconds:180}")
+    private long activeWorkoutIdleSeconds;
     //로그인 로직
     @Transactional
     public LoginResponseDto login(LoginRequestDto dto){
@@ -78,11 +97,15 @@ public class MemberService{
             throw new BusinessException(ErrorCode.USERID_DUPLICATION);
         }
         String encodedPassword = passwordEncoder.encode(dto.getPassword());
+        // sex 는 지금까지 DTO 로 받기만 하고 엔티티에 옮기지 않아 조용히 버려졌다 —
+        // Swagger 는 REQUIRED 라고 표기하는데 저장은 안 되던 상태였고, 그래서 members.sex 에
+        // 값이 닿은 적이 없어 Sex enum 의 철자 오류(FEAMALE)도 여태 잠복해 있었다.
         Member member = Member.builder()
                 .username(dto.getUsername())
                 .email(dto.getEmail())
                 .password(encodedPassword)
                 .role(dto.getRole())
+                .sex(dto.getSex())
                 .build();
         memberRepository.save(member);
         return member.getUsername();
@@ -93,6 +116,14 @@ public class MemberService{
     public void deleteAccount(String email){
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(()-> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // createSession 과 같은 회원 행 락을 잡는다. 아래 "운동 중인가" 확인과 실제 삭제 사이에
+        // 새 세션이 시작되면 그 세션의 pose_data 가 정리를 빠져나가므로(이슈 #87), 확인만으로는
+        // 또 TOCTOU 다. createSession(SessionService:95)이 같은 락을 쓰므로 둘이 직렬화된다.
+        memberRepository.findByIdForUpdate(member.getId())
+                .orElseThrow(()-> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        requireNoActiveWorkout(member.getId());
 
         // pose_data는 파티셔닝을 위해 FK(ON DELETE CASCADE)를 제거했음 — 세션이 지워지기 전에
         // session_id 목록을 미리 확보해둬야 afterCommit 이후 정리할 수 있음
@@ -116,5 +147,35 @@ public class MemberService{
                     }
             );
         }
+    }
+
+    /**
+     * 운동이 <b>실제로 진행 중</b>이면 탈퇴를 거절한다. 세션 1건 삭제가 이미 같은 방침을 쓰고 있는데
+     * (SessionService.deleteSession, W006) 탈퇴 경로에만 빠져 있었다 — 그래서 "진행 중 세션 1건은
+     * 못 지우는데 그 세션을 가진 회원 전체는 지울 수 있는" 상태였다
+     * (docs/decisions/withdrawal-with-active-session.md, 이슈 #87).
+     *
+     * <p><b>판정을 상태값이 아니라 데이터 흐름으로 하는 이유.</b> {@code IN_PROGRESS} 만 보면 앱이
+     * 죽어 남은 세션 때문에 <b>운동 중이 아닌 사용자가 최대 ~45분간 탈퇴하지 못한다</b>(타임아웃
+     * 스케줄러가 걷어갈 때까지). 사용자에게는 원인이 안 보이는 형태라 안내 문구로 덮을 수 없다.
+     * 살아있는 세션은 rep 단위로 3~4초마다 프레임을 보내므로, 유입이 끊긴 것을 죽었다는 증거로 쓴다.
+     *
+     * <p>임계값의 기준은 배치 간격(~3~4초)이 아니라 <b>세트 간 휴식(최대 90초)</b>이다. 짧게 잡으면
+     * 쉬는 중인 사용자를 죽은 것으로 오판해 <b>정말 운동 중인데 탈퇴가 통과</b>한다 — 그건 막으려던
+     * 결함 그 자체라, 반대 방향 오판(죽은 세션 때문에 몇 분 더 기다림)보다 훨씬 나쁘다.
+     */
+    private void requireNoActiveWorkout(Long memberId) {
+        List<Long> inProgressIds =
+                sessionRepository.findIdsByMemberIdAndStatus(memberId, Status.IN_PROGRESS);
+        if (inProgressIds.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime since = LocalDateTime.now().minusSeconds(activeWorkoutIdleSeconds);
+        if (poseDataRepository.countSince(inProgressIds, since) > 0) {
+            throw new BusinessException(ErrorCode.WITHDRAWAL_BLOCKED_BY_ACTIVE_SESSION);
+        }
+        // 유입이 끊긴 IN_PROGRESS 세션(앱이 죽은 좀비)은 막지 않는다 — 탈퇴를 진행하고,
+        // 세션은 users CASCADE 로, pose_data 는 아래 afterCommit 정리로 함께 사라진다.
     }
 }
