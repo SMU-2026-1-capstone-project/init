@@ -140,11 +140,15 @@
 | D 대시보드 `GET /admin/stats/overview` (위젯 5종) | ✅ 실측 포함 |
 | 관리자 목록용 인덱스 2종 + 근거 | ✅ |
 | **C 운동/영상 관리** (목록·수정·삭제) | ⏸ **보류** — 등록 API 만 있음 |
-| **관리자 프론트** | ❌ **미착수.** 어디에 만들지(별도 웹 vs RN 탭)가 미결 |
+| **관리자 프론트** | ❌ **미착수.** ✅ 위치는 확정(2026-08-07) — **별도 웹 + 페이지 번호**. 스택·레포 위치는 미정 |
 
 **남은 6~12h 의 대부분은 프론트다.** 백엔드에서 남은 것은 C(CRUD 3개) 정도이고, 그건 A·B 와 같은 패턴이라 새 설계가 없다.
 
-⚠️ **그런데 프론트 위치가 안 정해지면 백엔드도 완전히는 못 닫는다** — 페이지 번호냐 무한 스크롤이냐가 `offset+count` 유지 여부를 가르기 때문이다([`../decisions/admin-page-scope.md`](../decisions/admin-page-scope.md) §5·§8-6). 현재는 offset 유지로 **잠정** 진행 중이다.
+~~⚠️ **그런데 프론트 위치가 안 정해지면 백엔드도 완전히는 못 닫는다** — 페이지 번호냐 무한 스크롤이냐가 `offset+count` 유지 여부를 가르기 때문이다. 현재는 offset 유지로 **잠정** 진행 중이다.~~
+
+✅ **2026-08-07 해소 — 별도 웹 + 페이지 번호로 확정**([`../decisions/admin-page-scope.md`](../decisions/admin-page-scope.md) §5-1). `offset+count` 가 **확정**됐고 `PageResponse`·`countOf` 의 잠정 상태가 풀렸다. **백엔드에서 남은 것은 C(운동/영상 CRUD 3개) 하나뿐**이고, A·B 와 같은 패턴이라 새 설계가 없다.
+
+> 📌 **이 결정 하나가 세 개를 풀었다** — #3 백엔드 종료 조건, `offset` 확정, keyset 의 자리. 특히 세 번째: keyset 은 관리자에서 자리를 잃고 **리포트 히스토리·캘린더**로 갔는데, 그쪽이 `(member_id, status, start_time)` 통합 인덱스([`../decisions/session-index-composition.md`](../decisions/session-index-composition.md), 2026-08-07)를 그대로 타는 자리라 오히려 접점이 더 직접적이다. **keyset 은 이제 선결 없이 착수 가능하다.**
 
 **목록에 없던 채로 늘어난 것** (시간 미추정) — 대부분 [코드 검증](./29-ai-code-verification.md)에서 나왔다:
 
@@ -267,7 +271,7 @@ Claude 병행 배율이 항목마다 다른 이유. 아래는 **0% 압축**된�
 | [#78](https://github.com/Shadowfit/init/issues/78) | 고치는 방법 3안(rep 단위 계산 / 짧은 rep 보정 / 프레임별 점수) 결정 — 비교는 [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md), **ㄱ안 추천(3~5h)** |
 | [#79](https://github.com/Shadowfit/init/issues/79) | **[#78](https://github.com/Shadowfit/init/issues/78) 결정에 종속** — ㄷ안(프레임별 점수)이면 코드 수정 없이 해소된다 |
 
-**독립적으로 바로 착수 가능**: #4, #5, 프론트 연동.
+**독립적으로 바로 착수 가능**: #4, #5, 프론트 연동, **keyset 페이지네이션**(2026-08-07 추가 — 관리자 프론트 위치가 확정돼 선결이 사라졌다. 자리는 관리자 목록이 아니라 리포트 히스토리·캘린더다).
 
 ---
 
