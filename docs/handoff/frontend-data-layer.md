@@ -1,6 +1,23 @@
 # 프론트 데이터 계층 누락 — 핸드오프
 
-> 작성: 2026-06-04 · 대상: 프론트 담당
+> ## ✅ 이 핸드오프는 완료됐다 (2026-08-08 파일 확인)
+>
+> **요청한 7개가 전부 존재한다.** 이 문서는 요청서라 본문(계약 명세)을 그대로 둔다 — 지금은 *"만들어라"* 가 아니라 *"무슨 계약으로 만들었나"* 를 보는 참조로 쓴다.
+>
+> | 요청 | 상태 |
+> |---|---|
+> | `types/preference.ts` · `types/feedback.ts` · `types/pose.ts` | ✅ 3/3 (`frontend/types/`) |
+> | `services/memberService.ts` · `preferenceService.ts` · `exercisesService.ts` · `aiService.ts` | ✅ 4/4 (`frontend/services/`) |
+>
+> `frontend/services/` 에는 그 밖에 `api.ts`·`authService.ts`(기존 참고 스타일)와 `reportService.ts`(문서에 없던 추가분)가 있다.
+>
+> ⚠️ **언제 만들어졌는지는 이 문서로 알 수 없다.** 완료 표시가 없어 2개월간 «부팅 안 됨»으로 읽혔다 — [`ai-h2-auth-middleware.md`](./ai-h2-auth-middleware.md) 와 **같은 드리프트가 같은 디렉터리에서 두 번** 났다.
+>
+> 🔴 **다만 §7 `aiService.ts` 는 이행 방식에 결함이 있다** — 내부 서비스 토큰을 앱 번들에 심는다: [#134](https://github.com/Shadowfit/init/issues/134). 이 문서가 *"Spring 아님 — AI 서버 직결"* 이라고 경고한 바로 그 항목이다.
+>
+> 📌 **남은 프론트 작업은 데이터 계층이 아니라 «세션 생명주기» 다** → [`frontend-session-lifecycle.md`](./frontend-session-lifecycle.md). 2026-08-08 확인 기준 `reattach` 호출이 프론트에 **아직 없다**(`frontend/` 전체 검색 0건).
+
+> 작성: 2026-06-04 · 완료 확인: **2026-08-08** · 대상: 프론트 담당
 > 한 줄: 화면(.tsx)은 다 작성됐는데 **서버 연결 코드(service/type) 7개가 안 만들어져** expo 부팅이 안 됨.
 > 백엔드 API는 전부 존재하고 포스트맨으로 검증됨. 아래 7개를 백엔드 계약대로 만들면 연결됨.
 
