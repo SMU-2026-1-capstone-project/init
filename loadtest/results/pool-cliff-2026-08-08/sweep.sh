@@ -10,7 +10,7 @@ S="ssh -i $PEM -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o Co
 # ⚠️ 퍼블릭 IP 2개(APP/OBS)는 커밋할 때 치환했다. 인스턴스는 측정 직후 전부 삭제했고,
 #    반납된 주소는 지금 다른 계정 것일 수 있다. 재현 시 본인 인스턴스 주소를 넣으면 된다.
 #    사설 IP(172.31.*)는 ghz·Prometheus 원본에도 그대로 박혀 있어 원본 값을 둔다.
-APP=<app-public-ip>; OBS=<obs-public-ip>; DBP=172.31.1.47; APPP=172.31.8.60
+APP="<app-public-ip>"; OBS="<obs-public-ip>"; DBP=172.31.1.47; APPP=172.31.8.60
 OUT="C:/Users/khjae/AppData/Local/Temp/claude/E--init/b2a0d6c9-7b8c-48b4-90ba-223a20532e31/scratchpad/results2"
 mkdir -p "$OUT"
 LOG="$OUT/sweep2.tsv"
