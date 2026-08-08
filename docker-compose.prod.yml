@@ -91,7 +91,9 @@ services:
     healthcheck:
       # 배포 직후 "떴는지"를 compose 가 판정할 수 있게 한다. Flyway 마이그레이션이
       # 오래 걸릴 수 있어 start_period 를 넉넉히 잡는다 (V1 baseline 은 테이블 12개를 만든다).
-      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      # 포트 9090 — 앱 포트가 아니라 **관리 포트**다 (application.yml [6], 2026-08-08).
+      # 컨테이너 안에서 부르므로 호스트 매핑이 없어도 닿는다.
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:9090/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5

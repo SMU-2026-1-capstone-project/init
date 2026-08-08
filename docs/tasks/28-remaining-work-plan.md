@@ -256,13 +256,28 @@
 
 가장 까다로운 지점은 **기존 email/password 계정과 소셜 계정의 충돌 처리**다. 여기서 시간이 갈린다 — 그리고 `members.password` 가 `NOT NULL` 이라(`mysql/schema.sql:12`) 소셜 전용 계정을 만들려면 마이그레이션이 강제된다.
 
-### 6. Prometheus + Grafana (5~7h / 2~4h) — 조건부
+### 6. Prometheus + Grafana — ✅ 착수 (2026-08-08, 사용자 결정)
 
-현재 `docker-compose.yml`에 MySQL·backend·ai만 있고 `micrometer-registry-prometheus`도 없다. 커스텀 메트릭 3종 + outbox lag가 **`/actuator/metrics` 스냅샷 조회만** 가능한 상태.
+~~현재 `docker-compose.yml`에 MySQL·backend·ai만 있고 `micrometer-registry-prometheus`도 없다. 커스텀 메트릭 3종 + outbox lag가~~ → **정정 (2026-08-08): 커스텀 지표는 3종이 아니라 9종이다.** 3종은 2026-07-28 관측성 1차 완료 시점의 수이고(상태 전이·낙관락 충돌·배치 행수), 그 뒤 아웃박스 3종(dispatch·pending·lag)·pose 고아 2종(#87 rows·window)·AI stop 1종이 더해졌다(`SessionMetrics.java`). 그 9종이 **`/actuator/metrics` 스냅샷 조회만** 가능한 상태였다.
 
-**착수 조건 🔶**: 남은 실험(소량 DELETE 파편화 / 관리자 인덱스 3안 비교)을 **하기로 정할 때만.** 안 하면 값이 없다.
+> ⚠️ 이 정정은 **현재 상태를 서술하는 문장에만** 적용된다. `observability-correlation-id.md` 이력과 [`27-implementation-gaps.md`](./27-implementation-gaps.md) 의 "3종"은 **2026-07-28 시점 기록**이라 당시엔 맞았다. 날짜가 박힌 기록은 고치지 않는다.
 
-가장 아까운 사례: 풀 사이징 실험에서 pool=10·c=100이 47% 타임아웃으로 붕괴한 걸 실측했는데, 그 순간의 커넥션 대기·활성 수 그래프가 없어 **결과 수치만 있고 과정이 없다.**
+~~**착수 조건 🔶**: 남은 실험(소량 DELETE 파편화 / 관리자 인덱스 3안 비교)을 **하기로 정할 때만.** 안 하면 값이 없다.~~
+
+✅ **조건은 이미 충족돼 있었다.** 원래 조건은 *"새 실험을 하기로 정할 때만"* 이었는데, 그건 **"볼 것이 없다"는 전제**에서 나온 말이다. 실제로는 계측이 이미 9종 박혀 있고 볼 수단만 없었다. 그중 절반은 **시계열이어야만 의미가 있는 것**들이다 — 적체는 쌓이는 추세가, 고아 창은 꼬리(p99)가, 락 충돌은 부하와의 상관이 답이다. 스냅샷 단건으로는 그 어느 것도 안 나온다.
+
+가장 아까운 사례: 풀 사이징 실험에서 pool=10·c=100이 47% 타임아웃으로 붕괴한 걸 실측했는데, 그 순간의 커넥션 대기·활성 수 그래프가 없어 **결과 수치만 있고 과정이 없다.** HikariCP 지표는 Micrometer 가 **자동으로** 내보내므로, 스택을 세우고 기존 rig 를 다시 돌리면 그 그래프가 나온다 — **새 실험을 결정할 필요가 없다.**
+
+**구성 (2026-08-08)**
+
+| 결정 | 내용 |
+|---|---|
+| 액추에이터 노출 | **ㄴ — 관리 포트 분리**(`management.server.port: 9090`). 8080 이 외부 노출이라 whitelist 에 넣으면 지표가 공개된다. prod compose 는 9090 을 **매핑하지 않고**, dev 만 로컬 검증용으로 연다 |
+| 기동 방식 | **compose profile `obs`** — 기본으로 안 뜬다. 2물리코어 장비에서 부하 실험과 동거하면 측정이 오염된다([`load-test-strategy.md`](../decisions/load-test-strategy.md) 전제) |
+| 대시보드 | **프로비저닝(JSON 커밋)**. UI 로 만들면 볼륨을 날렸을 때 재현이 안 되고 리뷰도 안 된다 |
+| 보존기간 | 7일. 용도가 장기 추세가 아니라 "실험 한 판 동안의 과정"이다 |
+
+**포함하지 않은 것 (의도적)**: ai-server 지표(FastAPI 에 계측이 없다 — 타깃만 적으면 영원히 DOWN 인 타깃이 생긴다), mysqld_exporter(`loadtest/` 스크립트가 `SHOW STATUS` 로 이미 뜨고 있어 중복).
 
 ---
 

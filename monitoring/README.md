@@ -1,0 +1,102 @@
+# 관측 스택 — Prometheus + Grafana
+
+커스텀 지표 9종을 **시계열로** 보기 위한 스택. 2026-08-08 도입([`../docs/tasks/28-remaining-work-plan.md`](../docs/tasks/28-remaining-work-plan.md) §2-6).
+
+## 켜고 끄기
+
+**기본으로는 뜨지 않는다.** compose profile 뒤에 있다.
+
+```bash
+docker compose --profile obs up -d          # 켜기
+docker compose --profile obs down           # 끄기 (데이터는 볼륨에 남는다)
+```
+
+| | 주소 | 비고 |
+|---|---|---|
+| Grafana | http://localhost:3000 | `admin` / `admin` (`GRAFANA_USER`·`GRAFANA_PASSWORD` 로 변경 가능) |
+| Prometheus | http://localhost:9091 | 호스트 9091 ↔ 컨테이너 9090. 백엔드 관리포트와 헷갈리지 않게 어긋냈다 |
+| 백엔드 지표 원본 | http://localhost:9090/actuator/prometheus | dev 에서만 열린다 (아래) |
+
+대시보드는 프로비저닝된다 — Grafana 를 켜면 **Shadowfit** 폴더에 이미 들어와 있다. UI 에서 만들지 않는다.
+
+> 🔴 **부하 실험 중에는 끄고 돌린다.** 이 개발 장비는 2물리코어에 MySQL+백엔드+AI 가 이미 동거 중이라([`../docs/decisions/load-test-strategy.md`](../docs/decisions/load-test-strategy.md)), 관측 스택까지 같이 돌면 **무엇 때문에 느려졌는지 구분할 수 없다.** 그래프를 보려고 켠 것이 그래프를 못 믿게 만든다.
+>
+> 실험 중 관측이 필요하면 관측 스택만 **다른 장비**에서 띄우고 `prometheus.yml` 의 타깃을 그쪽으로 돌리는 게 맞다. 지금은 안 한다.
+
+## 왜 포트가 나뉘어 있나
+
+`management.server.port: 9090` 으로 **액추에이터를 앱 포트(8080)에서 분리**했다.
+
+이유는 `/actuator/prometheus` 다. Prometheus 가 긁어가려면 인증 없이 닿아야 하는데, 8080 은 외부 노출이라 whitelist 에 넣으면 **지표가 인터넷에 공개된다** — 엔드포인트별 응답시간·에러율·회원 수 추이가 전부 보인다.
+
+```
+prod (docker-compose.prod.yml)              dev (docker-compose.yml)
+┌──────────────────────────┐                ┌──────────────────────────┐
+│ 8080 → 호스트 매핑 O     │ 앱 API         │ 8080 → 매핑 O            │
+│ 9090 → 매핑 X            │ 관리·지표      │ 9090 → 매핑 O ← 차이     │
+└──────────────────────────┘                └──────────────────────────┘
+   도커 네트워크 안의                           로컬 검증(verify 스킬)이
+   Prometheus 만 닿는다                        호스트에서 curl 하므로 연다
+```
+
+AI 서버 gRPC 8585 를 `expose` 만 하고 `ports` 에 안 쓰는 것과 같은 방식이다.
+
+> 🔴 **검증에서 뒤집힌 것 (2026-08-08)** — 도입 시 *"포트를 나누면 시큐리티가 관리 포트엔 안 걸린다"* 고 봤는데 **틀렸다. 필터체인이 두 포트에 공유된다.**
+>
+> ```
+> 분리만 했을 때:  9090 /actuator/prometheus → 401   ← Prometheus 가 못 긁는다
+>                  9090 /actuator/health     → 200   ← whitelist 에 있어서
+> ```
+>
+> 그래서 `application.yml` whitelist 에 `/actuator/prometheus` 를 넣어야 했다. 그대로 뒀으면 스크레이프가 **"타깃 DOWN" 으로 조용히 실패**했을 것이다.
+>
+> **결과적으로 보호 수단이 "인증"이 아니라 "네트워크 경계" 하나로 분명해졌다.** 8080 에 같은 경로를 쳐도 지표는 안 샌다(검증: 500 + 일반 오류 본문, 지표 문자열 없음) — 액추에이터가 9090 에서만 서비스되기 때문이다. **9090 을 어딘가에 노출하는 순간 whitelist 가 그대로 뚫린다. prod compose 에 매핑을 추가하지 말 것.**
+
+## `/actuator/health` 도 같이 옮겨갔다
+
+포트를 나누면 health 도 9090 으로 간다. 8080 을 치던 두 곳을 함께 고쳤다:
+
+- `docker-compose.prod.yml` 컨테이너 healthcheck
+- `.claude/skills/verify/SKILL.md` 로컬 검증 절차
+
+둘 다 안쪽/로컬에서 부르므로 매핑 없이 닿는다.
+
+## 무엇을 보나
+
+대시보드([`grafana/dashboards/shadowfit-backend.json`](grafana/dashboards/shadowfit-backend.json))는 5개 묶음이다.
+
+| 묶음 | 왜 있나 |
+|---|---|
+| **커넥션 풀** | 풀 사이징 실험에서 pool=10·c=100 이 47% 타임아웃으로 붕괴한 걸 실측했는데 **그 순간의 그래프가 없어 "결과만 있고 과정이 없다"** 로 남았다. 이 스택의 1순위 용도 |
+| **아웃박스** | 적체는 "지금 3건"이 아니라 **기울기**가 답이다. 발행기가 죽으면 값만 계속 오른다 |
+| **세션 파이프라인** | 낙관락 충돌(스케줄러↔AI 콜백 경쟁)은 지금까지 **코드와 재현 실험으로만** 증명돼 있고 실제 빈도를 볼 수단이 없었다 |
+| **pose_data (#87)** | 고아 행 수 × 창의 폭(p99) 을 곱해야 빈도 상한이 나온다. 그 상한이 있어야 "핫패스에 상시 락을 얹을 만한가"를 판단할 수 있다 |
+| **HTTP · JVM** | 기본 축. 기본 접힘 |
+
+### 지표 이름이 코드와 다르게 보이는 이유
+
+Micrometer 가 Prometheus 관례로 바꾼다. 코드에서 `shadowfit.outbox.pending` 이면 쿼리에서는 `shadowfit_outbox_pending` 이고, 카운터에는 `_total` 이, 타이머에는 `_seconds_*` 가 붙는다.
+
+## 패널이 "No data" 로 보이는 것은 대개 정상이다
+
+**Micrometer 는 카운터·타이머를 "첫 기록 시점"에 만든다.** 그래서 서버를 갓 띄우면 `/actuator/prometheus` 에 게이지 2종(`shadowfit_outbox_pending`·`shadowfit_pose_orphan_rows`)만 나오고 나머지 7종은 **아예 없다.** 도입 검증 때 실제로 그랬다.
+
+세션이 한 번 돌면 채워진다. 즉 **빈 패널 ≠ 고장**이다.
+
+다만 그 성질 때문에 "대시보드 쿼리 이름이 맞는지"를 서버로는 확인할 수 없다(없는 지표는 이름이 틀려도 똑같이 안 나온다). 그래서 이름을 **테스트로 고정**했다:
+
+```
+backend/src/test/java/com/shadowfit/global/observability/SessionMetricsExportNamesTest.java
+```
+
+레지스트리를 직접 만들어 9종을 한 번씩 기록한 뒤 scrape 결과에서 이름·태그·백분위 라벨을 검사한다. **이 테스트가 깨지면 대시보드 JSON 도 같이 고쳐야 한다.**
+
+## 🔴 한계 · 넣지 않은 것
+
+- **ai-server (FastAPI) 지표 없음** — Python 쪽에 계측이 아예 없다. 타깃만 적으면 영원히 DOWN 인 타깃이 하나 생겨 "관측 스택이 고장난 것처럼" 보이므로 아예 뺐다
+- **mysqld_exporter 없음** — MySQL 내부 지표는 `loadtest/` 스크립트가 `SHOW STATUS` 로 이미 뜨고 있다. 중복이고 컨테이너만 는다
+- **알림(Alertmanager) 없음** — 상시 운영이 아니라 볼 때만 켜는 구조라 울릴 대상이 없다
+- **고아 행 게이지는 실시간이 아니다** — 스케줄러가 미리 채운 값을 읽는다(대용량 anti-join 을 스크레이프마다 돌리면 그 자체가 부하). **최대 갱신주기만큼 지연**이 있다
+- **보존 7일** — 그보다 오래된 것은 사라진다. 실험 결과를 남기려면 그래프를 캡처하거나 수치를 문서에 적을 것
+- **8080 의 `/actuator/health` 가 500 을 반환한다** — whitelist(두 포트 공유)는 통과하는데 핸들러가 9090 으로 갔기 때문이다. 404 가 맞는 응답이라 깔끔하지 않다. 그 줄을 빼면 **9090 헬스체크가 401 로 깨지므로** 지금은 감수한다. 영향은 "옛 URL 을 치면 404 대신 500" 하나다
+- **실측으로 확인한 범위** — 스크레이프 타깃 UP, 그라파나→프로메테우스 도달, 게이지 2종·HikariCP·HTTP·JVM 쿼리 값 반환까지. **부하를 넣은 상태의 그래프는 아직 안 봤다** — 이 스택의 1순위 용도(풀 붕괴의 과정)는 rig 를 다시 돌려야 채워진다

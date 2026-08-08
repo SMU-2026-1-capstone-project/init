@@ -60,7 +60,7 @@
 |---|---|---|
 | **신뢰성(전달 의미론)** | 멱등 수신 + **outbox 로 at-least-once 송신** = exactly-once | 🟢 **구현·측정 완료(2026-07-29, PR #60·#63·#67)** — [문서](../decisions/outbox-reliable-messaging.md). **"통보 유실 0"은 주장이 아니라 실측**이다 |
 | **회복탄력성** | gRPC **deadline**(`withDeadlineAfter`) + Resilience4j **서킷브레이커**(`aiServer` 인스턴스) | 🟢 **있음** — `ExerciseAnalysisService`, `application.yml` `resilience4j.circuitbreaker` |
-| **관측성** | **correlation id 전파**(@Async·gRPC 콜백·스케줄러·FastAPI 왕복) + Actuator + 커스텀 메트릭 3종 | 🟢 1차 완료(2026-07-28, [문서](../decisions/observability-correlation-id.md)) — JSON 구조화는 수집기 도입 시 |
+| **관측성** | **correlation id 전파**(@Async·gRPC 콜백·스케줄러·FastAPI 왕복) + Actuator + **커스텀 지표 9종** + **Prometheus·Grafana 시계열** | 🟢 1차 완료(2026-07-28, [문서](../decisions/observability-correlation-id.md)) · 🟢 **2차 — 관측 스택 (2026-08-08)**. 지표는 3종 → **9종**(아웃박스 3·pose 고아 2 추가). 스냅샷만 보던 것이 시계열이 됐다 — 적체의 *기울기*, 고아 창의 *꼬리(p99)*, 락 충돌의 *부하 상관*은 시계열이라야 답이 나온다. JSON 구조화는 수집기 도입 시 |
 | **캐싱** | 기준 좌표·TTS 템플릿 = 카탈로그 패턴(유한·불변·공유). 로컬 Caffeine → 다중 인스턴스 시 Redis | 🔶 설계됨 |
 | **보안** | JWT + RefreshToken + blacklist + BCrypt + role | 🟢 있음 |
 

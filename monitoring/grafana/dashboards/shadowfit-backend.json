@@ -1,0 +1,219 @@
+{
+  "uid": "shadowfit-backend",
+  "title": "Shadowfit 백엔드",
+  "tags": ["shadowfit"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "row",
+      "title": "커넥션 풀 — 붕괴의 과정을 보는 자리",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "풀 상태 (활성 / 유휴 / 대기)",
+      "description": "pool=10·c=100 에서 47% 타임아웃으로 붕괴한 실측이 있는데 그 순간의 이 그래프가 없어 '결과만 있고 과정이 없다'로 남았다. pending 이 치솟는 순간이 곧 붕괴 지점이다.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "hikaricp_connections_active{application=\"shadowfit\"}", "legendFormat": "활성" },
+        { "refId": "B", "expr": "hikaricp_connections_idle{application=\"shadowfit\"}", "legendFormat": "유휴" },
+        { "refId": "C", "expr": "hikaricp_connections_pending{application=\"shadowfit\"}", "legendFormat": "대기(pending)" },
+        { "refId": "D", "expr": "hikaricp_connections_max{application=\"shadowfit\"}", "legendFormat": "상한" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "커넥션 획득 대기 시간",
+      "description": "풀이 마르면 여기부터 늘어난다. 타임아웃(30s 기본)에 닿기 전에 이 곡선이 먼저 꺾이므로 선행 지표다.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "hikaricp_connections_acquire_seconds_max{application=\"shadowfit\"}", "legendFormat": "최대" },
+        { "refId": "B", "expr": "rate(hikaricp_connections_acquire_seconds_sum{application=\"shadowfit\"}[1m]) / clamp_min(rate(hikaricp_connections_acquire_seconds_count{application=\"shadowfit\"}[1m]), 1)", "legendFormat": "평균(1m)" },
+        { "refId": "C", "expr": "rate(hikaricp_connections_timeout_total{application=\"shadowfit\"}[1m])", "legendFormat": "타임아웃/초" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "아웃박스 — 조용히 안 나가는 것을 잡는 자리",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "적체 (PENDING 행 수)",
+      "description": "발행기가 죽거나 독 메시지가 쌓이면 이 값만 계속 오른다. 스냅샷으로는 '지금 3건'만 알 수 있고 쌓이는 중인지 빠지는 중인지는 기울기로만 안다 — 이 패널이 있어야 하는 이유.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "shadowfit_outbox_pending{application=\"shadowfit\"}", "legendFormat": "PENDING" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "발행 결과 (sent / retry / failed)",
+      "description": "failed 는 종료 상태의 유실이라 retry 와 반드시 구분해서 본다 — 전자는 사람이 봐야 할 사건이고 후자는 정상 운영 중에도 나온다.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum by (outcome) (rate(shadowfit_outbox_dispatch_total{application=\"shadowfit\"}[1m]))", "legendFormat": "{{outcome}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "통보 지연 (생성 → 전달)",
+      "description": "폴링 간격이 실제 지연에 얼마나 반영되는지. 폴링 주기보다 지연이 크게 길면 발행기가 못 따라가고 있다는 뜻이다.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "shadowfit_outbox_lag_seconds_max{application=\"shadowfit\"}", "legendFormat": "최대" },
+        { "refId": "B", "expr": "rate(shadowfit_outbox_lag_seconds_sum{application=\"shadowfit\"}[1m]) / clamp_min(rate(shadowfit_outbox_lag_seconds_count{application=\"shadowfit\"}[1m]), 1)", "legendFormat": "평균(1m)" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "세션 파이프라인 — 정합성",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "상태 전이 (status × source)",
+      "description": "같은 FAILED 라도 'AI 가 죽어서'와 '타임아웃이 걷어내서'는 운영상 완전히 다른 사건이라 source 로 쪼개 본다.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum by (status, source) (rate(shadowfit_session_transitions_total{application=\"shadowfit\"}[1m]))", "legendFormat": "{{status}} / {{source}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "낙관락 충돌 (retry / yield)",
+      "description": "스케줄러 ↔ AI 콜백 경쟁. 지금까지 코드와 재현 실험으로만 증명돼 있고 실제 발생 빈도를 볼 수단이 없었다. 어느 쪽이 이겼는지(outcome)가 정책 그 자체라 태그로 갈라 본다.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum by (source, outcome) (rate(shadowfit_session_optimistic_lock_conflicts_total{application=\"shadowfit\"}[1m]))", "legendFormat": "{{source}} / {{outcome}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "AI StopAnalysis 결과",
+      "description": "session-missing 은 AI 프로세스 재시작으로 in-memory 상태가 사라진 경우다. gRPC 전송층만 보면 '성공'이라 사건 자체가 안 보이는데, 그때 CompleteAnalysis 가 영영 오지 않아 결과가 유실된다.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum by (outcome) (rate(shadowfit_ai_stop_result_total{application=\"shadowfit\"}[1m]))", "legendFormat": "{{outcome}}" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "pose_data — 고아 행(#87)과 다운샘플",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "고아 행 수 (#87)",
+      "description": "세션 검증과 INSERT 사이에 탈퇴가 끼어들어 정리 경로를 빠져나간 행. ⚠️ 스케줄러가 주기적으로 채우는 값이라 최대 갱신주기만큼 지연이 있다 — 스크레이프 시점의 실시간 값이 아니다.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "shadowfit_pose_orphan_rows{application=\"shadowfit\"}", "legendFormat": "고아 행" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "고아가 생길 수 있는 창의 폭 (백분위)",
+      "description": "위 게이지가 '몇 건 났나'라면 이건 '날 수 있는 구간이 얼마나 넓나'다. 둘을 곱해야 빈도 상한이 나온다. 평균이 아니라 꼬리(p99)를 보는 이유는 확률을 지배하는 게 꼬리이기 때문이다.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "shadowfit_pose_orphan_window_seconds{application=\"shadowfit\", quantile=\"0.5\"}", "legendFormat": "p50" },
+        { "refId": "B", "expr": "shadowfit_pose_orphan_window_seconds{application=\"shadowfit\", quantile=\"0.95\"}", "legendFormat": "p95" },
+        { "refId": "C", "expr": "shadowfit_pose_orphan_window_seconds{application=\"shadowfit\", quantile=\"0.99\"}", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "다운샘플 실측 R — 수신 프레임 vs 저장 행",
+      "description": "설계상의 R 값이 실제로 그렇게 나오는지. 두 선의 비가 곧 R 이다.",
+      "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum by (stage) (rate(shadowfit_pose_batch_frames_sum{application=\"shadowfit\"}[1m]))", "legendFormat": "{{stage}} 프레임/초" },
+        { "refId": "B", "expr": "sum(rate(shadowfit_pose_batch_frames_sum{application=\"shadowfit\", stage=\"stored\"}[1m])) / clamp_min(sum(rate(shadowfit_pose_batch_frames_sum{application=\"shadowfit\", stage=\"received\"}[1m])), 0.001)", "legendFormat": "저장 비율 (= 1/R)" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "HTTP · JVM — 기본 축",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 },
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "엔드포인트별 응답시간 (최대)",
+          "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 45 },
+          "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "expr": "topk(10, http_server_requests_seconds_max{application=\"shadowfit\"})", "legendFormat": "{{method}} {{uri}}" }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "상태코드별 요청률",
+          "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 45 },
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "expr": "sum by (status) (rate(http_server_requests_seconds_count{application=\"shadowfit\"}[1m]))", "legendFormat": "{{status}}" }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "JVM 힙",
+          "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 53 },
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "expr": "sum(jvm_memory_used_bytes{application=\"shadowfit\", area=\"heap\"})", "legendFormat": "사용" },
+            { "refId": "B", "expr": "sum(jvm_memory_max_bytes{application=\"shadowfit\", area=\"heap\"})", "legendFormat": "최대" }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "GC 일시정지",
+          "datasource": { "type": "prometheus", "uid": "shadowfit-prom" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 53 },
+          "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "expr": "rate(jvm_gc_pause_seconds_sum{application=\"shadowfit\"}[1m])", "legendFormat": "{{action}} / {{cause}}" }
+          ]
+        }
+      ]
+    }
+  ]
+}

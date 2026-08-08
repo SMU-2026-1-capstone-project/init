@@ -54,6 +54,12 @@ services:
     ports:
       - "8080:8080"
       - "6565:6565"
+      # 관리 포트(9090) — **dev 에서만** 호스트에 연다.
+      # docker-compose.prod.yml 에는 이 매핑이 없다. 그게 포트를 분리한 이유 자체다
+      # (외부에 지표를 안 내보낸다, application.yml [6]).
+      # 로컬에서 여는 이유는 verify 스킬이 호스트에서 curl 로 health 를 폴링하기
+      # 때문이다 — 안 열면 로컬 검증 절차가 통째로 막힌다.
+      - "9090:9090"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Seoul
@@ -101,10 +107,65 @@ services:
     networks:
       - shadowfit-net
 
+  # ── 관측 스택 ─────────────────────────────────────────────────────────────
+  # 기본으로는 뜨지 않는다. 켤 때만:  docker compose --profile obs up -d
+  #
+  # profile 로 뺀 이유는 취향이 아니라 **측정 오염**이다. 이 개발 장비는 2물리코어에
+  # MySQL+백엔드+AI 가 이미 동거 중이라(load-test-strategy.md 전제), 부하 실험 중에
+  # 관측 스택까지 같이 돌면 무엇 때문에 느려졌는지 구분할 수 없게 된다.
+  # 그래프를 보려고 켠 것이 그래프를 못 믿게 만드는 상황을 만들지 않는다.
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: shadowfit-prometheus
+    profiles: ["obs"]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      # 보존기간 7일. 이 프로젝트의 용도는 장기 추세가 아니라 "실험 한 판 동안의
+      # 과정"이라, 그보다 길게 잡으면 디스크만 먹는다.
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"   # 호스트 9091 — 백엔드 관리포트 9090 과 헷갈리지 않게 어긋냈다
+    networks:
+      - shadowfit-net
+
+  grafana:
+    image: grafana/grafana:11.5.1
+    container_name: shadowfit-grafana
+    profiles: ["obs"]
+    restart: unless-stopped
+    environment:
+      # 로컬 전용이고 외부에 열지 않는다. 운영에 올릴 때는 반드시 바꿀 것.
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      # 익명 접근 차단 — 기본값이지만 명시한다.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      TZ: Asia/Seoul
+    volumes:
+      # 프로비저닝 — 대시보드를 손으로 만들지 않는다. 손으로 만들면 그 그래프가
+      # 어떻게 나왔는지 코드에 안 남아서, 재현도 리뷰도 안 된다.
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    networks:
+      - shadowfit-net
+
 networks:
   shadowfit-net:
     driver: bridge
 
 volumes:
   mysql_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local

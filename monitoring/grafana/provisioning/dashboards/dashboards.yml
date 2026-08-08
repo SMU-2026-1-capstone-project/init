@@ -1,0 +1,17 @@
+# 대시보드 프로비저닝 — /var/lib/grafana/dashboards 의 JSON 을 자동으로 읽는다.
+# compose 가 ./monitoring/grafana/dashboards 를 거기에 물려준다.
+
+apiVersion: 1
+
+providers:
+  - name: shadowfit
+    orgId: 1
+    folder: Shadowfit
+    type: file
+    disableDeletion: false
+    # UI 에서 고친 것이 파일로 안 돌아가므로, 고칠 일이 있으면 JSON 을 편집한다.
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
