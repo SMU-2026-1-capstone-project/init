@@ -12,7 +12,7 @@
 
 | 반영한 것 | 어디 |
 |---|---|
-| **아웃박스** — 세션 종료 통보가 at-most-once → **at-least-once** | §1 · §4 중단 · §6 · §9 |
+| **아웃박스** — 세션 종료 통보가 at-most-once → **상한 있는 재시도**(유실이 «조용히» 에서 «조회 가능» 으로) | §1 · §4 중단 · §6 · §9 |
 | **회복탄력성** — gRPC deadline + Resilience4j 서킷브레이커 | §1 · §6 |
 | **관측성** — correlation id 가 gRPC 양방향·`@Async`·스케줄러를 넘어 전파 | §1 · §6 |
 | **`ReattachAnalysis`** — AI 상태 소실 시 세션 이어하기 (RPC 신설) | §3 · §4 재부착 |
@@ -34,7 +34,7 @@
 | 인증 | 내부 공유 토큰(`INTERNAL_API_TOKEN`) 기반, gRPC metadata `Authorization: Bearer …` |
 | 네트워크 | Docker Compose `shadowfit-net` 브리지, 컨테이너명 DNS |
 | 호출 패턴 | Spring → AI: 비동기(`@Async`, 202 Accepted) / AI → Spring: 콜백 (3회 재시도) |
-| **전달 의미론 (Spring → AI 종료 통보)** | **아웃박스 + 발행기 폴링 = at-least-once.** 수신 측 멱등과 합쳐 effectively exactly-once (2026-07-29) |
+| **전달 의미론 (Spring → AI 종료 통보)** | **아웃박스 + 발행기 폴링 = «상한 있는 재시도»**(기본 10회, 초과 시 터미널 `FAILED`). 🔴 **전달 보장이 아니다** — 의도를 DB 에 보존하고 실패를 조회 가능하게 만든다. `effectively exactly-once` 는 *전달이 성공한 건에 한해*, 그리고 AI `StopAnalysis` 가 멱등하다는 전제에서만 성립 (2026-07-29) |
 | **회복탄력성** | 모든 Spring → AI 호출에 **gRPC deadline**(`withDeadlineAfter`) + **Resilience4j 서킷브레이커**(`aiServer`) |
 | **관측성** | **correlation id** 가 HTTP(`X-Request-Id`) → MDC → gRPC 메타데이터(`x-request-id`) → FastAPI `ContextVar` 로 전파. 커스텀 지표 9종 |
 | 상태 저장 | AI: in-memory `SessionState`, Spring: MySQL (`Session`, `PoseData`, `ExerciseReference`). **소실 시 `ReattachAnalysis` 로 복구 가능**(2026-07-31) |
@@ -138,7 +138,9 @@ Docker 네트워크는 `shadowfit-net` 브리지 한 개. 외부 노출은 backe
 
 ### 중단 — 🔄 아웃박스 도입으로 경로가 바뀌었다 (2026-07-29)
 
-1. 프론트 → `PUT /exercises/sessions/{id}/stop` (커밋 `143a2e4`에서 신설)
+1. 프론트 → **`PATCH /sessions/{sessionId}/end`** (`SessionController.java:57`, 멱등 — 이미 종료된 세션 재호출도 200)
+   🔴 **2026-08-08 정정**: 이 자리에 적혀 있던 `PUT /exercises/sessions/{id}/stop`(커밋 `143a2e4` 신설)은 **지금 컨트롤러에 없다** — 전 컨트롤러 `stop` 매핑 0건. 프론트도 `PATCH …/end` 를 부른다(`exercisesService.ts:23`).
+   📌 **의도적 삭제였다** — [`../decisions/session-end-trigger.md`](../decisions/session-end-trigger.md) §박힌 코드(2026-05-26)가 *"`ExercisesController.stopSession`(`PUT …/stop`) **삭제**"* 를 기록하고 있다. **ET-H(단일 endpoint 분배자) 확정**의 일부다 — 클라는 `PATCH /sessions/{id}/end` **한 번만** 부르고 Spring 이 AI 통보를 분배한다. 즉 결정 문서는 처음부터 맞았고 **이 현황 문서만 2.5개월 안 따라왔다**
 2. `ExerciseAnalysisService.stopAnalysis` — **gRPC 를 직접 부르지 않는다.** 세션 상태 변경과 **같은 트랜잭션**에서 `outbox_events(type=STOP_ANALYSIS, payload={sessionId})` 를 적재
 3. `OutboxPublisher` — `@Scheduled` 폴링(기본 1초, `outbox.publisher.poll-interval-ms`)으로 `PENDING` 을 집어 gRPC `StopAnalysis` 송신. 실패하면 재시도(기본 상한 10회, `outbox.publisher.max-retry`) 후 `FAILED`
 4. AI: `SessionState` 제거 + 백그라운드 스레드에서 `_send_complete_analysis` 호출
@@ -146,7 +148,7 @@ Docker 네트워크는 `shadowfit-net` 브리지 한 개. 외부 노출은 backe
 6. Spring: `ExerciseGrpcService.completeAnalysis` 수신 → `SessionService.completeSession`
 7. Spring: `Session(status=COMPLETED, total_reps=…, avg_sync_rate=…)` 갱신
 
-> 🔴 **왜 바꿨나 — dual-write 였다.** 예전 경로는 DB 커밋과 gRPC 송신이 별개 동작이라, 커밋은 됐는데 통보가 실패하면 **Spring 은 `COMPLETED` 인데 AI 에는 orphan 세션이 남았다.** `afterCommit` 으로 미뤄도 "커밋 후 송신 실패"는 그대로 남는다 — 유실을 **0으로 만들 수 없는 구조**였다. 아웃박스는 통보 의도를 DB 에 같이 커밋해 at-least-once 를 만든다. 상세: [`../decisions/outbox-reliable-messaging.md`](../decisions/outbox-reliable-messaging.md).
+> 🔴 **왜 바꿨나 — dual-write 였다.** 예전 경로는 DB 커밋과 gRPC 송신이 별개 동작이라, 커밋은 됐는데 통보가 실패하면 **Spring 은 `COMPLETED` 인데 AI 에는 orphan 세션이 남았다.** `afterCommit` 으로 미뤄도 "커밋 후 송신 실패"는 그대로 남는다 — 유실을 **0으로 만들 수 없는 구조**였다. 아웃박스는 통보 의도를 DB 에 같이 커밋해 **재시도할 수 있게** 만든다 — ⚠️ 유실을 0 으로 만드는 게 아니라 **상한(10회)까지 자동 재시도하고, 넘으면 `FAILED` 로 남긴다.** 상세: [`../decisions/outbox-reliable-messaging.md`](../decisions/outbox-reliable-messaging.md).
 >
 > ⚠️ 재시도가 있으므로 **같은 통보가 두 번 갈 수 있다** — AI 측 `StopAnalysis` 가 멱등해야 성립한다(이미 없는 세션이면 성공 반환).
 
@@ -190,7 +192,7 @@ AI 컨테이너가 재시작되면 in-memory `SessionState` 가 사라지는데,
 | AI 콜백 재시도 | `spring_client.report_complete_analysis` | 1초 → 3초 백오프, 최대 3회 |
 | Spring 낙관적 락 재시도 | `SessionService.completeSession` | `@Version` 충돌 시 최대 3회 |
 | 타임아웃 양보 | `SessionTimeoutScheduler` | AI 완료 콜백이 늦게 와도 충돌 시 AI 결과 우선 |
-| **아웃박스 (at-least-once)** 🆕 | `OutboxPublisher` + `outbox_events` 테이블 | 종료 통보를 DB 에 같이 커밋 → 폴링 발행 → 재시도(상한 10). **수신 멱등과 합쳐 effectively exactly-once** |
+| **아웃박스 (상한 있는 재시도)** 🆕 | `OutboxPublisher` + `outbox_events` 테이블 | 종료 통보를 DB 에 같이 커밋 → 폴링 발행 → **재시도 상한 10회 초과 시 터미널 `FAILED`**(`OutboxPublisher.java:148-149`). 🔴 **무한 재시도가 아니므로 «반드시 전달» 이 아니다** |
 | **gRPC deadline** 🆕 | `ExerciseAnalysisService` — 모든 스텁에 `withDeadlineAfter` | AI 가 hang 해도 호출 스레드가 무한 대기하지 않는다 |
 | **서킷브레이커** 🆕 | Resilience4j `aiServer` 인스턴스 (`CircuitBreakerRegistry`) | AI 연속 실패 시 회로 개방 — 죽은 서버에 계속 밀어넣지 않는다 |
 | **correlation id 전파** 🆕 | `CorrelationIdFilter` · `GrpcCorrelation{Client,Server}Interceptor` · `CorrelationIds` | HTTP `X-Request-Id` → MDC(`cid`) → gRPC 메타데이터 `x-request-id` → FastAPI `ContextVar`. `@Async`·스케줄러 경계도 넘긴다 |
@@ -199,10 +201,23 @@ AI 컨테이너가 재시작되면 in-memory `SessionState` 가 사라지는데,
 >
 > | 방향 | 전달 의미론 | 실패 시 |
 > |---|---|---|
-> | **Spring → AI** (종료 통보) | **at-least-once** (아웃박스) | 재시도 상한(10)까지 자동. 그 뒤 `FAILED` 로 남아 **조회 가능**하다 |
+> | **Spring → AI** (종료 통보) | **상한 있는 재시도**(아웃박스, 기본 10회) — *at-least-once 는 전달이 성공한 건에 한해* | 상한까지 자동 재시도, 그 뒤 터미널 `FAILED`. **유실은 여전히 가능하지만 «조용히» 는 아니다** — 행이 남아 조회·재처리 가능 |
 > | **AI → Spring** (완료 콜백) | 여전히 **최대 3회 후 유실** | ERROR 로그만. **수동 복구 절차 없음** — §9 |
 >
-> 즉 **한쪽만 닫혔다.** 카프카·RabbitMQ 같은 외부 브로커는 여전히 쓰지 않는다(아웃박스는 MySQL 테이블 + 스케줄러).
+> 🔴 **«한쪽이 닫혔다» 고 쓰면 과장이다** (2026-08-08 리뷰 지적 반영). 아웃박스가 바꾼 것은 **유실의 성질**이다:
+>
+> | | 이전 (dual-write) | 지금 (아웃박스) |
+> |---|---|---|
+> | 커밋 후 송신 실패 | **통보 의도가 사라진다** — 흔적 없음 | 의도가 행으로 남는다 |
+> | 재시도 | 없음 | 자동, **상한 10회** |
+> | 상한 초과 후 | — | 터미널 `FAILED` — **여전히 미전달이지만 조회 가능** |
+> | 재처리 | 불가 | 가능(행이 있으므로) |
+>
+> 즉 **«유실 0» 이 아니라 «유실이 관측 가능해졌다»** 다. 지표 `shadowfit_outbox_pending` 의 **기울기**를 보는 이유가 이것이고, 🔴 **`FAILED` 를 사람이 보고 재처리하는 운영 절차는 아직 없다.**
+>
+> 카프카·RabbitMQ 같은 외부 브로커는 쓰지 않는다(아웃박스는 MySQL 테이블 + 스케줄러).
+>
+> ⚠️ **«유실 0» 은 실험 결과다.** [`../decisions/outbox-reliable-messaging.md`](../decisions/outbox-reliable-messaging.md) §6 의 실측은 *그 실험 조건에서 상한 안에 전부 전달됐다* 는 뜻이고, **운영 보장으로 인용하면 안 된다.**
 >
 > ⚠️ MDC 는 ThreadLocal 이라 스레드가 바뀌면 사라진다. 그래서 `@Async`·gRPC 콜백·스케줄러 경계마다 **명시적으로 넘긴다** — 실제로 2026-07-28 에 백그라운드 스레드 경계에서 끊긴 버그를 한 번 고쳤다(`bfa4d50`).
 
@@ -264,7 +279,7 @@ AI 컨테이너가 재시작되면 in-memory `SessionState` 가 사라지는데,
 - **proto 중복 파일** — 양쪽이 손으로 동기화. 한쪽만 바꾸면 런타임에 직렬화 실패까지 잡히지 않음. 실제로 2026-08-07 에 **머지로 계약 불일치 2건이 드러났다**(`e027889`).
 - ⚠️ **`ReportFeedbackBatch` 가 반쪽이다** — proto·Spring 수신부·DB 테이블·시드까지 있는데 **AI 가 안 부른다.** TTS 피드백 기능 전체가 시연용 더미로만 존재한다(§3-1). [`../tasks/30-ai-remaining-work.md`](../tasks/30-ai-remaining-work.md) §1 이 1순위로 잡아둔 항목.
 - 🔴 **`user.proto`/`UserService` 가 죽은 채 남아 있다** — 선언만 있고 양쪽 다 구현·호출이 없다(§3-1). Java 클래스는 계속 생성된다. **어느 문서에도 안 적혀 있던 것**이라 여기 처음 기록한다.
-- **AI → Spring 방향은 여전히 유실 가능** — 완료 콜백이 3회 실패하면 ERROR 로그만 남고 수동 복구 절차가 없다. ✅ **반대 방향(Spring → AI 종료 통보)은 아웃박스로 닫혔다**(§6).
+- **양방향 모두 유실이 가능하다 — 성질이 다를 뿐이다.** AI → Spring 완료 콜백은 3회 실패 시 **흔적이 로그뿐**이고, Spring → AI 종료 통보는 상한 10회 초과 시 **`FAILED` 행으로 남는다**(§6). 🔴 **둘 다 «사람이 보고 재처리하는 절차» 는 없다.** «아웃박스로 닫혔다» 는 서술은 과장이라 걷어냈다(2026-08-08 리뷰).
 - **AI in-memory 세션 상태** — AI 컨테이너 재시작 시 진행 중 세션 소실은 그대로다. ✅ 다만 **복구 경로가 생겼다** — `ReattachAnalysis`(§4 재부착)로 DB 값에서 되살릴 수 있다. ⚠️ **자동은 아니다** — 프론트가 재부착을 호출해야 하고, 아무도 안 부르면 결국 스케줄러가 `FAILED` 처리한다.
 - **단일 AI 인스턴스 가정** — 메모리 `SessionState`가 인스턴스 로컬이라 수평 확장 불가. (재부착은 이 문제를 **줄이지 않는다** — 상태가 여전히 인스턴스 로컬이다.)
 - **gRPC reflection / health check 표준 미적용** — 헬스체크는 AI HTTP `/health`만, gRPC 채널 상태는 별도 모니터 없음. ⚠️ 서킷브레이커가 회로를 열어도 **그 사실을 볼 지표가 ai-server 쪽엔 없다**(§7-1 — 관측 스택이 Spring 만 덮는다).

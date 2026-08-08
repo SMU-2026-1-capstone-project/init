@@ -236,7 +236,7 @@ cd frontend && npx expo start
 | 2 | 운동 화면 진입, "스쿼트" 선택 → 시작 버튼 | `POST /exercises/sessions` 호출, 응답 `{sessionId, status:IN_PROGRESS}` |
 | 3 | 카메라 켜짐, 스쿼트 5회 천천히 수행 | 프론트가 프레임마다 `POST /pose` 호출 (네트워크 탭 확인) |
 | 4 | rep 1 완성 시점 | Spring 로그에 `[AI → Spring] PoseData 배치 전송 (session=X, count=N, success=true)` |
-| 5 | 5 rep 완료 후 종료 버튼 | `PUT /exercises/sessions/{id}/stop` 호출, 즉시 202 |
+| 5 | 5 rep 완료 후 종료 버튼 | **`PATCH /sessions/{id}/end`** 호출, `200`(멱등). 🔴 2026-08-08 정정 — 예전 `PUT …/stop`(202)은 **컨트롤러에 없다** |
 | 6 | 종료 후 1~2초 | Spring 로그에 `[AI → Spring] CompleteAnalysis 성공 (session=X, status=COMPLETED, attempt=1)` |
 
 ### 8.3 DB 검증 (운동 끝난 직후)

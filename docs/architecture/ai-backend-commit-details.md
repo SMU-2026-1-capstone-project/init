@@ -413,7 +413,7 @@ proto의 `int64`와 Spring DTO 타입 정렬 + REST 시대 잔재 제거.
 | **AI** | **0줄** — ⚠️ 단 `StopAnalysis` **멱등 가정**에 의존하게 됐다 |
 | **Infra** | `outbox_events` 테이블 |
 
-**성격**: 🔴 **이 문서의 네 칸 분류가 가장 오해를 부르는 커밋.** "AI 0줄"이라 결합 변경이 아닌 것처럼 보이지만, `StopAnalysis` 의 전달 의미론이 **at-most-once → at-least-once** 로 바뀌었다. **파일이 아니라 계약으로 봐야 한다.**
+**성격**: 🔴 **이 문서의 네 칸 분류가 가장 오해를 부르는 커밋.** "AI 0줄"이라 결합 변경이 아닌 것처럼 보이지만, `StopAnalysis` 의 전달 의미론이 **at-most-once → «상한 있는 재시도»**(10회 후 터미널 `FAILED`)로 바뀌었다. **파일이 아니라 계약으로 봐야 한다.** ⚠️ at-least-once 라고만 쓰면 «반드시 전달» 로 읽히므로 그렇게 쓰지 않는다.
 
 ### 084fac7 · c98d405 — 세션 재부착 (2026-07-31) ⭐
 
@@ -476,7 +476,7 @@ proto의 `int64`와 Spring DTO 타입 정렬 + REST 시대 잔재 제거.
 > | `ReportFeedbackBatch` | proto 양쪽 ✅ · Spring 수신부 ✅ · **AI 호출부 ❌** (`spring_client.py` 는 `report_pose_data_batch`·`report_complete_analysis` 둘만 부른다) |
 > | `user.proto` / `UserService.GetUserInfo` | 🔴 **양쪽 다 구현·호출 0건.** 선언은 `backend/src/main/proto/user.proto` 에만 있고 `ai-server/app/proto/` 엔 파일 자체가 없다 |
 >
-> 그리고 **전달 의미론은 이 표에 안 나타난다** — `StopAnalysis` 는 2026-07-29 에 at-most-once → **at-least-once** 로 바뀌었지만 시그니처가 그대로라 이 표에서는 안 보인다([`ai-backend-changelog.md`](./ai-backend-changelog.md) §4).
+> 그리고 **전달 의미론은 이 표에 안 나타난다** — `StopAnalysis` 는 2026-07-29 에 at-most-once → **«상한 있는 재시도»** 로 바뀌었지만 시그니처가 그대로라 이 표에서는 안 보인다([`ai-backend-changelog.md`](./ai-backend-changelog.md) §4).
 
 ---
 

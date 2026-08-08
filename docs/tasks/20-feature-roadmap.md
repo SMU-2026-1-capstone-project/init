@@ -7,7 +7,7 @@
 > | 이 문서가 적은 것 | 2026-08-08 실제 |
 > |---|---|
 > | 운동 시작 — 🟥 호출 없음 | ✅ `frontend/app/(tabs)/exercise.tsx:89` — `exercisesService.startSession` |
-> | 운동 중단 — 🟥 호출 없음 | ✅ 같은 파일 `:102` — `endSession`. ⚠️ **단 엔드포인트가 다르다** — 이 문서는 `PUT /exercises/sessions/{id}/stop` 을 가리키는데 프론트가 부르는 건 `PATCH /sessions/{id}/end` (`exercisesService.ts:23`) |
+> | 운동 중단 — 🟥 호출 없음 | ✅ 같은 파일 `:102` — `endSession`. **클라·서버 일치**: `PATCH /sessions/{id}/end`(`SessionController.java:57` ↔ `exercisesService.ts:23`, 멱등 200). 🔴 **낡은 쪽은 문서였다** — 이 표가 가리킨 `PUT /exercises/sessions/{id}/stop` 은 **2026-05-26 ET-H 결정으로 의도적으로 삭제**됐다([`../decisions/session-end-trigger.md`](../decisions/session-end-trigger.md)). [`../07-api-design.md`](../07-api-design.md) 도 같은 오류였고 함께 고쳤다 |
 > | 프레임 송신 — 🟥 카메라 프레임 송신 X | ✅ `exercise.tsx:175` — `aiService.detectPose` (AI 직결, 분기 H2). 🔴 그 경로에 [#134](https://github.com/Shadowfit/init/issues/134) 결함 있음 |
 > | 결과 표시 — 🟥 표시 X | ✅ `frontend/app/report/[id].tsx` 존재 |
 > | 데이터 계층 (`services/`·`types/`) | ✅ **7개 전부 존재** — [`../handoff/frontend-data-layer.md`](../handoff/frontend-data-layer.md) 완료 |

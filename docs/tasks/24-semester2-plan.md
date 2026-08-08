@@ -58,11 +58,11 @@
 | 작업 | 추정 | 비고 |
 |------|------|------|
 | 1학기 시연 회고 (백엔드 관점 — 어디서 막혔는지, 결합 결정 이력 정리) | 2h | [`architecture/ai-backend-monthly-log.md`](../architecture/ai-backend-monthly-log.md) 업데이트 |
-| OP-07 (CI — GitHub Actions PR 마다 `./gradlew test`) | 2h | 이후 회귀 방지 |
-| OP-04 (Flyway 도입, 베이스라인 잡기) | 4h | Week 5 의 세트 컬럼 추가 때 깔끔하게 쓰기 위함 |
+| ~~OP-07 (CI — GitHub Actions PR 마다 `./gradlew test`)~~ | ~~2h~~ | ✅ **완료** — `.github/workflows/backend-test.yml`·`ai-server-test.yml`·`proto-sync-check.yml` |
+| ~~OP-04 (Flyway 도입, 베이스라인 잡기)~~ | ~~4h~~ | ✅ **완료 (2026-08-01, #115)** — `V1__baseline.sql` 포함 |
 | Week 2 의 proto 변경 (BE-09) 을 AI 작업자와 일정 합의 | 30m | 양쪽 동시 PR 필요 |
 
-**백엔드 마일스톤**: CI 동작, Flyway 베이스라인 확정.
+**백엔드 마일스톤**: ~~CI 동작, Flyway 베이스라인 확정.~~ → 🔴 **Week 1 의 두 항목이 방학 중에 끝났다**(2026-08-08 확인). 이 주차에 남는 것은 **회고**와 **BE-09 proto 일정 합의**뿐이다. 관측성·서킷브레이커도 §4 가 9월로 배치했는데 이미 끝났다 — **Week 1 에서 실제 진척을 점검하고 주차를 다시 짜야 한다**(이 문서 머리의 정정 블록).
 
 ---
 
