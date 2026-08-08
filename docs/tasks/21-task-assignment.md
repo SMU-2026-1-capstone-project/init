@@ -11,25 +11,38 @@
 
 ---
 
-## 1. Frontend (React Native) — 가장 큰 갭
+## 1. Frontend (React Native)
+
+> 🔴 **2026-08-07 정정.** 이 표는 2026-05-23 기준이라 **전 항목이 📋(대기)로 남아 있었는데, 실제로는 절반 이상이 구현돼 있다.** 코드로 대조해 상태를 갱신한다. 근거는 각 행에 파일·심볼로 적었다.
 
 | ID | 작업 | 우선 | 의존성 | 추정 | 담당 | 상태 |
 |----|------|-----|--------|------|------|------|
-| FE-01 | `services/exerciseService.ts` 신설 (startSession / stopSession) + `types/exercise.ts` | 🔴 | — | 1~2h | | 📋 |
-| FE-02 | `exercise.tsx` 녹화 버튼 핸들러 — 시작 시 startSession, 종료 시 stopSession 호출 | 🔴 | FE-01 | 2h | | 📋 |
-| FE-03 | `exercise.tsx` 의 DEV 패널(수동 syncRate) 제거 | 🔴 | FE-02 | 30m | | 📋 |
-| FE-04 | 카메라 프레임 캡처·base64 인코딩 로직 (`expo-camera` `takePictureAsync` 또는 frame callback) | 🔴 | — (H2 확정) | 3h | | 📋 |
-| FE-05 | 프레임 송신 — `exerciseService.sendFrame()` → **AI `POST /pose` 직접 호출** (H2 채택). `Authorization: Bearer ${INTERNAL_API_TOKEN}` 헤더 첨부 (분기 I1 잠정) | 🔴 | FE-04, 분기 I 확정, AI 측 인증 미들웨어 | 2h | | 📋 |
-| FE-06 | 운동 결과 화면 — 종료 후 rep 수·sync_rate·feedback 표시 | 🔴 | FE-02 | 4h | | 📋 |
-| FE-07 | TTS 재생 — `expo-speech` + `/preferences/tts` + `/exercises/{id}/feedback-templates` 매핑 | 🟡 | FE-02 | 3h | | 📋 |
-| FE-08 | 관절 점 오버레이 시각화 — AI 응답의 landmarks 좌표로 카메라 위에 점 그리기 | 🟡 | FE-04 | 4h | | 📋 |
-| FE-09 | 캘린더 화면 데이터 연동 — `GET /records/calendar` | 🟡 | — | 2~3h | | 📋 |
-| FE-10 | 주간 통계 화면 데이터 연동 — `GET /reports/weekly` 또는 SessionService API | 🟡 | — | 2~3h | | 📋 |
-| FE-11 | 리포트 상세 화면 — worst 구간·이전 기록 비교·자세 분석 차트 | 🟡 | BE-02 | 5~6h | | 📋 |
-| FE-12 | 운동 타이머 UI — 진행 시간 표시 | 🟡 | FE-02 | 1h | | 📋 |
-| FE-13 | 관리자 화면 — 대시보드·카테고리·운동 영상 관리 | 🟢 | BE-03~05 | 8h+ | | 📋 |
+| ~~FE-01~~ | ~~`exerciseService` 신설 (startSession / stopSession)~~ | — | — | — | | ✅ **완료** — `services/` 에 `exercisesService`·`aiService`·`reportService`·`memberService`·`preferenceService`·`authService` 7종 |
+| ~~FE-02~~ | ~~녹화 버튼 핸들러 — startSession / 종료 호출~~ | — | — | — | | ✅ **완료** — `exercise.tsx:89` `startSession`, `exercisesService` 의 세션 종료(`/end`) |
+| **FE-03** | `exercise.tsx` 의 DEV 패널(수동 syncRate) 제거 | 🟡 | — | 30m | | 📋 **남음** — `exercise.tsx:355` 에 `__DEV__ && isRecording` 조건으로 아직 있다. `__DEV__` 가드가 있어 배포본엔 안 나오므로 우선순위는 🔴→🟡 로 낮춘다 |
+| ~~FE-04~~ | ~~카메라 프레임 캡처·인코딩~~ | — | — | — | | ✅ **완료** — `takePictureAsync`(`exercise.tsx:80`), ~3fps(330ms) |
+| ~~FE-05~~ | ~~프레임 송신 → AI `POST /pose` 직결~~ | — | — | — | | ✅ **완료** — `aiService`, `EXPO_PUBLIC_INTERNAL_API_TOKEN` 헤더 |
+| **FE-06** | 운동 결과 화면 — 종료 후 rep 수·sync_rate·feedback 표시 | 🔴 | — | 4h | | 🔶 **확인 필요** — `report/[id].tsx` 가 있으나 세션 종료 직후 결과 화면과 같은 것인지 미확인 |
+| **FE-07** | TTS 재생 — `expo-speech` + `/preferences/tts` + 피드백 템플릿 매핑 | 🟡 | **AI-04** | 3h | | 📋 **남음** — `expo-speech` 사용처가 없다. ⚠️ **AI 가 결함을 안 보내므로**([`30-ai-remaining-work.md`](./30-ai-remaining-work.md) §1) 지금 만들어도 울릴 내용이 없다 |
+| **FE-08** | 관절 점 오버레이 시각화 | 🟡 | — | 4h | | 📋 |
+| ~~FE-09~~ | ~~캘린더 화면 데이터 연동~~ | — | — | — | | ✅ **완료** — `(tabs)/index.tsx` 가 `calendar` 호출 |
+| ~~FE-10~~ | ~~주간 통계 화면 연동~~ | — | — | — | | ✅ **완료** — `(tabs)/activity.tsx` 가 `weekly-summary` 호출 |
+| **FE-11** | 리포트 상세 — worst 구간·이전 기록 비교·자세 분석 차트 | 🟡 | BE-02 | 5~6h | | 🔶 **부분** — `report/[id].tsx` 는 있으나 worst 구간·비교·차트 여부 미확인 |
+| **FE-12** | 운동 타이머 UI | 🟡 | — | 1h | | 📋 |
+| **FE-14** | **세션 재부착 연동** — 앱 복귀 시 `GET /sessions/active` → `POST /sessions/{id}/reattach` | 🔴 | — | **추정 없음** | | 📋 **목록에 없던 것.** 백엔드([#73](https://github.com/Shadowfit/init/pull/73)·[#74](https://github.com/Shadowfit/init/pull/74))·AI 는 끝났는데 **프론트가 안 불러서 사용자 체감 효과가 0 이다** |
+| **FE-15** | **휴식 중 프레임 전송 중단** ([#92](https://github.com/Shadowfit/init/issues/92)) | 🟡 | **AI-03**(세트 경계) | **추정 없음** | | 📋 **목록에 없던 것.** 휴식 개념이 프론트에 아예 없다. 세션당 MediaPipe 추론 800~1,350회 낭비 |
+| **FE-13** | 관리자 화면 — 대시보드·회원 목록·세션 목록 | 🟢 | ~~BE-03~05~~ **완료** | 🔴 **추정 없음** | | 📋 **범위가 바뀌었다** — 아래 |
 
-소계: 🔴 6개, 🟡 6개, 🟢 1개
+소계: 🔴 3개, 🟡 5개, 🟢 1개 / ✅ 완료 6개
+
+### ⚠️ FE-13 은 이제 이 표의 8h+ 로 못 잡는다
+
+관리자 화면을 **만든다**가 확정됐고([`../decisions/admin-page-scope.md`](../decisions/admin-page-scope.md) §8-6), **별도 웹으로 페이지 번호 방식**까지 정해졌다. 그런데:
+
+- 이 행의 8h+ 는 **화면 3종(대시보드·카테고리·영상)** 기준인데, 확정된 범위는 **A 회원 목록 · B 세션 목록 · D 대시보드**다 — **겹치지 않는다**
+- **별도 웹**이면 React Native 앱이 아니라 **프로젝트 세팅이 통째로 추가**된다
+
+→ **현재 추정 없음.** [`28-remaining-work-plan.md`](./28-remaining-work-plan.md) §3 도 같은 단서를 달아뒀다. 백엔드는 A·B·D 가 다 끝나 **프론트만 기다리는 상태**다.
 
 ---
 
@@ -57,17 +70,35 @@
 
 ---
 
-## 3. AI Server (FastAPI) — 거의 없음
+## 3. AI Server (FastAPI) — ~~거의 없음~~ **적지 않다** (2026-08-07 정정)
 
-[`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 정책으로 손대지 않음. **현재 시연용 동작에는 추가 작업 없음.**
+> 🔴 **이 절의 제목과 전제가 틀렸다.** *"거의 없음 / 현재 시연용 동작에는 추가 작업 없음"* 은
+> 2026-05-23 시점 판단인데, 그 뒤로 두 가지가 달라졌다:
+>
+> 1. **2학기 계획이 종목 확장을 Week 3~4 로 못박았다**([`24-semester2-plan.md`](./24-semester2-plan.md)) — AI-02 는 "새 운동 추가 시점"이라는 막연한 의존이 아니라 **일정에 걸린 항목**이고, 백엔드를 막는 유일한 AI 작업이다
+> 2. **아래 3건이 AI 잔여의 전부가 아니다** — 목록에 없던 큰 항목이 더 있다(아래 표 두 번째 블록)
+>
+> 전수 조사와 근거는 [`30-ai-remaining-work.md`](./30-ai-remaining-work.md) (2026-08-07 신설).
+>
+> ⚠️ [`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 정책은 **완화됐다** — ai-server 변경은 이제 가능하고, 변경 사실을 알리고 면적을 최소화하면 된다. *"정책으로 손대지 않음"* 은 더 이상 이 표를 보류로 둘 근거가 못 된다.
 
 | ID | 작업 | 우선 | 의존성 | 추정 | 담당 | 상태 |
 |----|------|-----|--------|------|------|------|
-| AI-01 | `ExtractReferenceData` 실제 구현 — YouTube 다운로드 + MediaPipe 추출 | ⚪ | 새 운동 추가 시점 | 6h | (원작자) | 🟦 |
-| AI-02 | 런지·플랭크 분석기 추가 | ⚪ | 위와 동일 | 운동당 4h+ | (원작자) | 🟦 |
-| AI-03 | 운동 세트 자동 구분 분석 | ⚪ | BE-09 와 협의 | 4h | (원작자) | 🟦 |
+| AI-01 | `ExtractReferenceData` 실제 구현 — YouTube 다운로드 + MediaPipe 추출 | 🟡 | AI-02 의 선결 | 6h | (원작자) | 📋 |
+| AI-02 | 런지·플랭크 분석기 추가 | 🟡 | AI-01 · **2학기 Week 3~4** | 운동당 4h+ | (원작자) | 📋 |
+| AI-03 | 운동 세트 자동 구분 분석 | 🟡 | BE-09 와 협의 · AI-04 의 선결 | 4h | (원작자) | 📋 |
 
-소계: ⚪ 3개 (모두 보류)
+**목록에 없던 것** — [`30-ai-remaining-work.md`](./30-ai-remaining-work.md) 에서 나왔다:
+
+| ID | 작업 | 우선 | 의존성 | 추정 | 상태 |
+|----|------|-----|--------|------|------|
+| **AI-04** | **결함 분류 + `ReportFeedbackBatch` 송신** — proto·Spring 수신부·시드가 다 있는데 AI 가 그 RPC 를 한 번도 안 부른다. TTS 피드백 기능 전체가 시연용 더미로만 존재한다 | 🔴 | AI-03(세트 경계) | **추정 없음** | 📋 |
+| **AI-05** | **부하 측정 1회** — [`../decisions/ai-load-budget.md`](../decisions/ai-load-budget.md) §5 에 계획이 이미 있고 실행만 남았다. "MediaPipe 가 AI CPU 95%+" 명제의 유일한 근거가 될 측정 | 🟡 | — | **추정 없음** | 📋 |
+| **AI-06** | 선택형 스타일 기준(reference) — [`../decisions/reference-style-and-caching.md`](../decisions/reference-style-and-caching.md) | 🟢 | AI-01 | **추정 없음** | 📋 |
+
+소계: 🔴 1개, 🟡 4개, 🟢 1개 — **추정된 것만 18h+**(AI-01 6h + AI-02 8h+ + AI-03 4h), 추정 없는 것 3개.
+
+> 📌 **"AI 는 할 게 적다"는 인상은 측정 밀도의 착시였다.** 백엔드는 [`28-remaining-work-plan.md`](./28-remaining-work-plan.md) 300여 줄로 하위 작업까지 쪼개져 있고 AI 는 이 표 세 줄이었다. 게다가 AI 미구현은 **돌아가는 것처럼 보인다** — `ExtractReferenceData` 는 `success=True` 를 돌려주고, 세션 801 더미가 TTS 피드백을 시연해준다. 실제 작업량은 백엔드 잔여(17~28h)와 비슷하다.
 
 ---
 
