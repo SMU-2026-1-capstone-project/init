@@ -1,7 +1,9 @@
 # Spring ↔ FastAPI 결합 — 커밋별 구체 변경
 
-마지막 업데이트: 2026-05-23
+마지막 업데이트: **2026-08-08** (이전 2026-05-23 — 그룹 9 와 부록 3개를 갱신했다)
 범위: 각 커밋이 Spring(`backend/`)·FastAPI(`ai-server/`)·`proto`·`docker-compose.yml` 어디를 어떻게 바꿨는지 기능 단위로 정리.
+
+> 🔴 **이 문서의 네 칸 분류에는 함정이 있다** (2026-08-08 추가). *"proto 는 항상 결합 인터페이스의 변경이라 가장 위"* 라는 읽기 규칙이 **proto 가 안 바뀌면 결합 변경이 아니다** 로 오해되기 쉽다. 실제로 이 프로젝트 최대의 결합 변경(아웃박스, `993dfa1`)은 **proto 0줄·AI 0줄**이면서 `StopAnalysis` 의 전달 의미론을 바꿨다. **계약은 시그니처만이 아니다** — 전달 보장, 멱등 요구, proto 밖 메타데이터(`x-request-id`)도 계약이다.
 연관: 시간순 요약은 [`ai-backend-changelog.md`](./ai-backend-changelog.md), 현재 결합 현황은 [`ai-backend-integration.md`](./ai-backend-integration.md).
 
 읽는 법: "**proto**", "**Spring**", "**AI**", "**Infra**" 네 칸으로 변경면을 분리. proto는 항상 결합 인터페이스의 변경이라 가장 위.
@@ -367,6 +369,75 @@ proto의 `int64`와 Spring DTO 타입 정렬 + REST 시대 잔재 제거.
 
 ---
 
+## 그룹 9: 전달 의미론·회복탄력성·관측성 (2026-05-25 ~ 2026-08-08) 🆕
+
+> 커밋별 파일 단위 상세는 [`ai-backend-monthly-log.md`](./ai-backend-monthly-log.md) 2026-07·08 절에 있다. 여기서는 이 문서의 관점(**proto / Spring / AI / Infra** 네 칸)으로만 압축한다.
+
+### baffa48 — feat(tts,session): 피드백 batch gRPC 통일 (2026-05-25)
+
+| 면 | 변경 |
+|---|---|
+| **proto** | `ReportFeedbackBatch` 신설 (양쪽 동기) |
+| **Spring** | `ExerciseGrpcService.reportFeedbackBatch` → `FeedbackLogService`. REST endpoint 폐기 |
+| **AI** | proto 만 동기 — ⚠️ **호출부 없음(현재까지)** |
+| **Infra** | — |
+
+### 0c47598 · 215d49a — 회복탄력성 (2026-07-11)
+
+| 면 | 변경 |
+|---|---|
+| **proto** | 없음 |
+| **Spring** | 전 스텁 `withDeadlineAfter` · Resilience4j `aiServer` 서킷브레이커 · `application.yml` 임계값 |
+| **AI** | 없음 |
+| **Infra** | `build.gradle` +1 |
+
+**성격**: 계약을 안 바꾸고 **실패의 정의**를 바꿨다. "AI 가 안 죽고 느려지는" 경우가 이때부터 실패다.
+
+### aaf576a · bfa4d50 — correlation id 양방향 전파 (2026-07-28)
+
+| 면 | 변경 |
+|---|---|
+| **proto** | 없음 — 🔴 **대신 proto 밖에 계약이 하나 늘었다**: gRPC 메타데이터 `x-request-id` |
+| **Spring** | `observability/` 6개 신설(`CorrelationIds` 180줄 포함) + `AsyncConfig` + 서비스 2개 대폭 수정 |
+| **AI** | `grpc/correlation.py` 신설(`ContextVar`), `server.py`·`spring_client.py`·`main.py` 수정, 테스트 118줄 |
+| **Infra** | `logback-spring.xml` 패턴에 `%X{cid}` |
+
+**성격**: **proto 동기화 검사로는 잡히지 않는 결합 계약**이 생겼다. 메타데이터 키 이름이 어긋나면 추적만 조용히 끊긴다(기능은 돈다).
+
+### cb26e4a · 993dfa1 · eebf852 — 아웃박스 (2026-07-29) ⭐⭐
+
+| 면 | 변경 |
+|---|---|
+| **proto** | 없음 |
+| **Spring** | `model/outbox/` 4개 + `repository/outbox/` + `OutboxPublisher`(213줄) 신설. `stopAnalysis` 가 gRPC 직접 호출을 버림 |
+| **AI** | **0줄** — ⚠️ 단 `StopAnalysis` **멱등 가정**에 의존하게 됐다 |
+| **Infra** | `outbox_event` 테이블 |
+
+**성격**: 🔴 **이 문서의 네 칸 분류가 가장 오해를 부르는 커밋.** "AI 0줄"이라 결합 변경이 아닌 것처럼 보이지만, `StopAnalysis` 의 전달 의미론이 **at-most-once → at-least-once** 로 바뀌었다. **파일이 아니라 계약으로 봐야 한다.**
+
+### 084fac7 · c98d405 — 세션 재부착 (2026-07-31) ⭐
+
+| 면 | 변경 |
+|---|---|
+| **proto** | `ReattachAnalysis` 신설 (양쪽 동기 + 생성 산출물) |
+| **Spring** | `SessionController` endpoint · `ReattachSessionResponseDto` · `ExerciseAnalysisService.reattachSession`(트랜잭션 밖에서 gRPC) · `Session`·`PoseData`·`ErrorCode` 보강 |
+| **AI** | `exercise_servicer.py` 핸들러(+81) · `session_state.py` 보존 분기(+39) · 테스트 142줄 |
+| **Infra** | — |
+
+**성격**: `StartAnalysis` 와 **멱등 규칙이 정반대**라 분리. 섞으면 정상 시작이 조용히 no-op 이 된다.
+
+### e28bc65 · 025a014 · d440cae — 종료 주체들의 경쟁 정리 (2026-08-03)
+
+| 면 | 변경 |
+|---|---|
+| **proto** | 없음 |
+| **Spring** | 타임아웃 경로도 아웃박스에 통보 적재(#98) · 종료 선행 시 중복 적재 방지(#100) · 재부착↔타임아웃 레이스 테스트 확정 |
+| **AI** | 없음 |
+
+**성격**: 7월에 종료 주체가 넷(사용자 중단·AI 콜백·타임아웃·재부착)으로 늘어난 대가를 치른 작업.
+
+---
+
 ## 보조 그룹: 직접 영향 적은 잡정리
 
 ### 0fe056e — fix: MySQL 클라이언트 charset 을 utf8mb4 로 강제 (2026-05-16)
@@ -389,9 +460,23 @@ proto의 `int64`와 Spring DTO 타입 정렬 + REST 시대 잔재 제거.
 | 2026-04-17 | ea1c636 | + `StopAnalysis`(`StopRequest`/`StopResponse`) | 중단 RPC |
 | 2026-04-27 | f172933 | `PoseDataRequest`에 `sync_rate`, `feedback_message` | 실시간 결과 동반 |
 | 2026-04-27 | 2dd55e0 | (AI측 동기 + 주석 정리) | 양쪽 proto 정렬 |
-| 이후 | — | RPC 추가 없음 | 안정화 |
+| ~~이후~~ | ~~—~~ | ~~RPC 추가 없음~~ | ~~안정화~~ → **틀렸다. 아래 2건이 더 생겼다** |
+| **2026-05-25** | **baffa48** | **+ `ReportFeedbackBatch`**(`FeedbackBatchRequest`/`Response`) | TTS 발화 이벤트. ⚠️ **AI 호출부는 끝까지 안 생겼다** |
+| **2026-07-31** | **084fac7** | **+ `ReattachAnalysis`**(`ReattachRequest`/`Response`) | AI 상태 소실 복구. `StartAnalysis` 와 **멱등 규칙이 정반대**라 일부러 분리 |
+| 2026-08-01 | d4cfca7 | `is_correct` **제거** | 메시지 이름은 그대로인데 **나르는 의미**가 바뀌었다(대표 프레임 = 가장 깊은 지점) |
+| 2026-08-07 | e027889 | (계약 불일치 2건 정정) | 브랜치 머지에서 갈라진 것이 **테스트로만** 드러났다 |
 
-총 정의된 RPC: `ExtractReferenceData`, `StartAnalysis`, `StopAnalysis`, `SavePoseDataBatch`, `CompleteAnalysis`, `GetFinalPoseData` (미사용).
+**현재 정의된 RPC — `ExerciseService` 7개**: `ExtractReferenceData`, `StartAnalysis`, **`ReattachAnalysis`**, `StopAnalysis`, `SavePoseDataBatch`, `CompleteAnalysis`, **`ReportFeedbackBatch`**.
+`GetFinalPoseData` 는 **지금 proto 에 없다**(위 표의 초기 정의 이후 제거됨).
+
+> 🔴 **선언 ≠ 사용.** 이 표는 «정의»의 이력이라 흐르지 않는 것도 들어 있다. 2026-08-08 확인:
+>
+> | | 상태 |
+> |---|---|
+> | `ReportFeedbackBatch` | proto 양쪽 ✅ · Spring 수신부 ✅ · **AI 호출부 ❌** (`spring_client.py` 는 `report_pose_data_batch`·`report_complete_analysis` 둘만 부른다) |
+> | `user.proto` / `UserService.GetUserInfo` | 🔴 **양쪽 다 구현·호출 0건.** 선언은 `backend/src/main/proto/user.proto` 에만 있고 `ai-server/app/proto/` 엔 파일 자체가 없다 |
+>
+> 그리고 **전달 의미론은 이 표에 안 나타난다** — `StopAnalysis` 는 2026-07-29 에 at-most-once → **at-least-once** 로 바뀌었지만 시그니처가 그대로라 이 표에서는 안 보인다([`ai-backend-changelog.md`](./ai-backend-changelog.md) §4).
 
 ---
 
@@ -414,6 +499,17 @@ proto의 `int64`와 Spring DTO 타입 정렬 + REST 시대 잔재 제거.
 | `global/grpc/UserGrpcService` | 6ce9a43 | — | **48bb0fc에서 삭제** |
 | `global/config/InternalAuthInterceptor` | c52f677 | — | 유지 (gRPC 인증) |
 | `global/config/WebClientConfig` | 660e294 | — | 유지 (단, gRPC 전환 후 사실상 미사용) |
+| **`service/Exercise/OutboxPublisher`** | **993dfa1** | — | 유지 — **`StopAnalysis` 의 실제 호출자.** `ExerciseAnalysisService` 는 이벤트만 적재한다 |
+| **`model/outbox/OutboxEvent`·`EventType`·`Status`·`DispatchOutcome`** | cb26e4a · 993dfa1 | eebf852(CAS) | 유지 — 전달 보장의 저장소 |
+| **`repository/outbox/OutboxEventRepository`** | cb26e4a | eebf852 | 유지 |
+| **`global/observability/CorrelationIds`** | aaf576a | bfa4d50 | 유지 — **proto 밖 결합 계약**(`x-request-id`)의 정의 자리 |
+| **`global/observability/GrpcCorrelation{Client,Server}Interceptor`** | aaf576a | — | 유지 (양방향 전파) |
+| **`global/observability/CorrelationIdFilter`** | aaf576a | — | 유지 (HTTP 진입점 `X-Request-Id`) |
+| **`global/observability/SessionMetrics`** | aaf576a | 993dfa1, 569d773 | 유지 — 커스텀 지표 **9종** |
+| **`global/config/AsyncConfig`** | aaf576a | — | 유지 — `@Async` 경계 cid 전파 |
+| **`controller/SessionController`** | 084fac7 | — | 유지 — 재부착 endpoint |
+| **`dto/.../ReattachSessionResponseDto`** | 084fac7 | — | 유지 |
+| `global/proto/user.proto` (`UserService`) | (초기) | — | 🔴 **선언만 남아 있고 구현·호출 0건** — Java 클래스는 계속 생성된다 |
 
 ## 부록: 결합 표면(AI 측 핵심 파일) 라이프사이클
 
@@ -433,4 +529,20 @@ proto의 `int64`와 Spring DTO 타입 정렬 + REST 시대 잔재 제거.
 | `app/core/mediapipe_detector.py` | (초기) | c7657f1 | 유지 (thread-local) |
 | `app/api/endpoints/pose.py` | (초기) | c7657f1 | 유지 (sync 핸들러) |
 | `app/config.py` | (초기) | e8e1b65/1a50c14 | 유지 (gRPC 타깃·토큰) |
-| `app/main.py` | (초기) | b568706 | 유지 (로거·라우터 등록) |
+| `app/main.py` | (초기) | b568706 · aaf576a | 유지 (로거·라우터 등록 + cid) |
+| **`app/grpc/correlation.py`** | **aaf576a** | bfa4d50 | 유지 — `ContextVar` 기반 cid 수신·전파 |
+| `app/grpc/session_state.py` | 1a50c14 | **084fac7** | 유지 — 재부착 시 **있으면 보존** 분기 추가 |
+| `app/grpc/exercise_servicer.py` | e8e1b65 | **084fac7** | 유지 — `ReattachAnalysis` 핸들러 |
+| `app/grpc/spring_client.py` | e8e1b65 | c7657f1 · aaf576a | 유지 — ⚠️ **부르는 RPC 는 2개뿐**(`SavePoseDataBatch`·`CompleteAnalysis`). `ReportFeedbackBatch` 호출부 없음 |
+| **`exercise_pb2.py` · `exercise_pb2_grpc.py`** (ai-server **루트**) | (초기) | 084fac7 | 🔴 **실제로 로드되는 사본이 이쪽이다** — 아래 |
+
+> 🔴 **생성 산출물이 두 곳에 있고, 실행되는 것은 «루트» 쪽이다** (2026-08-08 확인).
+>
+> ```
+> ai-server/exercise_pb2.py            ← import exercise_pb2 가 실제로 이걸 집는다
+> ai-server/app/proto/exercise_pb2.py  ← 내용은 동일하나 이 이름으로 로드되지 않는다
+> ```
+>
+> 코드가 `import exercise_pb2`(최상위 bare import)를 쓰고 `sys.path` 조작이 없다. Dockerfile 이 `WORKDIR /app` + `uvicorn app.main:app` 이므로 cwd(=ai-server 루트)가 `sys.path` 에 먼저 들어간다. `importlib.util.find_spec` 으로 확인한 결과 → `E:\init\ai-server\exercise_pb2.py`.
+>
+> **지금은 두 사본이 byte 단위로 동일해서 문제가 없다**(`diff` 확인). 위험은 **다음 재생성**이다 — `.proto` 옆인 `app/proto/` 에만 생성하면 **실행 코드는 옛 계약을 그대로 쓴다.** 이 프로젝트가 이미 한 번 겪은 종류의 함정이다(`e027889` — 계약이 갈라진 것이 테스트로만 드러났다).

@@ -1,6 +1,10 @@
 # Spring ↔ FastAPI 결합 — 월별 작업 로그
 
-마지막 업데이트: 2026-05-24
+마지막 업데이트: **2026-08-08** (이전 2026-05-24 — 그 사이 2026-06·07·08 을 뒤늦게 채웠다)
+
+> ⚠️ **06~08 절의 수록 기준은 앞 절들과 다르다.** 03~05 는 거의 전 커밋을 담았지만, 이 3개월은 커밋이 332건이라 **결합 계약(RPC·메시지·인증·메타데이터)이나 전달 의미론에 영향을 준 것만** 담았다. 나머지(DB·부하테스트·관리자 API·CI 등 Spring 단독 작업)는 [`../tasks/28-remaining-work-plan.md`](../tasks/28-remaining-work-plan.md)·[`../handoff/`](../handoff/) 와 git log 를 볼 것.
+>
+> 🔴 **판정은 파일 위치가 아니라 계약으로 한다.** 아웃박스(`993dfa1`)는 AI 파일을 0줄 건드렸지만 `StopAnalysis` 의 전달 의미론을 바꿨으므로 수록했다 — `proto`·`ai-server` 경로만 훑으면 **이 프로젝트 최대의 결합 변경을 놓친다.**
 범위: 각 달에 어떤 파일을 어떻게 만졌는지 결합 관점에서 분석 정리. **각 커밋은 `Spring 측` / `FastAPI 측` / `공통(proto·DB·infra)` 3섹션으로 분할**해 책임 경계를 명확히 한다.
 연관:
 - 커밋별 구체 변경 → [`ai-backend-commit-details.md`](./ai-backend-commit-details.md)
@@ -659,3 +663,199 @@
 - **`InternalExerciseController`의 여정**: 도입(0d89668) → 삭제(5ce1872) → 복원(e5f5b29) → 또 삭제(a9f9017) → 부활(2f48526) → 최종 종료(8ac8248). REST 콜백 시대의 잔재가 gRPC 전환 후 5번에 걸쳐 흔들린 흔적.
 - **AI 측 평행 구현 청산**: `mock_server.py`(04-14 신설 → 05-16 삭제)와 실제 `app/grpc/` 패키지(04-28 신설)가 17일간 공존. 5/16에 mock 제거하고, 같은 날 `session_registry`/`pose_analysis_engine`/`auth_interceptor` 등 평행 사본도 정리.
 - **결합 표면이 1개로 다시 통일**: 메인 결합은 gRPC 양방향(`exercise.proto`). 2f48526 (05-09) 의 TTS 도메인 추가 시 `POST /internal/feedback/batch` REST endpoint가 한 달간 보조 결합으로 공존했으나, **2026-05-26 gRPC 통일 결정으로 `ReportFeedbackBatch` RPC 추가 + REST endpoint 삭제** → 결합 표면 다시 gRPC 단일. `InternalExerciseController` 의 5번 흔들림과 유사한 *REST→gRPC 수렴 패턴* 재현.
+
+---
+
+## 2026-06 — 결합면은 거의 멈춰 있었다 (커밋 26건, 결합 관련 1건)
+
+이 달의 결합 관점 핵심: **"없음"이 사실이다.** 커밋 26건 중 `proto`·`ai-server` 를 건드린 것은 **1건**(`85ccb6c`)뿐이고, 나머지는 전부 Spring 단독의 DB·부하테스트 작업이다(pose_data 적재 측정, 다운샘플 설계, 풀 사이징 실측). 결합 계약은 5월 말 상태 그대로 유지됐다.
+
+#### 85ccb6c (06-04) — 아몰랑 푸시
+
+**Spring 측** / **FastAPI 측** / **공통** — 커밋 메시지가 내용을 설명하지 않아 **이 로그에서 성격을 단정하지 않는다.** 결합 계약(RPC·메시지·인증) 변경은 확인되지 않았다.
+
+> 📌 **기록 원칙**: 메시지가 비어 있는 커밋은 "무엇이었는지 모른다"로 남긴다. 추정해서 채우면 이 문서의 나머지 서술과 신뢰도가 같아 보이게 된다.
+
+**결합 결과**: 없음(확인된 범위에서).
+
+---
+
+## 2026-07 — 보장을 바꾼 달 (커밋 212건) ⭐
+
+이 달의 결합 관점 핵심: **"경로를 만드는 것"에서 "경로의 보장을 바꾸는 것"으로.** 새 RPC 는 1개(`ReattachAnalysis`)지만, **기존 RPC 의 전달 의미론·실패 처리·추적성이 전부 바뀌었다.** 그리고 이 셋 중 둘은 **AI 코드를 한 줄도 안 건드리고** 이뤄졌다.
+
+### 07-11 — 회복탄력성 (Spring 단독)
+
+#### 0c47598 (07-11) — fix(resilience): Spring→AI gRPC 호출에 데드라인 추가
+
+**Spring 측**
+- `service/Exercise/ExerciseAnalysisService.java` (+8 -2) — 모든 스텁에 `withDeadlineAfter`
+
+**FastAPI 측** — (없음)
+
+**공통** — (없음)
+
+**결합 결과**: **"AI 가 죽지 않고 느려지는" 경우가 처음으로 결합 실패로 분류된다.** 그전에는 호출 스레드가 무한 대기했다.
+
+#### 215d49a (07-11) — feat(resilience): Resilience4j 서킷브레이커 적용
+
+**Spring 측**
+- `build.gradle` (+1) — Resilience4j
+- `ExerciseAnalysisService.java` (+37) — `CircuitBreakerRegistry` 로 `aiServer` 인스턴스
+- `application.yml` (+24 -2) — 임계값·윈도우 설정
+
+**FastAPI 측** — (없음)
+
+**공통** — (없음)
+
+**결합 결과**: 연속 실패 시 회로 개방 — 죽은 서버에 계속 밀어넣지 않는다. ⚠️ **회로가 열린 사실을 볼 지표는 ai-server 쪽에 없다**(관측 스택이 Spring 만 덮는다).
+
+### 07-19 — 의존성 보안 (FastAPI 단독)
+
+#### 83ad508 · dc701ab (07-19) — fix(security): AI 의존성 취약점
+
+**Spring 측** — (없음)
+
+**FastAPI 측**
+- `requirements.txt` — `protobuf 4.25.3 → 4.25.8`(DoS), `python-multipart → 0.0.32`
+
+**공통** — frontend lockfile(`dc701ab`)
+
+**결합 결과**: 🔴 **양쪽 protobuf 메이저가 갈렸다** — AI 4.25.x / Spring `protobuf-java` 3.25.x. wire format 은 호환이지만 **같은 `.proto` 를 서로 다른 런타임으로 컴파일한다**는 상태가 됐고, 두 버전을 함께 올려주는 장치는 없다.
+
+### 07-22 — AI 판정 기준 (FastAPI 주도)
+
+#### d8349f3 (07-22) — feat(persona): 페르소나별 싱크로율 임계값 실제 연결
+
+**FastAPI 측** — 임계값을 하드코딩에서 페르소나 기반으로
+
+**결합 결과**: **proto 무변경으로 AI 판정 기준만 바뀐 첫 사례.** 계약은 같은데 **같은 입력에 다른 판정**이 나온다 — 계약 동기화로는 잡히지 않는 종류의 결합 변화다.
+
+### 07-28 — 관측성 1차 (양쪽) ⭐
+
+#### aaf576a (07-28) — feat(backend,ai): correlation id 전파 + 커스텀 메트릭
+
+**Spring 측**
+- `global/observability/CorrelationIds.java` (+180) — MDC 키(`cid`·`sessionId`), HTTP 헤더 `X-Request-Id`, gRPC 메타데이터 키 `x-request-id`
+- `CorrelationIdFilter.java` (+43) — HTTP 진입점
+- `GrpcCorrelationClientInterceptor.java` (+38) · `GrpcCorrelationServerInterceptor.java` (+65) — **양방향** 전파
+- `GrpcObservabilityConfig.java` (+35), `SessionMetrics.java` (+62)
+- `global/config/AsyncConfig.java` (+29) — `@Async` 경계 전파
+- `ExerciseAnalysisService.java` (+101 -80), `ExerciseGrpcService.java` (+66 -53)
+
+**FastAPI 측**
+- `app/grpc/correlation.py` (+99) — `ContextVar` 기반 수신·보관
+- `app/grpc/server.py` (+6 -1), `spring_client.py` (+8 -2), `main.py` (+6 -1)
+- `tests/test_correlation.py` (+118)
+
+**결합 결과**: **처음으로 두 서비스의 로그가 한 요청으로 이어졌다.** 🔴 그리고 **proto 밖에 결합 계약이 하나 늘었다** — `x-request-id` 메타데이터. proto 동기화 검사로는 안 잡히는 계약이다.
+
+#### bfa4d50 (07-28) — fix(ai): correlation id 가 백그라운드 스레드 경계에서 끊기던 것
+
+**Spring 측** — `CorrelationIds.java` (+3 -1), `logback-spring.xml` (+3 -1)
+
+**FastAPI 측** — `correlation.py` (+44 -1), `exercise_servicer.py` (+6 -2), `spring_client.py` (+5 -1), `tests/test_correlation.py` (+75 -3)
+
+**결합 결과**: 도입 당일에 바로 드러난 흠. **MDC/ContextVar 는 스레드·태스크 로컬이라 경계마다 명시적으로 넘겨야 한다** — `StopAnalysis` 후 백그라운드로 완료 콜백을 보내는 그 경로가 정확히 그 경계였다.
+
+### 07-29 — 아웃박스 (Spring 단독, 결합 의미론 변경) ⭐⭐
+
+#### cb26e4a (07-29) — feat(outbox): OutboxEvent 엔티티 + 리포지토리
+
+**Spring 측**
+- `model/outbox/OutboxEvent.java` (+117), `OutboxEventType.java` (+20), `OutboxStatus.java` (+35)
+- `repository/outbox/OutboxEventRepository.java` (+127)
+
+**FastAPI 측** — (없음) / **공통** — (없음)
+
+#### 993dfa1 (07-29) — feat(outbox): 세션 종료 통보를 아웃박스로 전환 — 유실 0 달성
+
+**Spring 측**
+- `service/Exercise/OutboxPublisher.java` (+213) — `@Scheduled` 폴링 발행기(기본 1초, 재시도 상한 10)
+- `ExerciseAnalysisService.java` (+89 -52) — `stopAnalysis` 가 **gRPC 직접 호출을 버리고** 세션 상태와 같은 트랜잭션에 이벤트 적재
+- `model/outbox/DispatchOutcome.java` (+29), `SessionMetrics.java` (+38 -1) — 아웃박스 지표 3종
+- `SessionService.java` (+19 -16), 테스트 2건 보강
+
+**FastAPI 측** — (없음)
+
+**결합 결과**: 🔴 **이 프로젝트에서 가장 큰 결합 변경인데 AI 파일은 0줄이다.** `StopAnalysis` 의 전달 의미론이 **at-most-once → at-least-once** 로 바뀌었다 — dual-write(커밋과 송신이 별개라 커밋 후 송신 실패 시 유실)를 구조적으로 닫았다. *"유실 0"* 은 실측.
+⚠️ **대신 AI 의 `StopAnalysis` 가 멱등해야 성립한다** — 재시도가 같은 통보를 두 번 보낼 수 있다. **코드 변경이 없는 것과 계약 변경이 없는 것은 다르다.**
+📌 이 커밋 때문에 [`ai-backend-integration.md`](./ai-backend-integration.md) §6 이 2.5개월간 *"영구 큐 없음, 3회 실패 시 유실"* 로 틀린 채 있었다.
+
+#### eebf852 (07-29) — fix(outbox): 소유권 조건부 갱신(CAS) + 예외 계약 (CodeRabbit)
+
+**Spring 측** — 발행기가 둘 이상일 때 같은 행을 두 번 집는 것 방지
+
+### 07-31 — 세션 재부착 (양쪽) ⭐
+
+#### 084fac7 (07-31) — feat(session): 세션 재부착 — AI 상태 소실 시 이어하기 (#59 2단계)
+
+**proto** (양쪽 동기)
+- `ReattachAnalysis (ReattachRequest) → ReattachResponse` **신설**
+
+**Spring 측**
+- `controller/SessionController.java` (+19) — `POST /exercises/sessions/{id}/reattach`
+- `dto/exercises/session/ReattachSessionResponseDto.java` (+78)
+- `service/Exercise/ExerciseAnalysisService.java` (+87) — **DB 조회를 트랜잭션에서 끝내고 트랜잭션 밖에서 gRPC 호출**(외부 지연이 커넥션 점유로 번지지 않게)
+- `model/exercise/Session.java` (+22), `PoseData.java` (+8), `PoseDataRepository.java` (+7), `ErrorCode.java` (+8)
+
+**FastAPI 측**
+- `app/grpc/exercise_servicer.py` (+81 -3) — **있으면 보존, 없으면 DB 값으로 생성**
+- `app/grpc/session_state.py` (+39), `app/api/endpoints/pose.py` (+2)
+- `app/proto/exercise.proto` (+34) + 생성 산출물, `tests/test_session_reattach.py` (+142)
+
+**결합 결과**: 5월 판이 알려진 약점으로 적어둔 *"AI 재시작 시 진행 중 세션 전부 소실"* 에 **복구 경로**가 생겼다. ⚠️ 자동이 아니다 — 프론트가 호출해야 하고, 아무도 안 부르면 스케줄러가 `FAILED` 처리한다. 그리고 **수평 확장 문제는 그대로다**(상태가 여전히 인스턴스 로컬).
+📌 **`StartAnalysis` 에 합치지 않은 이유가 proto 주석에 박혀 있다**: 계약이 *"있으면 보존"* 이라 정상 시작의 *"새로 만든다"* 와 **멱등 규칙이 정반대**다. 섞으면 **정상 시작이 조용히 no-op** 이 될 수 있다.
+
+#### c98d405 (07-31) — fix(session): CodeRabbit 리뷰 반영 — 실패 경로 테스트 + 문서 수치 정정
+
+---
+
+## 2026-08 — 경쟁 조합 정리와 계약 불일치 (커밋 94건, 08-08 기준)
+
+이 달의 결합 관점 핵심: **7월에 늘어난 종료 경로들이 서로 부딪히는 자리를 좁혔다.** 아웃박스·재부착·타임아웃이 모두 "세션을 끝내는" 주체가 되면서 경쟁 조합이 늘었고, 그걸 테스트로 확정하는 작업이 이 달의 결합 작업이다.
+
+### 08-01 — 대표 프레임 전략 변경 (Spring + DB)
+
+#### d4cfca7 · 4000530 (08-01) — feat(report): 대표 프레임 = "가장 깊게 앉은 순간" (ㄹ안) + `is_correct` 삭제
+
+**Spring 측** — 대표 프레임 선택 전략 변경, `is_correct` 제거
+**공통** — DB 마이그레이션(`4000530` — 두 `ALTER` 를 한 문장으로 + 재구성 비용 주석 실측 정정)
+
+**결합 결과**: proto 메시지 이름은 그대로인데 **`PoseDataRequest` 가 나르는 의미가 바뀌었다** — 저장되는 프레임이 "윈도우 최저 sync_rate" 에서 "가장 깊은 지점"으로. `d8349f3` 과 같은 종류의 변화다(계약 동기화로 안 잡힌다).
+
+### 08-03 — 종료 주체들의 경쟁 정리 (Spring 주도)
+
+#### e28bc65 (08-03) — fix(session): 타임아웃으로 걷어가는 세션도 AI 에 통보한다 (#98)
+
+**Spring 측** — 타임아웃 경로도 아웃박스에 통보 적재
+
+**결합 결과**: 그전엔 Spring 만 `FAILED` 로 바꾸고 **AI 에는 orphan 세션이 남았다.** 아웃박스가 있으니 타임아웃 경로도 같은 보장을 받게 편입한 것.
+
+#### 025a014 (08-03) — fix(session): 종료가 먼저면 통보를 중복 적재하지 않는다 (CodeRabbit #100)
+
+#### d440cae (08-03) — test(session): 재부착-타임아웃 레이스의 결과를 확정한다 (#77 → #98)
+
+**결합 결과**: 위 셋을 합쳐 **"누가 세션을 끝내는가"의 조합**(사용자 중단 · AI 완료 콜백 · 타임아웃 스케줄러 · 재부착)이 테스트로 고정됐다.
+
+#### e7e04b7 · 35c8d1e (08-03) — fix(ai): rep 판정·버퍼 (#93, #91)
+
+**FastAPI 측** — 휴식 중 앉았다 일어나기를 rep 으로 세지 않음(#93), rep 프레임 버퍼 상한(#91)
+
+**결합 결과**: proto 무변경. 다만 `SavePoseDataBatch` 로 흐르는 **행 수와 내용**이 달라진다.
+
+### 08-07 — 계약 불일치가 머지에서 드러났다
+
+#### e027889 (08-07) — fix(test): 머지로 드러난 계약 불일치 2건
+
+**결합 결과**: 📌 **이 문서 §5(`changelog` §6) «proto 는 결합의 무게 중심» 관찰의 실물 증거.** 브랜치를 합칠 때 proto 계약이 갈라져 있던 것이 **테스트로만** 드러났다 — 런타임 직렬화 실패 전에 잡힌 건 운이 좋은 쪽이다.
+
+### 08-08 — 관측 스택 (Spring 단독, 결합면에 빈칸을 남긴다)
+
+#### 0b1e1f2 외 (08-08) — feat(obs): Prometheus + Grafana
+
+**Spring 측** — 관리 포트 9090 분리, compose profile `obs`, 대시보드 JSON 프로비저닝
+
+**FastAPI 측** — (없음)
+
+**결합 결과**: ⚠️ **관측성이 Spring 만 덮는다.** ai-server 는 계측이 없어 스크레이프 타깃에 넣지 않았다(넣으면 영원히 DOWN 인 타깃이 생긴다). 즉 `07-11` 의 서킷브레이커가 회로를 열어도 **AI 쪽 상태를 볼 지표가 없다** — 결합 관점에서 **관측의 절반이 빈칸**이다.
