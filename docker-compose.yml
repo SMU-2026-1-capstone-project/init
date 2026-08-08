@@ -59,7 +59,11 @@ services:
       # (외부에 지표를 안 내보낸다, application.yml [6]).
       # 로컬에서 여는 이유는 verify 스킬이 호스트에서 curl 로 health 를 폴링하기
       # 때문이다 — 안 열면 로컬 검증 절차가 통째로 막힌다.
-      - "9090:9090"
+      # 🔴 루프백에 묶는다(#128). 인터페이스를 안 적으면 0.0.0.0 이라 LAN 의 누구나
+      # /actuator/prometheus 를 무인증으로 읽는다 — "보호 수단은 인증이 아니라 포트
+      # 경계"라는 이 설계의 전제가 dev 에서 통째로 깨진다. 용도가 호스트 curl 이므로
+      # 127.0.0.1 로 목적은 그대로다.
+      - "127.0.0.1:9090:9090"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Seoul
@@ -129,7 +133,9 @@ services:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     ports:
-      - "9091:9090"   # 호스트 9091 — 백엔드 관리포트 9090 과 헷갈리지 않게 어긋냈다
+      # 호스트 9091 — 백엔드 관리포트 9090 과 헷갈리지 않게 어긋냈다.
+      # 루프백 고정(#128): 프로메테우스 UI 는 인증이 아예 없어 노출되면 지표 전량이 공개된다.
+      - "127.0.0.1:9091:9090"
     networks:
       - shadowfit-net
 
@@ -154,7 +160,9 @@ services:
     depends_on:
       - prometheus
     ports:
-      - "3000:3000"
+      # 루프백 고정(#128). 아래 기본 비밀번호가 admin 이라, 0.0.0.0 이면 .env 가 없는
+      # 순간 admin/admin 콘솔이 LAN 에 열린다.
+      - "127.0.0.1:3000:3000"
     networks:
       - shadowfit-net
 

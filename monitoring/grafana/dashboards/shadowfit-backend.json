@@ -38,7 +38,7 @@
       "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
       "targets": [
         { "refId": "A", "expr": "hikaricp_connections_acquire_seconds_max{application=\"shadowfit\"}", "legendFormat": "최대" },
-        { "refId": "B", "expr": "rate(hikaricp_connections_acquire_seconds_sum{application=\"shadowfit\"}[1m]) / clamp_min(rate(hikaricp_connections_acquire_seconds_count{application=\"shadowfit\"}[1m]), 1)", "legendFormat": "평균(1m)" },
+        { "refId": "B", "expr": "rate(hikaricp_connections_acquire_seconds_sum{application=\"shadowfit\"}[1m]) / clamp_min(rate(hikaricp_connections_acquire_seconds_count{application=\"shadowfit\"}[1m]), 1e-9)", "legendFormat": "평균(1m)" },
         { "refId": "C", "expr": "rate(hikaricp_connections_timeout_total{application=\"shadowfit\"}[1m])", "legendFormat": "타임아웃/초" }
       ]
     },
@@ -80,7 +80,7 @@
       "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
       "targets": [
         { "refId": "A", "expr": "shadowfit_outbox_lag_seconds_max{application=\"shadowfit\"}", "legendFormat": "최대" },
-        { "refId": "B", "expr": "rate(shadowfit_outbox_lag_seconds_sum{application=\"shadowfit\"}[1m]) / clamp_min(rate(shadowfit_outbox_lag_seconds_count{application=\"shadowfit\"}[1m]), 1)", "legendFormat": "평균(1m)" }
+        { "refId": "B", "expr": "rate(shadowfit_outbox_lag_seconds_sum{application=\"shadowfit\"}[1m]) / clamp_min(rate(shadowfit_outbox_lag_seconds_count{application=\"shadowfit\"}[1m]), 1e-9)", "legendFormat": "평균(1m)" }
       ]
     },
     {
@@ -163,7 +163,7 @@
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
       "targets": [
         { "refId": "A", "expr": "sum by (stage) (rate(shadowfit_pose_batch_frames_sum{application=\"shadowfit\"}[1m]))", "legendFormat": "{{stage}} 프레임/초" },
-        { "refId": "B", "expr": "sum(rate(shadowfit_pose_batch_frames_sum{application=\"shadowfit\", stage=\"stored\"}[1m])) / clamp_min(sum(rate(shadowfit_pose_batch_frames_sum{application=\"shadowfit\", stage=\"received\"}[1m])), 0.001)", "legendFormat": "저장 비율 (= 1/R)" }
+        { "refId": "B", "expr": "sum(rate(shadowfit_pose_batch_frames_sum{application=\"shadowfit\", stage=\"stored\"}[1m])) / clamp_min(sum(rate(shadowfit_pose_batch_frames_sum{application=\"shadowfit\", stage=\"received\"}[1m])), 1e-9)", "legendFormat": "저장 비율 (= 1/R)" }
       ]
     },
     {
