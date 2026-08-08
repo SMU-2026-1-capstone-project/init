@@ -1,13 +1,33 @@
 # AI Server 작업 상세 — AI-01 ~ AI-03
 
-마지막 업데이트: 2026-05-24
+> ## 🔴 «전부 보류» 판정이 낡았고, 이 목록에 없는 1순위가 따로 있다 (2026-08-08)
+>
+> 아래 3건은 모두 **🟦 보류 / 의존: 새 운동 추가 결정** 으로 적혀 있다. [`30-ai-remaining-work.md`](./30-ai-remaining-work.md) 가 그 판정을 뒤집었다:
+>
+> > *"**보류는 낡은 판단이다.** 그 전제는 «시연용 동작에는 추가 작업 없음» 인데, 그 뒤로 요구가 바뀌었다 — 2학기 계획이 종목 확장을 Week 3~4 에 못박았고, TTS 피드백은 시연용 더미로만 존재한다. AI-01~03 은 **보류가 아니라 순서를 정할 대상**이다."*
+>
+> 🔴 **더 중요한 것: 이 문서에 없는 항목이 지금 AI 트랙 1순위다.**
+>
+> | | 상태 |
+> |---|---|
+> | **결함 분류 → `ReportFeedbackBatch` 송신** | 통째로 미구현. proto·Spring 수신부·DB 테이블·시드는 다 있고 **AI 가 안 부른다**(2026-08-08 확인, `ai-server/` 에 `FeedbackBatch` 사용 0건) |
+>
+> 이 문서가 2026-05-24 에 *"시연용 동작에 추가 필요한 작업 없음"* 이라고 적었을 때, **바로 전날(2026-05-25) 신설된 `ReportFeedbackBatch` 요청서**([`../handoff/ai-tts-feedback-batch.md`](../handoff/ai-tts-feedback-batch.md))가 이 목록에 편입되지 않았다. **AI-01~03 이라는 번호 체계 밖에서 일이 하나 늘었고, 그래서 «AI 트랙은 거의 없음» 이 2.5개월 유지됐다.**
+>
+> 📌 **AI 잔여의 정본은 [`30-ai-remaining-work.md`](./30-ai-remaining-work.md)** (2026-08-07 신설). 이 문서는 AI-01~03 의 **착수 상세**로만 쓴다.
+
+마지막 업데이트: 2026-05-24 · 판정 정정: **2026-08-08**
 출처: [`21-task-assignment.md`](./21-task-assignment.md) §3 의 항목별 풀이.
 범위: 각 작업이 **어떤 파일을 / 무엇을 / 왜 / 어디까지** 만져야 하는지 + 현재 코드 상태 확인. 담당자(=ai-server 원작자)가 받아서 바로 시작할 수 있는 단위.
 
 > **정책 알림** ([`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md))
 > ai-server 는 다른 사람 설계. 이 문서의 모든 항목은 **원작자가 진행하거나, 진행 전에 사용자 확인**. 우리(Spring 쪽 작업자)가 자의적으로 손대지 않음.
 >
-> **현재 상태**: 시연용 동작에 추가 필요한 작업 없음. 모든 항목은 [`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) 정책상 **새 운동 추가 결정 시점**까지 보류.
+> ~~**현재 상태**: 시연용 동작에 추가 필요한 작업 없음. 모든 항목은 [`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) 정책상 **새 운동 추가 결정 시점**까지 보류.~~
+>
+> 🔴 **위 «현재 상태» 는 2026-05-24 시점 기록이다 — 지금 상태로 읽지 말 것** (2026-08-08). *"추가 필요한 작업 없음"* 은 두 군데서 틀렸다: ① 종목 확장이 2학기 Week 3~4 로 못박혀 **AI-01~03 은 보류가 아니라 순서를 정할 대상**이고, ② 이 목록에 **없는 항목**(결함 분류 → `ReportFeedbackBatch` 송신)이 지금 AI 트랙 **1순위**다. 현재 상태의 정본은 [`30-ai-remaining-work.md`](./30-ai-remaining-work.md).
+>
+> ⚠️ `project-squat-first` 정책 자체는 유효하다 — 바뀐 것은 *"그래서 지금 할 일이 없다"* 는 결론이다.
 
 읽는 법:
 - **현재 상태**: 코드를 실제로 확인한 결과 (📁 = 존재, ❌ = 부재, ⚠️ = 부분 구현)

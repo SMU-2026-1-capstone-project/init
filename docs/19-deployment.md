@@ -4,7 +4,8 @@
 범위: ShadowFit 배포 절차, 환경 변수 관리, 롤백 전략. 운영 호스팅이 아직 정해지지 않아 **본 문서는 "지금 가능한 절차" + "결정해야 할 사항"** 두 축으로 구성합니다.
 
 > 🔴 **가장 먼저 알아야 할 것**: 배포 대상 호스트가 없다. 상시 EC2 인스턴스가 없고
-> (2026-07-25 풀 사이징에 쓴 2대는 실측 후 삭제) AWS 연결도 아직이다. 그래서 CD 는
+> (2026-07-25 풀 사이징에 쓴 2대, **2026-08-08 격자 재측정에 쓴 3대** 모두 실측 후 삭제)
+> AWS 연결도 아직이다. 그래서 CD 는
 > **이미지 빌드·푸시까지만 자동**이고 배포는 수동이다 ([§3.0](#30-cd-파이프라인--어디까지-자동인가)).
 
 ---
@@ -71,11 +72,28 @@
 **적용 상태 확인**:
 
 ```bash
-curl -s http://localhost:8080/actuator/flyway | jq '.contexts[].flywayBeans.flyway.migrations[] | {version, description, state}'
-# 또는
+# dev — 9090 이 루프백에 매핑돼 있다 (docker-compose.yml)
+curl -s http://localhost:9090/actuator/flyway | jq '.contexts[].flywayBeans.flyway.migrations[] | {version, description, state}'
+
+# prod — 9090 을 호스트에 매핑하지 않는다(의도된 설계). 컨테이너 안에서 부른다
+docker exec shadowfit-backend wget -qO- http://localhost:9090/actuator/flyway \
+  | jq '.contexts[].flywayBeans.flyway.migrations[] | {version, description, state}'
+
+# 어느 환경이든 되는 경로 — DB 를 직접 본다
 docker exec -it shadowfit-mysql mysql -u"$MYSQL_USER" -p shadowfit \
   -e "SELECT version, description, installed_on, success FROM flyway_schema_history ORDER BY installed_rank;"
 ```
+
+> 🔴 **8080 이 아니다** ([이슈 #130](https://github.com/Shadowfit/init/issues/130)). 2026-08-08 관리 포트
+> 분리로 액추에이터가 9090 으로 옮겨갔는데 이 절차가 8080 을 시키고 있었다. 8080 에 같은 경로를
+> 치면 핸들러가 없어 **404** 다(그 전엔 500 이었고, [#129](https://github.com/Shadowfit/init/issues/129) 로 404 가 됐다).
+>
+> ⚠️ **prod 는 HTTP 경로가 `docker exec` 뿐이다.** 그래서 Flyway 도입(#115)의 목적이던 *"적용 이력을
+> 추적 가능한 형태로"* 가 prod 에서는 컨테이너 안에 들어가야만 닿는다. 9090 을 prod 에서 루프백
+> (`127.0.0.1:9090:9090`)에 매핑할지는 *"prod 에 관측 스택을 올릴지"* 미결과 같은 자리라 열어둔다
+> ([`tasks/28-remaining-work-plan.md`](./tasks/28-remaining-work-plan.md) §7). **결정 전까지는 위 세 번째
+> 명령(DB 직접 조회)이 prod 의 1순위 확인 경로다** — 두 번째 명령은 백엔드 이미지에 `wget` 이 있다는
+> 전제에 기대는데(healthcheck 가 그걸 쓴다), 그 healthcheck 자체가 실제 호스트에서 검증된 적이 없다.
 
 > ⚠️ Flyway 가 답하는 것은 **"내 파일이 돌았나"** 까지다. 누가 손으로 `ALTER TABLE` 을 치면
 > 여기엔 아무것도 안 남는다 — 드리프트 탐지는 별건이고 미도입 상태다.
@@ -87,7 +105,8 @@ docker exec -it shadowfit-mysql mysql -u"$MYSQL_USER" -p shadowfit \
 ### 3.0 CD 파이프라인 — 어디까지 자동인가
 
 **이미지 빌드·푸시까지 자동, 배포는 수동이다.** 배포 대상 호스트가 없어서다
-(상시 EC2 인스턴스 없음 — 2026-07-25 풀 사이징에 쓴 2대는 실측 후 삭제).
+(상시 EC2 인스턴스 없음 — 2026-07-25 풀 사이징 2대 · 2026-08-08 격자 재측정 3대,
+전부 실측 후 삭제. 실험용으로 띄웠다 지우는 패턴이 두 번 반복됐다).
 
 ```
 main 에 push
@@ -126,14 +145,18 @@ vim .env                                  # 운영 값 입력 (§2.1 — 시크�
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 
-# 3) 헬스체크
-docker compose -f docker-compose.prod.yml ps      # 셋 다 'healthy'
-curl http://localhost:8080/actuator/health
+# 3) 헬스체크 — prod 는 9090 을 호스트에 매핑하지 않으므로 ps 의 healthy 가 1순위다
+docker compose -f docker-compose.prod.yml ps      # 셋 다 'healthy' (컨테이너가 안에서 9090 을 친다)
+docker exec shadowfit-backend wget -qO- http://localhost:9090/actuator/health   # 내용까지 보려면
 
-# 4) 스키마가 적용됐는지 — 여기서 Flyway 결과를 본다
-curl -s http://localhost:8080/actuator/flyway
+# 4) 스키마가 적용됐는지 — 여기서 Flyway 결과를 본다 (§2.3 에 세 경로 비교)
+docker exec -it shadowfit-mysql mysql -u"$MYSQL_USER" -p shadowfit \
+  -e "SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank;"
 docker exec -it shadowfit-mysql mysql -u"$MYSQL_USER" -p shadowfit -e "SELECT id, name FROM exercises;"
 ```
+
+> 🔴 **여기서 `curl localhost:8080/actuator/…` 를 치지 않는다** ([#130](https://github.com/Shadowfit/init/issues/130)).
+> 액추에이터는 9090 이고 prod 는 그 포트를 호스트에 매핑하지 않는다 — 8080 에 치면 404 다.
 
 > 마스터 데이터(`exercises`, 피드백 템플릿)는 Flyway 가 넣는다. **dev 픽스처(테스트 계정·
 > 가짜 세션)는 안 들어간다** — 의도적이다. 운영에 필요 없고 있으면 안 되는 데이터다.
@@ -181,19 +204,34 @@ docker compose up -d
 
 ---
 
-## 5. 모니터링·로깅 — **TODO**
+## 5. 모니터링·로깅 — 🔄 절반은 됐다 (2026-08-08 갱신)
 
-현재는 `docker logs <컨테이너명>` 으로 stdout 만 보는 수준. 운영 도입 후보:
+~~현재는 `docker logs <컨테이너명>` 으로 stdout 만 보는 수준.~~ **dev 에는 관측 스택이 있다.** 다만 **prod 구성에는 아직 없다** — 그 결정이 §5-1 이다.
 
-| 영역 | 후보 도구 | 우선순위 |
+| 영역 | 후보 도구 | 상태 (2026-08-08) |
 |------|---------|---------|
-| 애플리케이션 로그 집계 | ELK, Loki | 높음 |
-| 메트릭 (CPU/메모리/RPS) | Prometheus + Grafana | 높음 |
-| Spring Actuator | `actuator/health`, `actuator/metrics` | 높음 (코드만 변경) |
-| AI 서버 헬스 | `python -c urllib...` 컨테이너 헬스체크만 존재 | 중간 |
-| gRPC 채널 상태 | (현재 없음) | 중간 |
-| 알람 | Slack 웹훅, PagerDuty | 결정 필요 |
-| 에러 추적 | Sentry | 중간 |
+| **Spring Actuator** | `actuator/health`·`metrics`·`flyway`·`prometheus` | ✅ **완료.** 🔴 **관리 포트 9090 으로 분리** — 8080 은 외부 노출이라 지표를 열면 공개된다. prod compose 는 9090 을 **매핑하지 않는다** |
+| **메트릭 (RPS·풀·JVM + 커스텀 9종)** | Prometheus + Grafana | ✅ **dev 완료** (compose profile `obs`, 대시보드 JSON 프로비저닝) — [`../monitoring/README.md`](../monitoring/README.md). 🔶 **prod 미적용** (§5-1) |
+| **correlation id 전파** | MDC + `%X{cid}` | ✅ **완료** — HTTP·gRPC 양방향·`@Async`·스케줄러. 두 서비스 로그를 한 요청으로 이어 본다 |
+| 애플리케이션 로그 집계 | ELK, Loki | ❌ 미도입. 로그는 여전히 컨테이너 stdout. **JSON 구조화도 안 했다** — 수집기를 붙일 때 같이 한다 |
+| **AI 서버 지표** | (Prometheus 타깃) | ❌ **의도적 제외.** FastAPI 에 계측이 없어 타깃만 적으면 영원히 DOWN 인 타깃이 생긴다. 🔴 **그래서 관측성이 Spring 만 덮는다** — 서킷브레이커가 회로를 열어도 AI 쪽 상태를 볼 지표가 없다 |
+| AI 서버 헬스 | 컨테이너 헬스체크(`urllib`) | 🔶 그대로 |
+| gRPC 채널 상태 | (없음) | ❌ 미도입 |
+| **MySQL 내부 지표** | mysqld_exporter | ❌ 미도입. 🔴 **우선순위가 올라갔다** — 2026-08-08 부하 실험에서 *"MySQL 이 놀고 있었다"* 를 말하려 했는데 **수집한 적 없는 지표였다.** 없어서 결론을 못 냈다 |
+| 알람 | Slack 웹훅, PagerDuty | ❌ 미도입. 상시 운영이 아니라 울릴 대상이 없다 |
+| 에러 추적 | Sentry | ❌ 미도입 |
+| **판단 기준선(SLO)** | — | 🔴 **없다.** 그래프는 생겼는데 *"얼마면 나쁜가"* 가 없다. 실제로 부하 실험에서 판정 기준으로 SLO 를 쓸 수 없어 임의값(plateau 90%)을 미리 못박아 우회했다 |
+
+### 5-1. 🔶 prod 에 관측 스택을 올릴지 — 미결정
+
+지금은 dev compose 에만 있다. 이 결정은 두 가지와 묶여 있다:
+
+1. **배포 대상 호스트가 없다**(§1). AWS 가 붙는 시점(#4)과 같이 정하는 게 맞다
+2. **9090 매핑 여부.** prod 에서 `/actuator/flyway` 를 HTTP 로 보려면 루프백 매핑(`127.0.0.1:9090:9090`)이 필요하다. 지금은 `docker exec` 뿐이라 §2.3 의 3번째 명령(DB 직접 조회)이 1순위 경로다
+
+> ⚠️ **올릴 때의 함정**: 호스트 RAM 만 올리고 `docker --memory` 캡을 안 풀면 그대로 OOM 이다 — 2026-07-25 EC2 실험에서 `exit 137` 을 두 번 겪었다. **둘을 같이 조정할 것.**
+>
+> ⚠️ **2코어급 인스턴스에 앱과 동거시키면 안 된다.** 관측 스택이 CPU 를 다투면 지표 자체가 오염된다. 2026-08-08 실험은 **obs 를 별 인스턴스**(t4g.small, 시간당 약 30원)로 분리해서 수치와 그래프를 같은 판에서 얻었다
 | 사용자 분석 | (결정 필요) | 낮음 |
 
 특히 AI 콜백 ERROR 로그는 운영자에게 즉시 알람이 가야 데이터 유실을 조기 발견할 수 있음. [`decisions/ai-backend-coupling.md`](./decisions/ai-backend-coupling.md) §분기 A 와 연계.

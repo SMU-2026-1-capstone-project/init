@@ -13,6 +13,7 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(500, "C003", "서버 내부 오류가 발생했습니다."),
     INVALID_TYPE_VALUE(400, "C004", "입력값의 타입이 적절하지 않습니다."),
     HANDLE_ACCESS_DENIED(403, "C005", "접근이 거부되었습니다."),
+    RESOURCE_NOT_FOUND(404, "C006", "요청한 경로를 찾을 수 없습니다."),
 
     // --- Auth ---
     UNAUTHORIZED(401, "A001", "로그인이 필요한 서비스입니다."),

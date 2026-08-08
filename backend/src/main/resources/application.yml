@@ -22,6 +22,12 @@ spring:
       # 기본값(10)은 분리 배포(앱서버·DB 별도 인스턴스) 고부하(c=100)에서 47% 타임아웃 실패로
       # 무너짐 — 15부터 20/30과 동급으로 안정화되는 걸 실측 확인(2026-07-25,
       # docs/decisions/pose-ingest-downsampling.md §5-1(7)(8)). 30까지 늘려도 이득 없어 15로 설정.
+      #
+      # ⚠️ 위 근거는 낡았다(2026-08-08). 그 실험은 «배치당 25행» 을 쓰던 코드에서 나왔고, 같은
+      # PR #53 이 넣은 다운샘플(R=5) 때문에 지금은 5행을 쓴다. 재측정(§5-1(9), EC2 3대, c 10~100
+      # × pool 5~20)에서는 절벽이 아예 없다 — 병목이 커넥션이 아니라 백엔드 CPU 로 옮겨갔다.
+      # 15 가 해롭다는 증거는 없어 값은 유지하되, "왜 15인가" 는 재검토 미결이다
+      # (docs/decisions/pool-cliff-vs-concurrency.md §8).
       maximum-pool-size: 15
 
   # [1-1] Flyway — 스키마 마이그레이션 (이슈 #115, schema-migration-tracking.md §8)
@@ -104,15 +110,43 @@ security:
     - "/ws/**"
     - "/actuator/health"
     - "/actuator/health/**"
+    # ⚠️ 2026-08-08 — 이 줄이 필요하다는 것은 **실측으로 알았다.**
+    #
+    # 관리 포트를 9090 으로 분리하면(management.server.port) 시큐리티가 거기엔 안
+    # 걸릴 것으로 봤는데 **틀렸다.** 실제로는 필터체인이 두 포트에 공유돼서,
+    # 분리만 해두면 Prometheus 가 9090 을 긁을 때 401 을 받는다(검증 로그: 9090
+    # /actuator/prometheus → 401, /actuator/health → 200 ← 이 whitelist 때문).
+    #
+    # 그래서 permitAll 이 필요하다. 지표가 공개되지 않는 근거는 **인증이 아니라
+    # 포트 경계**다 — 액추에이터는 9090 에서만 서비스되고, prod compose 는 그
+    # 포트를 호스트에 매핑하지 않는다. 8080 에 같은 경로를 쳐도 핸들러가 없다.
+    # 🔴 따라서 9090 을 어딘가에 노출하는 순간 이 whitelist 가 그대로 뚫린다.
+    - "/actuator/prometheus"
 
 # [6] Actuator — 캐시 히트율·서킷브레이커 상태 관측용
 management:
+  # ⚠️ 2026-08-08: 관리 엔드포인트를 앱 포트(8080)에서 분리했다.
+  #
+  # 이유는 /actuator/prometheus 다. Prometheus 가 긁어가려면 인증 없이 닿아야 하는데,
+  # 8080 은 외부 노출이라 whitelist 에 넣으면 지표가 인터넷에 공개된다 — 엔드포인트별
+  # 응답시간·에러율·회원 수 추이가 전부 보인다.
+  #
+  # 그래서 포트를 나누고 compose 에서 9090 을 **매핑하지 않는다.** 같은 도커 네트워크
+  # 안의 Prometheus 만 shadowfit-backend:9090 으로 닿는다. AI 서버 gRPC 8585 를
+  # expose 만 하고 ports 에 안 쓰는 것과 같은 방식이다.
+  #
+  # 🔴 부작용: /actuator/health 도 같이 9090 으로 옮겨간다. 컨테이너 healthcheck 와
+  #    verify 스킬이 8080 을 치고 있어 함께 고쳤다(docker-compose.prod.yml,
+  #    .claude/skills/verify/SKILL.md). 둘 다 안쪽에서 부르므로 매핑 없이 닿는다.
+  server:
+    port: 9090
   endpoints:
     web:
       exposure:
         # flyway: 이 서버가 어느 버전까지 적용했는지 HTTP 로 확인한다 (GET /actuator/flyway).
         # 배포 후 "스키마가 코드보다 뒤처졌나"를 DB 에 붙지 않고 볼 수 있어 CD 와 맞물린다.
-        include: health,caches,metrics,circuitbreakers,circuitbreakerevents,flyway
+        # prometheus: 스크레이프 대상. 위 포트 분리로 외부에서는 닿지 않는다.
+        include: health,caches,metrics,circuitbreakers,circuitbreakerevents,flyway,prometheus
   endpoint:
     health:
       show-details: always

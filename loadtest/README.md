@@ -18,7 +18,7 @@
 | `batch.json` | 생성된 데이터 템플릿 (session 801, R=25, ~52KB / 프레임 ~2.1KB). **실측 R 로 재생성 권장** |
 | `run-save-pose-batch.ps1` | Windows 실행 (smoke / baseline / ramp) |
 | `run-save-pose-batch.sh` | bash 실행 (Git Bash / Linux) |
-| `results/` | ghz HTML 리포트 출력 (gitignore) |
+| `results/` | 실행 출력. **일회성 리포트는 안 남기고, 실험 결과는 커밋한다** — 아래 |
 
 ### 사전조건
 
@@ -89,6 +89,30 @@ python gen_batch.py --session 801 --reps <측정 R> --out batch.json
 
 ramp 가 이미 session 801 에 pose_data 를 대량 적재함(side effect). 이걸 GET /reports projection
 전/후 비교(payload ~3MB→0.05MB, strategy §4.6-1)의 시드로 재활용 가능.
+
+---
+
+## results/ — 무엇을 남기고 무엇을 버리나
+
+| | |
+|---|---|
+| **버린다** | smoke·ramp 처럼 되돌려 볼 일 없는 일회성 실행 출력 |
+| **커밋한다** | **인프라를 띄워 돈을 쓴 실험의 원시 결과** — ghz JSON, 지표 시계열, 그래프, 실행 스크립트 |
+
+> 🔴 **이 구분은 실제로 손해를 보고 생겼다.** 2026-07-25 분리 배포 실측(풀 사이징)은 결과 JSON 을
+> 로컬 세션에만 두고 인프라와 함께 지웠다. 그래서 2026-08-08 에 같은 질문을 다시 물으려면
+> **처음부터 다시 비용을 냈다.** 원시 파일은 수 MB 인데 재생성 비용은 반나절 + 실비다.
+
+| 디렉터리 | 실험 |
+|---|---|
+| [`results/pool-cliff-2026-08-08/`](./results/pool-cliff-2026-08-08/) | 풀 사이징 cliff × 동시성 (c 10~100 × pool 5·20, EC2 3대). **초당 ~205건 수준에서 절벽 없음** — 다운샘플(R=5)이 풀을 병목에서 빼냈다. ⚠️ 병목이 **어디로 갔는지는 미상**(초판의 "백엔드 CPU" 는 철회 — 근거 수치가 원본에 없었다). 설계는 [`pool-cliff-vs-concurrency.md`](../docs/decisions/pool-cliff-vs-concurrency.md), 경위는 그 폴더 README §5 |
+
+> 🔴 **이 실험이 남긴 rig 쪽 숙제 2개** — 다음 부하 실험 전에 확인할 것:
+> 1. **ghz 커넥션 수.** 결과 14판이 전부 `"connections": 1` 이다. `-c 100` 을 줘도 TCP 커넥션 하나에 다중화했다면 **측정한 천장이 서버가 아니라 부하기의 것**일 수 있다. `--connections` 를 동시성에 맞춰 올린 뒤 같은 판을 다시 재는 게 1번이다
+> 2. **`scrape_interval` 15초 vs 판 ~10초.** 판당 지표 샘플이 0~1개라 **게이지를 판별로 귀속시킬 수 없다.** 부하 실험용으로는 스크레이프를 5초 이하로 낮추거나, 판 길이를 늘려야 한다
+
+각 디렉터리의 `README.md` 가 그 실험의 결과 문서이고, 원시 파일로 그래프를 다시 그릴 수 있게
+`plot.py`(의존성 없음)까지 같이 둔다.
 
 ---
 

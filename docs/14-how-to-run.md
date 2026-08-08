@@ -513,6 +513,15 @@ docker exec -it shadowfit-mysql mysql -u shadowfit -pshadowfit -e "SHOW DATABASE
 - **Swagger UI** (API 문서): http://localhost:8080/swagger-ui.html
 - Swagger 페이지가 열리면 백엔드가 정상 작동 중입니다
 
+> 🔴 **`/actuator/*` 는 8080 이 아닙니다** (2026-08-08 추가). 관리·지표 엔드포인트는 **9090** 으로 분리했습니다([`../monitoring/README.md`](../../monitoring/README.md)). 8080 에 같은 경로를 치면 **404** 입니다.
+>
+> ```bash
+> curl http://localhost:9090/actuator/health     # 헬스체크
+> curl http://localhost:9090/actuator/flyway     # 스키마가 어디까지 적용됐나
+> ```
+>
+> dev 에서는 9090 이 **`127.0.0.1` 로만** 열려 있습니다(같은 LAN 의 다른 사람이 지표를 읽지 못하게 — 이슈 #128). 그래서 **휴대폰에서는 9090 에 닿지 않습니다.** 폰 테스트에 필요한 건 8080 뿐이니 정상입니다.
+
 ### 6-3. Frontend 확인
 
 Expo Go 앱 또는 웹 브라우저에서 앱 화면이 뜨면 정상입니다.
@@ -531,8 +540,37 @@ Expo Go 앱 또는 웹 브라우저에서 앱 화면이 뜨면 정상입니다.
 | Docker Desktop | 트레이 아이콘 | 초록색 고래 아이콘 |
 | MySQL | `docker compose ps` | `healthy` 상태 |
 | Backend | http://localhost:8080/swagger-ui.html | Swagger 페이지 열림 |
+| **Backend 관리포트** | http://localhost:9090/actuator/health | `{"status":"UP"}` — **8080 아님** |
+| **스키마(Flyway)** | http://localhost:9090/actuator/flyway | 마이그레이션 목록이 전부 `SUCCESS` |
 | AI Server | http://localhost:8000/health | `{"status":"ok"}` 응답 |
 | Frontend | Expo 터미널 | QR 코드 표시됨 |
+
+### 🔄 6-5. 2026-08-08 기준으로 달라진 것
+
+이 가이드는 2026-06-04 판이라 아래 세 가지가 빠져 있습니다.
+
+**① 테이블은 이제 Flyway 가 만듭니다.** 예전에는 docker 가 처음 뜰 때 `mysql/schema.sql` 을 한 번 실행하는 게 전부였는데, 지금은 **백엔드가 부팅하면서** `backend/src/main/resources/db/migration/` 의 미적용 마이그레이션을 적용합니다([이슈 #115](https://github.com/Shadowfit/init/issues/115)).
+
+- 손으로 `ALTER TABLE` 을 치지 않습니다
+- 마이그레이션이 실패하면 **애플리케이션이 아예 뜨지 않습니다** (반쯤 적용된 채 도는 것보다 낫다는 판단)
+- 적용 상태는 위 표의 `/actuator/flyway` 로 봅니다
+
+**② 부하테스트 픽스처는 자동으로 안 들어갑니다.** Flyway 도입으로 initdb 마운트가 없어졌고, `mysql/dev-seed.sql`(테스트 계정·더미 세션 801)은 **의도적으로 마이그레이션에서 제외**했습니다 — 배포 환경에 가면 안 되는 데이터라서요. `loadtest/` 를 쓸 때만 직접 넣습니다:
+
+```bash
+docker exec -i shadowfit-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit < mysql/dev-seed.sql
+```
+
+**③ 관측 스택(Prometheus·Grafana)은 기본으로 안 뜹니다.** compose profile 뒤에 있습니다 — 필요할 때만:
+
+```bash
+docker compose --profile obs up -d                      # 켜기 (Grafana: localhost:3000)
+docker compose --profile obs stop prometheus grafana    # 끄기 (관측만)
+```
+
+> 🔴 **`docker compose --profile obs down` 을 쓰지 마세요** ([이슈 #131](https://github.com/Shadowfit/init/issues/131)). `--profile` 은 **올릴 대상을 고르는 옵션이라 내릴 때는 범위를 좁히지 않습니다** — MySQL·백엔드·AI 까지 같이 정지·삭제됩니다. 서비스 이름을 꼭 적으세요.
+
+⚠️ **경로 주의**: 이 문서 예시의 `cd "c:/최지호/..."` 는 작성 당시 경로입니다. 지금 저장소 위치로 바꿔 읽으세요.
 
 ---
 

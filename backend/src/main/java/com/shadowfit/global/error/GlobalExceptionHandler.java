@@ -7,6 +7,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -78,6 +79,28 @@ public class GlobalExceptionHandler {
             return base + " 허용값: " + allowed;
         }
         return base;
+    }
+
+    /**
+     * ⚠️ 2026-08-08 추가(이슈 #129): 매핑되지 않은 경로는 Spring 6.1+ 에서
+     * NoResourceFoundException 으로 온다. 이 핸들러가 없으면 handleUnexpectedException 이 받아
+     * <b>404 대신 500</b> 이 나가고, 매 요청마다 {@code log.error} 스택트레이스가 남았다.
+     * 29~33행 AccessDeniedException(403→500)·53~61행 MethodArgumentTypeMismatchException(400→500)
+     * 과 <b>같은 형태의 세 번째 사례</b>다.
+     *
+     * <p>계기는 관리 포트 분리(#6)다. {@code /actuator/health} 는 whitelist 에 남아 있어(9090
+     * 헬스체크가 401 로 깨지지 않으려면 필요) 8080 요청이 시큐리티를 통과하는데 핸들러는 9090
+     * 에만 있다 — 즉 <b>상시 경로</b>가 됐다. 외부 uptime 모니터가 8080 을 주기적으로 찌르면
+     * 매 요청이 ERROR 로그가 되어 로그 자체가 오탐 채널이 된다.
+     *
+     * <p>WARN 으로 남기는 이유: 클라이언트 오타든 서버 라우팅 실수든 <b>서버 결함은 아니다.</b>
+     * 다만 경로는 남겨야 "8080 을 찌르고 있다"를 알아챌 수 있다.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponseDto> handleNoResourceFound(NoResourceFoundException e) {
+        // getResourcePath() 는 앞 슬래시가 없다("no-such-path"). 로그를 경로로 grep 하려면 붙여야 한다.
+        log.warn("No handler for {} /{}", e.getHttpMethod(), e.getResourcePath());
+        return buildResponse(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
     @ExceptionHandler(Exception.class)

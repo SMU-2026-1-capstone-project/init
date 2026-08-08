@@ -1,0 +1,18 @@
+# Grafana 데이터소스 프로비저닝.
+# 이 파일이 있으면 Grafana 첫 기동 때 데이터소스가 자동으로 붙는다 — UI 에서 손으로
+# 추가하지 않는다. 손으로 하면 볼륨을 날렸을 때 재현이 안 된다.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    # uid 를 고정한다 — 대시보드 JSON 이 이 값으로 데이터소스를 가리키기 때문에,
+    # 자동 생성되는 uid 에 맡기면 대시보드가 "데이터소스 없음"으로 뜬다.
+    uid: shadowfit-prom
+    access: proxy
+    # 컨테이너 이름 + 컨테이너 내부 포트. 호스트 매핑(9091)이 아니다 —
+    # Grafana 는 같은 도커 네트워크 안에서 Prometheus 를 부른다.
+    url: http://shadowfit-prometheus:9090
+    isDefault: true
+    editable: false

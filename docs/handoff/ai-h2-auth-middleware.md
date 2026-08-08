@@ -1,6 +1,33 @@
 # AI 측 작업 요청 — H2 채택 부속 인증 미들웨어
 
-마지막 업데이트: 2026-05-24
+> ## ✅ 이 요청은 이행됐다 (2026-08-08 코드 확인)
+>
+> **요청 3건 전부 완료.** 이 문서는 요청서라 본문을 그대로 두고, 확인 결과만 여기 적는다.
+>
+> | 요청 | 상태 | 실제 위치 |
+> |---|---|---|
+> | **A.** HTTP 인증 미들웨어 신설 | ✅ | `ai-server/app/middleware/auth.py` — `InternalAuthMiddleware` |
+> | **B.** 미들웨어 등록 + CORS | ✅ | `ai-server/app/main.py:63`(`add_middleware(InternalAuthMiddleware)`) · `:53`(CORS) · `:15`(import) |
+> | **C.** docker-compose `ports` 복귀 | ✅ | `docker-compose.yml:95` — `"8000:8000"`, `:91` 에 *"분기 H2 채택"* 주석까지 달려 있다 |
+>
+> ⚠️ **언제 이행됐는지는 이 문서로 알 수 없다.** 완료 표시가 없어 2.5개월간 «요청 대기»처럼 보였다 — 이 프로젝트가 반복해 겪는 드리프트다([`work-log-2026-08-08.md`](./work-log-2026-08-08.md) §1: *"잔여로 적혀 있던 2건이 이미 끝나 있었다"*).
+>
+> ## 🔴 그런데 이행 방식에 결함이 있다 — 내부 토큰이 앱 번들에 들어간다
+>
+> 미들웨어는 정확히 요청대로 붙었다. 문제는 **프론트가 그 토큰을 어떻게 들고 있는가**다 (2026-08-08 코드 확인, [#134](https://github.com/Shadowfit/init/issues/134)):
+>
+> | 지점 | 확인한 것 |
+> |---|---|
+> | `ai-server/app/middleware/auth.py:41` | `token != settings.INTERNAL_API_TOKEN` → **Spring↔AI gRPC 와 같은 토큰**을 요구한다 |
+> | `frontend/services/aiService.ts:29` | `process.env.EXPO_PUBLIC_INTERNAL_API_TOKEN` 을 읽어 `Authorization: Bearer` 로 붙인다 |
+>
+> **`EXPO_PUBLIC_` 접두 변수는 빌드 시 클라이언트 번들에 인라인된다** — 즉 **모든 앱 설치본에 내부 서비스 토큰이 들어간다.** 그 토큰은 `docker-compose.yml` 이 Spring·AI 양쪽에 같은 값으로 주입하는 것이고, Spring 의 `InternalAuthInterceptor` 가 gRPC 6565 인증에 쓰는 것과 동일하다.
+>
+> 이 요청서(§A)는 *"내부 토큰으로 인증한다"* 까지만 적고 **그 토큰이 클라이언트에 배포된다는 사실은 적지 않았다.** 분기 H2(직결)를 채택하는 순간 *"내부 전용 토큰"* 이라는 전제가 깨지는데, 그 검토가 어느 문서에도 없다.
+>
+> → **별건 이슈로 분리했다: [#134](https://github.com/Shadowfit/init/issues/134).** 이 문서는 요청 이행 여부까지만 다룬다.
+
+마지막 업데이트: 2026-05-24 (완료 확인: **2026-08-08**)
 대상: **ai-server 담당자**
 배경: [`../decisions/ai-backend-coupling.md`](../decisions/ai-backend-coupling.md) §11 결정 로그 (2026-05-24) — **분기 H → H2 (프론트 → AI 직결) 채택**. 프론트가 AI `POST /pose` 직접 호출 가능하게 외부 노출 필요. 단 `POST /pose` 가 무인증이라 인증 미들웨어 필수.
 

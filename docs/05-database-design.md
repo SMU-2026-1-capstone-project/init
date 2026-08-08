@@ -192,6 +192,59 @@ CREATE TABLE session_feedback_logs (
 ```
 운동 중 device TTS 가 실제 발화한 시점을 AI 가 gRPC `ExerciseService.ReportFeedbackBatch` (인증: `Authorization: Bearer`) 로 송신. BT-SET (분기 2.A.BT) 모델 — 세트 경계마다 mini-batch + 세션 종료 시 final batch. 매 rep 실시간 호출 금지. 멱등성: `(session_id, occurred_at, feedback_type)` uniqueKey + `INSERT IGNORE` 로 retry 안전.
 
+> ⚠️ **이 테이블은 비어 있다** (2026-08-08 확인). 송신하는 쪽(AI)이 `ReportFeedbackBatch` 를 **한 번도 부르지 않는다** — 수신부·테이블·시드만 있다([`tasks/30-ai-remaining-work.md`](./tasks/30-ai-remaining-work.md) §1).
+
+### outbox_events (세션 종료 통보 전달 보장) — 🆕 2026-07-29 추가
+
+```sql
+CREATE TABLE outbox_events (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    aggregate_type  VARCHAR(50)  NOT NULL,                    -- 'SESSION'
+    aggregate_id    BIGINT       NOT NULL,                    -- session_id (FK 없음 — 아래)
+    event_type      VARCHAR(50)  NOT NULL,                    -- 'STOP_ANALYSIS'
+    payload         JSON         NOT NULL,                    -- { "sessionId": 42 }
+    correlation_id  VARCHAR(64)  NULL,                        -- 원 요청과 이어붙이기 위해 «행에» 저장
+    status          ENUM('PENDING','PROCESSING','SENT','FAILED') NOT NULL DEFAULT 'PENDING',
+    retry_count     INT          NOT NULL DEFAULT 0,
+    next_retry_at   DATETIME     NULL,                        -- 지수 백오프(1s→2s→4s…, 상한 5분)
+    locked_by       VARCHAR(64)  NULL,                        -- 선점한 발행기 식별(인스턴스 ID)
+    lock_expires_at DATETIME     NULL,                        -- 지난 PROCESSING 은 회수 대상
+    sent_at         DATETIME     NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**무엇을 위한 테이블인가** — 세션 종료 통보(Spring → AI `StopAnalysis`)가 **dual-write** 였다. DB 커밋과 gRPC 송신이 별개라, 커밋은 됐는데 통보가 실패하면 **Spring 은 `COMPLETED` 인데 AI 에는 orphan 세션**이 남았다. 이제 통보 «의도» 를 세션 상태와 **같은 트랜잭션**에 적재하고, `OutboxPublisher` 가 폴링해 보낸다 → **at-least-once**. 수신 측 멱등과 합쳐 effectively exactly-once. 설계: [`decisions/outbox-reliable-messaging.md`](./decisions/outbox-reliable-messaging.md).
+
+**이 스키마의 결정 3가지가 다른 테이블과 다르다:**
+
+| 결정 | 왜 |
+|---|---|
+| 🔴 **`aggregate_id` 에 FK 를 걸지 않았다** | 걸면 outbox 가 특정 애그리거트에 종속돼 다른 이벤트 타입으로 확장할 수 없고, **세션 삭제 시 CASCADE 로 통보 이력까지 사라진다.** 참조무결성은 발행기가 대체한다 — 대상이 없으면 AI 가 `success=false` 를 주고 그때 터미널 `FAILED` 로 종결된다 |
+| **`correlation_id` 를 컬럼으로 둔다** | 발행기는 `@Scheduled` 스레드라 MDC 가 비어 있고, outbox 는 스레드가 아니라 **시간·프로세스 경계**를 넘는다. 런타임 캡처로는 원리상 이을 수 없어 **행에 저장**해야 원 요청과 이어진다. MDC 와 달리 이 값은 **인스턴스 재시작을 견딘다** |
+| **`locked_by` + `lock_expires_at`** | 발행기가 둘 이상일 때 같은 행을 두 번 집는 것 방지(조건부 갱신=CAS). 리뷰에서 지적받아 추가(`eebf852`) |
+
+**운영 파라미터**: 폴링 간격 `outbox.publisher.poll-interval-ms`(기본 1000), 재시도 상한 `outbox.publisher.max-retry`(기본 10). 지표 3종(`shadowfit_outbox_pending`·`dispatch`·`lag`)이 Prometheus 로 나간다 — **적체는 "지금 몇 건"이 아니라 기울기가 답**이라 시계열로 본다([`../monitoring/README.md`](../../monitoring/README.md)).
+
+> 🔴 **2026-08-08 정정 — 이 문서에 이 테이블이 6주간 없었다.** 스키마 문서가 «기능 테이블» 은 다 담았는데 **«전달 보장» 테이블이 빠졌다.** 같은 결의 누락이 [`02-folder-structure.md`](./02-folder-structure.md) 에도 있었다(`model/outbox/`·`global/observability/` 없음) — **기능이 아닌 것은 문서 갱신 트리거가 안 울린다**는 패턴이다.
+
+## 스키마는 이제 Flyway 가 적용한다 (2026-08-01, #115)
+
+이 문서의 `CREATE TABLE` 들은 **읽기용 설명**이다. 실제 적용 경로는 다음과 같이 바뀌었다:
+
+| | 이전 | 지금 |
+|---|---|---|
+| 적용 | docker initdb 가 `mysql/schema.sql` 을 **최초 1회** | **백엔드 부팅 시** `backend/src/main/resources/db/migration/` 의 미적용분 |
+| 이력 | 없음 — "이 DB 가 어디까지 갔는지" 알 수 없었다 | `flyway_schema_history` 테이블 |
+| 확인 | — | `curl http://localhost:9090/actuator/flyway` (🔴 8080 아님) |
+
+- 스키마를 바꿀 때는 **새 파일**을 추가한다(`V3__…sql`). **이미 적용된 파일은 고치지 않는다** — checksum 이 달라지면 다음 부팅이 실패한다
+- `mysql/schema.sql` 은 남아 있다 — 부하테스트 스크래치 DB 를 통째로 세울 때 쓴다
+- ⚠️ `mysql/dev-seed.sql`(테스트 계정·더미 세션 801)은 **의도적으로 마이그레이션에서 제외**했다. 배포 환경에 가면 안 되는 데이터라서 — 부하테스트 전에 손으로 넣는다
+- ⚠️ Flyway 가 답하는 것은 *"내 파일이 돌았나"* 까지다. 누가 손으로 `ALTER TABLE` 을 치면 **아무것도 안 남는다** — 드리프트 탐지는 별건이고 미도입이다
+
+상세: [`decisions/schema-migration-tracking.md`](./decisions/schema-migration-tracking.md)
+
 ## joint_coordinates JSON 구조 예시
 MediaPipe의 33개 관절 포인트에 대한 1초 평균 좌표:
 ```json

@@ -1,6 +1,17 @@
 # AI 트랙 남은 작업 — 무엇이 비어 있나
 
-작성: 2026-08-07
+작성: 2026-08-07 · ✅ **재확인: 2026-08-08 — §1 판정이 코드와 일치**
+
+> 이 저장소 문서 전수 감사(2026-08-08) 중 §1 을 코드로 대조했다. **정확하다**: `ai-server/` 전체에 `FeedbackBatch`·`feedback_batch` 사용 0건, `spring_client.py` 가 부르는 RPC 는 `report_pose_data_batch`·`report_complete_analysis` 둘뿐. Spring 수신부(`ExerciseGrpcService.java:120`)·proto(`exercise.proto:34`)는 있다. *"이미 만들어둔 것이 놀고 있다"* 가 사실이다.
+>
+> 🔴 **착수 전에 알아야 할 함정 2건이 감사 중 새로 나왔다:**
+>
+> | | 내용 |
+> |---|---|
+> | [#132](https://github.com/Shadowfit/init/issues/132) | 생성 산출물이 `ai-server/` **루트**와 `app/proto/` 두 곳에 있고, `import exercise_pb2`(bare)가 실제로 집는 것은 **루트 쪽**이다(`find_spec` 확인). **`.proto` 옆(`app/proto/`)에만 재생성하면 실행 코드는 옛 계약을 그대로 쓴다** — §1 의 "pb2 재생성" 단계가 정확히 이 함정 위에 있다 |
+> | [#134](https://github.com/Shadowfit/init/issues/134) | 프론트 AI 직결이 **내부 서비스 토큰을 앱 번들에 심는다**. TTS 발화가 프론트에서 붙는 순간 같은 경로를 쓴다 |
+>
+> 📌 **AI 트랙 진척 기록의 자리** — 이 문서는 «남은 것» 이고, 한 일은 [`../architecture/ai-backend-monthly-log.md`](../architecture/ai-backend-monthly-log.md)(2026-06~08 절, 2026-08-08 신설)에 결합 관점으로 정리돼 있다.
 범위: `ai-server/` (FastAPI + gRPC + MediaPipe). **Spring 백엔드는 [`28-remaining-work-plan.md`](./28-remaining-work-plan.md)** 가 다룬다 — 그 문서는 범위를 백엔드로 못박고 있어서 AI 쪽 잔여가 어디에도 모여 있지 않았다. 이 문서가 그 자리를 채운다.
 
 > ⚠️ **시간 추정**: [`21-task-assignment.md`](./21-task-assignment.md) §3 에 AI-01~03 추정이 이미 있다(아래 §0-1). 그 밖의 항목은 추정이 없고, 근거 없는 숫자를 새로 지어내지 않았다 — **"추정 없음"이라고 적는 편이 정직하다.** 그리고 기존 추정도 **실측이 아니라 추정**이고 AI 작업의 실측 데이터는 한 건도 없다.

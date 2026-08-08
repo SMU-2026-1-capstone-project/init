@@ -50,6 +50,13 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
 	implementation 'com.github.ben-manes.caffeine:caffeine:3.2.4'
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	// Micrometer 지표를 Prometheus 가 긁어갈 텍스트 형식으로 내보낸다 (/actuator/prometheus).
+	// runtimeOnly 인 이유: 코드가 이 라이브러리를 import 하지 않는다. SessionMetrics 는
+	// MeterRegistry 인터페이스만 알고, 어떤 형식으로 나가는지는 클래스패스가 정한다.
+	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+	// 테스트에서는 compile 이 필요하다 — SessionMetricsExportNamesTest 가
+	// PrometheusMeterRegistry 를 직접 만들어 "내보내지는 이름"을 고정한다.
+	testImplementation 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.4.0'
 
 	// --- Security ---

@@ -113,13 +113,25 @@ POST /exercises/1/reference?youtubeUrl=https://youtu.be/xxx
 ```
 유튜브 URL → AI 가 MediaPipe로 프레임마다 관절 좌표 추출 → Spring 콜백으로 `exercise_references` 테이블 영속화.
 
-### PUT /exercises/sessions/{sessionId}/stop - 운동 세션 중단 (2026-05-17 신설)
-권장 종료 경로. 프론트가 종료 버튼을 누르면 호출.
+### PATCH /sessions/{sessionId}/end - 운동 세션 종료
+권장 종료 경로. 프론트가 종료 버튼을 누르면 호출. **멱등** — 이미 종료된 세션에 다시 호출해도 `200`.
 ```
-PUT /exercises/sessions/42/stop
+PATCH /sessions/42/end
 
-// Response 202 (본문 없음)
+// Response 200 (본문 없음)
+// 403 — 본인 세션 아님
 ```
+`SessionController.java:57` → `SessionService.endSession`. `endTime` 기록 + **아웃박스에 AI 통보 적재**(직접 gRPC 호출 아님 — [`architecture/ai-backend-integration.md`](./architecture/ai-backend-integration.md) §4 중단).
+
+> 🔴 **2026-08-08 정정 — 이 절은 존재하지 않는 엔드포인트를 적고 있었다.** 원래 `PUT /exercises/sessions/{sessionId}/stop`(2026-05-17 `143a2e4` 신설, `202`)로 되어 있었는데 **지금 컨트롤러에 `stop` 매핑이 0건**이다. 프론트도 `PATCH /sessions/{id}/end` 를 부른다(`frontend/services/exercisesService.ts:23`) — **즉 클라·서버는 일치하고 문서만 낡아 있었다.**
+>
+> ✅ **언제·왜 바뀌었는지는 결정 문서에 있다** — [`decisions/session-end-trigger.md`](./decisions/session-end-trigger.md)(2026-05-26): **ET-H(단일 endpoint 분배자 패턴) 확정**으로 `PUT …/stop` 을 **의도적으로 삭제**하고 `PATCH /sessions/{id}/end` 하나로 합쳤다. 클라가 종료를 한 번만 알리면 Spring 이 endTime 기록과 AI 통보를 **분배**한다(그 통보는 2026-07-29 아웃박스로 다시 바뀐다).
+>
+> 🔴 **즉 이 문서가 2.5개월 넘게 «폐기된 endpoint 를 권장 경로» 로 적고 있었다.** 결정 문서는 맞았고 API 문서만 안 따라왔다 — 프론트가 이 문서를 계약으로 읽었다면 없는 경로를 불렀을 것이다.
+>
+> ⚠️ 응답 코드도 `202 Accepted`(비동기 접수) → **`200 OK`**(멱등 종료)로 바뀌었다.
+>
+> 📌 `143a2e4` 를 기록한 문서들([`architecture/ai-backend-changelog.md`](./architecture/ai-backend-changelog.md)·`commit-details`·`monthly-log`)은 **그 시점 사실**이라 그대로 둔다.
 내부 흐름:
 1. Spring → gRPC `StopAnalysis(session_id=42)` 송신, 즉시 202 반환
 2. AI 가 누적 통계 정리 후 gRPC `CompleteAnalysis` 로 콜백 (3회 재시도)

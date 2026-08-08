@@ -1,6 +1,25 @@
 # AI 측 작업 요청 — TTS 피드백 분류·송신
 
-마지막 업데이트: 2026-05-26 (gRPC 통일 결정 반영)
+> ## 🔴 2.5개월간 착수되지 않았다 (2026-08-08 코드 확인)
+>
+> 이 문서 아래 배경 블록은 *"AI 담당자는 **pb2 재생성 + `spring_client` 함수 신설만** 진행하면 됨"* 이라고 적었다. **그 둘이 아직 안 됐다.**
+>
+> | 확인 | 결과 |
+> |---|---|
+> | `ai-server/` 전체에서 `FeedbackBatch` · `feedback_batch` 사용 | **0건** |
+> | `ai-server/app/grpc/spring_client.py` 가 부르는 RPC | `report_pose_data_batch` · `report_complete_analysis` **둘뿐** |
+> | Spring 수신부 | ✅ 있다 — `ExerciseGrpcService.java:120` → `FeedbackLogService` |
+> | proto 양쪽 | ✅ 있다 — `exercise.proto:34` |
+>
+> **즉 준비된 쪽은 다 준비돼 있고 호출자만 없다.** 그래서 TTS 피드백 기능 전체가 **시연용 더미로만 존재**한다.
+>
+> 📌 **이 항목은 지금 AI 트랙 1순위로 잡혀 있다** — [`../tasks/30-ai-remaining-work.md`](../tasks/30-ai-remaining-work.md) §1: *"이미 만들어둔 것이 놀고 있다. proto·테이블·시드가 다 있는데 AI 가 안 불러서…"*
+>
+> ⚠️ **그리고 이 문서의 «남은 일은 둘뿐» 이라는 서술도 이제 낙관적이다.** 그 판단은 2026-05-26 기준이고, 그 뒤 **결함 분류 로직 자체(8종 enum 판정)** 가 여전히 없다는 점이 §1 에서 다시 정리됐다. pb2 재생성은 기계적이지만 **무엇을 어떤 enum 으로 분류하는가는 설계가 남아 있다.**
+>
+> 🔴 **재생성 시 함정 하나** — 생성 산출물이 `ai-server/` 루트와 `app/proto/` 두 곳에 있고 **실제로 로드되는 건 루트 쪽**이다([#132](https://github.com/Shadowfit/init/issues/132)). `.proto` 옆(`app/proto/`)에만 생성하면 **실행 코드는 옛 계약을 그대로 쓴다.**
+
+마지막 업데이트: 2026-05-26 (gRPC 통일 결정 반영) · 미착수 확인: **2026-08-08**
 대상: **ai-server 담당자**
 배경: [`../decisions/tts-design.md`](../decisions/tts-design.md) — 분기 1·2·3·7·8 결정 (2026-05-25). 8-A (단말 OS TTS) MVP 채택. AI 가 8종 enum 분류 + 세션 종료/세트 경계 batch 송신 담당.
 

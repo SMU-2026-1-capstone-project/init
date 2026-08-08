@@ -76,23 +76,40 @@ eas build --profile development --platform android
 ```
 
 ## Git 브랜치 전략
-```
-main              ← 배포 가능한 안정 버전
-├── develop       ← 개발 통합 브랜치
-│   ├── feature/auth          ← 인증 기능
-│   ├── feature/pose-detect   ← 자세 감지
-│   ├── feature/calendar      ← 달력 일지
-│   ├── feature/report        ← 보고서
-│   └── feature/tts           ← TTS 음성
-└── hotfix/xxx    ← 긴급 수정
-```
 
-### 브랜치 명명 규칙
+> 🔴 **실제로 쓰는 방식이 이 그림과 다르다** (2026-08-08 확인). `develop` 브랜치는 **존재하지 않는다**(`git branch -a` 에 0건). 실제로는 **main 하나에 짧은 작업 브랜치를 직접 PR** 하는 방식(GitHub Flow)이다.
+>
+> ```
+> main                          ← 유일한 통합 브랜치. PR 로만 들어간다
+> ├── feat/observability-stack  ← 작업 단위 브랜치, 머지 후 삭제
+> ├── fix/admin-query-param-400
+> ├── docs/ai-remaining-work
+> └── test/pose-data-orphan-race
+> ```
+>
+> **접두어도 `feature/` 가 아니라 `feat/` 를 쓴다.** 실제 이력에서 관측된 것:
+>
+> | 접두어 | 용도 | 예 |
+> |---|---|---|
+> | `feat/` | 새 기능 | `feat/outbox` · `feat/session-reattach` |
+> | `fix/` | 버그 수정 | `fix/timeout-notifies-ai` · `fix/sync-rate-null-average` |
+> | `docs/` | 문서·결정 | `docs/outbox-review-followup` |
+> | `test/` | 테스트 전용 | `test/reattach-timeout-race` |
+> | `chore/` · `ci/` | 잡정리·CI | `ci/backend-test-workflow` |
+>
+> ⚠️ `refactor/`·`hotfix/` 는 규칙에는 있지만 **실제 이력에 거의 없다.**
+>
+> 📌 **PR 은 필수 경로다.** main 에 직접 푸시하지 않고, CI(`backend-test.yml`·`ai-server-test.yml`·`proto-sync-check.yml`)가 통과해야 머지된다([`18-testing-guide.md`](./18-testing-guide.md) §7). CodeRabbit 리뷰도 붙는다 — 이 저장소는 리뷰에서 잡힌 결함이 여러 건 있어서 **PR 을 형식이 아니라 게이트로 쓴다.**
+>
+> 🔴 **머지 후 브랜치를 지운다.** 삭제 이력과 복원용 해시는 [`handoff/branch-cleanup-2026-08-06.md`](./handoff/branch-cleanup-2026-08-06.md) 에 남긴다.
+
+### 브랜치 명명 규칙 (실제)
 ```
-feature/{기능명}   - 새 기능
+feat/{기능명}      - 새 기능
 fix/{버그설명}     - 버그 수정
-refactor/{대상}    - 리팩토링
 docs/{문서명}      - 문서 작업
+test/{대상}        - 테스트 전용
+chore/ · ci/       - 잡정리 · CI
 ```
 
 ## 개발 분담 예시 (4인 팀 기준)

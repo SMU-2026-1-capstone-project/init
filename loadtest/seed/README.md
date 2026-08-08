@@ -24,6 +24,15 @@ docker exec -i shadowfit-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shad
 ```
 
 ### 2. pose_data 시딩 (601 템플릿 × 세션 cross join, 청크)
+
+> 🔴 **2026-08-08: 원본 세션 601 의 pose_data 가 사라졌다**(로컬 `pose_data` 0행 — Flyway 도입 #115 로 initdb 마운트가 없어지면서 볼륨이 초기화된 것으로 보인다). 아래 `CREATE TABLE ... FROM pose_data WHERE session_id=601` 은 **에러 없이 빈 템플릿을 만들고**, 그러면 cross join 이 0행을 넣고 조용히 끝난다.
+> → 합성으로 재생성하려면 [`gen_pose_template.py`](./gen_pose_template.py) 를 쓴다. **원본과 바이트 단위로 같지 않고**(≈2.03KB vs ~2.3KB), JSON 모양이 달라 `measure_json.sh` 트림 실험에는 못 쓴다 — 스크립트 헤더의 정직 단서 참고.
+> ```bash
+> python gen_pose_template.py --rows 750 --out template.sql
+> docker exec -i shadowfit-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit' < template.sql
+> ```
+> 이 경로로 만들었으면 아래 첫 블록(원본 추출)은 **건너뛰고** `for` 루프부터 실행한다.
+
 ```bash
 docker exec shadowfit-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit -e "
 DROP TABLE IF EXISTS _pose_template;

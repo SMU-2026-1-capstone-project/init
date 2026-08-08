@@ -55,6 +55,21 @@
 | `W002` `METADATA_NOT_FOUND` | 404 | 운동 메타데이터(JSON/Video)를 찾을 수 없습니다. |
 | `W003` `SESSION_NOT_FOUND` | 404 | 진행 중인 운동 세션을 찾을 수 없습니다. |
 | `W004` `S3_UPLOAD_ERROR` | 500 | 파일 저장소(S3) 연결에 실패했습니다. |
+| `W005` `SESSION_ALREADY_IN_PROGRESS` | **409** | 이미 진행 중인 운동 세션이 있습니다. |
+| `W006` `SESSION_DELETE_NOT_ALLOWED` | **409** | 진행 중인 세션은 삭제할 수 없습니다. |
+| `W007` `EXERCISE_NOT_SUPPORTED` | **400** | 아직 분석을 지원하지 않는 운동입니다. |
+| `W008` `SESSION_REATTACH_EXPIRED` | **410** | 재개할 수 있는 시간이 지난 세션입니다. 새로 시작해 주세요. |
+| `W009` `SESSION_REATTACH_UNAVAILABLE` | **503** | 지금은 이어하기를 할 수 없습니다. 잠시 후 다시 시도해 주세요. |
+| `W010` `WITHDRAWAL_BLOCKED_BY_ACTIVE_SESSION` | **409** | 운동을 종료한 뒤 탈퇴할 수 있습니다. |
+
+> 🔴 **W005~W010 은 2026-08-08 에 추가한 것이다** — 코드에는 있었는데 이 문서에만 없었다(`ErrorCode.java:35-60`). 프론트가 이 문서를 계약으로 읽으면 **여섯 가지 응답을 «모르는 에러» 로 처리한다.**
+>
+> 특히 프론트가 지금 다뤄야 하는 것들이 여기 몰려 있다:
+> - **`W008`(410)·`W009`(503)** — 이어하기 분기. [`handoff/frontend-session-lifecycle.md`](./handoff/frontend-session-lifecycle.md) §4 가 요구하는 처리의 응답 코드다. 410 은 «포기하고 새 세션», 503 은 «잠시 후 재시도» 로 **동작이 갈린다**
+> - **`W005`(409)** — 진행 중 세션이 있는데 새로 시작하려 할 때. `GET /sessions/active` 로 되찾는 경로와 짝이다
+> - **`W010`(409)** — 진행 중 세션이 있는 회원의 탈퇴 차단([`decisions/withdrawal-with-active-session.md`](./decisions/withdrawal-with-active-session.md))
+>
+> ⚠️ **`W008` 이 410(Gone)인 것은 의도된 선택이다.** 404 가 아니라 410 을 쓰면 *"있었지만 이제 못 쓴다"* 가 구분된다 — 프론트가 «남의 세션/없음»(404)과 «시간 초과»(410)를 다르게 안내할 수 있다.
 
 ### 필터링 엔진 (V00x)
 | 코드 | HTTP | 메시지 |

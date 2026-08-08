@@ -1,7 +1,9 @@
 # Spring ↔ FastAPI 결합 변경 이력
 
-마지막 업데이트: 2026-05-23
+마지막 업데이트: **2026-08-08** (이전 2026-05-23 — 그 사이 2.5개월치를 §4 로 채웠다)
 범위: `ai-server/`(FastAPI)와 `backend/`(Spring Boot) 사이의 결합 방식·통신 프로토콜·인증·데이터 흐름 변경에 직접 영향을 준 커밋들. UI/문서/단순 버그 수정은 제외.
+
+> ⚠️ **범위 주의**: *"결합에 영향을 준"* 은 **파일 위치가 아니라 계약**으로 판정한다. 아웃박스(`cb26e4a`·`993dfa1`)는 **Spring 파일만** 건드렸지만 `StopAnalysis` 의 전달 의미론을 바꿨으므로 §4 에 들어간다 — `proto`·`ai-server` 경로만 훑으면 놓친다. 실제로 이 문서가 2.5개월 밀린 동안 **가장 큰 결합 변경이 그 커밋들이었다.**
 
 연관 문서:
 - 현재 결합 현황 → [`ai-backend-integration.md`](./ai-backend-integration.md)
@@ -31,12 +33,22 @@
 2026-05-17  8ac8248   StopAnalysis session_id int32 손실 + 응답 DTO Long 통일
 2026-05-17  c7657f1   AI 동시성·콜백 신뢰성 P1 Phase A (재시도·thread-local)
 2026-05-17  143a2e4   PUT /stop 신설 + /complete 디프리케이트 (AI 단일 진실 원칙)
+2026-05-25  baffa48   ReportFeedbackBatch 신설 (⚠ AI 호출부는 끝까지 안 생김)
+2026-07-11  0c47598   Spring→AI 전 호출에 gRPC deadline (hang 을 실패로)
+2026-07-11  215d49a   Resilience4j 서킷브레이커 aiServer 적용
+2026-07-19  83ad508   AI protobuf 4.25.3 → 4.25.8 (양쪽 메이저가 갈림)
+2026-07-28  aaf576a   correlation id 양방향 전파 (proto 밖 계약 하나 추가)
+2026-07-29  993dfa1   ★ 종료 통보를 아웃박스로 — 유실이 «조용히» 에서 «조회 가능» 으로
+2026-07-31  084fac7   ReattachAnalysis 신설 — AI 상태 소실 복구 경로
+2026-08-03  e28bc65   타임아웃으로 걷는 세션도 AI 에 통보
+2026-08-07  e027889   머지로 드러난 proto 계약 불일치 2건
 ```
 
-세 단계로 요약:
+네 단계로 요약:
 1. **REST 시대 (2026-03-30 ~ 04-08)**: WebClient + InternalExerciseController. proto 없음.
 2. **gRPC 전환 (2026-04-13 ~ 04-28)**: proto·인증·콜백 흐름 다 갖춤. 단 AI 쪽은 mock 서버.
 3. **실통합·신뢰성 강화 (2026-05-16 ~ 05-17)**: mock 제거, 동시성·재시도 보강, API 디프리케이트 정리.
+4. **전달 의미론·회복탄력성·관측성 (2026-05-25 ~ 08-08)** 🆕: **경로를 만드는 시기에서 경로의 보장을 바꾸는 시기로.** RPC 는 5 → 7 이지만 더 큰 변화는 같은 RPC 의 의미론이다 — 아웃박스로 Spring→AI 종료 통보의 유실이 **관측 가능**해졌고(⚠️ 상한 10회 재시도이므로 «반드시 전달» 은 아니다), deadline·서킷브레이커로 "안 죽고 느려지는" 경우가 실패로 분류됐고, correlation id 로 두 서비스 로그가 한 요청으로 이어졌다. ⚠️ **AI→Spring 방향은 여전히 3회 후 유실이고 흔적이 로그뿐이다.** 🔴 **어느 쪽도 «닫히지» 않았다** — 한쪽만 유실이 조회 가능해졌다.
 
 ---
 
@@ -216,7 +228,89 @@
 
 ---
 
-## 4. 결합 요소별 변경 시점
+## 4. 전달 의미론·회복탄력성·관측성 (2026-05-25 ~ 2026-08-08) 🆕
+
+> 🔴 **이 절은 2026-08-08 에 뒤늦게 채웠다.** 이 문서는 2026-05-23 에서 멈춰 있었고 그 사이 결합면에 커밋 21건이 들어갔다. **§1~§3 이 "경로를 만드는" 시기였다면 이 시기는 "그 경로의 보장을 바꾸는" 시기다** — RPC 는 2개 늘었지만(`ReattachAnalysis`·`ReportFeedbackBatch`) 더 큰 변화는 **같은 RPC 의 전달 의미론**이었다.
+
+### baffa48 — feat(tts,session): AI→Spring 피드백 batch gRPC 통일 + 세션 종료 ET-H (2026-05-25)
+
+- **proto**: `ReportFeedbackBatch` 신설. TTS 발화 이벤트를 REST 가 아니라 gRPC 단일 채널로
+- **Spring**: `ExerciseGrpcService.reportFeedbackBatch` → `FeedbackLogService`. REST endpoint 폐기
+- **AI**: proto 만 동기. ⚠️ **호출부는 이때도, 지금도 없다** — 아래 §6 참조
+
+### 83ad508 / dc701ab — fix(security): AI 의존성 취약점 (2026-07-19)
+
+- **AI**: `protobuf 4.25.3 → 4.25.8`(DoS), `python-multipart → 0.0.32`
+- 📌 **결합면에서 의미**: Spring 은 `protobuf-java 3.25.x` 라인이라 **양쪽 protobuf 메이저가 갈렸다.** wire format 은 호환이지만 버전을 같이 올려주는 장치는 없다
+
+### d8349f3 — feat(persona): 페르소나별 싱크로율 임계값 실제 연결 (2026-07-22)
+
+- **AI**: 임계값이 하드코딩에서 페르소나 기반으로. proto 계약 변경 없이 **AI 내부 판정 기준만** 바뀐 첫 사례
+
+### 0c47598 · 215d49a — feat/fix(resilience): deadline + 서킷브레이커 (2026-07-11) ⭐
+
+- **Spring**: 모든 Spring → AI 스텁에 `withDeadlineAfter` 적용(`0c47598` — *"hang 을 실패로 잡음"*), Resilience4j 서킷브레이커 `aiServer` 인스턴스 적용(`215d49a`)
+- **AI**: 없음
+- 📌 **이때부터 "AI 가 안 죽고 느려지는" 경우가 결합 실패로 분류된다.** 그전에는 호출 스레드가 무한 대기했다
+
+### aaf576a · bfa4d50 — feat(backend,ai): 관측성 1차 — correlation id 전파 (2026-07-28) ⭐
+
+- **Spring**: `CorrelationIdFilter`(HTTP `X-Request-Id`) · `GrpcCorrelation{Client,Server}Interceptor`(메타데이터 `x-request-id`) · `CorrelationIds`(MDC) · 커스텀 지표
+- **AI**: `app/grpc/correlation.py` — `ContextVar` 기반 수신·전파
+- **결합면에서 의미**: **처음으로 두 서비스의 로그를 한 요청으로 이어 볼 수 있게 됐다.** gRPC 메타데이터에 결합 계약이 하나 늘었다(proto 밖의 계약)
+- `bfa4d50`: **백그라운드 스레드 경계에서 cid 가 끊기던 것** 수정 — MDC 가 ThreadLocal 이라 생긴 문제
+
+### cb26e4a · 993dfa1 · eebf852 — feat(outbox): 세션 종료 통보를 아웃박스로 (2026-07-29) ⭐⭐ 결합 의미론 변경
+
+- **Spring**: `OutboxEvent` 엔티티·`OutboxEventRepository`(`cb26e4a`) → `stopAnalysis` 가 gRPC 직접 호출을 버리고 **세션 상태와 같은 트랜잭션에 이벤트를 적재**, `OutboxPublisher` 가 폴링 발행(`993dfa1`)
+- **AI**: 없음 — ⚠️ **단, AI 의 `StopAnalysis` 가 멱등해야 성립한다**(재시도가 같은 통보를 두 번 보낼 수 있다)
+- **의미**: `StopAnalysis` 의 전달 의미론이 **at-most-once → «상한 있는 재시도»**. dual-write(커밋과 송신이 별개라 커밋 후 송신 실패 시 **흔적 없이** 유실)를 구조적으로 고쳤다 — ⚠️ **유실 자체가 사라진 게 아니라** 의도가 행으로 남아 재시도·조회가 된다. 상한(기본 10회) 초과 시 터미널 `FAILED`. 🔴 *"유실 0"* 은 **그 실험 조건에서의 실측**이고 운영 보장이 아니다
+- `eebf852`: 소유권 조건부 갱신(CAS) — 발행기가 둘 이상일 때 같은 행을 두 번 집는 것 방지 (CodeRabbit)
+- 📌 **이 커밋 묶음이 §1~§3 전체를 통해 가장 큰 결합 변경이다.** RPC 목록은 그대로인데 **보장이 달라졌다** — 그래서 [`ai-backend-integration.md`](./ai-backend-integration.md) §6 이 2.5개월간 틀린 채로 있었다
+
+### 084fac7 · c98d405 — feat(session): 세션 재부착 (2026-07-31, #59 2단계) ⭐
+
+- **proto**: `ReattachAnalysis(ReattachRequest) → ReattachResponse` 신설
+- **Spring**: `ExerciseAnalysisService.reattachSession` — DB 조회를 트랜잭션에서 끝내고 **트랜잭션 밖에서** gRPC 호출(커넥션 점유 방지). `SessionController` 엔드포인트
+- **AI**: `ExerciseServicer.ReattachAnalysis` — **있으면 보존, 없으면 DB 값으로 생성**
+- 📌 **`StartAnalysis` 에 합치지 않은 이유가 proto 주석에 박혀 있다**: 멱등 규칙이 정반대라 한 핸들러에 섞으면 **정상 시작이 조용히 no-op** 이 될 수 있다
+- **의미**: §3 시기의 알려진 약점(*"AI 재시작 시 진행 중 세션 전부 소실"*)에 **복구 경로**가 생겼다. ⚠️ 자동은 아니다 — 프론트가 불러야 한다
+
+### e28bc65 · 025a014 · d440cae — 타임아웃과 재부착이 만나는 자리 (2026-08-03)
+
+- **Spring**: 타임아웃으로 걷어가는 세션도 AI 에 통보(`e28bc65`, #98) — 그전엔 Spring 만 `FAILED` 로 바꾸고 AI 엔 orphan 이 남았다. 종료가 먼저 온 경우 통보를 **중복 적재하지 않게** 수정(`025a014`, CodeRabbit #100)
+- `d440cae`: **재부착 ↔ 타임아웃 레이스**의 결과를 테스트로 확정(#77 → #98)
+- **의미**: 아웃박스·재부착이 들어오면서 **"누가 세션을 끝내는가"의 경쟁 조합이 늘었다.** 이 세 커밋이 그 조합을 좁힌다
+
+### e7e04b7 · 35c8d1e — fix(ai): rep 판정·버퍼 (2026-08-03)
+
+- **AI**: 휴식 중 앉았다 일어나기를 rep 으로 세지 않음(#93), rep 프레임 버퍼 상한(#91)
+- proto 무변경. **결합 계약이 아니라 AI 판정 품질** — 다만 `SavePoseDataBatch` 로 흐르는 **행 수와 내용이 달라진다**
+
+### d4cfca7 · 4000530 — feat(report): 대표 프레임 = "가장 깊게 앉은 순간" + `is_correct` 삭제 (2026-08-01)
+
+- **proto/DB**: `is_correct` 제거, 대표 프레임 선택 전략 변경(ㄹ안). DB 마이그레이션 동반(`4000530` — 두 `ALTER` 를 한 문장으로)
+- **의미**: `PoseDataRequest` 가 나르는 의미가 바뀌었다 — 저장되는 프레임이 "윈도우 최저 sync_rate" 에서 "가장 깊은 지점"으로
+
+### e027889 — fix(test): 머지로 드러난 계약 불일치 2건 (2026-08-07)
+
+- 📌 **§5 «proto 는 결합의 무게 중심» 관찰의 실물 증거.** 브랜치를 합칠 때 proto 계약이 갈라져 있던 것이 **테스트로만** 드러났다 — 런타임 직렬화 실패 전에 잡힌 건 운이 좋았던 쪽이다
+
+### 📌 이 시기의 결합면 요약
+
+| | §1~§3 (2026-03~05) | **§4 (2026-05~08)** |
+|---|---|---|
+| 주된 활동 | 경로를 **만든다** | 경로의 **보장을 바꾼다** |
+| RPC 수 | 0 → 5 | 5 → **7** |
+| Spring→AI 전달 | at-most-once | **상한 있는 재시도**(종료 통보만, 10회 후 `FAILED`) |
+| AI→Spring 전달 | 3회 재시도 후 유실 | **그대로.** ⚠️ 어느 쪽도 «닫히지» 않았다 — 한쪽만 **유실이 조회 가능**해졌다 |
+| 실패 처리 | 무한 대기 가능 | **deadline + 서킷브레이커** |
+| 추적성 | 없음 | **correlation id 양방향** |
+| proto 밖 계약 | 토큰 메타데이터 | **+ `x-request-id` 메타데이터** |
+
+---
+
+## 5. 결합 요소별 변경 시점
 
 | 결합 요소 | 도입 커밋 | 그 이후 큰 변경 |
 |---------|---------|--------------|
@@ -229,13 +323,26 @@
 | 내부 토큰 인증 | c52f677 (Spring) + e8e1b65/1a50c14 (AI) | — |
 | Docker 네트워크 / 토큰 주입 | 6ce9a43 / c52f677 | c7657f1에서 외부 노출 차단 |
 | 세션 in-memory 상태 (AI) | e8e1b65 (`session_registry`) → 1a50c14 (`session_state`) | 4a0f456에서 registry 삭제 |
-| 낙관적 락 + 타임아웃 양보 | (Spring 측, 명시 도입 커밋 불분명 — SessionTimeoutScheduler 도입 시점) | 143a2e4 흐름에서 의미 강화 |
+| 낙관적 락 + 타임아웃 양보 | (Spring 측, 명시 도입 커밋 불분명 — SessionTimeoutScheduler 도입 시점) | 143a2e4 흐름에서 의미 강화, **e28bc65·025a014·d440cae 에서 재부착·아웃박스와의 경쟁 정리** |
+| **TTS 피드백 채널** (`ReportFeedbackBatch`) | baffa48 (proto + Spring 수신부) | ⚠️ **AI 호출부가 도입된 적이 없다** — §6 |
+| **회복탄력성** (deadline·서킷브레이커) | 0c47598 · 215d49a | — |
+| **관측성** (correlation id) | aaf576a | bfa4d50(스레드 경계 누락 수정) |
+| **아웃박스** (상한 있는 재시도) | cb26e4a · 993dfa1 | eebf852(CAS), e28bc65·025a014(타임아웃 경로 편입) |
+| **세션 재부착** (`ReattachAnalysis`) | 084fac7 | c98d405, d440cae(타임아웃 레이스 확정) |
+| **`user.proto` / `UserService`** | (초기 — 커밋 불명) | 🔴 **한 번도 구현·호출된 적이 없다** — §6 |
 
 ---
 
-## 5. 변경 트렌드 관찰
+## 6. 변경 트렌드 관찰
 
 - **결합 표면이 줄어드는 방향으로 진행**: REST 콜백 controller(0d89668)·GrpcConfig(48bb0fc)·mock_server(6ac0390)·session_registry(e8e1b65) 등 초기 도입 컴포넌트가 모두 나중에 제거됨 (8ac8248, 7d51cf6, 1a50c14, 4a0f456). 양쪽 모두 인터페이스 갈래를 줄여가는 추세.
 - **신뢰성 작업은 AI 쪽 코드 변경을 동반**: c7657f1에서 thread-local·재시도가 AI에 추가됐고, 그 외 AI 동작 변경은 1a50c14·4a0f456 같은 큰 통합 정리에만 몰려 있음 → [`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 와 정합.
 - **proto는 결합의 무게 중심**: 거의 모든 신기능 도입(953bad6, 4eb153b, ea1c636, f172933, c52f677 일부, 8ac8248 후속) 이 proto 동기 변경을 강제. → [`decisions/ai-backend-coupling.md`](../decisions/ai-backend-coupling.md) §5 분기 B의 근거.
 - **권위 충돌 정리**: 143a2e4에서 “프론트가 운동 통계를 직접 만들지 않음” 원칙으로 결합 책임 경계 명확화.
+
+### 🔄 2026-08-08 추가 관찰 — §4 시기가 위 네 줄을 어떻게 바꿨나
+
+- **"결합 표면이 줄어드는 방향"은 §4 에서 깨졌다.** 이 시기에 RPC 가 5 → 7 로 늘고, proto 밖 계약(`x-request-id` 메타데이터)도 하나 늘었다. 다만 **늘어난 이유가 다르다** — §1~§3 의 표면은 *"같은 일을 하는 갈래가 여럿"* 이라 줄일 수 있었고, `ReattachAnalysis` 는 *"멱등 규칙이 정반대라 일부러 나눈 것"* 이다. **줄일 표면과 나눠야 할 표면은 다르다.**
+- **"신뢰성 작업은 AI 쪽 코드 변경을 동반"은 §4 에서 뒤집혔다.** 이 시기 신뢰성 작업 3건(deadline·서킷브레이커·아웃박스)은 **전부 Spring 단독**이다. 아웃박스는 AI 에 코드를 한 줄도 안 넣고 전달 의미론을 바꿨다 — ⚠️ 대신 **AI 의 `StopAnalysis` 가 멱등하다는 가정에 의존**한다. **코드 변경이 없는 것과 계약 변경이 없는 것은 다르다.**
+- **"proto 는 결합의 무게 중심"은 그대로 유효하고, 증거가 하나 더 생겼다** — `e027889`(머지로 드러난 계약 불일치 2건).
+- 🔴 **새 관찰: 선언된 결합면이 흐르지 않는 채로 오래 남는다.** `ReportFeedbackBatch` 는 2026-05-25 에 만들어져 **2.5개월 넘게 수신부만 있는 상태**이고, `user.proto` 는 한 번도 쓰인 적이 없다. 둘 다 **문서에는 "있다"로만 적혀 있어서** 결합 구조만 보면 동작하는 경로처럼 보였다. → 이 문서와 [`ai-backend-integration.md`](./ai-backend-integration.md) §3-1 은 이제 **선언과 실제 사용을 구분해 적는다.**

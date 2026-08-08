@@ -98,17 +98,40 @@ AI가 코드를 빨리 짜주면 **순수 구현은 싸지고**, 차별화는 **
 
 ## 5. 산출물 체크리스트
 
-| 산출물 | 상태 | 시점 |
-|---|---|---|
-| [`portfolio/db-deep-dive.md`](../portfolio/db-deep-dive.md) | ✅ 작성됨 | — |
-| [`portfolio/problem-solving-log.md`](../portfolio/problem-solving-log.md) | ✅ 작성됨 | — |
-| projection 수치 카드 (before/after) | ⬜ | 6월 |
-| 동시성 카드 2개 (일일집계·report 멱등성) | ⬜ | 6월 |
-| 파티셔닝+TTL 설계 문서 | ⬜ | 7월 |
-| case study (GET /reports 진화기) | ⬜ | 7~8월 |
-| CS 50토픽 코드 매핑 | ⬜ | 8월 |
-| 면접 3단 답변 세트 | ⬜ | 8월~10월 |
-| 트러블 git blame 검증 | ⬜ | 10월 |
+> 🔄 **2026-08-08 대조.** 방학이 2/3 지난 시점이라 계획과 실제를 나란히 적는다. **6월분은 다 됐고, 7월분은 절반이 다른 일로 교체됐고, 8월분(③ 버킷)이 밀렸다.**
+
+| 산출물 | 계획 | **2026-08-08 실제** | 시점 |
+|---|:--:|---|---|
+| [`portfolio/db-deep-dive.md`](../portfolio/db-deep-dive.md) | ✅ | ✅ | — |
+| [`portfolio/problem-solving-log.md`](../portfolio/problem-solving-log.md) | ✅ | ✅ | — |
+| projection 수치 카드 (before/after) | ⬜ | ✅ **완료** — payload −98.7%([`portfolio-narrative.md`](../portfolio/portfolio-narrative.md) §2 읽기축) | 6월 |
+| 동시성 카드 2개 (일일집계·report 멱등성) | ⬜ | ✅ **완료** — 낙관락·멱등 수신·MVCC 재현까지 | 6월 |
+| 파티셔닝+TTL 설계 문서 | ⬜ | ✅ **완료** — DROP PARTITION, DELETE 대비 625x | 7월 |
+| case study (GET /reports 진화기) | ⬜ | ⬜ **없다** — `docs/portfolio/` 에 해당 문서 없음. 재료는 흩어져 있다(projection·인덱스·keyset·버퍼풀) | 7~8월 |
+| CS 50토픽 코드 매핑 | ⬜ | ⬜ **없다** — 계획 문서 2곳에서만 언급된다 | 8월 |
+| 면접 3단 답변 세트 | ⬜ | 🟨 **부분** — [`portfolio/interview-qa-kandl.md`](../portfolio/interview-qa-kandl.md) 가 있으나 **특정 회사 면접(2026-07-21) 대비용**이다. 30초/2분/10분 3단 구조의 범용 세트는 아니다 | 8월~10월 |
+| 트러블 git blame 검증 | ⬜ | ⬜ | 10월 |
+
+### 5-1. 🔴 계획에 없던 일이 7~8월을 채웠다
+
+7월 계획 5줄 중 **Redis 캐싱과 R 실측 2건이 안 됐고**, 그 자리에 계획에 없던 작업이 들어왔다.
+
+| 계획했으나 안 된 것 | 상태 |
+|---|---|
+| **Redis 캐싱**(cache-aside + stampede 방지) | ❌ **미도입.** `build.gradle`·`application.yml` 에 Redis 없음. 2026-08-08 에 *"어디에 넣을지"* 를 비교하는 [결정 문서](../decisions/redis-adoption.md)가 **이제 막 작성됐고 결정 미확정** — 즉 7월에 「구현」으로 잡았던 것이 8월에 「분기점」으로 되돌아갔다 |
+| **R 실측 / 천장 재측정** | 🟨 천장은 **두 번 실측**했다(EC2 2대·3대). ⚠️ 그런데 **R 실측은 여전히 없다** — 팀원 `squat.mp4` 미확보 조건이 안 풀렸고, 그래서 부하 결과를 *"사용자 몇 명"* 으로 번역할 수 없다([`../decisions/load-test-strategy.md`](../decisions/load-test-strategy.md) §7) |
+
+| 계획에 없었는데 한 것 | 포폴 버킷 |
+|---|---|
+| **outbox at-least-once**(유실 0 실측) | ② — 신뢰성 카드. 계획의 «동시성»보다 상위 서사 |
+| **관측성 2차** — correlation id + 지표 9종 + Prometheus·Grafana 시계열 | ② — 계획은 이걸 **9월(2학기 오버레이)** 로 잡았는데 8월에 끝났다 |
+| gRPC deadline + 서킷브레이커 | ② — 같은 이유로 9월 항목이 앞당겨졌다 |
+| **풀 사이징 실측 2회 + 병목 이동 증명** | ② — 계획엔 «천장 재측정» 한 줄뿐이었는데 **자기 처방이 자기 근거를 무효화한 서사**로 커졌다 |
+| Flyway · CD 앞단 · 인덱스 통합 · 관리자 API 3종 | ①/② |
+
+> 📌 **읽는 방식이 중요하다.** 이건 «계획 실패»가 아니라 **버킷 ②의 내용이 «DB 깊이» 에서 «신뢰성·운영» 으로 이동한 것**이다. 그리고 그 이동은 [`../decisions/portfolio-benchmark.md`](../decisions/portfolio-benchmark.md)·[`db-portfolio-roadmap.md`](../decisions/db-portfolio-roadmap.md) 의 방향과 맞다.
+>
+> 🔴 **다만 밀린 것이 전부 ③ 버킷(글·면접 준비)이라는 점은 그냥 밀린 것이다.** 이 문서 §2 가 *"AI 코드를 이해 못 하면 ① 시간 아낀 게 아니라 ③ 빚"* 이라고 적고, §6 리스크에 *"③에 전수 검증 시간 사수(8월)"* 를 넣어뒀다. 전수 검증은 [`29-ai-code-verification.md`](./29-ai-code-verification.md) 로 **착수했으나 상태가 «진행 중»** 이고, CS 매핑·case study 는 시작되지 않았다. **방학이 3주 남았다.**
 
 ---
 
