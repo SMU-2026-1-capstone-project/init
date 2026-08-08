@@ -6,8 +6,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +48,36 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
         log.warn("Validation failed: {}", message);
         return buildResponse(code, message.isEmpty() ? code.getMessage() : message);
+    }
+
+    /**
+     * ⚠️ 2026-08-08 추가: @RequestParam 의 타입 변환 실패(enum 에 없는 정렬 키, 숫자가 아닌 page)는
+     * MethodArgumentTypeMismatchException 이라 위 MethodArgumentNotValidException 핸들러에 안 걸리고
+     * handleUnexpectedException 으로 떨어져 400 대신 500 이 나가던 버그가 있었음
+     * — AdminQueryParamBindingErrorTest 로 발견. 29~33행의 AccessDeniedException 건과 같은 형태다.
+     *
+     * <p>@ModelAttribute 쪽(검색조건 record 의 status·startedFrom)은 Spring 6.1 부터 바인딩 실패가
+     * MethodArgumentNotValidException 으로 오므로 이미 400 이었다. 같은 테스트가 그 두 경로도
+     * 함께 고정해 둔다 — 프레임워크가 바꾸면 알아채야 하는 지점이라서.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponseDto> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        ErrorCode code = ErrorCode.INVALID_INPUT_VALUE;
+        log.warn("Type mismatch on parameter '{}': {}", e.getName(), e.getValue());
+        return buildResponse(code, buildTypeMismatchMessage(e));
+    }
+
+    /** enum 이면 허용값을 같이 알려준다 — 관리자 화면 개발 중 정렬 키를 맞추는 데 그게 실질적으로 필요하다. */
+    private String buildTypeMismatchMessage(MethodArgumentTypeMismatchException e) {
+        String base = "%s: '%s' 는 허용되지 않는 값입니다.".formatted(e.getName(), e.getValue());
+        Class<?> required = e.getRequiredType();
+        if (required != null && required.isEnum()) {
+            String allowed = Arrays.stream(required.getEnumConstants())
+                    .map(Object::toString)
+                    .collect(Collectors.joining(", "));
+            return base + " 허용값: " + allowed;
+        }
+        return base;
     }
 
     @ExceptionHandler(Exception.class)
