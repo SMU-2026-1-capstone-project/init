@@ -105,7 +105,11 @@ ramp 가 이미 session 801 에 pose_data 를 대량 적재함(side effect). 이
 
 | 디렉터리 | 실험 |
 |---|---|
-| [`results/pool-cliff-2026-08-08/`](./results/pool-cliff-2026-08-08/) | 풀 사이징 cliff × 동시성 (c 10~100 × pool 5·20, EC2 3대). **절벽 없음** — 다운샘플이 병목을 DB 쓰기에서 백엔드 CPU 로 옮겨놨다. 설계는 [`pool-cliff-vs-concurrency.md`](../docs/decisions/pool-cliff-vs-concurrency.md) |
+| [`results/pool-cliff-2026-08-08/`](./results/pool-cliff-2026-08-08/) | 풀 사이징 cliff × 동시성 (c 10~100 × pool 5·20, EC2 3대). **초당 ~205건 수준에서 절벽 없음** — 다운샘플(R=5)이 풀을 병목에서 빼냈다. ⚠️ 병목이 **어디로 갔는지는 미상**(초판의 "백엔드 CPU" 는 철회 — 근거 수치가 원본에 없었다). 설계는 [`pool-cliff-vs-concurrency.md`](../docs/decisions/pool-cliff-vs-concurrency.md), 경위는 그 폴더 README §5 |
+
+> 🔴 **이 실험이 남긴 rig 쪽 숙제 2개** — 다음 부하 실험 전에 확인할 것:
+> 1. **ghz 커넥션 수.** 결과 14판이 전부 `"connections": 1` 이다. `-c 100` 을 줘도 TCP 커넥션 하나에 다중화했다면 **측정한 천장이 서버가 아니라 부하기의 것**일 수 있다. `--connections` 를 동시성에 맞춰 올린 뒤 같은 판을 다시 재는 게 1번이다
+> 2. **`scrape_interval` 15초 vs 판 ~10초.** 판당 지표 샘플이 0~1개라 **게이지를 판별로 귀속시킬 수 없다.** 부하 실험용으로는 스크레이프를 5초 이하로 낮추거나, 판 길이를 늘려야 한다
 
 각 디렉터리의 `README.md` 가 그 실험의 결과 문서이고, 원시 파일로 그래프를 다시 그릴 수 있게
 `plot.py`(의존성 없음)까지 같이 둔다.
