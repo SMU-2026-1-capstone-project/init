@@ -72,11 +72,28 @@
 **적용 상태 확인**:
 
 ```bash
-curl -s http://localhost:8080/actuator/flyway | jq '.contexts[].flywayBeans.flyway.migrations[] | {version, description, state}'
-# 또는
+# dev — 9090 이 루프백에 매핑돼 있다 (docker-compose.yml)
+curl -s http://localhost:9090/actuator/flyway | jq '.contexts[].flywayBeans.flyway.migrations[] | {version, description, state}'
+
+# prod — 9090 을 호스트에 매핑하지 않는다(의도된 설계). 컨테이너 안에서 부른다
+docker exec shadowfit-backend wget -qO- http://localhost:9090/actuator/flyway \
+  | jq '.contexts[].flywayBeans.flyway.migrations[] | {version, description, state}'
+
+# 어느 환경이든 되는 경로 — DB 를 직접 본다
 docker exec -it shadowfit-mysql mysql -u"$MYSQL_USER" -p shadowfit \
   -e "SELECT version, description, installed_on, success FROM flyway_schema_history ORDER BY installed_rank;"
 ```
+
+> 🔴 **8080 이 아니다** ([이슈 #130](https://github.com/Shadowfit/init/issues/130)). 2026-08-08 관리 포트
+> 분리로 액추에이터가 9090 으로 옮겨갔는데 이 절차가 8080 을 시키고 있었다. 8080 에 같은 경로를
+> 치면 핸들러가 없어 **404** 다(그 전엔 500 이었고, [#129](https://github.com/Shadowfit/init/issues/129) 로 404 가 됐다).
+>
+> ⚠️ **prod 는 HTTP 경로가 `docker exec` 뿐이다.** 그래서 Flyway 도입(#115)의 목적이던 *"적용 이력을
+> 추적 가능한 형태로"* 가 prod 에서는 컨테이너 안에 들어가야만 닿는다. 9090 을 prod 에서 루프백
+> (`127.0.0.1:9090:9090`)에 매핑할지는 *"prod 에 관측 스택을 올릴지"* 미결과 같은 자리라 열어둔다
+> ([`tasks/28-remaining-work-plan.md`](./tasks/28-remaining-work-plan.md) §7). **결정 전까지는 위 세 번째
+> 명령(DB 직접 조회)이 prod 의 1순위 확인 경로다** — 두 번째 명령은 백엔드 이미지에 `wget` 이 있다는
+> 전제에 기대는데(healthcheck 가 그걸 쓴다), 그 healthcheck 자체가 실제 호스트에서 검증된 적이 없다.
 
 > ⚠️ Flyway 가 답하는 것은 **"내 파일이 돌았나"** 까지다. 누가 손으로 `ALTER TABLE` 을 치면
 > 여기엔 아무것도 안 남는다 — 드리프트 탐지는 별건이고 미도입 상태다.
@@ -128,14 +145,18 @@ vim .env                                  # 운영 값 입력 (§2.1 — 시크�
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 
-# 3) 헬스체크
-docker compose -f docker-compose.prod.yml ps      # 셋 다 'healthy'
-curl http://localhost:8080/actuator/health
+# 3) 헬스체크 — prod 는 9090 을 호스트에 매핑하지 않으므로 ps 의 healthy 가 1순위다
+docker compose -f docker-compose.prod.yml ps      # 셋 다 'healthy' (컨테이너가 안에서 9090 을 친다)
+docker exec shadowfit-backend wget -qO- http://localhost:9090/actuator/health   # 내용까지 보려면
 
-# 4) 스키마가 적용됐는지 — 여기서 Flyway 결과를 본다
-curl -s http://localhost:8080/actuator/flyway
+# 4) 스키마가 적용됐는지 — 여기서 Flyway 결과를 본다 (§2.3 에 세 경로 비교)
+docker exec -it shadowfit-mysql mysql -u"$MYSQL_USER" -p shadowfit \
+  -e "SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank;"
 docker exec -it shadowfit-mysql mysql -u"$MYSQL_USER" -p shadowfit -e "SELECT id, name FROM exercises;"
 ```
+
+> 🔴 **여기서 `curl localhost:8080/actuator/…` 를 치지 않는다** ([#130](https://github.com/Shadowfit/init/issues/130)).
+> 액추에이터는 9090 이고 prod 는 그 포트를 호스트에 매핑하지 않는다 — 8080 에 치면 404 다.
 
 > 마스터 데이터(`exercises`, 피드백 템플릿)는 Flyway 가 넣는다. **dev 픽스처(테스트 계정·
 > 가짜 세션)는 안 들어간다** — 의도적이다. 운영에 필요 없고 있으면 안 되는 데이터다.
