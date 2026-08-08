@@ -75,9 +75,25 @@
 ### 추가 의존성
 | 의존성 | 용도 | Gradle 표기 |
 |--------|------|------------|
-| jjwt | JWT 토큰 생성/검증 | `io.jsonwebtoken:jjwt-api:0.12.5` |
+| jjwt | JWT 토큰 생성/검증 | ~~`0.12.5`~~ → **`io.jsonwebtoken:jjwt-api:0.13.0`** (+ `jjwt-impl`·`jjwt-jackson` runtimeOnly) |
 | OpenAI Java SDK | GPT 피드백 생성 | `com.theokanning.openai-gpt3-java:service:0.18.2` |
 | SpringDoc OpenAPI | Swagger API 문서 | `org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6` |
+
+### 🔄 2026-08-08 추가 — 위 표에 없던 백엔드 의존성
+
+이 문서는 2026-03-30 판이라 **그 뒤 들어온 것이 통째로 빠져 있었다.** 성격별로 묶으면 이 프로젝트가 무엇을 하고 있었는지가 보인다.
+
+| 성격 | 의존성 | 왜 |
+|---|---|---|
+| **결합 (gRPC)** | `net.devh:grpc-{client,server}-spring-boot-starter:3.1.0.RELEASE`, `io.grpc:*` **1.83.1**, `protobuf-java` **3.25.5** | Spring↔FastAPI 양방향. ⚠️ AI 쪽 protobuf 는 **4.25.8** — **양쪽 메이저가 다르다** |
+| **회복탄력성** | `io.github.resilience4j:resilience4j-spring-boot3:2.4.0` | Spring→AI 서킷브레이커(`aiServer`) |
+| **관측성** | `spring-boot-starter-actuator`, `io.micrometer:micrometer-registry-prometheus` | 🔴 **후자는 `runtimeOnly`** — 코드가 import 하지 않는다(`SessionMetrics` 는 Micrometer 코어 API 만 쓴다). 레지스트리는 클래스패스에 있으면 자동 배선된다 |
+| **스키마** | `org.flywaydb:flyway-core`, `flyway-mysql` | 부팅 시 마이그레이션 적용 |
+| **쿼리** | `com.querydsl:querydsl-jpa::jakarta` | 🔴 **`jakarta` 분류자가 필수** — 빠뜨리면 `javax` 기반 아티팩트가 딸려온다(build.gradle 주석에 박혀 있다) |
+| **캐시** | `spring-boot-starter-cache`, `caffeine:3.2.4` | 로컬 캐시. ❌ **Redis 는 아직 없다**(도입 미결정) |
+| 기타 | `spring-boot-starter-webflux`(WebClient), `modelmapper:3.2.6`, `commons-lang3:3.20.0`, `dotenv-java:3.2.0`, `jackson-databind:2.22.1` | |
+
+> ⚠️ **버전을 이 문서로 확인하지 말 것.** 위 표도 2026-08-08 스냅샷이라 곧 낡는다. **정본은 `backend/build.gradle`** 이고, 이 표는 *"무엇이 왜 들어와 있나"* 를 보는 용도다. 실제로 이 문서가 5개월간 `jjwt 0.12.5` 로 남아 있었다(실제 0.13.0).
 
 ---
 

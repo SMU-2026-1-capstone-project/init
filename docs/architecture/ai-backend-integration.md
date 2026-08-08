@@ -61,7 +61,7 @@
                        │                        ┌──────────────────┐
                        │                        │ shadowfit-mysql  │
                        │                        │ (MySQL 8.0)      │
-                       │                        │  + outbox_event  │
+                       │                        │  + outbox_events │
                        │                        └──────────────────┘
               ┌────────┴─────────┐
               │  shadowfit-ai    │  gRPC SavePoseDataBatch (실시간 콜백)
@@ -73,7 +73,7 @@
               └──────────────────┘
 ```
 
-⚠️ **`StopAnalysis` 만 화살표의 의미가 다르다.** Spring 코드가 직접 부르는 게 아니라 `outbox_event` 를 거쳐 `OutboxPublisher` 가 폴링해 보낸다(§4 중단). 나머지 Spring → AI 호출은 호출 스레드에서 바로 나간다.
+⚠️ **`StopAnalysis` 만 화살표의 의미가 다르다.** Spring 코드가 직접 부르는 게 아니라 `outbox_events` 를 거쳐 `OutboxPublisher` 가 폴링해 보낸다(§4 중단). 나머지 Spring → AI 호출은 호출 스레드에서 바로 나간다.
 
 Docker 네트워크는 `shadowfit-net` 브리지 한 개. 외부 노출은 backend REST(8080)만, gRPC(6565)·관리포트(9090)·AI HTTP(8000)/gRPC(8585)는 컨테이너 내부 전용 — **9090 은 dev compose 에서만 호스트에 열리고, 그것도 `127.0.0.1` 로 묶여 있다**(2026-08-08, #128).
 
@@ -139,7 +139,7 @@ Docker 네트워크는 `shadowfit-net` 브리지 한 개. 외부 노출은 backe
 ### 중단 — 🔄 아웃박스 도입으로 경로가 바뀌었다 (2026-07-29)
 
 1. 프론트 → `PUT /exercises/sessions/{id}/stop` (커밋 `143a2e4`에서 신설)
-2. `ExerciseAnalysisService.stopAnalysis` — **gRPC 를 직접 부르지 않는다.** 세션 상태 변경과 **같은 트랜잭션**에서 `outbox_event(type=STOP_ANALYSIS, payload={sessionId})` 를 적재
+2. `ExerciseAnalysisService.stopAnalysis` — **gRPC 를 직접 부르지 않는다.** 세션 상태 변경과 **같은 트랜잭션**에서 `outbox_events(type=STOP_ANALYSIS, payload={sessionId})` 를 적재
 3. `OutboxPublisher` — `@Scheduled` 폴링(기본 1초, `outbox.publisher.poll-interval-ms`)으로 `PENDING` 을 집어 gRPC `StopAnalysis` 송신. 실패하면 재시도(기본 상한 10회, `outbox.publisher.max-retry`) 후 `FAILED`
 4. AI: `SessionState` 제거 + 백그라운드 스레드에서 `_send_complete_analysis` 호출
 5. AI: 누적 통계 계산 → `spring_client.report_complete_analysis` (gRPC `CompleteAnalysis`)
@@ -190,7 +190,7 @@ AI 컨테이너가 재시작되면 in-memory `SessionState` 가 사라지는데,
 | AI 콜백 재시도 | `spring_client.report_complete_analysis` | 1초 → 3초 백오프, 최대 3회 |
 | Spring 낙관적 락 재시도 | `SessionService.completeSession` | `@Version` 충돌 시 최대 3회 |
 | 타임아웃 양보 | `SessionTimeoutScheduler` | AI 완료 콜백이 늦게 와도 충돌 시 AI 결과 우선 |
-| **아웃박스 (at-least-once)** 🆕 | `OutboxPublisher` + `outbox_event` 테이블 | 종료 통보를 DB 에 같이 커밋 → 폴링 발행 → 재시도(상한 10). **수신 멱등과 합쳐 effectively exactly-once** |
+| **아웃박스 (at-least-once)** 🆕 | `OutboxPublisher` + `outbox_events` 테이블 | 종료 통보를 DB 에 같이 커밋 → 폴링 발행 → 재시도(상한 10). **수신 멱등과 합쳐 effectively exactly-once** |
 | **gRPC deadline** 🆕 | `ExerciseAnalysisService` — 모든 스텁에 `withDeadlineAfter` | AI 가 hang 해도 호출 스레드가 무한 대기하지 않는다 |
 | **서킷브레이커** 🆕 | Resilience4j `aiServer` 인스턴스 (`CircuitBreakerRegistry`) | AI 연속 실패 시 회로 개방 — 죽은 서버에 계속 밀어넣지 않는다 |
 | **correlation id 전파** 🆕 | `CorrelationIdFilter` · `GrpcCorrelation{Client,Server}Interceptor` · `CorrelationIds` | HTTP `X-Request-Id` → MDC(`cid`) → gRPC 메타데이터 `x-request-id` → FastAPI `ContextVar`. `@Async`·스케줄러 경계도 넘긴다 |

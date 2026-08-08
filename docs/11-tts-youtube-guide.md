@@ -8,7 +8,25 @@
 | 설정 조회/변경 API | `GET /preferences/tts`, `PATCH /preferences/tts` |
 | 운동별 멘트 마스터 | DB `exercise_feedback_templates`, `GET /exercises/{id}/feedback-templates` |
 | 실제 음성 합성·재생 | **클라이언트 device TTS** (`expo-speech`) — 서버는 TTS 오디오 합성하지 않음 |
-| 발화 이벤트 로그 | AI 가 BT-SET 모델 (세트 경계 + 세션 종료 final) 로 gRPC `ExerciseService.ReportFeedbackBatch` 송신 → `session_feedback_logs` 테이블 |
+| 발화 이벤트 로그 | AI 가 BT-SET 모델 (세트 경계 + 세션 종료 final) 로 gRPC `ExerciseService.ReportFeedbackBatch` 송신 → `session_feedback_logs` 테이블 — 🔴 **이 줄만 미구현** (아래) |
+
+> ## 🔴 이 표의 마지막 두 줄이 아직 안 붙어 있다 (2026-08-08 코드 확인)
+>
+> 위 5줄 중 **서버 쪽 3줄은 다 있고, 양 끝(AI 송신 · 클라이언트 발화)이 비어 있다.**
+>
+> | 책임 | 상태 | 근거 |
+> |---|:--:|---|
+> | 설정 저장·조회/변경 API | ✅ | `GET`·`PATCH /preferences/tts` |
+> | 멘트 마스터 (`exercise_feedback_templates`) | ✅ | 테이블 + 시드 + 조회 API |
+> | Spring 수신부 (`ReportFeedbackBatch`) | ✅ | `ExerciseGrpcService.java:120` → `FeedbackLogService` |
+> | **AI 송신** | ❌ | `ai-server/` 전체에 `FeedbackBatch` 사용 **0건**. `spring_client.py` 는 `report_pose_data_batch`·`report_complete_analysis` 둘만 부른다 |
+> | **클라이언트 발화 (`expo-speech`)** | ❌ | `frontend/` 에 `expo-speech`·`Speech.speak` 사용 **0건** |
+>
+> **즉 «TTS 기능» 은 지금 설정 화면과 템플릿 테이블까지만 존재한다.** 소리가 나는 경로가 양쪽 다 없다.
+>
+> 📌 **이건 «협의 미완» 이 아니라 «착수 미완» 이다.** [`handoff/tts-negotiation-checklist.md`](./handoff/tts-negotiation-checklist.md) 가 협의 28건을 잡아뒀고 그중 11건은 2026-05-26 에 해소됐는데, 정작 Spring 은 협의 없이 만들 수 있는 것을 그 뒤로 다 만들었다. AI 측 착수가 [`tasks/30-ai-remaining-work.md`](./tasks/30-ai-remaining-work.md) §1 의 **1순위**다.
+>
+> ⚠️ **재생성 시 함정**: pb2 생성 산출물이 `ai-server/` 루트와 `app/proto/` 두 곳에 있고 **실제로 로드되는 건 루트 쪽**이다([이슈 #132](https://github.com/Shadowfit/init/issues/132)).
 
 > 모든 멘트는 한국어 단일 ([`project-korean-only`](../../C:/Users/khjae/.claude/projects/E--init/memory/project_korean_only.md)). 다국어 분리 컬럼·로직 없음.
 

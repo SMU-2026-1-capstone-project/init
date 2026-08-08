@@ -4,6 +4,20 @@
 
 | 페르소나 | 대상 | 싱크로율 기준 | 특징 |
 |---------|------|-------------|------|
+> ## ✅ 이 표가 드디어 실제 코드와 일치한다 (2026-08-08 확인)
+>
+> 이 문서는 2026-03-30 설계안인데, **2026-07-22 까지 «문서에만» 있었다.** 그때까지 실제 상태는:
+>
+> | 층 | 당시 |
+> |---|---|
+> | Spring DB | 컬럼 **2개**(beginner/advanced)만 |
+> | ai-server `constants.py` | 4개 dict 이 있었으나 **0~1 스케일의 죽은 값** — 아무도 안 읽었다 |
+> | 실제 판정 로직 | 🔴 **페르소나 무관 고정값**(`sync_rate >= 70/40`) |
+>
+> 2026-07-22(`d8349f3`)에 실제로 연결됐고, 지금은 아래 네 값이 코드에 그대로 있다 — `ai-server/app/utils/constants.py:44` 의 `SYNC_THRESHOLDS = {BEGINNER: 60.0, ADVANCED: 85.0, DIET: 70.0, REHAB: 50.0}` 이고 `squat_analyzer.py:367` 이 `SYNC_THRESHOLDS.get(state.persona, …)` 로 읽는다. 경위: [`handoff/ai-persona-threshold-connection.md`](./handoff/ai-persona-threshold-connection.md).
+>
+> 📌 **4개월간 «설계는 있는데 안 걸려 있던» 상태였다.** 문서가 틀린 게 아니라 **문서만 맞았던** 경우다 — 이 저장소의 다른 드리프트(문서가 낡음)와 방향이 반대라 기록해둔다. 같은 형태가 지금도 하나 남아 있다: `ReportFeedbackBatch` 는 proto·수신부·테이블이 다 있는데 **AI 가 안 부른다**([`tasks/30-ai-remaining-work.md`](./tasks/30-ai-remaining-work.md) §1).
+
 | 헬린이 (BEGINNER) | 운동 초심자, 홈트 입문자 | 60% 이상 | 직관적 가이드, 쉬운 피드백 |
 | 헬창 (ADVANCED) | 중/상급자 | 85% 이상 | ROM 분석, 좌우 불균형 데이터 |
 | 다이어트 (DIET) | 체중 감량 목적 | 70% 이상 | 칼로리 소모 중심, 운동량 강조 |

@@ -158,37 +158,68 @@ shadowfit/
 │   │   │   │   │   ├── exercise/Exercise.java, Session.java(@Version), PoseData.java,
 │   │   │   │   │   │   ExerciseReference.java, ExerciseFeedbackTemplate.java,
 │   │   │   │   │   │   SessionFeedbackLog.java, FeedbackType.java, Status.java
+│   │   │   │   │   ├── outbox/                # 🆕 전달 보장 (2026-07-29)
+│   │   │   │   │   │   OutboxEvent.java, OutboxEventType.java, OutboxStatus.java,
+│   │   │   │   │   │   DispatchOutcome.java
 │   │   │   │   │   └── report/Report.java, DailyLog.java, BaseTimeEntity.java
 │   │   │   │   ├── repository/                # JPA 리포지토리 (도메인별 폴더)
 │   │   │   │   │   ├── exercise/...
 │   │   │   │   │   ├── member/...
+│   │   │   │   │   ├── outbox/OutboxEventRepository.java   # 🆕
 │   │   │   │   │   └── report/...
 │   │   │   │   ├── dto/                       # DTO (도메인별 폴더)
 │   │   │   │   │   ├── exercises/session/, exercises/feedback/
 │   │   │   │   │   ├── login/, onboarding/, preference/, admin/, report/
+│   │   │   │   │   └── common/PageResponse.java   # 🆕 공통 페이징 (관리자 목록)
 │   │   │   │   ├── global/
 │   │   │   │   │   ├── config/InternalAuthInterceptor.java  # gRPC 토큰 검증
 │   │   │   │   │   ├── config/SchedulerConfig.java           # @EnableScheduling
+│   │   │   │   │   ├── config/AsyncConfig.java               # 🆕 @Async 경계 cid 전파
 │   │   │   │   │   ├── config/WebClientConfig.java
+│   │   │   │   │   ├── observability/          # 🆕 관측성 (2026-07-28)
+│   │   │   │   │   │   CorrelationIds.java, CorrelationIdFilter.java,
+│   │   │   │   │   │   GrpcCorrelationClientInterceptor.java,
+│   │   │   │   │   │   GrpcCorrelationServerInterceptor.java,
+│   │   │   │   │   │   GrpcObservabilityConfig.java, SessionMetrics.java
+│   │   │   │   │   ├── util/SetSummaryFormatter.java, YoutubeValidator.java
 │   │   │   │   │   ├── security/                            # JWT·Security
 │   │   │   │   │   ├── etc/JpaAuditingConfig.java, SwaggerConfig.java
-│   │   │   │   │   └── error/GlobalExceptionHandler.java
+│   │   │   │   │   └── error/GlobalExceptionHandler.java, ErrorCode.java
 │   │   │   │   └── grpc/                       # 코드 생성된 gRPC stubs (com.shadowfit.grpc)
 │   │   │   └── resources/
-│   │   │       ├── application.yml
-│   │   │       ├── application-dev.yml
-│   │   │       └── application-prod.yml
+│   │   │       ├── application.yml             # 단일 파일 (프로파일 분리 안 함)
+│   │   │       ├── application.properties      # hikari 타임아웃 2개만
+│   │   │       ├── db/migration/               # 🆕 Flyway (V1__…sql, V2__…sql, …)
+│   │   │       └── logback-spring.xml          # 🆕 로그 패턴에 %X{cid}
 │   │   └── test/                              # 테스트
 │   │       └── java/com/shadowfit/
 │   ├── src/main/proto/exercise.proto  # ai-server/app/proto/ 와 수동 동기
+│   ├── src/main/proto/user.proto      # 🔴 선언만 있고 구현·호출 0건 (이슈 #133)
 │   ├── build.gradle
 │   └── settings.gradle
 │
+├── monitoring/                    # 🆕 관측 스택 (2026-08-08, compose profile `obs`)
+│   ├── prometheus.yml
+│   ├── grafana/                   # 데이터소스·대시보드 프로비저닝 (JSON 커밋)
+│   └── README.md
+│
 └── mysql/                         # DB 관련 (코드상 `mysql/`, 실제 `database/` 아님)
-    ├── schema.sql                 # 테이블 생성 스크립트
+    ├── schema.sql                 # 테이블 생성 스크립트 (Flyway 도입 후에도 참조용·부하테스트용)
     ├── data.sql                   # 초기 시드
+    ├── dev-seed.sql               # 🆕 부하테스트 픽스처(세션 801). ⚠️ Flyway 에서 의도적 제외
+    ├── migrations/                # SQL 이력 (Flyway 이전 흔적)
     └── my.cnf                     # MySQL 클라이언트 utf8mb4 강제 (커밋 0fe056e)
 ```
+
+> 🔴 **2026-08-08 정정 — 이 트리가 2.5개월 낡아 있었다.** 위 🆕 표시가 새로 반영한 것이고, **틀렸던 것도 하나 있다**:
+>
+> | 이 문서가 적었던 것 | 실제 |
+> |---|---|
+> | `resources/application-dev.yml` · `application-prod.yml` | 🔴 **둘 다 없다.** 프로파일별 yml 로 나누지 않았고 `application.yml` 한 장 + `application.properties`(hikari 타임아웃 2개)뿐이다 |
+>
+> 빠져 있던 것: `model/outbox/`·`repository/outbox/`(전달 보장) · `global/observability/`(6개) · `global/util/` · `dto/common/` · `resources/db/migration/`(Flyway) · `logback-spring.xml` · 루트 `monitoring/` · `mysql/dev-seed.sql`.
+>
+> 📌 **패턴이 보인다** — 빠진 것 대부분이 **«기능» 이 아니라 «보장·관측·운영»** 이다. 기능 디렉터리(`controller`·`service`)는 처음부터 맞았고, 그 뒤 2.5개월에 늘어난 것이 전부 이 결의 것이었다. 결합 문서가 밀린 이유([`architecture/README.md`](./architecture/README.md))와 같은 뿌리다.
 
 ## 주요 디렉토리 설명
 

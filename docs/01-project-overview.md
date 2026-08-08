@@ -8,13 +8,20 @@ ShadowFit은 실시간 운동 자세 교정 모바일 애플리케이션입니�
 | 구분 | 기술 |
 |------|------|
 | Frontend | React Native (Expo) |
-| Backend API | Spring Boot 3.4.0 (Java 21) |
+| Backend API | **Spring Boot 3.5.16** (Java 21) — 🔴 4.x 로 올리지 않는다(확정) |
 | AI Server | FastAPI (Python 3.12) — MediaPipe, DTW |
-| Database | MySQL 8.0+ (Docker) |
+| **서비스간 통신** | **gRPC** (Spring ↔ FastAPI 양방향, 내부 토큰 인증) |
+| Database | MySQL 8.0+ (Docker) — **Flyway 로 스키마 이력 추적** |
 | Infra | Docker / Docker Compose |
+| **관측성** | correlation id 전파 + Actuator(**관리포트 9090**) + 커스텀 지표 9종 + **Prometheus·Grafana**(profile `obs`) |
+| **신뢰성** | **아웃박스**(종료 통보 at-least-once) + 멱등 수신 · gRPC deadline · Resilience4j 서킷브레이커 |
 | Pose Estimation | MediaPipe Python (ai-server에서 실행) |
 | AI Feedback | GPT API (운동 종료 후 피드백) |
-| TTS | React Native TTS |
+| TTS | 클라이언트 device TTS(`expo-speech`) — ⚠️ **미구현**([`11-tts-youtube-guide.md`](./11-tts-youtube-guide.md)) |
+
+> 🔄 **2026-08-08 갱신.** 이 표는 `Spring Boot 3.4.0` 으로 멈춰 있었고(실제 **3.5.16**), **gRPC·Flyway·관측성·신뢰성 네 줄이 아예 없었다.** TTS 도 *"React Native TTS"* 라고만 적혀 있어 마치 되는 것처럼 보였다.
+>
+> 📌 **빠져 있던 네 줄이 다 «기능이 아닌 것» 이다.** 이 저장소의 문서 드리프트가 반복적으로 그 방향이다 — 기능 표는 관리되고, **보장·관측·운영은 트리거가 안 울린다**([`02-folder-structure.md`](./02-folder-structure.md)·[`05-database-design.md`](./05-database-design.md) 도 같은 누락이었다).
 
 ## 핵심 기능
 1. **실시간 자세 분석**: MediaPipe를 활용한 관절 포인트 추출 및 싱크로율 계산

@@ -27,12 +27,25 @@ javac --version
 
 ## 2. Spring Boot 프로젝트 생성
 
+> ## 🔴 이 절이 «Boot 4.0.x» 를 시키고 있었다 — 확정된 결정과 반대다 (2026-08-08 정정)
+>
+> 이 문서는 2026-03-30 작성이라 *"Spring Boot: **4.0.x**(최신 안정 버전)"* 로 적혀 있었다. 그런데:
+>
+> | | |
+> |---|---|
+> | 실제 프로젝트 | **`org.springframework.boot` 3.5.16** (`backend/build.gradle:3`) |
+> | 결정 | 🔴 **4.x 로 올리지 않는다** — 확정 사항이고 업그레이드 제안 대상이 아니다 |
+>
+> 이 문서를 그대로 따라 새 모듈을 만들면 **본체와 메이저가 다른 프로젝트가 생긴다.** 버전을 «최신» 으로 고르라는 안내는 **재현 가능한 셋업 문서에 넣을 문구가 아니다** — 시간이 지나면 자동으로 틀린다. 지금은 실제 값을 박아둔다.
+>
+> 📌 이 문서의 나머지(JDK 21, Gradle-Groovy, 패키지명)는 실제와 일치한다.
+
 ### 방법 1: Spring Initializr (권장)
 1. https://start.spring.io/ 접속
 2. 설정:
    - **Project**: Gradle - Groovy
    - **Language**: Java
-   - **Spring Boot**: 4.0.x (최신 안정 버전)
+   - **Spring Boot**: 🔴 **3.5.x — «최신» 을 고르지 말 것** (2026-08-08 정정)
    - **Group**: com.shadowfit
    - **Artifact**: backend
    - **Packaging**: Jar

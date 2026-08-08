@@ -204,19 +204,34 @@ docker compose up -d
 
 ---
 
-## 5. 모니터링·로깅 — **TODO**
+## 5. 모니터링·로깅 — 🔄 절반은 됐다 (2026-08-08 갱신)
 
-현재는 `docker logs <컨테이너명>` 으로 stdout 만 보는 수준. 운영 도입 후보:
+~~현재는 `docker logs <컨테이너명>` 으로 stdout 만 보는 수준.~~ **dev 에는 관측 스택이 있다.** 다만 **prod 구성에는 아직 없다** — 그 결정이 §5-1 이다.
 
-| 영역 | 후보 도구 | 우선순위 |
+| 영역 | 후보 도구 | 상태 (2026-08-08) |
 |------|---------|---------|
-| 애플리케이션 로그 집계 | ELK, Loki | 높음 |
-| 메트릭 (CPU/메모리/RPS) | Prometheus + Grafana | 높음 |
-| Spring Actuator | `actuator/health`, `actuator/metrics` | 높음 (코드만 변경) |
-| AI 서버 헬스 | `python -c urllib...` 컨테이너 헬스체크만 존재 | 중간 |
-| gRPC 채널 상태 | (현재 없음) | 중간 |
-| 알람 | Slack 웹훅, PagerDuty | 결정 필요 |
-| 에러 추적 | Sentry | 중간 |
+| **Spring Actuator** | `actuator/health`·`metrics`·`flyway`·`prometheus` | ✅ **완료.** 🔴 **관리 포트 9090 으로 분리** — 8080 은 외부 노출이라 지표를 열면 공개된다. prod compose 는 9090 을 **매핑하지 않는다** |
+| **메트릭 (RPS·풀·JVM + 커스텀 9종)** | Prometheus + Grafana | ✅ **dev 완료** (compose profile `obs`, 대시보드 JSON 프로비저닝) — [`../monitoring/README.md`](../monitoring/README.md). 🔶 **prod 미적용** (§5-1) |
+| **correlation id 전파** | MDC + `%X{cid}` | ✅ **완료** — HTTP·gRPC 양방향·`@Async`·스케줄러. 두 서비스 로그를 한 요청으로 이어 본다 |
+| 애플리케이션 로그 집계 | ELK, Loki | ❌ 미도입. 로그는 여전히 컨테이너 stdout. **JSON 구조화도 안 했다** — 수집기를 붙일 때 같이 한다 |
+| **AI 서버 지표** | (Prometheus 타깃) | ❌ **의도적 제외.** FastAPI 에 계측이 없어 타깃만 적으면 영원히 DOWN 인 타깃이 생긴다. 🔴 **그래서 관측성이 Spring 만 덮는다** — 서킷브레이커가 회로를 열어도 AI 쪽 상태를 볼 지표가 없다 |
+| AI 서버 헬스 | 컨테이너 헬스체크(`urllib`) | 🔶 그대로 |
+| gRPC 채널 상태 | (없음) | ❌ 미도입 |
+| **MySQL 내부 지표** | mysqld_exporter | ❌ 미도입. 🔴 **우선순위가 올라갔다** — 2026-08-08 부하 실험에서 *"MySQL 이 놀고 있었다"* 를 말하려 했는데 **수집한 적 없는 지표였다.** 없어서 결론을 못 냈다 |
+| 알람 | Slack 웹훅, PagerDuty | ❌ 미도입. 상시 운영이 아니라 울릴 대상이 없다 |
+| 에러 추적 | Sentry | ❌ 미도입 |
+| **판단 기준선(SLO)** | — | 🔴 **없다.** 그래프는 생겼는데 *"얼마면 나쁜가"* 가 없다. 실제로 부하 실험에서 판정 기준으로 SLO 를 쓸 수 없어 임의값(plateau 90%)을 미리 못박아 우회했다 |
+
+### 5-1. 🔶 prod 에 관측 스택을 올릴지 — 미결정
+
+지금은 dev compose 에만 있다. 이 결정은 두 가지와 묶여 있다:
+
+1. **배포 대상 호스트가 없다**(§1). AWS 가 붙는 시점(#4)과 같이 정하는 게 맞다
+2. **9090 매핑 여부.** prod 에서 `/actuator/flyway` 를 HTTP 로 보려면 루프백 매핑(`127.0.0.1:9090:9090`)이 필요하다. 지금은 `docker exec` 뿐이라 §2.3 의 3번째 명령(DB 직접 조회)이 1순위 경로다
+
+> ⚠️ **올릴 때의 함정**: 호스트 RAM 만 올리고 `docker --memory` 캡을 안 풀면 그대로 OOM 이다 — 2026-07-25 EC2 실험에서 `exit 137` 을 두 번 겪었다. **둘을 같이 조정할 것.**
+>
+> ⚠️ **2코어급 인스턴스에 앱과 동거시키면 안 된다.** 관측 스택이 CPU 를 다투면 지표 자체가 오염된다. 2026-08-08 실험은 **obs 를 별 인스턴스**(t4g.small, 시간당 약 30원)로 분리해서 수치와 그래프를 같은 판에서 얻었다
 | 사용자 분석 | (결정 필요) | 낮음 |
 
 특히 AI 콜백 ERROR 로그는 운영자에게 즉시 알람이 가야 데이터 유실을 조기 발견할 수 있음. [`decisions/ai-backend-coupling.md`](./decisions/ai-backend-coupling.md) §분기 A 와 연계.

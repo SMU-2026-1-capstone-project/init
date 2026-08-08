@@ -1,6 +1,6 @@
 # 테스트 가이드
 
-마지막 업데이트: 2026-05-23
+마지막 업데이트: **2026-08-08** (§3 인벤토리 2 → 53개, §7 CI «없음» → 워크플로 7개, §7-1 ai-server 러너 함정 신설). 최초 2026-05-23
 범위: Spring 백엔드의 테스트 실행 방법, 테스트 환경 구성, 현재 보유 테스트 인벤토리.
 
 ---
@@ -50,6 +50,28 @@ testRuntimeOnly 'com.h2database:h2'         // 2026-05-09 추가
 ---
 
 ## 3. 현재 보유 테스트 인벤토리
+
+> 🔴 **아래 트리는 2026-05-23 기준이고 지금은 2개가 아니라 53개다** (2026-08-08 확인). 목록을 일일이 박아두면 또 낡으므로 **세는 방법과 계층만** 적는다.
+>
+> ```bash
+> find backend/src/test -name "*Test*.java" | wc -l     # → 53 (2026-08-08)
+> ```
+>
+> | 계층 | 예 |
+> |---|---|
+> | 서비스 단위 | `SessionServiceTest` · `ExerciseAnalysisServiceTest` · `AdminStatsServiceTest` · `FeedbackLogServiceTest` |
+> | 동시성·정합성 | `DailyLogServiceConcurrencyTest` · 낙관락 충돌 시뮬레이션(§5.3) |
+> | gRPC 결합 | `ExerciseGrpcServiceTest` · `GrpcCorrelationInterceptorTest` · `GrpcObservabilityWiringTest` |
+> | 관측성 | `CorrelationIdFilterTest` · `AsyncMdcPropagationTest` · `SessionMetricsRecordingTest` · `SessionMetricsExportNamesTest` |
+> | 보안 | `JwtUtilTest` · `JwtAuthFilterTest` · `CustomUserDetailsServiceTest` · `AdminAuthorizationIntegrationTest` |
+> | 통합 | `ExerciseSessionFlowIntegrationTest` · `AdminQueryParamBindingErrorTest` |
+> | **측정 장치** | `AdminMemberExplainCaptureTest` · `AdminSessionExplainCaptureTest` · `AdminStatsExplainCaptureTest` — 🔴 **테스트가 아니라 `EXPLAIN` 캡처 도구**다. 실행 계획을 문서에 옮기려고 테스트 껍데기를 쓴 것 |
+>
+> 📌 **확장 과정에서 진짜 버그 5건이 나왔다** — `@Async` self-invocation(비동기가 실제로는 동기 실행), `@OnDelete` 누락 2건(entity-schema drift) 등. 커버리지 % 가 아니라 **이 5건이 테스트 확장의 근거**다([`tasks/27-implementation-gaps.md`](./tasks/27-implementation-gaps.md) §3).
+>
+> ⚠️ **두 종류가 섞여 있다는 것을 알고 볼 것.** 위 «측정 장치» 3종은 깨지면 *"코드가 틀렸다"* 가 아니라 *"측정 대상이 바뀌었다"* 는 뜻이다. `SessionMetricsExportNamesTest` 도 비슷하다 — 깨지면 **대시보드 JSON 도 같이 고쳐야 한다**([`monitoring/README.md`](../monitoring/README.md)).
+
+~~2026-05-23 시점 인벤토리:~~
 
 ```
 backend/src/test/java/com/shadowfit/
@@ -151,16 +173,37 @@ class XxxIntegrationTest {
 
 ---
 
-## 7. CI/CD (현재 상태)
+## 7. CI/CD (현재 상태) — ✅ 2026-08-08 전면 갱신
 
-> **메모**: 현재 명시적 CI 파이프라인 정의(`*.yml` GitHub Actions, GitLab CI 등) 가 저장소에 없는 것으로 보임. `./gradlew test` 가 통과한다는 것은 로컬 수동 검증 단계.
+> ~~**메모**: 현재 명시적 CI 파이프라인 정의(`*.yml` GitHub Actions, GitLab CI 등) 가 저장소에 없는 것으로 보임. `./gradlew test` 가 통과한다는 것은 로컬 수동 검증 단계.~~
 >
-> 다음 작업 후보 (도입 시):
-> - `.github/workflows/test.yml` — PR마다 `./gradlew test` 자동 실행
-> - 커버리지 리포트 (`jacoco`)
-> - PR 머지 시 main 브랜치 빌드 후 Docker 이미지 push
+> 🔴 **낡았다. CI 는 있고, CD 앞단까지 있다.** `.github/workflows/` 실제 내용:
 
-CI 도입은 [`decisions/`](./decisions/) 에 별도 결정 문서로 다룰 만함.
+| 워크플로 | 역할 |
+|---|---|
+| `backend-test.yml` | Spring 테스트. `workflow_call` 로 CD 가 재사용한다 |
+| `ai-server-test.yml` | ai-server(pytest) 테스트. 〃 |
+| **`proto-sync-check.yml`** | 🔴 **`backend/src/main/proto/` ↔ `ai-server/app/proto/` 동기 검사.** 이 저장소의 오래된 약점(proto 수동 동기)을 자동화로 막은 자리 |
+| `cd-backend.yml` · `cd-ai-server.yml` | 테스트 통과한 커밋만 이미지로 → GHCR 푸시. **배포 job 은 미구현**(대상 호스트 없음) |
+| `dependency-submission.yml` · `split-modules.yml` | 의존성 그래프 · 모듈 분리 |
+
+**위 "다음 작업 후보" 3줄의 현재 상태:**
+
+| 후보 | 상태 |
+|---|---|
+| PR마다 `./gradlew test` 자동 실행 | ✅ 됨 (`backend-test.yml`) |
+| 커버리지 리포트(`jacoco`) | ❌ **아직 없다.** 그래서 이 프로젝트는 커버리지 **%를 주장하지 않는다** — "파일 수·계층 커버"까지만 말한다([`tasks/27-implementation-gaps.md`](./tasks/27-implementation-gaps.md) §3의 정직 단서) |
+| main 머지 시 이미지 push | ✅ 됨 (`cd-backend.yml`) |
+
+> 📌 **`proto-sync-check.yml` 이 후보 목록에 없었던 항목이라는 점이 흥미롭다.** 2026-05-23 시점엔 "테스트 자동화"만 생각했는데, 실제로 아픈 곳은 **양쪽 proto 가 갈라지는 것**이었다. 그래도 2026-08-07 에 머지로 계약 불일치 2건이 드러났다(`e027889`) — 검사가 잡는 범위 밖이 남아 있다는 뜻이다.
+>
+> 🔴 **그리고 이 검사가 못 보는 것이 하나 더 있다** — 생성 산출물이 `ai-server/` **루트**와 `app/proto/` 두 곳에 있고 **실제로 로드되는 건 루트 쪽**이다([이슈 #132](https://github.com/Shadowfit/init/issues/132)). `.proto` 두 개가 같아도 **실행되는 pb2 는 다를 수 있다.**
+
+### 7-1. ai-server 테스트 실행 — 러너에 함정이 있다
+
+`ai-server/tests/` 에 **10개** 파일이 있다(`test_auth_middleware` · `test_camera` · `test_correlation` · `test_pose_filter` · `test_reference_builder` · `test_session_reattach` · `test_squat_analyzer` · `test_streaming_depth_metric` · `test_streaming_rep_counting` · `test_sync_feedback`).
+
+⚠️ **로컬에서 그냥 `pytest` 가 안 된다** — `ai-server/.venv` 에는 pytest 가 없고, 시스템 python 에는 grpc 가 없다. **임시 러너를 만들어 돌려야 한다.** CI(`ai-server-test.yml`)는 자기 환경을 구성하므로 이 문제가 없다.
 
 ---
 

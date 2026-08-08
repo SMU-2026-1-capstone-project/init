@@ -1,5 +1,11 @@
 # React Native (Expo) 설치 및 설정 가이드
 
+> 🔄 **2026-08-08 확인 — 이 문서는 «신규 셋업» 절차이고, 지금 저장소는 이미 셋업이 끝나 있다.** 새로 클론했다면 이 문서가 아니라 [`14-how-to-run.md`](./14-how-to-run.md) §4(`npm install`)로 가는 게 맞다.
+>
+> 현재 실제 버전(`frontend/package.json`): **Expo SDK `~54.0.33`** · **React Native `0.81.5`**. 이 문서의 `create-expo-app` 예시는 작성 당시(2026-03) 템플릿 기준이라 **지금 실행하면 다른 버전이 깔린다** — 기존 프로젝트에 맞추려면 `package.json` 을 정본으로 볼 것.
+>
+> ⚠️ 아래 Node 하한(18)은 작성 당시 기준이다. `package.json` 에 `engines` 가 없어 **이 저장소가 요구하는 Node 버전을 코드로 확인할 수 없다** — Expo SDK 54 문서를 따르는 게 맞다.
+
 ## 사전 요구사항
 - **Node.js** 18 이상 (LTS 권장)
 - **npm** 또는 **yarn**

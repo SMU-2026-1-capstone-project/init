@@ -118,10 +118,38 @@ volumes:
 | 컨테이너 | 호스트 노출 | 컨테이너간 통신 |
 |---------|-----------|--------------|
 | `shadowfit-mysql` | 3306 (개발 편의) | `shadowfit-mysql:3306` |
-| `shadowfit-backend` | 8080 (REST), 6565 (gRPC) | 위와 동일 |
-| `shadowfit-ai` | **없음** (`expose` 만) | `shadowfit-ai:8000`, `shadowfit-ai:8585` |
+| `shadowfit-backend` | 8080 (REST), 6565 (gRPC), **`127.0.0.1:9090`(관리·지표, dev 만)** | 위와 동일 |
+| `shadowfit-ai` | ~~**없음** (`expose` 만)~~ → **8000 열림** (분기 H2) | `shadowfit-ai:8000`, `shadowfit-ai:8585` |
+| **`shadowfit-prometheus`** 🆕 | `127.0.0.1:9091` (profile `obs`) | 컨테이너 9090 ↔ 호스트 9091 |
+| **`shadowfit-grafana`** 🆕 | `127.0.0.1:3000` (profile `obs`) | — |
 
-AI 의 8000/8585를 `ports` 로 열면 `INTERNAL_API_TOKEN` 검증이 없는 HTTP 경로(`/health`, `/pose` 등)에 외부에서 직접 접근 가능. 그래서 2026-05-17 부로 `expose` 만 사용.
+~~AI 의 8000/8585를 `ports` 로 열면 `INTERNAL_API_TOKEN` 검증이 없는 HTTP 경로(`/health`, `/pose` 등)에 외부에서 직접 접근 가능. 그래서 2026-05-17 부로 `expose` 만 사용.~~
+
+> ## 🔄 이 정책이 두 번 바뀌었다 (2026-08-08 갱신)
+>
+> **① AI 8000 은 이제 열려 있다.** 2026-05-24 에 **분기 H2(프론트 → AI 직결)** 를 채택하면서 `docker-compose.yml:95` 에 `"8000:8000"` 이 들어왔다. 위 문단이 걱정한 *"인증 없는 HTTP 경로"* 는 `InternalAuthMiddleware` 로 막았다(`ai-server/app/middleware/auth.py`, `main.py:63`). gRPC 8585 는 여전히 `expose` 만이다.
+>
+> 🔴 **그런데 그 인증에 결함이 있다** ([이슈 #134](https://github.com/Shadowfit/init/issues/134)): 미들웨어가 요구하는 토큰이 **Spring↔AI gRPC 인증과 같은 `INTERNAL_API_TOKEN`** 이고, 프론트는 그것을 `EXPO_PUBLIC_INTERNAL_API_TOKEN` 으로 들고 있다. `EXPO_PUBLIC_` 접두는 **앱 번들에 인라인**되므로 **내부 서비스 토큰이 모든 설치본에 들어간다.**
+>
+> **② 관리 포트 9090 과 관측 스택이 생겼다** (2026-08-08). 액추에이터를 8080 에서 분리했다 — `/actuator/prometheus` 를 인증 없이 열어야 하는데 8080 은 외부 노출이라 지표가 공개된다.
+>
+> | | dev | prod |
+> |---|---|---|
+> | 9090 매핑 | ✅ `127.0.0.1:9090` | ❌ **매핑 안 함** (의도) |
+> | Prometheus·Grafana | profile `obs` (기본 미기동) | 없음 (미결) |
+>
+> 🔴 **셋 다 `127.0.0.1:` 을 반드시 붙인다** ([이슈 #128](https://github.com/Shadowfit/init/issues/128)). 인터페이스를 안 적으면 도커는 **모든 인터페이스**에 바인딩하므로 같은 LAN 의 누구나 지표를 무인증으로 읽고, Grafana 는 `.env` 없으면 **admin/admin** 이다. 실제로 도입 당일 그 상태였다.
+>
+> 📌 **여기서 보호 수단이 «인증» 이 아니라 «네트워크 경계» 하나라는 점을 알고 있어야 한다.** `/actuator/prometheus` 는 시큐리티 whitelist 에 있다(필터체인이 두 포트에 공유되기 때문에 넣어야 Prometheus 가 긁는다). **9090 을 어딘가에 노출하면 whitelist 가 그대로 뚫린다.**
+>
+> ### 관측 스택 켜고 끄기
+>
+> ```bash
+> docker compose --profile obs up -d                       # 켜기
+> docker compose --profile obs stop prometheus grafana     # 끄기 (관측만)
+> ```
+>
+> 🔴 **`--profile obs down` 을 쓰지 말 것** ([이슈 #131](https://github.com/Shadowfit/init/issues/131)). `--profile` 은 **올릴 대상을 고르는 옵션이라 내릴 때 범위를 좁히지 않는다** — `--dry-run` 으로 확인한 실제 대상은 **backend·ai·mysql 까지 정지 후 제거**다. 상세: [`../monitoring/README.md`](../../monitoring/README.md).
 
 ## Backend Dockerfile
 

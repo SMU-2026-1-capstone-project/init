@@ -411,7 +411,7 @@ proto의 `int64`와 Spring DTO 타입 정렬 + REST 시대 잔재 제거.
 | **proto** | 없음 |
 | **Spring** | `model/outbox/` 4개 + `repository/outbox/` + `OutboxPublisher`(213줄) 신설. `stopAnalysis` 가 gRPC 직접 호출을 버림 |
 | **AI** | **0줄** — ⚠️ 단 `StopAnalysis` **멱등 가정**에 의존하게 됐다 |
-| **Infra** | `outbox_event` 테이블 |
+| **Infra** | `outbox_events` 테이블 |
 
 **성격**: 🔴 **이 문서의 네 칸 분류가 가장 오해를 부르는 커밋.** "AI 0줄"이라 결합 변경이 아닌 것처럼 보이지만, `StopAnalysis` 의 전달 의미론이 **at-most-once → at-least-once** 로 바뀌었다. **파일이 아니라 계약으로 봐야 한다.**
 
