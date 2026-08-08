@@ -77,7 +77,7 @@ JPA 경로였다면 `ddl-auto: validate` 로 부팅 시 막을 수 있었다(현
 |---|---|
 | 로컬 dev DB | **1대.** 드리프트 관측된 그 DB |
 | CI | `ddl-auto: create-drop` — 매번 엔티티에서 새로 만든다. 마이그레이션과 무관 |
-| EC2 | **상시 인스턴스 없음.** 2026-07-25 풀 사이징 재검증에 쓴 2대는 **실측 후 삭제**([[풀 사이징 AWS 재검증]]) |
+| EC2 | **상시 인스턴스 없음.** 2026-07-25 풀 사이징 재검증 2대 · 2026-08-08 격자 재측정 3대(app·db·obs) 모두 **실측 후 삭제**([[풀 사이징 AWS 재검증]], [`pool-cliff-vs-concurrency.md`](./pool-cliff-vs-concurrency.md)) |
 | 부하테스트 스크래치 DB | `schema.sql` 을 매번 통째로 적용해 만들고 버린다([`measure_admin_filter_explain.sh:72-88`](../../loadtest/measure_admin_filter_explain.sh#L72-L88)) |
 
 → **"누가 어디까지 돌렸는지 모른다"는 지금 1대짜리 문제다.** 다만 [#4 CD](../tasks/28-remaining-work-plan.md#4-cd--배포-문서-713h--59h) 가 남은 4덩어리 중 **착수 2순위**이고, CD 가 붙는 순간 "배포는 자동인데 스키마 적용은 수동"이 되어 **배포마다 재발하는 구조**가 된다.

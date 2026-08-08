@@ -287,6 +287,17 @@ MediaPipe를 GPU로 5ms까지 줄이면 "MediaPipe 지배적이라 gRPC는 신�
 
 ### 2-5. properties/yml의 connection 설정 — 문서화 완료 (2026-07-11)
 
+> 🔴 **이 절은 2026-07-11 스냅샷이고, 아래 "현재 상태"는 더 이상 현재가 아니다** (2026-08-08 확인). 날짜가 박힌 기록이라 본문은 그대로 두고 실제 현재 상태만 여기 적는다.
+>
+> | | 이 절이 적은 것 (07-11) | **실제 (2026-08-08 코드 확인)** |
+> |---|---|---|
+> | 값 | `10` | **`15`** (`application.yml:25`) |
+> | 위치 | `application.properties` | **`application.yml` 에서만** — `application.properties:10` 은 *"yml에서만 관리"* 라는 주석만 남아 있다 |
+>
+> **왜 옮겼나**: 2026-07-25(PR #53)에 15 로 올렸는데, `properties` 에 남아 있던 `10` 이 우선순위(properties > yml)로 **yml 설정을 조용히 무시**하고 있었다 — CodeRabbit 이 Major 로 잡았다. 그래서 한 곳에서만 관리하도록 정리했다.
+>
+> ⚠️ **그리고 "15" 의 근거도 이미 낡았다**: 2026-08-08 격자 재측정에서 pool 5~20 전 구간이 동급으로 나왔고(절벽 없음), 병목이 커넥션이 아니라 **백엔드 CPU** 로 옮겨간 것이 확인됐다 — 원인은 우리가 넣은 다운샘플(R=5)이다. 값을 어떻게 할지는 [`pool-cliff-vs-concurrency.md`](./pool-cliff-vs-concurrency.md) §8 미결. 아래 §2-5 본문의 *"왜 10인가"* 논의는 **두 단계 낡은 상태**로 읽을 것.
+
 **현재 상태**:
 - ~~`application.properties`: `hikari.initialization-fail-timeout`, `hikari.connection-timeout`만 명시. `maximum-pool-size`는 Spring Boot 기본값(10)에 암묵적으로 의존.~~ **✅ `maximum-pool-size=10` 명시 완료** — 실측 근거 주석과 함께 `application.properties`에 추가.
 - `pose-ingest-downsampling.md §5-1(5)`에서 이미 **pool 10→30 재생성 실측** — 개선 0, 오히려 저~중 동시성에서 악화. 결론: "천장은 풀이 아니라 박스(물리 2코어)", HikariCP 스위트스폿(물리코어×2+1≈5) 기준 이미 pool=10이 위.

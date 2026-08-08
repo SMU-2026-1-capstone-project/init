@@ -28,7 +28,15 @@
 |---|---|---|---|---|---|---|
 | I1 | 배치 부분 실패 | 제약 위반·커넥션 끊김 | 🟢 | gRPC 에러 | 🔶 트랜잭션 단위 *(원자성 점검 필요)* | 부분 커밋 시 데이터 구멍 → **배치 원자성·재시도 정책** 명시 |
 | I2 | 중복 배치 적재 | FastAPI 재전송 | 🟢 | — | 🔴 멱등키 없음 — `idx_session_timestamp`가 **non-unique 인덱스**(`schema.sql:86`) | 재전송 시 **중복 행** → `(session_id, timestamp_sec)` **UNIQUE + UPSERT/INSERT IGNORE** |
-| I3 | 적재 폭주 → 풀/버퍼풀 압박 | 고빈도 프레임·동시 세션↑ | 🔴 | 🔴 메트릭 없음 | 🔶 배치 INSERT(감축) | **백프레셔·rate limit·커넥션풀 한도**, 버퍼풀 사이징(§④) |
+| I3 | 적재 폭주 → 풀/버퍼풀 압박 | 고빈도 프레임·동시 세션↑ | 🟡 *(하향)* | 🟢 **`hikaricp_*` 시계열**(2026-08-08) | 🟢 배치 INSERT + **다운샘플 R=5** | **백프레셔·rate limit**. ⚠️ 아래 I3-note |
+
+> **I3-note (2026-08-08 실측 반영)** — 이 행은 세 칸이 다 바뀌었고, 그 근거가 [풀 사이징 격자 실험](../../loadtest/results/pool-cliff-2026-08-08/)이다.
+>
+> - **감지 🔴→🟢**: `hikaricp_connections_pending`·`_active`·`_acquire_seconds_max`·`_timeout_total` 을 시계열로 본다([`monitoring/README.md`](../../monitoring/README.md)). 실험에서 실제로 이 네 개가 답을 줬다
+> - **Blast 🔴→🟡**: c=100 부하에서 **풀은 포화됐지만(`pending` 96, 대기 7.28초) 아무도 죽지 않았다**(`timeout_total` 0). 커넥션당 작업이 짧아 30초 한도에 못 미치고 큐가 빠진다 — **포화 ≠ 붕괴**
+> - **완화 🔶→🟢**: 다운샘플 R=5 가 배치당 25행 → 5행으로 줄이면서 **병목이 DB 쓰기에서 백엔드 CPU 로 옮겨갔다**(백엔드 p90 128% vs MySQL 53%)
+>
+> ⚠️ **그래서 이 행의 갭도 성격이 바뀐다.** "커넥션풀 한도"는 이제 레버가 아니다(pool 5~20 전 구간 동급). 폭주가 실제로 아플 자리는 **앱 CPU** 이고, 거기엔 아직 백프레셔도 rate limit 도 없다. 🔴 **버퍼풀 사이징(§④)은 이 경로에서 근거가 사라졌다** — MySQL 이 놀고 있었다.
 
 ## 3. 세션 종료 통보 — `stopAnalysis` (afterCommit gRPC) ⭐ 헤드라인
 
