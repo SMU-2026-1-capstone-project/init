@@ -7,9 +7,23 @@
 **기본으로는 뜨지 않는다.** compose profile 뒤에 있다.
 
 ```bash
-docker compose --profile obs up -d          # 켜기
-docker compose --profile obs down           # 끄기 (데이터는 볼륨에 남는다)
+docker compose --profile obs up -d                          # 켜기
+docker compose --profile obs stop prometheus grafana        # 끄기 (관측만)
+docker compose --profile obs rm -sf prometheus grafana      # 컨테이너까지 지우기
 ```
+
+> 🔴 **`--profile obs down` 을 쓰지 말 것** ([#131](https://github.com/Shadowfit/init/issues/131)). `--profile` 은 **올릴 대상을 고르는 옵션이고 내릴 대상을 좁히지 않는다.** `down` 은 compose 파일의 서비스를 통째로 내린다 — `--dry-run` 으로 확인한 실제 대상:
+>
+> ```
+> shadowfit-backend  Stopping → Removing      ← 피시험 대상
+> shadowfit-ai       Stopping → Removing
+> mysql              Stopping → Removing      ← 데이터 볼륨은 남지만 컨테이너는 사라진다
+> grafana · prometheus  Stopping → Removing
+> ```
+>
+> 이 명령이 쓰이는 상황이 하필 **실험 도중**(아래 경고 참조)이라, 문서대로 치면 **그래프만 끄려다 측정 대상까지 죽는다.** 게다가 `down` 은 컨테이너를 제거하므로 판을 처음부터 다시 세워야 한다. 서비스 이름을 명시해야 범위가 실제로 좁혀진다 — 위 두 명령은 `--dry-run` 에서 grafana·prometheus **둘만** 건드리는 것을 확인했다.
+
+데이터는 어느 쪽이든 볼륨에 남는다. 볼륨까지 버리려면 `docker volume rm` 을 따로 쓴다.
 
 | | 주소 | 비고 |
 |---|---|---|
