@@ -1,6 +1,28 @@
 # 기능 로드맵 — 요구사항 ↔ 코드 매핑
 
-마지막 업데이트: 2026-05-23
+> ## 🔴 이 문서는 2.5개월 낡았다 — 특히 «프론트 열» 이 전부 틀렸다 (2026-08-08 확인)
+>
+> 아래 표는 2026-05-23 기준이고, 프론트 칸을 대부분 **🟥 호출 없음**으로 적었다. **지금은 부른다.**
+>
+> | 이 문서가 적은 것 | 2026-08-08 실제 |
+> |---|---|
+> | 운동 시작 — 🟥 호출 없음 | ✅ `frontend/app/(tabs)/exercise.tsx:89` — `exercisesService.startSession` |
+> | 운동 중단 — 🟥 호출 없음 | ✅ 같은 파일 `:102` — `endSession`. ⚠️ **단 엔드포인트가 다르다** — 이 문서는 `PUT /exercises/sessions/{id}/stop` 을 가리키는데 프론트가 부르는 건 `PATCH /sessions/{id}/end` (`exercisesService.ts:23`) |
+> | 프레임 송신 — 🟥 카메라 프레임 송신 X | ✅ `exercise.tsx:175` — `aiService.detectPose` (AI 직결, 분기 H2). 🔴 그 경로에 [#134](https://github.com/Shadowfit/init/issues/134) 결함 있음 |
+> | 결과 표시 — 🟥 표시 X | ✅ `frontend/app/report/[id].tsx` 존재 |
+> | 데이터 계층 (`services/`·`types/`) | ✅ **7개 전부 존재** — [`../handoff/frontend-data-layer.md`](../handoff/frontend-data-layer.md) 완료 |
+> | 관리자 페이지 «대부분 미구현» (§1-4) | ✅ **백엔드는 닫혔다** (2026-08-08). 관리자 **프론트**는 미착수 — [`28-remaining-work-plan.md`](./28-remaining-work-plan.md) §3 |
+>
+> **여전히 맞는 것** (확인함):
+> - **개인화 TTS 발화 🟥** — `expo-speech`·`Speech.speak` 사용 0건. 게다가 **AI 송신 경로도 없다**(`ReportFeedbackBatch` 미호출, [`../handoff/ai-tts-feedback-batch.md`](../handoff/ai-tts-feedback-batch.md))
+> - **운동 세트 자동 구분 🟥** — 스키마에 set 개념 없음. 📌 다만 `SetSummaryFormatter.java:14` 가 `FIXED_SET_COUNT = 1` 로 **"1세트 x N회"를 고정 문구로 만들어** 화면에는 세트가 있는 것처럼 보인다
+> - **세션 생명주기 처리 🟥** — 이탈·재부착은 여전히 프론트에 없다([`../handoff/frontend-session-lifecycle.md`](../handoff/frontend-session-lifecycle.md), `reattach` 호출 0건)
+>
+> ⚠️ **전수 재감사는 하지 않았다.** 위 표는 프론트 칸 중 **명백히 뒤집힌 것**만 확인한 결과다. 나머지 행(캘린더·주간요약·관절 오버레이·타이머 등)은 화면 파일이 존재하는 것까지만 봤고 **연동 여부는 확인하지 않았다** — 이 문서를 근거로 "남은 일"을 세면 과대가 된다.
+>
+> 📌 **이 문서를 상속한 문서들도 같이 낡았다** — [`21-task-assignment.md`](./21-task-assignment.md)(2026-08-08 부분 동기화됨) · [`22-backend-tasks-detail.md`](./22-backend-tasks-detail.md) · [`24-semester2-plan.md`](./24-semester2-plan.md). 백엔드 잔여의 **현재 정본은 [`28-remaining-work-plan.md`](./28-remaining-work-plan.md)**, AI 잔여는 [`30-ai-remaining-work.md`](./30-ai-remaining-work.md) 다.
+
+마지막 업데이트: 2026-05-23 (⚠️ 상태 확인만 **2026-08-08**, 표 본문은 미갱신)
 근거: 발표 자료 *요구사항 정의* (HO-PT 6쪽) + 현재 코드 상태
 목적: PPT 의 검정/회색 마킹과 실제 구현 상태가 어디서 일치·불일치하는지 한눈에 보기, 그리고 **스택별로 무엇이 남았는지** 정리.
 

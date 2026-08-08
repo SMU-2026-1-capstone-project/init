@@ -1,6 +1,26 @@
 # Backend 2학기 10주 계획
 
-마지막 업데이트: 2026-05-24
+> ## 🔄 출발점 가정이 이미 달라졌다 (2026-08-08 대조)
+>
+> 이 문서 스스로 적어둔 전제 — *"**이 문서는 가정 기반 계획**입니다. 방학 진척에 따라 출발점이 달라지면 주차 매핑이 밀리거나 압축됨. **Week 1에 실제 진척 점검 후 조정**"* — 이 정확히 발동할 상황이다.
+>
+> **Week 1 «운영 기반» 으로 잡아둔 것 중 두 개가 이미 끝났다:**
+>
+> | 이 문서의 배치 | 2026-08-08 실제 |
+> |---|---|
+> | **OP-04 Flyway 도입** — Week 1, 4h | ✅ **2026-08-01 완료** (#115, `f7e52d4`) |
+> | 관측성·SLO·Resilience4j — [`26-vacation…`](./26-vacation-semester2-portfolio-plan.md) §4 가 **9월** 로 배치 | ✅ **deadline·서킷브레이커 2026-07-11 / 관측 스택 2026-08-08 완료.** ⚠️ **SLO 만 여전히 없다** |
+> | ~~BE-01 프록시~~ 🗑️ 폐기 | ✅ 폐기가 맞았다 — 프론트가 AI 직결로 붙었다(`aiService.ts`). 🔴 단 그 경로에 [#134](https://github.com/Shadowfit/init/issues/134) |
+> | BE-05 (관리자 통계) | ✅ **백엔드 완료** — `/admin/stats/overview` 외 3종. 관리자 **프론트**는 미착수 |
+> | BE-09 (세트 도입) — Week 5, AI-03 와 동시 | ❌ 미구현. 📌 다만 `SetSummaryFormatter.java:14` 가 `FIXED_SET_COUNT = 1` 로 **"1세트 x N회"를 고정 출력**해 화면상으로는 세트가 있는 듯 보인다 |
+>
+> 🔴 **그래서 «10주» 라는 분량 전제부터 다시 봐야 한다.** 이 문서는 방학에 BE-01~03 정도가 끝나 있는 상태를 가정했는데, 실제로는 **운영 기반(Flyway·CD·관측)과 관리자 백엔드까지 앞당겨졌고**, 대신 계획에 없던 것(outbox·재부착·풀 사이징 실측)이 들어왔다. 순수하게 남은 기능은 **Goal·패턴·추천·세트 + 관리자 프론트 + 프론트 생명주기**다.
+>
+> ⚠️ **밀린 것은 기능이 아니라 ③ 버킷(글·면접·CS 매핑)이다** — [`26-vacation-semester2-portfolio-plan.md`](./26-vacation-semester2-portfolio-plan.md) §5-1. 이 문서가 *"2학기엔 새 깊이 작업을 벌이지 말 것"* 이라고 못박았는데, **그 전제는 «방학에 ③이 끝나 있다» 였다.**
+>
+> 📌 백엔드 잔여의 현재 정본은 [`28-remaining-work-plan.md`](./28-remaining-work-plan.md), AI 는 [`30-ai-remaining-work.md`](./30-ai-remaining-work.md).
+
+마지막 업데이트: 2026-05-24 · 출발점 대조: **2026-08-08**
 범위: **백엔드(Spring) 작업자 1명 시점**의 2학기 10주 계획. 프론트엔드·AI·인프라는 다른 트랙(또는 다른 사람)이라 가정하고, 백엔드가 챙길 작업과 그 작업이 다른 트랙에 의존하는 지점만 다룬다.
 연관: [`20-feature-roadmap.md`](./20-feature-roadmap.md), [`21-task-assignment.md`](./21-task-assignment.md), [`22-backend-tasks-detail.md`](./22-backend-tasks-detail.md)
 

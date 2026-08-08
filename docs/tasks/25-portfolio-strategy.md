@@ -1,6 +1,21 @@
 # 포폴·진로 전략 회고
 
-마지막 업데이트: 2026-05-24
+> ## 📌 이 문서는 «원류» 이고, 실행 정본은 그 뒤 문서들로 갈라졌다 (2026-08-08)
+>
+> 2026-05-24 에 세운 전략 회고이고, 그 방향은 **여전히 유효하다**(측정→최적화→판단→글로 증명, 라이브 시그널 중시). 다만 그 뒤 2.5개월간 **더 구체적인 문서로 분화**했으니 실행 근거는 아래를 본다:
+>
+> | 목적 | 정본 |
+> |---|---|
+> | 포폴 방향·로드맵 (쓰기축/읽기축) | [`../decisions/db-portfolio-roadmap.md`](../decisions/db-portfolio-roadmap.md) |
+> | 경쟁 포폴 대비 «채울 것 vs 밀 것» | [`../decisions/portfolio-benchmark.md`](../decisions/portfolio-benchmark.md) |
+> | 대외 서사 한 장 | [`../portfolio/portfolio-narrative.md`](../portfolio/portfolio-narrative.md) |
+> | 방학·2학기 시간 배분과 실제 진척 대조 | [`26-vacation-semester2-portfolio-plan.md`](./26-vacation-semester2-portfolio-plan.md) §5 |
+>
+> 🔴 **이 문서가 세운 판단 중 하나는 2026-08-08 에 근거가 강해졌다.** *"AI가 코드를 빨리 짜주면 순수 구현은 싸지고, 차별화는 측정→최적화→**판단**으로 이동한다"* — 같은 날 풀 사이징 재측정에서 **우리가 넣은 처방(다운샘플 R=5)이 우리 벤치마크의 근거(pool=15)를 무효화한 것**을 잡아냈다. 구현이 아니라 *"내 최적화가 내 측정을 낡게 했을 수 있다"* 를 의심한 판단이 산출물이었다([`../decisions/pool-cliff-vs-concurrency.md`](../decisions/pool-cliff-vs-concurrency.md)).
+>
+> ⚠️ **반대로 «라이브 시그널» 항목은 부채가 쌓였다** — 이 문서가 승부처로 지목한 *"자기 코드 100% 이해"* 의 실행처가 [`29-ai-code-verification.md`](./29-ai-code-verification.md) 인데 **2026-08-01 이후 멈춰 있고, 그 사이 검증 대상은 늘었다.**
+
+마지막 업데이트: 2026-05-24 · 정본 분화 안내: **2026-08-08**
 범위: 졸업작품을 백엔드 신입 포폴로 어떻게 발전시킬지 논의한 결과 정리. 결정·미결·산출물·다음 액션.
 연관: [`20-feature-roadmap.md`](./20-feature-roadmap.md), [`21-task-assignment.md`](./21-task-assignment.md), [`24-semester2-plan.md`](./24-semester2-plan.md), [`../architecture/ai-backend-monthly-log.md`](../architecture/ai-backend-monthly-log.md)
 

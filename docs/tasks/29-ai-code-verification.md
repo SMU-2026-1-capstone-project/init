@@ -1,7 +1,26 @@
 # AI 작성 코드 전수 검증 로그
 
 작성: 2026-08-01 · 갱신: 2026-08-01 (#79 등록, #78 원인 보강)
-상태: **진행 중** — 어제(2026-07-31) 머지분 중 Spring 재부착 경로·ai-server 경로·#72·#73 완료, 테스트 3종 상세 미완
+상태: **진행 중 (2026-08-01 이후 멈춤)** — 어제(2026-07-31) 머지분 중 Spring 재부착 경로·ai-server 경로·#72·#73 완료, 테스트 3종 상세 미완
+
+> ## 🔄 2026-08-08 — 일주일간 진척 없음, 그런데 검증 대상이 그 사이 늘었다
+>
+> 표(§ 아래)의 두 줄이 **여전히 ⬜** 다: *"테스트 3종 내용 상세(552줄) — 이름만 훑음"*, *"ai-server `test_session_reattach.py`(144줄)"*.
+>
+> 🔴 **그리고 이 문서가 검증하기로 한 범위가 그 뒤 일주일 동안 커졌다.** 2026-08-01~08 사이 머지·작업된 것 중 AI(Claude)가 작성한 코드:
+>
+> | 영역 | 미검증 |
+> |---|---|
+> | 관측 스택 (`monitoring/`, 대시보드 JSON, `SessionMetricsExportNamesTest`) | ⬜ |
+> | Flyway 마이그레이션 (#115) | ⬜ |
+> | CD 앞단 워크플로 (#4) | ⬜ |
+> | 관리자 API 3종 + 인덱스 통합 (#110) | ⬜ |
+> | 대표 프레임 ㄹ안 + `is_correct` 삭제 (`d4cfca7`) | ⬜ |
+> | 부하 rig 재생성기·스윕 스크립트 | ⬜ |
+>
+> ⚠️ **그리고 이 «검증 부채» 는 그 자체로 근거가 있다** — 같은 주에 대시보드 지표 3종이 20배 틀리게 계산되던 것(#127)과 «포트 경계로 보호한다» 면서 경계가 없던 것(#128)이 **리뷰에서** 잡혔다. 즉 **검증하면 나온다는 것이 그 주에 실증됐다.**
+>
+> 📌 이 문서의 상위 계획([`26-vacation-semester2-portfolio-plan.md`](./26-vacation-semester2-portfolio-plan.md) §6)이 리스크로 적어둔 문장이 지금 상태를 정확히 서술한다: *"AI 코드 미이해 → 라이브 질문 붕괴 → ③에 전수 검증 시간 사수(8월)"*. **방학이 3주 남았다.**
 목적: [`26-vacation-semester2-portfolio-plan.md`](./26-vacation-semester2-portfolio-plan.md) §3 **8월 항목 ③ "내 AI 코드 전수 검증"** 의 실행 기록
 연관: [`28-remaining-work-plan.md`](./28-remaining-work-plan.md) §6 · [`../decisions/session-resume-and-ai-state.md`](../decisions/session-resume-and-ai-state.md)
 
