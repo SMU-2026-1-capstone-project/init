@@ -26,6 +26,12 @@
 
 ## 4. 남겨둔 검증 작업(코드 아님, 실험)
 
+- [ ] 🔶 **세션 분산도 스윕** (신규 2026-08-09, 보류 — 사용자 결정) — 4차 실측이 **부하가 몇 개 세션에 흩어져 있느냐가 결론을 통째로 바꾼다**는 것을 보였다: 단일 세션 220 RPS ↔ 100세션 649 RPS, 락 대기 8,056 ↔ 0~3([`../../loadtest/results/commit-count-2026-08-09/`](../../loadtest/results/commit-count-2026-08-09/), [#166](https://github.com/Shadowfit/init/issues/166)). **그런데 1 과 100 사이가 통째로 비어 있다.**
+  - 무엇을 모르나: 세션 수를 1 → 2 → 5 → 20 → 100 으로 흔들면 **어디서 경합이 풀리는지**. 지금은 «단일은 나쁘고 100은 괜찮다» 만 안다
+  - 왜 값이 있나: 실제 DAU 1,000 이 어느 쪽에 가까운지 모르는 채 *"다세션이 현실적"* 이라고만 쓰고 있다. **«100세션이면 충분히 분산» 이라는 것도 측정한 적 없다**
+  - 비용: EC2 4대 · 5판 · 30분 남짓 (rig 는 `commit-count-2026-08-09/` 에 그대로 있다 — `gen_batch_multi.py --sessions` 범위만 바꾸면 된다)
+  - ⚠️ **같이 고칠 것**: 이번 rig 는 판별 시간 창을 TSV 에 안 남겨 ghz 리포트에서 역산해야 했고(`analyze_metrics.py`), `buffer_pool_dirty_pages` 를 스크레이프에 안 넣어 «판 순서 효과» 의 새 후보를 검증 못 했다
+
 - [x] **소량 DELETE 반복 시 파편화 실험** — **완료(2026-08-09)**, [`loadtest/results/delete-fragmentation-2026-08-09/`](../../loadtest/results/delete-fragmentation-2026-08-09/README.md).
   `outbox_events` 행 모양으로 200,000행 고정 · 25,000행/사이클. **FIFO 삭제는 누적 없음**(3회전 내내 1,348페이지,
   재구축본보다 11% 조밀). **구멍 뚫기 삭제는 계단 한 번**(1,348 → 1,668, +24%) 후 평탄이고,
@@ -87,6 +93,7 @@
 | 외부 통합 다양성(OAuth2·S3·푸시 등) | §3 | 착수 여부 미결정 — 후보 비교 완료([`external-integration-candidates.md`](../decisions/external-integration-candidates.md)), 선택은 미확정 |
 | AI→Spring 콜백 방향 장애 보호 | §3 | 의도적 스코프 제외 |
 | 소량 DELETE 파편화 실험 | §4 | ✅ 완료(2026-08-09) — FIFO 는 누적 없음, 구멍 뚫기는 계단 1회(+24%) 후 평탄. `pose_data` 행 모양·파티션 상호작용은 미검증 |
+| **세션 분산도 스윕** | §4 | 🔶 **보류(2026-08-09, 사용자 결정)** — 1 과 100 사이가 비어 있다. rig 는 그대로 있어 재개 비용이 낮다 |
 | 다른 운동 종목 확장 / 베타 테스트 | §5 | 2학기 범위 |
 
 이와 별개로 **보강 3축 중 남은 착수 순서(outbox vs 회복탄력성)**가 최상위 미결정 — [`portfolio-narrative.md §7`](../portfolio/portfolio-narrative.md).

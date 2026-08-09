@@ -124,6 +124,12 @@ echo "-- 남은 키페어 --"
 aws ec2 describe-key-pairs --query "KeyPairs[].KeyName" --output text
 echo "-- 남은 보안그룹 (default 제외) --"
 aws ec2 describe-security-groups --query "SecurityGroups[?GroupName!='default'].[GroupId,GroupName]" --output text
+# 이 둘은 이 실험이 만들지 않지만, 남아 있으면 과금된다. 확인 비용이 0 이라 같이 본다
+# — «내가 만든 것» 이 아니라 «남아 있는 것» 을 묻는 절이므로 대상을 좁히지 않는다.
+echo "-- 스냅샷 (직접 만든 것) --"
+aws ec2 describe-snapshots --owner-ids self --query "Snapshots[].[SnapshotId,VolumeSize]" --output text
+echo "-- Elastic IP (인스턴스에 안 붙어 있으면 시간당 과금) --"
+aws ec2 describe-addresses --query "Addresses[].[PublicIp,AllocationId]" --output text
 echo
 # §5 가 이 스크립트의 **최종 판정**이다. 태그·순서·요청 성공 여부와 무관하게, 계정에
 # 남아 있는 것이 있으면 과금된다. 2026-08-09 실행에서 «인스턴스 4대 running» 을 잡은 것도
@@ -131,7 +137,9 @@ echo
 REMAIN=$( { aws ec2 describe-instances --query "Reservations[].Instances[?State.Name!='terminated'].InstanceId" --output text
             aws ec2 describe-volumes --query "Volumes[].VolumeId" --output text
             aws ec2 describe-key-pairs --query "KeyPairs[].KeyName" --output text
-            aws ec2 describe-security-groups --query "SecurityGroups[?GroupName!='default'].GroupId" --output text; } | tr -d '[:space:]')
+            aws ec2 describe-security-groups --query "SecurityGroups[?GroupName!='default'].GroupId" --output text
+            aws ec2 describe-snapshots --owner-ids self --query "Snapshots[].SnapshotId" --output text
+            aws ec2 describe-addresses --query "Addresses[].AllocationId" --output text; } | tr -d '[:space:]')
 if [ -n "$REMAIN" ]; then
   echo "🔴 위에 남은 것이 있다 — 과금이 계속된다. 지우고 다시 확인할 것." >&2
   exit 1
