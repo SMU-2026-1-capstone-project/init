@@ -84,6 +84,25 @@ public class ExerciseAnalysisService {
         return circuitBreakerRegistry.circuitBreaker("aiServer");
     }
 
+    /**
+     * AI 가 «내려갔다» 가 아니라 «이 요청을 거절했다» 인가.
+     *
+     * <p>둘을 가르는 이유는 서킷브레이커 집계다. 서킷은 <b>상대의 건강</b>을 재는 장치인데,
+     * 요청이 틀려서 거절당한 것은 상대가 멀쩡하다는 증거에 가깝다. 같이 세면 관리자가 잘못
+     * 켠 종목(이슈 #147) 하나 때문에 서킷이 열려 <b>정상 종목까지 막힌다</b>.
+     *
+     * <p>{@code INVALID_ARGUMENT} 하나만 본다. {@code UNAVAILABLE}·{@code DEADLINE_EXCEEDED}
+     * 등은 그대로 건강 신호로 남겨야 한다 — 넓게 잡으면 진짜 장애를 서킷이 못 보게 된다.
+     *
+     * <p>{@code io.grpc.Status} 를 import 하지 않고 완전한 이름을 쓰는 이유 — 이 파일은 이미
+     * 세션 상태 {@code com.shadowfit.model.exercise.Status} 를 import 하고 있어 단순 이름이
+     * 충돌한다.
+     */
+    private boolean isClientRejection(Throwable t) {
+        return t instanceof StatusRuntimeException e
+                && e.getStatus().getCode() == io.grpc.Status.Code.INVALID_ARGUMENT;
+    }
+
     // 토큰 fastapi에게 보내고, 데드라인을 걸어 hang 상태도 onError(DEADLINE_EXCEEDED)로
     // 귀결시킨다 — 이래야 서킷브레이커가 hang도 실패로 기록할 수 있음.
     private ExerciseServiceGrpc.ExerciseServiceStub getAuthenticatedStub() {
@@ -248,8 +267,18 @@ public class ExerciseAnalysisService {
                 }
                 @Override
                 public void onError(Throwable t) {
-                    cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, t);
-                    log.error("gRPC 통신 장애: {}", t.getMessage());
+                    // INVALID_ARGUMENT 는 «AI 가 아프다» 가 아니라 «이 요청이 틀렸다» 다.
+                    // ai-server 가 분석기 없는 종목을 거절할 때 이 코드로 온다(이슈 #147).
+                    // 서킷에 실패로 기록하면 관리자가 잘못 켠 종목을 사용자가 몇 번 시도하는
+                    // 것만으로 서킷이 열려(sliding=10·min=5·threshold=50%) **정상 스쿼트 세션까지
+                    // 10초간 막힌다.** 건강 신호가 아니므로 권한만 반납하고 집계에서 뺀다.
+                    if (isClientRejection(t)) {
+                        cb.releasePermission();
+                        log.error("AI 가 요청을 거절했다 (세션 {}): {}", sessionId, t.getMessage());
+                    } else {
+                        cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, t);
+                        log.error("gRPC 통신 장애: {}", t.getMessage());
+                    }
                     // 이 한 번의 호출이 실패한 것(장애가 죽 이어져 서킷이 OPEN 되기 전이라도)도
                     // 사용자 입장에선 응답 없는 세션이므로 동일하게 즉시 FAILED 처리.
                     //
