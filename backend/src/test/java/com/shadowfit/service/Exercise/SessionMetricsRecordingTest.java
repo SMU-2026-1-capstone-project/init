@@ -190,7 +190,7 @@ SessionMetricsRecordingTest {
             when(sessionService.markAsFailedIfStillInProgress(eq(7L), any(LocalDateTime.class))).thenReturn(true);
             stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
 
-            DispatchOutcome outcome = service.stopAnalysis(7L);
+            DispatchOutcome outcome = service.stopAnalysis(7L, false);
 
             // 재시도해도 AI 는 그 세션을 영영 모른다 — 발행기가 행을 FAILED 로 종결해야 한다.
             // SENT 로 보면 실제 결과 유실이 "전송 성공"으로 위장된다.
@@ -216,7 +216,7 @@ SessionMetricsRecordingTest {
 
             // 예외가 새어나가면 발행기가 행 상태를 못 정해 PROCESSING 으로 남고, lock 만료까지
             // 불필요하게 붙들린다 — 세션 전이 실패가 전달 결과 판정을 오염시키면 안 된다.
-            DispatchOutcome outcome = service.stopAnalysis(10L);
+            DispatchOutcome outcome = service.stopAnalysis(10L, false);
 
             assertThat(outcome).isEqualTo(DispatchOutcome.TERMINAL_FAILED);
             assertThat(conflicts("ai-session-missing", "yield")).isEqualTo(1.0);
@@ -229,7 +229,7 @@ SessionMetricsRecordingTest {
         void stopAnalysis_success_recordsOkOnly() {
             stubStopResponse(true, "분석 중단 및 결과 보고 예약 완료.");
 
-            DispatchOutcome outcome = service.stopAnalysis(8L);
+            DispatchOutcome outcome = service.stopAnalysis(8L, false);
 
             assertThat(outcome).isEqualTo(DispatchOutcome.SENT);
             assertThat(stopResults("ok")).isEqualTo(1.0);
@@ -238,12 +238,51 @@ SessionMetricsRecordingTest {
         }
 
         @Test
+        @DisplayName("회수분 재송신의 success=false 는 세션을 걷어내지 않는다 — 중복 배달이다 (#152)")
+        void stopAnalysis_sessionMissing_onRedelivery_doesNotFailSession() {
+            stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
+
+            // 아웃박스는 at-least-once — 발행기가 송신 직후·결과 기록 전에 죽으면 lease 만료 후
+            // 같은 StopAnalysis 가 다시 나간다. AI 수신부는 멱등하지 않아(첫 호출이 상태를 제거)
+            // 두 번째 호출은 «반드시» success=false 다. 그 값을 유실로 읽으면 정상 완료 중인
+            // 세션을 FAILED 로 뒤집고 거짓 실패 지표를 남긴다.
+            DispatchOutcome outcome = service.stopAnalysis(7L, true);
+
+            // 재시도는 여전히 무의미하다 — 행은 종결한다.
+            assertThat(outcome).isEqualTo(DispatchOutcome.TERMINAL_FAILED);
+
+            // 핵심: 세션을 건드리지 않는다.
+            verify(sessionService, never())
+                    .markAsFailedIfStillInProgress(anyLong(), any(LocalDateTime.class));
+            assertThat(transitions(Status.FAILED, "ai-session-missing")).isZero();
+
+            // 사건 자체는 남긴다. 다만 «유실» 지표와 섞지 않는다 — 섞으면 정상 중복 배달이 유실
+            // 카운터를 부풀려, 진짜 유실이 났을 때 구분할 수단이 사라진다.
+            assertThat(stopResults("session-missing-redelivery")).isEqualTo(1.0);
+            assertThat(stopResults("session-missing")).isZero();
+        }
+
+        @Test
+        @DisplayName("첫 배달의 success=false 는 그대로 걷어낸다 — #152 수정이 원 동작을 지우지 않았다")
+        void stopAnalysis_sessionMissing_onFirstDelivery_stillFailsFast() {
+            when(sessionService.markAsFailedIfStillInProgress(eq(13L), any(LocalDateTime.class)))
+                    .thenReturn(true);
+            stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
+
+            assertThat(service.stopAnalysis(13L, false)).isEqualTo(DispatchOutcome.TERMINAL_FAILED);
+
+            assertThat(stopResults("session-missing")).isEqualTo(1.0);
+            assertThat(stopResults("session-missing-redelivery")).isZero();
+            assertThat(transitions(Status.FAILED, "ai-session-missing")).isEqualTo(1.0);
+        }
+
+        @Test
         @DisplayName("success=false 여도 세션이 이미 종료 상태면(false) 전이 지표는 올리지 않는다")
         void stopAnalysis_sessionMissing_alreadyFinished_recordsNoTransition() {
             when(sessionService.markAsFailedIfStillInProgress(eq(9L), any(LocalDateTime.class))).thenReturn(false);
             stubStopResponse(false, "진행 중인 세션을 찾을 수 없습니다.");
 
-            assertThat(service.stopAnalysis(9L)).isEqualTo(DispatchOutcome.TERMINAL_FAILED);
+            assertThat(service.stopAnalysis(9L, false)).isEqualTo(DispatchOutcome.TERMINAL_FAILED);
 
             // 사건 자체는 기록돼야 한다 — 세션 전이가 없었다고 유실이 없었던 건 아니다
             assertThat(stopResults("session-missing")).isEqualTo(1.0);
@@ -255,7 +294,7 @@ SessionMetricsRecordingTest {
         void stopAnalysis_circuitOpen_retriesInsteadOfDropping() {
             circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
 
-            DispatchOutcome outcome = service.stopAnalysis(11L);
+            DispatchOutcome outcome = service.stopAnalysis(11L, false);
 
             // 이전 설계는 여기서 그냥 return 해 통보를 통째로 버렸다(E1 의 두 번째 유실 경로).
             // 하필 AI 가 죽어 통보가 가장 많이 쌓이는 구간이라 피해가 컸다.
@@ -271,7 +310,7 @@ SessionMetricsRecordingTest {
             when(blockingStub.stopAnalysis(any(StopRequest.class)))
                     .thenThrow(new StatusRuntimeException(io.grpc.Status.fromCode(Code.UNAVAILABLE)));
 
-            DispatchOutcome outcome = service.stopAnalysis(12L);
+            DispatchOutcome outcome = service.stopAnalysis(12L, false);
 
             assertThat(outcome).isEqualTo(DispatchOutcome.RETRY);
             assertThat(stopResults("grpc-error")).isEqualTo(1.0);

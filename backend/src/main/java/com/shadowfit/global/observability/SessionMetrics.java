@@ -26,7 +26,14 @@ public class SessionMetrics {
     /** pose_data 배치 프레임 수 분포. tags: stage(received/stored) — 다운샘플 비율 관측용 */
     private static final String POSE_BATCH_FRAMES = "shadowfit.pose.batch.frames";
 
-    /** AI 분석 중단(StopAnalysis) 응답의 업무 결과. tags: outcome(ok/session-missing/grpc-error/skipped-circuit-open) */
+    /**
+     * AI 분석 중단(StopAnalysis) 응답의 업무 결과.
+     * tags: outcome(ok/session-missing/session-missing-redelivery/grpc-error/error/skipped-circuit-open)
+     *
+     * <p>{@code session-missing} 과 {@code session-missing-redelivery} 는 AI 응답이 같지만(둘 다
+     * {@code success=false}) 뜻이 다르다 — 앞은 «결과 유실», 뒤는 «회수분 재송신이라 첫 송신이
+     * 이미 처리됐을 수 있음»이다 (이슈 #152). 나누지 않으면 정상 중복 배달이 유실 지표를 부풀린다.
+     */
     private static final String AI_STOP_RESULT = "shadowfit.ai.stop.result";
 
     /** 아웃박스 발행 결과. tags: outcome(sent/retry/failed) */

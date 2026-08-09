@@ -40,6 +40,8 @@ import com.shadowfit.model.outbox.OutboxStatus;
 import com.shadowfit.repository.outbox.OutboxEventRepository;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -256,7 +258,7 @@ class SessionServiceTest {
 
             // 이전 설계는 afterCommit 에서 stopAnalysis 를 직접 불렀다. 이제 요청 경로엔 외부 호출이
             // 아예 없다 — 사용자는 AI 응답을 기다리지 않고, 송신 실패가 요청에 영향을 주지도 않는다.
-            verify(analysisService, never()).stopAnalysis(session.getId());
+            verify(analysisService, never()).stopAnalysis(eq(session.getId()), anyBoolean());
 
             List<OutboxEvent> events = stopEventsFor(session.getId());
             assertThat(events).hasSize(1);

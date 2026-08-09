@@ -320,6 +320,67 @@ class ExerciseSessionFlowIntegrationTest {
         }
     }
 
+    /**
+     * 중복 {@code StopAnalysis} 가 진행 중인 세션을 FAILED 로 떨어뜨리는가 (이슈 #152).
+     *
+     * <p>이슈는 «의심» 으로 열렸고 심각도가 두 갈래였다 — 늦게 온 완료 콜백이 FAILED 를 COMPLETED 로
+     * <b>덮으면 경미</b>(잠깐 뒤집힘 + 거짓 지표), <b>안 덮으면 심각</b>(정상 운동이 실패로 확정).
+     * 아래 두 테스트가 그 갈림길을 재현으로 닫는다. 결론은 <b>경미</b>다 — 두 순서 모두에서 최종
+     * 상태가 COMPLETED 이고 운동 기록도 남는다.
+     *
+     * <p>그래서 이 이슈의 실질 피해는 «상태» 가 아니라 <b>지표와 창(window)</b> 이다. 거짓
+     * {@code FAILED} 전이가 집계되고, 그 짧은 사이 조회하면 실패로 보인다. 그쪽 수정은
+     * {@code SessionMetricsRecordingTest} 의 회수분 분기 테스트가 담당한다.
+     */
+    @Nested
+    @DisplayName("중복 StopAnalysis — 순서가 갈려도 최종 상태는 COMPLETED (#152)")
+    class DuplicateStopAnalysis {
+
+        @Test
+        @DisplayName("걷어내기가 먼저 와도 늦은 완료 콜백이 COMPLETED 로 덮는다")
+        void failFast_thenCallback_endsCompleted() {
+            Session session = createInProgressSession();
+            Long sessionId = session.getId();
+
+            // 중복 배달 → AI 는 세션을 이미 지웠으므로 success=false → failSessionFast 가 하는 일
+            assertThat(sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now()))
+                    .isTrue();
+            assertThat(sessionRepository.findById(sessionId).orElseThrow().getStatus())
+                    .isEqualTo(Status.FAILED);
+
+            // 첫 배달이 촉발한 계산이 끝나 완료 콜백이 뒤늦게 도착
+            @SuppressWarnings("unchecked")
+            StreamObserver<SessionCompleteResponse> obs = mock(StreamObserver.class);
+            grpcService.completeAnalysis(sampleComplete(sessionId, 7, 88.0), obs);
+
+            Session result = sessionRepository.findById(sessionId).orElseThrow();
+            assertThat(result.getStatus()).isEqualTo(Status.COMPLETED);
+            assertThat(result.getTotalReps()).isEqualTo(7);
+        }
+
+        @Test
+        @DisplayName("완료 콜백이 먼저 오면 걷어내기는 아무 일도 하지 않는다")
+        void callback_thenFailFast_staysCompleted() {
+            Session session = createInProgressSession();
+            Long sessionId = session.getId();
+
+            @SuppressWarnings("unchecked")
+            StreamObserver<SessionCompleteResponse> obs = mock(StreamObserver.class);
+            grpcService.completeAnalysis(sampleComplete(sessionId, 7, 88.0), obs);
+            assertThat(sessionRepository.findById(sessionId).orElseThrow().getStatus())
+                    .isEqualTo(Status.COMPLETED);
+
+            // 이제 중복 배달의 걷어내기가 도착 — IN_PROGRESS 가 아니므로 false 를 돌려주고 끝난다.
+            // 이 false 가 곧 «전이 지표를 올리지 않는다» 의 근거다(failSessionFast 의 if 조건).
+            assertThat(sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now()))
+                    .isFalse();
+
+            Session result = sessionRepository.findById(sessionId).orElseThrow();
+            assertThat(result.getStatus()).isEqualTo(Status.COMPLETED);
+            assertThat(result.getTotalReps()).isEqualTo(7);
+        }
+    }
+
     @Nested
     @DisplayName("세션 없을 때 콜백 — 안전 처리")
     class CallbackForUnknownSession {

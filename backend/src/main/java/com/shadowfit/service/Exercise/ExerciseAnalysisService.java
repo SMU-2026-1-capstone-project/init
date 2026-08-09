@@ -425,9 +425,15 @@ public class ExerciseAnalysisService {
      * <p>처리량 상한은 "1 / AI 응답시간"이다. 부족해지면 논블로킹 재설계가 아니라 <b>발행기 다중화</b>가
      * 먼저다 — {@code SKIP LOCKED} 가 이미 행 단위 분배를 지원한다.
      *
+     * @param possiblyRedelivered 이 행이 <b>이미 한 번 나갔을 수 있는</b> 회수분인가 (이슈 #152).
+     *        아웃박스는 at-least-once 라 발행기가 송신 직후·결과 기록 전에 죽으면 lease 만료 후
+     *        같은 {@code StopAnalysis} 가 다시 나간다. AI 수신부는 멱등하지 않아서(첫 호출이 세션
+     *        상태를 제거한다) <b>두 번째 호출은 반드시 {@code success=false}</b> 로 답한다. 그 값이
+     *        "AI 가 세션을 잃었다"가 아니라 "첫 호출이 이미 정상 처리했다"는 뜻일 수 있으므로,
+     *        회수분에서는 세션을 FAILED 로 걷어내지 않는다. 아래 분기 참고.
      * @return 발행기가 행 상태로 옮길 결과 3분류. 예외를 던지지 않는다 — 모든 실패가 분류돼 나온다.
      */
-    public DispatchOutcome stopAnalysis(Long sessionId) {
+    public DispatchOutcome stopAnalysis(Long sessionId, boolean possiblyRedelivered) {
         try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
             log.info("AI 서버 분석 중단 요청 전송 - sessionId: {}", sessionId);
 
@@ -474,6 +480,20 @@ public class ExerciseAnalysisService {
                 sessionMetrics.aiStopResult("ok");
                 log.info("AI 서버 응답: {}", response.getMessage());
                 return DispatchOutcome.SENT;
+            }
+
+            // 회수분이면 이 success=false 를 «유실» 로 읽을 수 없다 (이슈 #152). 두 가지가 겹쳐
+            // 있는데 응답만으로는 안 갈린다:
+            //   (가) 첫 송신이 이미 정상 처리됐다 → 완료 콜백이 오는 중이다. 걷어내면 안 된다
+            //   (나) AI 가 재시작 등으로 세션을 정말 잃었다 → 걷어내는 게 맞다
+            // (가) 에서 걷어내면 정상 세션이 FAILED 로 잠깐 뒤집히고, 무엇보다 «실패» 지표가
+            // 거짓으로 올라간다. (나) 를 놓쳐도 타임아웃 스케줄러가 여전히 잡으므로 — 빠른 실패라는
+            // 최적화만 포기하는 것이지 안전망이 사라지지는 않는다. 그래서 안 걷어내는 쪽이 안전하다.
+            if (possiblyRedelivered) {
+                sessionMetrics.aiStopResult("session-missing-redelivery");
+                log.info("회수분 재송신에 세션 상태 없음 — 첫 송신이 이미 처리됐을 수 있어 세션을 "
+                        + "건드리지 않는다 (sessionId: {}, 응답: {})", sessionId, response.getMessage());
+                return DispatchOutcome.TERMINAL_FAILED;
             }
 
             sessionMetrics.aiStopResult("session-missing");
