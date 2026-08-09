@@ -4,6 +4,7 @@ import com.shadowfit.dto.login.LogOutRequestDto;
 import com.shadowfit.dto.login.LoginRequestDto;
 import com.shadowfit.dto.login.LoginResponseDto;
 import com.shadowfit.dto.login.MemberRequestDto;
+import com.shadowfit.dto.login.ReissueRequestDto;
 import com.shadowfit.dto.onboarding.OnboardingDto;
 import com.shadowfit.dto.onboarding.OnboardingRequestDto;
 import com.shadowfit.global.error.BusinessException;
@@ -37,10 +38,23 @@ public class MemberController {
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
+    @Operation(summary="토큰 재발급",
+            description = "리프레시 토큰으로 액세스·리프레시 토큰을 재발급한다 (이슈 #135). "
+                    + "액세스 토큰이 만료된 상태로 호출되는 것이 정상 경로라 인증을 요구하지 않는다 — "
+                    + "신원은 리프레시 토큰 자신의 서명에서 나온다.")
+    @PostMapping("/reissue")
+    public ResponseEntity<LoginResponseDto> reissue(@Valid @RequestBody ReissueRequestDto dto){
+        return ResponseEntity.ok(memberService.reissue(dto));
+    }
+
     @Operation(summary="로그아웃",description = "로그아웃을 할 수 있음")
     @PostMapping("/logout")
-    public ResponseEntity<Void> Logout(@Valid @RequestBody LogOutRequestDto dto){
-        memberService.logout(dto);
+    public ResponseEntity<Void> Logout(@Valid @RequestBody LogOutRequestDto dto,
+                                       @AuthenticationPrincipal CustomUserDetails userDetails){
+        // 지울 대상을 **본문의 refresh token 이 아니라 인증된 본인**으로 정한다
+        // (decisions/token-lifecycle.md §1-1-ㄴ). 재발급(§4-2)과는 사정이 반대다 — 이쪽은
+        // 인증을 통과해서 요청자가 이미 있는데도 본문을 믿고 있었다.
+        memberService.logout(dto, userDetails.getMember().getEmail());
         return ResponseEntity.noContent().build();
     }
 
