@@ -1,7 +1,9 @@
 package com.shadowfit.global.error;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -101,6 +103,43 @@ public class GlobalExceptionHandler {
         // getResourcePath() 는 앞 슬래시가 없다("no-such-path"). 로그를 경로로 grep 하려면 붙여야 한다.
         log.warn("No handler for {} /{}", e.getHttpMethod(), e.getResourcePath());
         return buildResponse(ErrorCode.RESOURCE_NOT_FOUND);
+    }
+
+    /**
+     * ⚠️ 2026-08-10 추가(이슈 #180): 요청 본문이 없거나 JSON 이 깨지면
+     * {@code HttpMessageNotReadableException} 이 온다. 핸들러가 없으면 아래
+     * {@code handleUnexpectedException} 이 받아 <b>400 대신 500</b> 이 나갔다.
+     * 29~33행(403→500) · 53~61행(400→500) · 84~97행(404→500) 에 이은
+     * <b>같은 형태의 네 번째 사례</b>다.
+     *
+     * <p><b>범위가 넓다</b> — 특정 컨트롤러가 아니라 <b>본문을 받는 모든 엔드포인트</b>가 해당된다.
+     * 실측(2026-08-10)에서 본문 없음 · 깨진 JSON · 필드 타입 불일치 셋 다 500 이었고,
+     * 그중 {@code POST /member/login} 은 whitelist 라 <b>인증 없이</b> 칠 수 있었다. 즉
+     * 로그 볼륨을 외부에서 통제할 수 있는 상태였다 — 84~97행이 "로그가 오탐 채널이 된다"고
+     * 적은 것과 같은 문제지만, 경로 오타로 <i>우연히</i> 발생하던 그쪽과 달리 이건 확정적이다.
+     *
+     * <p>🔴 <b>파서 메시지는 응답에도 로그에도 싣지 않는다.</b> 44행({@code @Valid} 실패)이 필드별
+     * 메시지를 응답에 실어주는 것은 <b>우리가 쓴 문구</b>라 안전하지만, Jackson 의 메시지는
+     * <b>클라이언트가 보낸 값을 그대로 담는다.</b> 실측(PR #181):
+     *
+     * <pre>Cannot deserialize value of type `java.lang.Long` from String "CANARY-...": not a valid ...</pre>
+     *
+     * <p>처음엔 이걸 {@code log.warn} 에 실었는데, 그러면 <b>응답에서 막은 유출이 로그로 옮겨갈
+     * 뿐이다</b> — 로그는 수집·보관·열람 주체가 더 넓어 오히려 노출면이 크다. 그래서 예외 <b>타입</b>과
+     * 요청 좌표만 남긴다. {@code MalformedRequestBodyTest} 가 카나리 문자열로 이 계약을 고정한다.
+     *
+     * <p>URI 를 남기는 것은 안전하다 — 본문 파싱은 <b>핸들러가 이미 매칭된 뒤</b>에 일어나므로
+     * 경로는 우리가 매핑한 라우트이고, 경로변수 타입 불일치는 여기가 아니라 53~61행으로 간다.
+     * 84~97행이 같은 이유로 경로를 남기고 있다("어디를 찌르고 있나"를 알아야 하므로).
+     *
+     * <p>WARN 인 이유: 클라이언트가 보낸 본문이 잘못된 것이지 서버 결함이 아니다(84~97행과 같은 판단).
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponseDto> handleUnreadableBody(HttpMessageNotReadableException e,
+                                                                 HttpServletRequest request) {
+        log.warn("Malformed request body on {} {} ({})", request.getMethod(), request.getRequestURI(),
+                e.getMostSpecificCause().getClass().getSimpleName());
+        return buildResponse(ErrorCode.INVALID_INPUT_VALUE);
     }
 
     @ExceptionHandler(Exception.class)
