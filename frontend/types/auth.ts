@@ -22,7 +22,8 @@ export interface SignupRequest {
   email: string;
   password: string;
   sex: Sex;
-  role: UserRole;
+  // role 은 없다 — 서버가 USER 로 고정한다 (이슈 #138).
+  // 보내도 서버가 무시하지만, 타입에 두면 "정할 수 있는 값"으로 읽힌다.
 }
 
 // 백엔드 LogOutRequestDto - accessToken/refreshToken 둘 다 NotBlank

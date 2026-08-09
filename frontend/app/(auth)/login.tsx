@@ -223,7 +223,6 @@ function SignupForm() {
         email: email.trim(),
         password,
         sex,
-        role: 'USER',
       });
     } catch (e: any) {
       console.error('[signup] status=', e.response?.status, 'data=', e.response?.data);
