@@ -1,0 +1,30 @@
+# D0 — ALGORITHM=INPLACE 거절 여부 (probe.sh [1])
+# 소형 복제본 pose_data_probe 에 던진 결과. 측정치가 아니라 전제 확인이다.
+
+## 던진 문장
+ALTER TABLE pose_data_probe ALGORITHM=INPLACE, LOCK=NONE PARTITION BY RANGE (UNIX_TIMESTAMP(created_at)) (
+  PARTITION p2026_01 VALUES LESS THAN (UNIX_TIMESTAMP('2026-02-01 00:00:00')),
+  PARTITION p2026_02 VALUES LESS THAN (UNIX_TIMESTAMP('2026-03-01 00:00:00')),
+  PARTITION p2026_03 VALUES LESS THAN (UNIX_TIMESTAMP('2026-04-01 00:00:00')),
+  PARTITION p2026_04 VALUES LESS THAN (UNIX_TIMESTAMP('2026-05-01 00:00:00')),
+  PARTITION p2026_05 VALUES LESS THAN (UNIX_TIMESTAMP('2026-06-01 00:00:00')),
+  PARTITION p2026_06 VALUES LESS THAN (UNIX_TIMESTAMP('2026-07-01 00:00:00')),
+  PARTITION p2026_07 VALUES LESS THAN (UNIX_TIMESTAMP('2026-08-01 00:00:00')),
+  PARTITION p2026_08 VALUES LESS THAN (UNIX_TIMESTAMP('2026-09-01 00:00:00')),
+  PARTITION p2026_09 VALUES LESS THAN (UNIX_TIMESTAMP('2026-10-01 00:00:00')),
+  PARTITION p2026_10 VALUES LESS THAN (UNIX_TIMESTAMP('2026-11-01 00:00:00')),
+  PARTITION p2026_11 VALUES LESS THAN (UNIX_TIMESTAMP('2026-12-01 00:00:00')),
+  PARTITION p2026_12 VALUES LESS THAN (UNIX_TIMESTAMP('2027-01-01 00:00:00')),
+  PARTITION p2027_01 VALUES LESS THAN (UNIX_TIMESTAMP('2027-02-01 00:00:00')),
+  PARTITION pfuture  VALUES LESS THAN MAXVALUE
+);
+
+## 서버 응답 (rc=1, errno=1845)
+mysql: [Warning] World-writable config file '/etc/mysql/conf.d/charset.cnf' is ignored.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+ERROR 1845 (0A000) at line 1: ALGORITHM=INPLACE is not supported for this operation. Try ALGORITHM=COPY.
+
+## [1b] LOCK 절 없이 ALGORITHM=INPLACE 만 (rc=1, errno=1845)
+mysql: [Warning] World-writable config file '/etc/mysql/conf.d/charset.cnf' is ignored.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+ERROR 1845 (0A000) at line 1: ALGORITHM=INPLACE is not supported for this operation. Try ALGORITHM=COPY.
