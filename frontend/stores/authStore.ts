@@ -25,6 +25,9 @@ interface AuthState {
   logout: () => Promise<void>;
   // 토큰 만료 등으로 서버 호출 없이 로컬 세션만 정리할 때 사용
   forceLogout: () => Promise<void>;
+  // api.ts 의 401 인터셉터가 재발급에 성공하면 호출한다 (이슈 #135).
+  // SecureStore 쓰기는 인터셉터가 이미 했고, 여기서는 메모리 상태만 맞춘다.
+  applyReissuedTokens: (accessToken: string, refreshToken: string) => void;
   restoreSession: () => Promise<void>;
   // 온보딩 완료 화면에서 PATCH 후 호출
   markOnboardingCompleted: () => void;
@@ -172,6 +175,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isLoading: false,
     });
   },
+
+  // 재발급 성공 — 세션은 그대로고 토큰만 바뀐다 (이슈 #135).
+  //
+  // isAuthenticated·user·onboardingCompleted 를 **건드리지 않는 것이 요점**이다. 재발급은
+  // 로그인이 아니라 «이어서 쓰는 것» 이라, 여기서 상태를 다시 세우면 화면이 재마운트되거나
+  // 라우팅 가드가 한 번 튄다 — 사용자에게는 «갑자기 깜빡였다» 로 보인다.
+  applyReissuedTokens: (accessToken, refreshToken) =>
+    set({ accessToken, refreshToken }),
 
   markOnboardingCompleted: () => set({ onboardingCompleted: true }),
 

@@ -4,6 +4,7 @@ import type {
   LoginResponse,
   SignupRequest,
   LogoutRequest,
+  ReissueRequest,
 } from '@/types/auth';
 
 // 백엔드 MemberController prefix: /member
@@ -22,4 +23,11 @@ export const authService = {
   // 회원 탈퇴
   deleteAccount: (email: string) =>
     api.delete<void>(`/member/${encodeURIComponent(email)}`),
+
+  // 토큰 재발급 (이슈 #135).
+  //
+  // ⚠️ 이걸 직접 부르지 마라 — api.ts 의 401 인터셉터가 자동으로 부른다. 손으로 부르면
+  // 회전이 두 번 돌아 서로의 토큰을 무효화한다. 여기 두는 것은 인터셉터가 쓰기 위해서다.
+  reissue: (data: ReissueRequest) =>
+    api.post<LoginResponse>('/member/reissue', data),
 };
