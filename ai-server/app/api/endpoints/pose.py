@@ -6,6 +6,7 @@ rep 1회가 완성될 때마다 Spring에 PoseData 묶음을 콜백한다.
 
 import json
 import logging
+import time
 
 import cv2
 
@@ -16,7 +17,12 @@ from app.core.analyzer_registry import get_analyzer
 from app.core.angle_calculator import extract_angles
 from app.core.mediapipe_detector import get_detector
 from app.grpc import spring_client
-from app.grpc.session_state import PerRepFrame, get_registry
+from app.grpc.session_state import (
+    MIN_FRAME_INTERVAL_SEC,
+    PerRepFrame,
+    accept_frame,
+    get_registry,
+)
 from app.models.pose import Landmark, PoseRequest, PoseResponse
 from app.utils.image_utils import base64_to_image
 
@@ -45,6 +51,12 @@ def detect_pose(req: PoseRequest):
     `async def`로 두면 이벤트 루프를 점유해 다른 요청을 굶긴다. FastAPI는
     `def` 핸들러를 자동으로 threadpool에서 실행하므로 그대로 두면 된다.
     """
+    # 유입 «도착» 시각. 반드시 디코딩·추론 **앞** 에서 찍는다 — 뒤에서 찍으면 상한이 재는 것이
+    # 클라 전송 간격이 아니라 MediaPipe 추론까지 끝난 완료 간격이 된다. 그 경우 프레임당 처리가
+    # 상한(300ms)을 넘는 기기에서는 클라가 아무리 빨리 보내도 전부 수락되고, 이 상한이 막으려던
+    # rep 소실이 그대로 재발한다. `test_frame_rate_limit` 의 핸들러 회귀 테스트가 이 순서를 고정한다.
+    received_at = time.monotonic()
+
     image_bgr = base64_to_image(req.image)
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
@@ -70,6 +82,30 @@ def detect_pose(req: PoseRequest):
     if analyzer is None:
         return PoseResponse(
             success=False, message=f"미지원 운동: {state.exercise_type}"
+        )
+
+    # 유입 속도 상한 (#143 ㄱ-2). 상태머신에 넣기 **전** 에 자른다 — 판정 상수가 전부 프레임
+    # 개수라, 클라가 빨라지면 실효 시간이 짧아져 정상 rep 이 «휴식» 으로 버려진다.
+    #
+    # 랜드마크는 그대로 돌려준다. 여기서 막는 것은 «판정에 들어가는 프레임» 이지 클라의 스켈레톤
+    # 오버레이가 아니다. 즉 화면은 클라가 보내는 속도 그대로 부드럽고, 판정만 상한을 탄다.
+    # MediaPipe 추론 자체를 아끼는 것은 별건이다(#92) — 그건 유입 «양» 의 문제이고 여기는 «속도» 다.
+    if not accept_frame(state, received_at):
+        if state.dropped_frame_count == 1:
+            # 세션당 한 번만 남긴다. 드롭은 매 프레임 일어날 수 있어서 그대로 두면 로그가 잠긴다.
+            # 누적 수치는 StopAnalysis 의 요약 로그가 담당한다.
+            logger.warning(
+                "[#143] 프레임 유입이 상한(%.0fms)을 넘어 초과분을 드롭한다 (session=%s). "
+                "클라 전송 간격이 규약(exercise.tsx intervalMs=330)보다 빨라졌다는 뜻이다 — "
+                "판정 상수 4/15/60 은 3fps 에서만 검증돼 있다.",
+                MIN_FRAME_INTERVAL_SEC * 1000,
+                req.session_id,
+            )
+        return PoseResponse(
+            success=True,
+            landmarks=landmarks,
+            message="유입 속도 상한 초과 — 분석 스킵",
+            rep_count=state.rep_count,
         )
 
     angles, smoothed_knee_angle, rep_event = analyzer.process_frame(state, landmarks)
