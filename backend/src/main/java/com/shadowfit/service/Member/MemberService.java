@@ -51,6 +51,20 @@ public class MemberService{
      */
     @Value("${member.withdrawal.active-workout-idle-seconds:180}")
     private long activeWorkoutIdleSeconds;
+
+    /**
+     * 재발급 재시도를 «탈취» 가 아니라 «응답을 못 받은 클라» 로 봐주는 유예 (이슈 #135).
+     *
+     * <p><b>근거는 클라의 HTTP timeout 이다</b> — {@code frontend/services/api.ts:35} 의
+     * {@code timeout: 10000}. 클라가 포기했지만 서버는 이미 회전을 끝냈을 수 있는 구간이 정확히
+     * 그만큼이고, 그 뒤 클라가 구본으로 다시 오면 유예가 없을 때 강제 로그아웃이 된다.
+     *
+     * <p>⚠️ <b>그 이상은 근거가 없어서 안 늘렸다</b>([[feedback_no_arbitrary_threshold_values]]).
+     * 지금 프론트에는 재시도 로직이 <b>아예 없다</b> — 401 을 받으면 곧바로 {@code forceLogout} 이다
+     * ({@code api.ts:63-70}). 재발급 흐름을 붙이면서 재시도 간격·횟수가 정해지면 이 값을 다시
+     * 유도해야 한다. 그때까지 이 10초는 «타임아웃 1회분» 이고 그 이상을 주장하지 않는다.
+     */
+    private static final long REISSUE_RETRY_GRACE_SECONDS = 10;
     //로그인 로직
     @Transactional
     public LoginResponseDto login(LoginRequestDto dto){
@@ -66,22 +80,107 @@ public class MemberService{
                 .role(member.getRole())
                 .build();
 
-        String accessToken=jwtUtil.createAccessToken(info);
-        String refreshToken=jwtUtil.createRefreshToken(info);
         UserRole role = member.getRole();
 
-        RefreshToken refreshTokenEntity= RefreshToken.builder()
-                .memberId(member.getId())
-                .token(refreshToken)
+        // 「1인 1세션」 — 기존 행이 있으면 **교체**한다 (이슈 #136, decisions/token-lifecycle.md §2 확정).
+        //
+        // 예전에는 매번 새 빌더를 save() 했다. PK 가 member_id 이고 @GeneratedValue 가 없어
+        // Spring Data JPA 가 persist 가 아니라 merge 로 보내므로, 중복 키 예외가 아니라
+        // **조용한 UPDATE** 였다 — 앞 기기 토큰이 실패 없이 사라졌다. 동작은 같지만 그게
+        // 사고가 아니라 정책이라는 것이 코드에 안 보였다.
+        //
+        // ⚠️ rotate() 가 아니라 replaceForNewLogin() 이다. 차이는 rotated_at 을 **비운다**는 것이고,
+        // 그게 없으면 앞 기기 토큰이 «직전 세대 + 유예 안» 에 걸려 재발급 시 새 세션의 토큰을
+        // 받아간다 — 1인 1세션을 세워놓고 정반대로 동작하게 된다.
+        RefreshToken entity = refreshTokenRepository.findById(member.getId())
+                .orElseGet(() -> RefreshToken.builder().memberId(member.getId()).build());
+
+        // 토큰 안의 ver 과 행의 token_version 이 **같아야** 한다. 그래서 다음 세대 번호를 먼저
+        // 계산해 토큰에 싣고, 엔티티가 행을 그 값으로 올린다.
+        String refreshToken = jwtUtil.createRefreshToken(info, entity.getTokenVersion() + 1);
+        entity.replaceForNewLogin(refreshToken);
+        refreshTokenRepository.save(entity);
+
+        String accessToken = jwtUtil.createAccessToken(info);
+        return new LoginResponseDto(accessToken, refreshToken, role);
+    }
+
+    /**
+     * refresh token 으로 access·refresh 를 재발급한다 (이슈 #135).
+     *
+     * <p><b>신원 근거는 refresh JWT 의 서명이다.</b> 이 경로는 access 가 만료된 뒤에 불리는 것이
+     * 정상이라 인증 필터를 통과하지 못하고 {@code SecurityContext} 가 비어 있다. 서명이 유효하고
+     * subject 가 그 회원이면 그것이 곧 소유권 증명이다 — 위조가 불가능하기 때문이다
+     * ({@code decisions/token-lifecycle.md} §4-2).
+     *
+     * <p><b>세 갈래로 갈린다:</b>
+     * <ol>
+     *   <li>저장된 토큰과 같다 → 정상 회전</li>
+     *   <li>직전 세대 + 유예 안 → <b>응답을 못 받은 클라의 재시도</b>로 본다. 회전하지 않고 현재
+     *       토큰을 다시 준다 (§ {@code REISSUE_RETRY_GRACE_SECONDS})</li>
+     *   <li>그 외 → 폐기된 구본이 왔다 → 세션을 끊는다</li>
+     * </ol>
+     *
+     * <p>3번의 판정 근거가 «token 불일치» 하나인 것에 주의. 세대 번호는 여기 안 쓴다 — 서명이
+     * 유효한데 저장된 것과 다른 토큰은 <b>정의상</b> 우리가 발급했던 구본이다.
+     *
+     * <p>⚠️ <b>3번은 «탈취» 와 «낡은 기기» 를 구분하지 못한다.</b> 1인 1세션이라 행이 하나뿐이고,
+     * 둘 다 «옛 토큰이 도착했다» 로 똑같이 보인다. 보수적인 쪽(끊는다)을 택했다 — 사용자는 이미
+     * «다른 기기에서 로그인하면 로그아웃된다» 를 전제로 하므로 재로그인이 정책 안에 있고, 반대로
+     * 관대하게 두면 탐지를 넣은 의미가 사라진다. 뒤집으려면 이 분기 하나만 바꾸면 된다.
+     */
+    @Transactional
+    public LoginResponseDto reissue(ReissueRequestDto dto) {
+        String presented = dto.getRefreshToken();
+
+        // 서명·만료 검증이 먼저다. 여기서 걸리면 DB 를 볼 이유가 없다.
+        if (!jwtUtil.isValidToken(presented)) {
+            throw new BusinessException(ErrorCode.INVALID_TOKEN);
+        }
+
+        Member member = memberRepository.findByEmail(jwtUtil.getUserEmail(presented))
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        RefreshToken entity = refreshTokenRepository.findById(member.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+
+        CustomUserInfoDto info = CustomUserInfoDto.builder()
+                .email(member.getEmail())
+                .role(member.getRole())
                 .build();
-        refreshTokenRepository.save(refreshTokenEntity);
-        return new LoginResponseDto(accessToken,refreshToken,role);
+        LocalDateTime now = LocalDateTime.now();
+
+        // (2) 재시도 — 회전하지 않는다. 여기서 또 회전하면 «응답 유실 → 재시도» 가 반복될 때
+        //     세대만 계속 올라가고, 정작 클라는 어느 토큰이 유효한지 영영 못 맞춘다.
+        if (!entity.getToken().equals(presented)
+                && entity.isWithinRetryGrace(jwtUtil.getTokenVersion(presented), now, REISSUE_RETRY_GRACE_SECONDS)) {
+            return new LoginResponseDto(jwtUtil.createAccessToken(info), entity.getToken(), member.getRole());
+        }
+
+        // (3) 폐기된 구본 — 세션을 끊는다.
+        if (!entity.getToken().equals(presented)) {
+            refreshTokenRepository.deleteByMemberId(member.getId());
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_REUSED);
+        }
+
+        // (1) 정상 회전
+        String rotated = jwtUtil.createRefreshToken(info, entity.getTokenVersion() + 1);
+        entity.rotate(rotated, now);
+        refreshTokenRepository.save(entity);
+
+        return new LoginResponseDto(jwtUtil.createAccessToken(info), rotated, member.getRole());
     }
 
     //로그아웃 로직
     @Transactional
-    public void logout(LogOutRequestDto dto){
-        refreshTokenRepository.deleteByToken(dto.getRefreshToken());
+    public void logout(LogOutRequestDto dto, String requesterEmail){
+        // 본문의 refresh token 으로 지우던 것을 **요청자 기준**으로 바꿨다
+        // (decisions/token-lifecycle.md §1-1-ㄴ). 예전 방식은 남의 토큰 값을 알면 남의 행을
+        // 지울 수 있었고, 반대로 그 행이 이미 새 로그인으로 교체됐으면 **0행을 지우고 성공했다** —
+        // 로그아웃했다고 응답하는데 서버에는 세션이 남는 쪽이 실제로 더 위험하다.
+        Member requester = memberRepository.findByEmail(requesterEmail)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        refreshTokenRepository.deleteByMemberId(requester.getId());
         String token = dto.getAccessToken();
         if(token.startsWith("Bearer ")){
             token = token.substring(7);

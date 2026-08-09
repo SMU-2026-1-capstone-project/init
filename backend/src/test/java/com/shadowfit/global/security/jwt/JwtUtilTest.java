@@ -40,10 +40,14 @@ class JwtUtilTest {
     @Test
     @DisplayName("refresh token도 정상 생성·검증됨")
     void createRefreshToken_isValid() {
-        String token = jwtUtil.createRefreshToken(userInfo);
+        String token = jwtUtil.createRefreshToken(userInfo, 3L);
 
         assertThat(jwtUtil.isValidToken(token)).isTrue();
         assertThat(jwtUtil.getUserEmail(token)).isEqualTo("test@test.com");
+        // ver claim 은 유예 판정의 재료다 (이슈 #135). 서명 안에 들어가므로 클라가 못 바꾼다.
+        assertThat(jwtUtil.getTokenVersion(token)).isEqualTo(3L);
+        // access token 에는 안 붙는다 — 회전 대상이 아니라 비교할 상대가 없다. 0 으로 읽힌다.
+        assertThat(jwtUtil.getTokenVersion(jwtUtil.createAccessToken(userInfo))).isZero();
     }
 
     @Test

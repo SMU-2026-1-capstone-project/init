@@ -170,6 +170,38 @@ services:
     networks:
       - shadowfit-net
 
+  # MySQL 내부 지표. 2026-08-09 추가 — **이전에는 «의도적으로 뺐다» 고 적혀 있었다.**
+  #
+  # 뺐던 근거는 두 개였고 둘 다 로컬 단일 박스 전제였다: ① loadtest/ 스크립트가 SHOW STATUS 로
+  # 직접 떠 오니 중복이다 ② 실험 중 컨테이너가 하나 는다. 2026-08-08 분리 배포(EC2 3대)에서
+  # 둘 다 무너졌다 — 원격 자동 스윕에서는 SHOW STATUS 를 **뜨는 사람이 없었고**, 수집된 지표가
+  # 전부 job="shadowfit-backend" 라 MySQL 쪽을 아예 못 봤다. 그 결과 "MySQL 은 놀고 백엔드가
+  # 탄다" 는 **수집한 적 없는 지표에 근거한 문장**이 나왔고 철회됐다.
+  # (docs/decisions/commit-count-and-mysql-metrics.md §3-1)
+  #
+  # ② 는 obs 를 분리한 순간 무의미해졌다 — 이 컨테이너는 피시험 대상(DB·앱)이 아니라
+  # 관측 쪽에 뜬다. 로컬에서도 obs 프로파일 뒤에 있어 기본으로는 안 뜬다.
+  mysqld-exporter:
+    image: prom/mysqld-exporter:v0.16.0
+    container_name: shadowfit-mysqld-exporter
+    profiles: ["obs"]
+    restart: unless-stopped
+    command:
+      - --mysqld.address=shadowfit-mysql:3306
+      - --mysqld.username=exporter
+    environment:
+      # 🔴 shadowfit 계정을 재사용하지 않는다. 이 계정에 필요한 권한(PROCESS·REPLICATION
+      # CLIENT·performance_schema SELECT)은 앱 계정이 가지면 안 되는 것이고, 반대로 앱
+      # 계정의 DML 권한은 익스포터가 가질 이유가 없다. 계정 생성은 mysql/exporter-user.sql.
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_EXPORTER_PASSWORD:-exporter}
+      TZ: Asia/Seoul
+    depends_on:
+      - mysql
+    # 포트를 호스트에 열지 않는다. Prometheus 가 같은 도커 네트워크에서 9104 를 긁는다 —
+    # 백엔드 관리 포트(9090)를 안 여는 것과 같은 이유다(application.yml [6]).
+    networks:
+      - shadowfit-net
+
 networks:
   shadowfit-net:
     driver: bridge

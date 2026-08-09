@@ -35,6 +35,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -64,6 +65,13 @@ class MemberServiceTest {
 
     private JwtBlacklist jwtBlacklist; // 순수 인메모리 맵이라 모킹 없이 실사용
     private MemberService memberService;
+
+    // Login·Logout 두 중첩 클래스가 함께 쓴다. 원래 Login 안에 private 으로 있었는데,
+    // 로그아웃이 요청자 기준으로 바뀌며(#135 §1-1-ㄴ) 거기서도 회원 조회가 필요해졌다.
+    private Member existingMember() {
+        return Member.builder().id(1L).email(EMAIL).username("user1")
+                .password("encoded-pw").role(UserRole.USER).build();
+    }
 
     private static final String EMAIL = "test@test.com";
 
@@ -141,11 +149,6 @@ class MemberServiceTest {
     @DisplayName("로그인")
     class Login {
 
-        private Member existingMember() {
-            return Member.builder().id(1L).email(EMAIL).username("user1")
-                    .password("encoded-pw").role(UserRole.USER).build();
-        }
-
         @Test
         @DisplayName("정상 로그인 — 토큰 발급 + refresh_token 저장")
         void login_success() {
@@ -154,7 +157,7 @@ class MemberServiceTest {
             when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(member));
             when(passwordEncoder.matches("raw-pw", "encoded-pw")).thenReturn(true);
             when(jwtUtil.createAccessToken(any(CustomUserInfoDto.class))).thenReturn("access-token");
-            when(jwtUtil.createRefreshToken(any(CustomUserInfoDto.class))).thenReturn("refresh-token");
+            when(jwtUtil.createRefreshToken(any(CustomUserInfoDto.class), anyLong())).thenReturn("refresh-token");
 
             LoginResponseDto result = memberService.login(dto);
 
@@ -164,6 +167,9 @@ class MemberServiceTest {
             verify(refreshTokenRepository).save(captor.capture());
             assertThat(captor.getValue().getMemberId()).isEqualTo(1L);
             assertThat(captor.getValue().getToken()).isEqualTo("refresh-token");
+            // 로그인은 유예를 열지 않는다 (이슈 #136). 열면 앞 기기가 재발급으로 새 세션의
+            // refresh token 을 받아가서 「1인 1세션」의 정반대가 된다.
+            assertThat(captor.getValue().getRotatedAt()).isNull();
         }
 
         @Test
@@ -203,28 +209,34 @@ class MemberServiceTest {
         @Test
         @DisplayName("refresh_token 삭제 + access token 블랙리스트 등록 (Bearer 접두어 제거)")
         void logout_bearerPrefix_stripped() {
+            when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(existingMember()));
             when(jwtUtil.getExpiration("raw-access-token")).thenReturn(123456L);
             LogOutRequestDto dto = LogOutRequestDto.builder()
                     .accessToken("Bearer raw-access-token")
                     .refreshToken("some-refresh-token")
                     .build();
 
-            memberService.logout(dto);
+            memberService.logout(dto, EMAIL);
 
-            verify(refreshTokenRepository).deleteByToken("some-refresh-token");
+            // 본문의 refresh token 이 아니라 **요청자** 기준으로 지운다 (§1-1-ㄴ).
+            // 본문 기준이면 ① 남의 토큰 값을 알면 남의 행을 지울 수 있고 ② 그 행이 이미 새
+            // 로그인으로 교체된 뒤면 0행을 지우고 «로그아웃 성공» 을 응답한다.
+            verify(refreshTokenRepository).deleteByMemberId(1L);
+            verify(refreshTokenRepository, never()).deleteByToken(anyString());
             assertThat(jwtBlacklist.isBlacklisted("raw-access-token")).isTrue();
         }
 
         @Test
         @DisplayName("Bearer 접두어 없는 토큰도 그대로 블랙리스트 등록됨")
         void logout_withoutBearerPrefix_stillWorks() {
+            when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(existingMember()));
             when(jwtUtil.getExpiration("plain-token")).thenReturn(123456L);
             LogOutRequestDto dto = LogOutRequestDto.builder()
                     .accessToken("plain-token")
                     .refreshToken("some-refresh-token")
                     .build();
 
-            memberService.logout(dto);
+            memberService.logout(dto, EMAIL);
 
             assertThat(jwtBlacklist.isBlacklisted("plain-token")).isTrue();
         }

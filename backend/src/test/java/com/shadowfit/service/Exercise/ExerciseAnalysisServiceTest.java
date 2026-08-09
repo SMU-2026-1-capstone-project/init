@@ -156,7 +156,7 @@ class ExerciseAnalysisServiceTest {
     void stopAnalysis_circuitOpen_skipsSilently() {
         circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
 
-        analysisService.stopAnalysis(1L);
+        analysisService.stopAnalysis(1L, false);
     }
 
     // ---- completeSession / applyCompleteFromApp (AI 콜백, 자기주입 self 필요 — 실컨텍스트라 정상 동작) ----

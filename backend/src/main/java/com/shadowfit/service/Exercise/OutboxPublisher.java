@@ -93,8 +93,12 @@ public class OutboxPublisher {
         try (CorrelationIds.Scope tick = CorrelationIds.startTask("outbox-dispatch")) {
             try {
                 // 회수분을 먼저 — 이미 한 번 실패(또는 크래시)한 건이라 더 오래 기다린 쪽이다.
-                dispatchBatch(self.claimStale());
-                dispatchBatch(self.claimPending());
+                //
+                // 두 번째 인자는 «이 행은 이미 한 번 나갔을 수 있다» 는 뜻이다(이슈 #152). 회수분은
+                // 이전 발행기가 송신 «도중» 죽었을 수 있어 중복 배달이 될 수 있는데, 그 사실이
+                // 지금까지 수신 결과를 해석하는 쪽에 전달되지 않았다.
+                dispatchBatch(self.claimStale(), true);
+                dispatchBatch(self.claimPending(), false);
             } catch (Exception e) {
                 // tick 하나가 죽어도 다음 tick 은 돌아야 한다. 여기서 안 잡으면 스케줄러가
                 // 해당 작업을 영구 중단시킨다.
@@ -103,12 +107,12 @@ public class OutboxPublisher {
         }
     }
 
-    private void dispatchBatch(List<OutboxEvent> claimed) {
+    private void dispatchBatch(List<OutboxEvent> claimed, boolean possiblyRedelivered) {
         for (OutboxEvent event : claimed) {
             // 행에 적힌 cid 로 복원 — MDC 는 스레드에 매달려 죽지만 DB 에 적힌 cid 는 재시작을 견딘다.
             try (CorrelationIds.Scope perRow = CorrelationIds.withCorrelationId(event.getCorrelationId());
                  CorrelationIds.Scope session = CorrelationIds.withSession(event.getAggregateId())) {
-                dispatchOne(event);
+                dispatchOne(event, possiblyRedelivered);
             } catch (Exception e) {
                 // 한 건의 실패가 배치 전체를 멈추면 안 된다. 상태를 못 바꾸고 빠져도 행은
                 // PROCESSING 으로 남아 lock 만료 후 회수되므로 유실되지 않는다.
@@ -118,9 +122,9 @@ public class OutboxPublisher {
     }
 
     /** 송신은 트랜잭션 <b>밖</b>에서, 결과 기록만 짧은 트랜잭션으로. */
-    private void dispatchOne(OutboxEvent event) {
+    private void dispatchOne(OutboxEvent event, boolean possiblyRedelivered) {
         DispatchOutcome outcome = switch (event.getEventType()) {
-            case STOP_ANALYSIS -> analysisService.stopAnalysis(event.getAggregateId());
+            case STOP_ANALYSIS -> analysisService.stopAnalysis(event.getAggregateId(), possiblyRedelivered);
         };
 
         switch (outcome) {

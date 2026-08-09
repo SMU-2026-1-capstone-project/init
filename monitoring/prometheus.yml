@@ -25,11 +25,36 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
+  # MySQL 내부 지표. 2026-08-09 추가 — 아래 🔴 블록이 "의도적으로 뺐다"고 적어둔 그 타깃이다.
+  # obs 프로파일에서만 뜨므로, 프로파일 없이 Prometheus 만 켜면 이 타깃은 DOWN 이다.
+  - job_name: mysql
+    static_configs:
+      - targets: ["shadowfit-mysqld-exporter:9104"]
+        labels:
+          application: shadowfit
+
 # 🔴 여기 없는 것 (의도적)
 #
 # - ai-server (FastAPI): Python 쪽에 지표 계측이 없다. prometheus-client 를 붙이는
 #   것은 별도 작업이고, 붙이지 않은 채 타깃만 적으면 영원히 DOWN 인 타깃이 하나
 #   생겨서 "관측 스택이 고장난 것처럼" 보인다.
-# - mysqld_exporter: MySQL 내부 지표(버퍼풀 히트율·락 대기)는 지금까지 loadtest/
-#   스크립트가 SHOW STATUS 로 직접 떠 왔다. 그 경로가 이미 있으므로 익스포터를
-#   더하는 것은 중복이고, 실험 중 컨테이너를 하나 더 띄우는 비용만 는다.
+#
+# 🔄 여기 있었다가 뒤집힌 것 — mysqld_exporter (2026-08-09)
+#
+#   원문: "MySQL 내부 지표(버퍼풀 히트율·락 대기)는 지금까지 loadtest/ 스크립트가
+#          SHOW STATUS 로 직접 떠 왔다. 그 경로가 이미 있으므로 익스포터를 더하는 것은
+#          중복이고, 실험 중 컨테이너를 하나 더 띄우는 비용만 는다."
+#
+#   지우지 않고 남긴다. 틀린 판단이 아니라 **전제가 바뀐 판단**이라서다 — 위 두 근거는
+#   둘 다 "사람이 붙어 있는 로컬 단일 박스"에서만 성립한다.
+#
+#   2026-08-08 분리 배포(EC2 3대)에서 둘 다 무너졌다:
+#     ① "중복" → 원격 자동 스윕에서는 SHOW STATUS 를 **뜨는 사람이 없다.** 그리고
+#        스냅샷은 «판별로 귀속되는 시계열» 을 못 준다
+#     ② "컨테이너 비용" → obs 를 분리한 순간 무의미하다. 피시험 대상이 아니라 관측
+#        박스에 뜬다
+#
+#   대가는 이미 치렀다. 그날 수집된 지표가 전부 job="shadowfit-backend" 라 MySQL 쪽을
+#   못 봤고, 그래서 "MySQL 은 놀고 백엔드가 탄다" 는 **수집한 적 없는 지표에 근거한
+#   문장**이 나왔다가 같은 날 철회됐다. 없어서 결론을 못 낸 것이 익스포터의 필요를
+#   입증한 셈이다. (docs/decisions/commit-count-and-mysql-metrics.md §3-1)

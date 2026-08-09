@@ -107,6 +107,15 @@ security:
     - "/webjars/**"
     - "/member/login"
     - "/member/signup"
+    # ⚠️ permitAll 이 이 엔드포인트의 **전제**다 (이슈 #135).
+    #
+    # 재발급은 access token 이 만료된 뒤에 불리는 것이 정상 경로라, 인증을 요구하면 «만료돼서
+    # 부르는 API 가 만료 때문에 막히는» 상태가 된다. 그래서 필터를 안 태운다.
+    #
+    # 그 대신 신원 근거가 요청자(SecurityContext)가 아니라 **refresh token 의 서명**이다 —
+    # 서버가 서명한 것이라 위조가 불가능하고, subject 가 곧 소유자다.
+    # (decisions/token-lifecycle.md §4-2 — «요청자 기준으로 확인한다» 는 처음 안이 틀렸던 자리다)
+    - "/member/reissue"
     - "/ws/**"
     - "/actuator/health"
     - "/actuator/health/**"

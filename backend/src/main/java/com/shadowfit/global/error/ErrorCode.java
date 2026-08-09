@@ -21,6 +21,15 @@ public enum ErrorCode {
     TOKEN_EXPIRED(401, "A003", "인증 토큰이 만료되었습니다."),
     INVALID_TOKEN(401, "A004", "잘못된 인증 토큰입니다."),
     LOGIN_INPUT_INVALID(401, "A005", "비밀번호가 틀렸습니다."),
+    // 폐기된 refresh token 이 도착했다 — 재시도 유예 밖이라 탈취로 본다 (이슈 #135).
+    //
+    // 문구에 «탈취» 라고 쓰지 않는 것은 의도다 — 낡은 기기가 살아 있을 때도 같은 코드가 나가고
+    // (decisions/token-lifecycle.md §4-3), 서버는 그 둘을 구분하지 못한다.
+    //
+    // 🔴 **이 코드는 지금 클라에 도달하지 않는다.** ErrorResponseDto 가 status·message·timestamp
+    // 만 싣고 code 를 안 싣는다. 즉 프론트는 A004(단순 무효)와 이걸 **message 문자열로만** 가를 수
+    // 있다. 응답에 code 를 추가하는 것은 전 에러 응답의 계약 변경이라 이 작업 범위 밖으로 뒀다.
+    REFRESH_TOKEN_REUSED(401, "A006", "만료된 로그인 정보입니다. 보안을 위해 다시 로그인해 주세요."),
 
     // --- User & Persona ---
     USER_NOT_FOUND(404, "U001", "존재하지 않는 사용자입니다."),
