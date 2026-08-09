@@ -66,6 +66,14 @@ public enum ErrorCode {
     // 세션이 있는데도 지우려면 이력을 먼저 처리해야 하는데, 그건 "운동 종목 삭제"가 아니라
     // "회원 운동 기록 삭제"라 별개 결정이다. 그래서 여기서는 거부만 한다.
     EXERCISE_DELETE_NOT_ALLOWED(409, "W011", "운동 이력이 있는 종목은 삭제할 수 없습니다."),
+    // analysis_supported 를 TRUE 로 켜려는데 기준 좌표(exercise_references)가 0건인 경우.
+    // 기준 좌표는 분석의 실제 입력이다 — ExerciseAnalysisService 가 DB 에서 읽어 AnalyzeRequest
+    // 에 실어 보내고(:215·:376), ai-server 는 그게 비면 "reference 각도 시퀀스가 비어 있음 —
+    // sync_rate는 0으로 계산됨" 을 경고만 하고 **그대로 진행**한다(exercise_servicer.py:78-82).
+    // 즉 켜두면 세션은 열리는데 결과가 전부 0 이 되므로, 켜기 전에 막는다.
+    //
+    // ⚠️ 이건 필요조건이지 충분조건이 아니다. W007 주석 참고.
+    EXERCISE_ANALYSIS_ENABLE_BLOCKED(400, "W012", "기준 좌표가 없어 분석을 활성화할 수 없습니다."),
 
     // --- F10-1 Filtering Engine ---
     LOW_SYNC_RATE(400, "V001", "운동 싱크로율이 너무 낮아 기록되지 않았습니다."),

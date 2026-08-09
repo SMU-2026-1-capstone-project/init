@@ -15,6 +15,7 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.repository.exercise.ExerciseQueryRepository;
+import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class AdminExerciseService {
     private final ExercisesRepository exercisesRepository;
     private final ExerciseQueryRepository exerciseQueryRepository;
     private final SessionRepository sessionRepository;
+    private final ExerciseReferenceRepository exerciseReferenceRepository;
     private final ObjectMapper objectMapper;
 
     // ─── 조회 ──────────────────────────────────────────────────────────────────────
@@ -171,6 +173,61 @@ public class AdminExerciseService {
         exercise.setSyncThresholdRehab(dto.rehab());
 
         return ExerciseThresholdResponseDto.fromEntity(exercise);
+    }
+
+    // ─── 분석 활성화 ────────────────────────────────────────────────────────────────
+
+    /**
+     * AI 분석 활성화 여부 변경 — {@code exercises.analysis_supported}.
+     *
+     * <p>이 값이 {@code true} 가 되면 {@code SessionService.createSession} 의 W007 가드가 열려
+     * <b>세션이 실제로 시작된다</b>. 그래서 등록·수정 DTO 에서 빼고 전용 경로로 분리했다
+     * ({@link com.shadowfit.dto.admin.AnalysisSupportUpdateDto} 주석).
+     *
+     * <p><b>@CacheEvict 가 여기서는 선택이 아니다.</b> 이 플래그를 읽는 것이 바로
+     * {@code SessionService.createSession} 의 {@code findByIdCached}
+     * ({@code SessionService.java:107})다 — Caffeine {@code expireAfterWrite=1h} 라 evict 가
+     * 없으면 <b>켜도 최대 1시간 동안 W007 로 계속 막히고, 꺼도 1시간 동안 계속 열린다.</b>
+     * 뒤쪽이 특히 나쁘다.
+     *
+     * <h4>켤 때만 가드를 건다</h4>
+     * 기준 좌표({@code exercise_references})가 0건이면 거부한다(W012). 그것이 분석의 실제
+     * 입력이고, 비어 있으면 ai-server 가 <b>경고만 하고 진행해</b> {@code sync_rate} 가 전부 0 이
+     * 되기 때문이다({@code exercise_servicer.py:78-82}). 끄는 방향은 안전하므로 가드가 없다.
+     *
+     * <h4>⚠️ 이 가드는 필요조건이지 충분조건이 아니다</h4>
+     * <b>ai-server 는 {@code exercise_id} 를 받아놓고 무시한다</b> —
+     * {@code exercise_servicer.py:73}·{@code :126} 이 {@code exercise_type = "squat"} 로
+     * 하드코딩돼 있고 분석기도 {@code squat_analyzer.py} 하나뿐이다(squat-first). 따라서 런지에
+     * 이 플래그를 켜면 세션은 열리고 <b>런지 동작이 스쿼트 기준으로 채점된다</b> — 에러가 아니라
+     * 조용히 틀린 점수가 나온다. Spring 에서는 이것을 검증할 수단이 없어(AI 의 지원 종목을 묻는
+     * RPC 가 없다) 막지 않고 경고 로그로 남긴다. 이슈로 등록해 뒀다.
+     */
+    @Transactional
+    @CacheEvict(cacheNames = "exercises", key = "#exerciseId")
+    public AdminExerciseDetailDto updateAnalysisSupport(Long exerciseId, boolean supported) {
+        Exercise exercise = findOrThrow(exerciseId);
+
+        if (supported && !exerciseReferenceRepository.existsByExerciseId(exerciseId)) {
+            log.warn("분석 활성화 거부 — 기준 좌표 0건: id={}, name={}", exerciseId, exercise.getName());
+            throw new BusinessException(ErrorCode.EXERCISE_ANALYSIS_ENABLE_BLOCKED);
+        }
+
+        boolean before = Boolean.TRUE.equals(exercise.getAnalysisSupported());
+        exercise.setAnalysisSupported(supported);
+
+        if (supported && !before) {
+            // 켜는 것만 WARN 이다. ai-server 가 종목과 무관하게 스쿼트로 분석하므로, 스쿼트가
+            // 아닌 종목을 켠 사실은 나중에 "점수가 이상하다"를 추적할 때 필요한 단서가 된다.
+            log.warn("분석 활성화: id={}, name={} — ai-server 는 exercise_id 를 무시하고 squat 으로 "
+                    + "분석한다(exercise_servicer.py:73). 스쿼트가 아니면 결과가 조용히 틀린다.",
+                    exerciseId, exercise.getName());
+        } else {
+            log.info("분석 활성화 여부 변경: id={}, name={}, {} -> {}",
+                    exerciseId, exercise.getName(), before, supported);
+        }
+
+        return AdminExerciseDetailDto.fromEntity(exercise);
     }
 
     // ─── 삭제 ──────────────────────────────────────────────────────────────────────

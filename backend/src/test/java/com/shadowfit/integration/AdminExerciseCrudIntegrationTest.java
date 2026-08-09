@@ -7,9 +7,11 @@ import com.shadowfit.dto.login.CustomUserInfoDto;
 import com.shadowfit.global.security.jwt.JwtUtil;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.ExerciseReference;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.UserRole;
+import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
@@ -58,6 +60,7 @@ class AdminExerciseCrudIntegrationTest {
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
     @Autowired private SessionRepository sessionRepository;
+    @Autowired private ExerciseReferenceRepository referenceRepository;
 
     private Member user;
     private Exercise exercise;
@@ -174,6 +177,59 @@ class AdminExerciseCrudIntegrationTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.name").value("스쿼트(개선)"))
                     .andExpect(jsonPath("$.category").value("LOWER"));
+        }
+    }
+
+    @Nested
+    @DisplayName("분석 활성화")
+    class AnalysisSupport {
+
+        @Test
+        @DisplayName("기준 좌표가 없으면 400 — 세션이 열리는 문이라 여기서 막는다")
+        void enable_withoutReferences_returns400() throws Exception {
+            mockMvc.perform(patch("/admin/exercises/" + exercise.getId() + "/analysis-support")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"supported\":true}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("기준 좌표가 있으면 200 이고 true 로 내려온다")
+        void enable_withReferences_returns200() throws Exception {
+            referenceRepository.saveAndFlush(ExerciseReference.builder()
+                    .exercise(exercise).timestampSec(0.0).jointCoordinates("{}").build());
+
+            mockMvc.perform(patch("/admin/exercises/" + exercise.getId() + "/analysis-support")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"supported\":true}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.analysisSupported").value(true));
+        }
+
+        /**
+         * {@code Boolean} + {@code @NotNull} 이라 필드를 빼면 400 이어야 한다. {@code boolean}
+         * 이었다면 조용히 {@code false} 로 처리돼 "끄겠다"와 "안 보냈다"가 섞인다.
+         */
+        @Test
+        @DisplayName("supported 를 안 보내면 400 — 조용한 false 가 아니다")
+        void missingField_returns400() throws Exception {
+            mockMvc.perform(patch("/admin/exercises/" + exercise.getId() + "/analysis-support")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("USER 역할이면 403")
+        void userRole_returns403() throws Exception {
+            mockMvc.perform(patch("/admin/exercises/" + exercise.getId() + "/analysis-support")
+                            .header("Authorization", "Bearer " + userToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"supported\":true}"))
+                    .andExpect(status().isForbidden());
         }
     }
 

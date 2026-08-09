@@ -44,7 +44,7 @@
 |---|---|:--:|---|
 | A | **회원 목록** | ✅ **구현 완료** (2026-08-04) | 필터·정렬 조합이 가장 많아 QueryDSL 근거가 가장 셈. `GET /admin/members`, 계획 측정 완료(§4-3) |
 | B | **세션 목록** | ✅ **구현 완료** (2026-08-04) | 운영 관점에서 실사용 가치(실패·타임아웃 세션 추적). `GET /admin/sessions`, **계획은 미측정**(§4-4) |
-| C | **운동/영상 관리** | ✅ **백엔드 구현 완료** (2026-08-09) | `GET·POST /admin/exercises`, `GET·PATCH·DELETE /admin/exercises/{id}` — 아래 §2-C 참고. ~~등록 API만 있음 — 목록·수정·삭제 3개~~ 🔴 **이 근거는 틀렸었다** |
+| C | **운동/영상 관리** | ✅ **백엔드 구현 완료** (2026-08-09) | `GET·POST /admin/exercises`, `GET·PATCH·DELETE /admin/exercises/{id}`, `PATCH …/{id}/analysis-support` — 아래 §2-C 참고. ~~등록 API만 있음 — 목록·수정·삭제 3개~~ 🔴 **이 근거는 틀렸었다** |
 | D | **대시보드 통계 위젯** | ✅ **구현 대상** | 조건 고정 집계 — QueryDSL 대상은 아니나(아래) **집계 비용이라는 별개 축** |
 
 **자르는 기준을 "QueryDSL 대상이냐"로 잡지 않았다.** 그 기준이면 D 가 먼저 잘리는데, D 는 다른 이유로 남는다.
@@ -80,7 +80,26 @@
 - **`exists` 이지 `count` 가 아니다** — 판정에 필요한 건 0 이냐뿐인데 `COUNT` 는 전 이력을 훑는다(스쿼트는 사실상 모든 세션이 달려 있다). 대가로 거부 메시지에 건수를 실을 수 없다
 - **`targetJoints` 는 저장 전에 JSON 검증** — MySQL `json` 컬럼이라 깨진 문자열은 DB 가 거부하고(에러 3140), 안 거르면 400 이어야 할 것이 **500** 으로 나간다
 
-**🔶 의도적으로 안 한 것 — `analysisSupported` 는 이 API 로 못 바꾼다.** 등록 시 서버가 `false` 로 고정하고, 수정 DTO 에도 자리를 두지 않았다. 그 값이 `true` 가 되면 `SessionService.createSession` 의 W007 가드가 통과되어 **분석기(ai-server)가 없는 종목의 세션이 열린다** — 가드가 막으려던 바로 그 상황이다. 결과적으로 **새 종목을 실제로 쓰게 만드는 경로는 여전히 SQL 뿐**이고, 이건 [[project_squat_first]] 방침과는 맞지만 **C 의 미완 항목으로 남는다.** 열려면 `/thresholds` 처럼 전용 엔드포인트로 분리하는 편이 맞다 — 🔶 **미결정**
+**`analysisSupported` 는 등록·수정 DTO 에 자리가 없다.** 등록 시 서버가 `false` 로 고정한다. 그 값이 `true` 가 되면 `SessionService.createSession` 의 W007 가드가 통과되어 세션이 실제로 시작되므로, 이름 하나 고치다 딸려 켜지면 안 되는 값이다.
+
+✅ **2026-08-09 (2차) — 전용 엔드포인트로 분리해 해소.** ~~🔶 미결정 · 새 종목을 쓰게 만드는 경로가 SQL 뿐~~
+
+`PATCH /admin/exercises/{id}/analysis-support`, 본문 `{ "supported": bool }`. 임계값을 `/thresholds` 로 뺀 것과 같은 근거다.
+
+| | |
+|---|---|
+| **켤 때** | 기준 좌표(`exercise_references`)가 0건이면 **400(W012)** 로 거부 |
+| **끌 때** | 가드 없음 — 잘못 켠 것을 되돌리는 길까지 막으면 안 된다 |
+| **캐시** | `@CacheEvict` 가 **선택이 아니다.** 이 플래그를 읽는 것이 `SessionService.java:107` 의 `findByIdCached` 다(Caffeine 1h) — 없으면 켜도 1시간 막히고 **꺼도 1시간 열려 있다** |
+| **본문 타입** | `Boolean` + `@NotNull`. `boolean` 이면 필드를 안 보냈을 때 조용히 `false` 가 돼 "끄겠다"와 "안 보냈다"가 섞인다 |
+
+**켜기 가드의 근거** — 기준 좌표는 분석의 **실제 입력**이다. `ExerciseAnalysisService:215`·`:376` 이 DB 에서 읽어 gRPC `AnalyzeRequest` 에 실어 보낸다. 비어 있으면 ai-server 가 *"reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨"* 을 **경고만 하고 그대로 진행한다**(`exercise_servicer.py:78-82`). 즉 켜두면 세션은 열리는데 결과가 전부 0 인, **실패로도 안 보이는 상태**가 된다.
+
+> 🔴 **⚠️ 이 가드는 필요조건이지 충분조건이 아니다 — [이슈 #147](https://github.com/Shadowfit/init/issues/147).**
+>
+> **ai-server 는 `exercise_id` 를 받아놓고 무시한다.** `exercise_servicer.py:73`·`:126` 이 `exercise_type = "squat"` 로 하드코딩돼 있고 분석기도 `squat_analyzer.py` 하나뿐이다(squat-first). 따라서 런지에 이 플래그를 켜면 세션은 열리고 **런지 동작이 스쿼트 기준으로 채점된다** — 에러가 아니라 **조용히 틀린 점수**다.
+>
+> Spring 에는 이걸 검증할 수단이 없다(AI 의 지원 종목을 묻는 RPC 가 없다). 그래서 막지 않고 **켜는 요청을 WARN 으로 남긴다** — 나중에 "점수가 이상하다"를 추적할 단서를 남기는 것이 지금 할 수 있는 전부다. ⚠️ 재현은 하지 않았다(#147 미검증 항목).
 
 ### 2-1. D 의 측정은 이 프로젝트에서 성립한다
 

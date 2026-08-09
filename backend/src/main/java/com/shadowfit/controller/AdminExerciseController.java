@@ -4,6 +4,7 @@ import com.shadowfit.dto.admin.AdminExerciseDetailDto;
 import com.shadowfit.dto.admin.AdminExerciseListItemDto;
 import com.shadowfit.dto.admin.AdminExerciseSearchCondition;
 import com.shadowfit.dto.admin.AdminExerciseSortKey;
+import com.shadowfit.dto.admin.AnalysisSupportUpdateDto;
 import com.shadowfit.dto.admin.ExerciseCreateDto;
 import com.shadowfit.dto.admin.ExerciseThresholdResponseDto;
 import com.shadowfit.dto.admin.ExerciseUpdateDto;
@@ -93,6 +94,21 @@ public class AdminExerciseController {
             @PathVariable Long exerciseId,
             @Valid @RequestBody ThresholdUpdateDto dto) {
         return ResponseEntity.ok(adminExerciseService.updateThresholds(exerciseId, dto));
+    }
+
+    @Operation(summary = "AI 분석 활성화 여부 변경",
+               description = "true 로 바꾸면 이 종목으로 세션을 시작할 수 있게 된다(W007 가드가 열린다). "
+                       + "기준 좌표가 0건이면 400(W012) 으로 거부한다 — 비어 있으면 ai-server 가 "
+                       + "경고만 하고 진행해 싱크로율이 전부 0 이 되기 때문이다.\n\n"
+                       + "⚠️ **이 검사는 필요조건이지 충분조건이 아니다.** ai-server 는 현재 exercise_id 를 "
+                       + "무시하고 무조건 squat 으로 분석한다(squat-first). 스쿼트가 아닌 종목을 켜면 "
+                       + "세션은 열리지만 결과가 조용히 틀린다.")
+    @PatchMapping("/{exerciseId}/analysis-support")
+    public ResponseEntity<AdminExerciseDetailDto> updateAnalysisSupport(
+            @PathVariable Long exerciseId,
+            @Valid @RequestBody AnalysisSupportUpdateDto dto) {
+        return ResponseEntity.ok(
+                adminExerciseService.updateAnalysisSupport(exerciseId, dto.supported()));
     }
 
     @Operation(summary = "운동 종목 삭제",

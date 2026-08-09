@@ -11,6 +11,7 @@ import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.ExerciseCategory;
 import com.shadowfit.repository.exercise.ExerciseQueryRepository;
+import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @DisplayName("AdminExerciseService 테스트")
@@ -38,6 +40,7 @@ class AdminExerciseServiceTest {
     @Mock private ExercisesRepository exercisesRepository;
     @Mock private ExerciseQueryRepository exerciseQueryRepository;
     @Mock private SessionRepository sessionRepository;
+    @Mock private ExerciseReferenceRepository exerciseReferenceRepository;
     private AdminExerciseService service;
 
     private static final Long EXERCISE_ID = 1L;
@@ -45,8 +48,8 @@ class AdminExerciseServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new AdminExerciseService(
-                exercisesRepository, exerciseQueryRepository, sessionRepository, new ObjectMapper());
+        service = new AdminExerciseService(exercisesRepository, exerciseQueryRepository,
+                sessionRepository, exerciseReferenceRepository, new ObjectMapper());
     }
 
     private Exercise exercise() {
@@ -212,6 +215,72 @@ class AdminExerciseServiceTest {
             ExerciseUpdateDto dto = new ExerciseUpdateDto("x", null, null, null, null, null);
 
             assertThatThrownBy(() -> service.updateExercise(EXERCISE_ID, dto))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.EXERCISE_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("분석 활성화")
+    class AnalysisSupport {
+
+        /**
+         * [왜] 기준 좌표는 분석의 실제 입력이다({@code ExerciseAnalysisService:215}). 비어 있으면
+         * ai-server 가 <b>경고만 하고 진행해</b> sync_rate 가 전부 0 이 된다
+         * ({@code exercise_servicer.py:78-82}) — 즉 "켜졌는데 결과가 전부 0" 이라는, 실패로도
+         * 안 보이는 상태가 만들어진다.
+         */
+        @Test
+        @DisplayName("기준 좌표가 0건이면 켤 수 없다 — W012")
+        void enable_withoutReferences_throws() {
+            Exercise exercise = exercise();
+            when(exercisesRepository.findById(EXERCISE_ID)).thenReturn(Optional.of(exercise));
+            when(exerciseReferenceRepository.existsByExerciseId(EXERCISE_ID)).thenReturn(false);
+
+            assertThatThrownBy(() -> service.updateAnalysisSupport(EXERCISE_ID, true))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.EXERCISE_ANALYSIS_ENABLE_BLOCKED);
+
+            // 거부됐으면 값이 그대로여야 한다 — 예외를 던지기 전에 setter 가 돌면 안 된다
+            assertThat(exercise.getAnalysisSupported()).isFalse();
+        }
+
+        @Test
+        @DisplayName("기준 좌표가 있으면 켜진다")
+        void enable_withReferences_succeeds() {
+            when(exercisesRepository.findById(EXERCISE_ID)).thenReturn(Optional.of(exercise()));
+            when(exerciseReferenceRepository.existsByExerciseId(EXERCISE_ID)).thenReturn(true);
+
+            AdminExerciseDetailDto result = service.updateAnalysisSupport(EXERCISE_ID, true);
+
+            assertThat(result.analysisSupported()).isTrue();
+        }
+
+        /**
+         * [왜] 끄는 방향은 안전하다. 기준 좌표가 없다는 이유로 <b>끄는 것까지</b> 막으면, 잘못
+         * 켜진 종목을 되돌릴 수단이 사라진다.
+         */
+        @Test
+        @DisplayName("끌 때는 기준 좌표를 보지 않는다")
+        void disable_doesNotCheckReferences() {
+            Exercise exercise = exercise();
+            exercise.setAnalysisSupported(true);
+            when(exercisesRepository.findById(EXERCISE_ID)).thenReturn(Optional.of(exercise));
+
+            AdminExerciseDetailDto result = service.updateAnalysisSupport(EXERCISE_ID, false);
+
+            assertThat(result.analysisSupported()).isFalse();
+            verifyNoInteractions(exerciseReferenceRepository);
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 운동이면 EXERCISE_NOT_FOUND")
+        void notFound_throws() {
+            when(exercisesRepository.findById(EXERCISE_ID)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.updateAnalysisSupport(EXERCISE_ID, true))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.EXERCISE_NOT_FOUND);
