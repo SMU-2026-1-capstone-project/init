@@ -3,11 +3,9 @@ package com.shadowfit.service.Member;
 import com.shadowfit.dto.login.CustomUserInfoDto;
 import com.shadowfit.dto.login.LoginRequestDto;
 import com.shadowfit.dto.login.LoginResponseDto;
-import com.shadowfit.dto.login.LogOutRequestDto;
 import com.shadowfit.dto.login.MemberRequestDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
-import com.shadowfit.global.security.jwt.JwtBlacklist;
 import com.shadowfit.global.security.jwt.JwtUtil;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.RefreshToken;
@@ -41,6 +39,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -63,7 +62,6 @@ class MemberServiceTest {
     @Mock private PoseDataCleanupService poseDataCleanupService;
     @Mock private PasswordEncoder passwordEncoder;
 
-    private JwtBlacklist jwtBlacklist; // 순수 인메모리 맵이라 모킹 없이 실사용
     private MemberService memberService;
 
     // Login·Logout 두 중첩 클래스가 함께 쓴다. 원래 Login 안에 private 으로 있었는데,
@@ -78,10 +76,8 @@ class MemberServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        jwtBlacklist = new JwtBlacklist();
         memberService = new MemberService(jwtUtil, memberRepository, refreshTokenRepository,
-                sessionRepository, poseDataRepository, poseDataCleanupService, passwordEncoder,
-                jwtBlacklist);
+                sessionRepository, poseDataRepository, poseDataCleanupService, passwordEncoder);
     }
 
     @Nested
@@ -207,38 +203,43 @@ class MemberServiceTest {
     class Logout {
 
         @Test
-        @DisplayName("refresh_token 삭제 + access token 블랙리스트 등록 (Bearer 접두어 제거)")
-        void logout_bearerPrefix_stripped() {
+        @DisplayName("요청자의 refresh_token 행만 지운다 — 토큰 값은 보지 않는다")
+        void logout_deletesByRequester() {
             when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(existingMember()));
-            when(jwtUtil.getExpiration("raw-access-token")).thenReturn(123456L);
-            LogOutRequestDto dto = LogOutRequestDto.builder()
-                    .accessToken("Bearer raw-access-token")
-                    .refreshToken("some-refresh-token")
-                    .build();
 
-            memberService.logout(dto, EMAIL);
+            memberService.logout(EMAIL);
 
             // 본문의 refresh token 이 아니라 **요청자** 기준으로 지운다 (§1-1-ㄴ).
             // 본문 기준이면 ① 남의 토큰 값을 알면 남의 행을 지울 수 있고 ② 그 행이 이미 새
             // 로그인으로 교체된 뒤면 0행을 지우고 «로그아웃 성공» 을 응답한다.
             verify(refreshTokenRepository).deleteByMemberId(1L);
             verify(refreshTokenRepository, never()).deleteByToken(anyString());
-            assertThat(jwtBlacklist.isBlacklisted("raw-access-token")).isTrue();
         }
 
         @Test
-        @DisplayName("Bearer 접두어 없는 토큰도 그대로 블랙리스트 등록됨")
-        void logout_withoutBearerPrefix_stillWorks() {
+        @DisplayName("access token 은 건드리지 않는다 — 블랙리스트가 없다 (#137 ㄴ-4)")
+        void logout_doesNotTouchAccessToken() {
             when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(existingMember()));
-            when(jwtUtil.getExpiration("plain-token")).thenReturn(123456L);
-            LogOutRequestDto dto = LogOutRequestDto.builder()
-                    .accessToken("plain-token")
-                    .refreshToken("some-refresh-token")
-                    .build();
 
-            memberService.logout(dto, EMAIL);
+            memberService.logout(EMAIL);
 
-            assertThat(jwtBlacklist.isBlacklisted("plain-token")).isTrue();
+            // 예전에는 여기서 access token 을 파싱해 만료시각을 뽑고 블랙리스트에 넣었다.
+            // 이 단언이 처음엔 `verify(jwtUtil, never()).getExpiration(...)` 이었는데,
+            // **그 메서드 자체를 지우면서 컴파일이 안 되는 단언**이 됐다 — 되살리려면 메서드부터
+            // 되살려야 하므로 보장은 오히려 강해졌다(#138 을 «필드 제거» 로 닫은 것과 같은 형태).
+            // 여기서는 로그아웃이 jwtUtil 을 아예 안 쓴다는 사실만 남긴다.
+            verifyNoInteractions(jwtUtil);
+        }
+
+        @Test
+        @DisplayName("없는 회원이면 USER_NOT_FOUND — 삭제는 시도하지 않는다")
+        void logout_memberNotFound_throws() {
+            when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> memberService.logout(EMAIL))
+                    .isInstanceOf(BusinessException.class);
+
+            verify(refreshTokenRepository, never()).deleteByMemberId(anyLong());
         }
     }
 

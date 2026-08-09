@@ -1,6 +1,5 @@
 package com.shadowfit.controller;
 
-import com.shadowfit.dto.login.LogOutRequestDto;
 import com.shadowfit.dto.login.LoginRequestDto;
 import com.shadowfit.dto.login.LoginResponseDto;
 import com.shadowfit.dto.login.MemberRequestDto;
@@ -47,14 +46,16 @@ public class MemberController {
         return ResponseEntity.ok(memberService.reissue(dto));
     }
 
-    @Operation(summary="로그아웃",description = "로그아웃을 할 수 있음")
+    @Operation(summary="로그아웃",
+            description = "요청자의 리프레시 토큰을 폐기한다. **요청 본문이 없다** — 지울 대상은 "
+                    + "인증된 본인이고(decisions/token-lifecycle.md §1-1-ㄴ), 액세스 토큰은 "
+                    + "블랙리스트를 두지 않으므로(#137 ㄴ-4) 남은 수명 동안 유효하다.")
     @PostMapping("/logout")
-    public ResponseEntity<Void> Logout(@Valid @RequestBody LogOutRequestDto dto,
-                                       @AuthenticationPrincipal CustomUserDetails userDetails){
-        // 지울 대상을 **본문의 refresh token 이 아니라 인증된 본인**으로 정한다
-        // (decisions/token-lifecycle.md §1-1-ㄴ). 재발급(§4-2)과는 사정이 반대다 — 이쪽은
-        // 인증을 통과해서 요청자가 이미 있는데도 본문을 믿고 있었다.
-        memberService.logout(dto, userDetails.getMember().getEmail());
+    public ResponseEntity<Void> Logout(@AuthenticationPrincipal CustomUserDetails userDetails){
+        // 본문(accessToken·refreshToken)을 받던 것을 없앴다. 요청자 기준으로 바꾼 시점에
+        // refreshToken 은 이미 안 쓰였고, accessToken 은 블랙리스트 등록에만 쓰이다가 #137 로
+        // 그 자리마저 사라졌다 — 아무 데도 안 쓰는 값을 @NotBlank 로 요구하고 있던 셈이다.
+        memberService.logout(userDetails.getMember().getEmail());
         return ResponseEntity.noContent().build();
     }
 

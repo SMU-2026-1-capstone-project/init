@@ -3,7 +3,6 @@ package com.shadowfit.service.Member;
 import com.shadowfit.dto.login.*;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
-import com.shadowfit.global.security.jwt.JwtBlacklist;
 import com.shadowfit.global.security.jwt.JwtUtil;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -36,7 +35,6 @@ public class MemberService{
     private final PoseDataRepository poseDataRepository;
     private final PoseDataCleanupService poseDataCleanupService;
     private final PasswordEncoder passwordEncoder;
-    private final JwtBlacklist jwtBlacklist;
 
     /**
      * 이 시간 동안 프레임 유입이 없으면 그 세션은 죽은 것으로 본다(탈퇴 가드 판정 기준).
@@ -171,22 +169,23 @@ public class MemberService{
         return new LoginResponseDto(jwtUtil.createAccessToken(info), rotated, member.getRole());
     }
 
-    //로그아웃 로직
+    /**
+     * 로그아웃 — <b>refresh token 행을 지우는 것이 전부다.</b>
+     *
+     * <p>지울 대상을 본문이 아니라 <b>요청자</b>로 정한다(decisions/token-lifecycle.md §1-1-ㄴ).
+     * 예전 방식은 남의 토큰 값을 알면 남의 행을 지울 수 있었고, 반대로 그 행이 이미 새 로그인으로
+     * 교체됐으면 <b>0행을 지우고 성공했다</b> — 로그아웃했다고 응답하는데 서버에는 세션이 남는
+     * 쪽이 실제로 더 위험하다.
+     *
+     * <p><b>access token 은 즉시 죽지 않는다</b>(이슈 #137, 같은 문서 ㄴ-4). 이미 발급된 access 는
+     * 남은 수명(30분 상한) 동안 유효하고, 그 대가로 블랙리스트라는 상태를 두지 않는다. 로그아웃의
+     * 의미가 «서버가 즉시 끊는다» 가 아니라 <b>«갱신이 끊기고 곧 만료된다»</b> 로 바뀐 것이다.
+     */
     @Transactional
-    public void logout(LogOutRequestDto dto, String requesterEmail){
-        // 본문의 refresh token 으로 지우던 것을 **요청자 기준**으로 바꿨다
-        // (decisions/token-lifecycle.md §1-1-ㄴ). 예전 방식은 남의 토큰 값을 알면 남의 행을
-        // 지울 수 있었고, 반대로 그 행이 이미 새 로그인으로 교체됐으면 **0행을 지우고 성공했다** —
-        // 로그아웃했다고 응답하는데 서버에는 세션이 남는 쪽이 실제로 더 위험하다.
+    public void logout(String requesterEmail){
         Member requester = memberRepository.findByEmail(requesterEmail)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         refreshTokenRepository.deleteByMemberId(requester.getId());
-        String token = dto.getAccessToken();
-        if(token.startsWith("Bearer ")){
-            token = token.substring(7);
-        }
-        long expiration = jwtUtil.getExpiration(token);
-        jwtBlacklist.add(token,expiration);
     }
 
     //회원가입 로직

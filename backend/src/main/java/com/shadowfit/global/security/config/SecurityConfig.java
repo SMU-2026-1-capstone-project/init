@@ -1,7 +1,6 @@
 package com.shadowfit.global.security.config;
 
 import com.shadowfit.global.security.jwt.JwtAuthFilter;
-import com.shadowfit.global.security.jwt.JwtBlacklist;
 import com.shadowfit.global.security.jwt.JwtUtil;
 import com.shadowfit.service.Member.CustomUserDetailsService;
 import jakarta.annotation.PostConstruct;
@@ -36,7 +35,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtBlacklist jwtBlacklist) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
@@ -54,7 +53,7 @@ public class SecurityConfig {
 
 
         // JWT 필터 추가
-        http.addFilterBefore(new JwtAuthFilter(customUserDetailsService, jwtUtil, jwtBlacklist),
+        http.addFilterBefore(new JwtAuthFilter(customUserDetailsService, jwtUtil),
                 UsernamePasswordAuthenticationFilter.class);
 
         http.exceptionHandling(exception -> exception

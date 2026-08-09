@@ -25,21 +25,19 @@ import static org.mockito.Mockito.when;
 
 /**
  * JwtAuthFilter 단위테스트 — 인증 필터 자체가 지금까지 무테스트였던 영역. 정상 인증뿐 아니라
- * 무효 토큰·블랙리스트·회원 없음·헤더 없음·/ws 경로 예외 케이스까지 검증.
+ * 무효 토큰·로그아웃 토큰·회원 없음·헤더 없음·/ws 경로 예외 케이스까지 검증.
  */
 @DisplayName("JwtAuthFilter 테스트")
 class JwtAuthFilterTest {
 
     @Mock private CustomUserDetailsService customUserDetailsService;
     @Mock private JwtUtil jwtUtil;
-    private JwtBlacklist jwtBlacklist; // 순수 인메모리 맵이라 실사용
     private JwtAuthFilter filter;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        jwtBlacklist = new JwtBlacklist();
-        filter = new JwtAuthFilter(customUserDetailsService, jwtUtil, jwtBlacklist);
+        filter = new JwtAuthFilter(customUserDetailsService, jwtUtil);
     }
 
     @AfterEach
@@ -103,19 +101,24 @@ class JwtAuthFilterTest {
     }
 
     @Test
-    @DisplayName("블랙리스트에 등록된 토큰이면(로그아웃됨) 검증에 유효해도 인증 안 됨")
-    void blacklistedToken_noAuthentication() throws Exception {
+    @DisplayName("로그아웃한 토큰도 서명이 유효하면 잔여 수명 동안 인증된다 — 블랙리스트를 없앤 대가 (#137)")
+    void loggedOutToken_stillAuthenticatesUntilExpiry() throws Exception {
+        // 이 테스트는 «고쳐야 할 결함» 이 아니라 **의도한 동작**을 고정한다.
+        // 블랙리스트를 없애면서(decisions/token-lifecycle.md ㄴ-4) 로그아웃의 의미가
+        // «서버가 즉시 끊는다» 에서 «갱신이 끊기고 곧 만료된다» 로 바뀌었다. 그 대가의 크기가
+        // 곧 access 수명(30분)이고, 여기가 그 사실이 코드로 남는 자리다.
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/sessions/1");
         request.addHeader("Authorization", "Bearer logged-out-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
         when(jwtUtil.isValidToken("logged-out-token")).thenReturn(true);
-        jwtBlacklist.add("logged-out-token", System.currentTimeMillis() + 100000);
+        when(jwtUtil.getUserEmail("logged-out-token")).thenReturn("test@test.com");
+        when(customUserDetailsService.loadUserByUsername("test@test.com")).thenReturn(userDetails());
 
         filter.doFilter(request, response, chain);
 
-        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
         verify(chain, times(1)).doFilter(request, response);
     }
 

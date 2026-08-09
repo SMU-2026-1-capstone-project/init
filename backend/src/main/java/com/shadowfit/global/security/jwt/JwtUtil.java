@@ -122,9 +122,10 @@ public class JwtUtil {
         return false;
     }
 
-    public long getExpiration(String token){
-        return parseClaims(token).getExpiration().getTime();
-    }
+    // getExpiration(token) 이 여기 있었다 — 토큰의 exp 를 epoch millis 로 꺼내는 두 줄이었고,
+    // 유일한 용도가 «블랙리스트에 넣을 때 언제까지 막을지» 를 같이 저장하는 것이었다.
+    // 블랙리스트를 없애면서(이슈 #137, decisions/token-lifecycle.md ㄴ-4) 호출부가 0 이 됐다.
+    // 만료 시각이 다시 필요해지면 parseClaims(token).getExpiration() 으로 바로 얻을 수 있다.
 
     // Claims 추출
     public Claims parseClaims(String accessToken){

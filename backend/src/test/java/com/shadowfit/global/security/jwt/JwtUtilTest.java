@@ -51,7 +51,7 @@ class JwtUtilTest {
     }
 
     @Test
-    @DisplayName("만료된 토큰은 isValidToken false — 단 getExpiration/parseClaims는 여전히 값 반환 (로그아웃 블랙리스트 계산용)")
+    @DisplayName("만료된 토큰은 isValidToken false — 단 parseClaims 는 여전히 claim 을 반환한다")
     void expiredToken_isInvalid_butClaimsStillReadable() {
         JwtUtil expiredIssuer = new JwtUtil(SECRET, -10L, -10L); // 발급 즉시 만료
         String expiredToken = expiredIssuer.createAccessToken(userInfo);
@@ -77,10 +77,13 @@ class JwtUtilTest {
     }
 
     @Test
-    @DisplayName("getExpiration은 발급 시점 + 설정된 만료시간(초)의 epoch millis를 반환")
-    void getExpiration_reflectsConfiguredExpiry() {
+    @DisplayName("설정한 만료시간(초)이 exp claim 에 그대로 반영된다")
+    void configuredExpiry_landsInExpClaim() {
+        // getExpiration() 을 검사하던 테스트였다. 그 메서드를 지웠으므로(#137) 같은 계약을
+        // parseClaims 로 검사한다 — 확인하려는 것은 메서드가 아니라 **단위가 초라는 사실**이고,
+        // 그건 여전히 유효하다(JwtUtil 은 plusSeconds 로 쓴다).
         String token = jwtUtil.createAccessToken(userInfo);
-        long expiration = jwtUtil.getExpiration(token);
+        long expiration = jwtUtil.parseClaims(token).getExpiration().getTime();
 
         long expectedMin = System.currentTimeMillis() + 3600L * 1000 - 5000;
         long expectedMax = System.currentTimeMillis() + 3600L * 1000 + 5000;

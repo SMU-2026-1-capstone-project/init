@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authService } from '@/services/authService';
 import { memberService } from '@/services/memberService';
+import { bumpSessionVersion } from '@/services/sessionVersion';
 import type {
   AuthUser,
   LoginRequest,
@@ -59,6 +60,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const res = await authService.login(data);
     const { accessToken, refreshToken, role } = res.data;
 
+    // 여기서부터 «다른 사람» 이다 (이슈 #170). 진행 중이던 재발급이 이 뒤에 끝나면
+    // 그 결과는 옛 세션 것이라 버려져야 한다.
+    //
+    // 위치가 응답 **뒤**인 것이 요점이다. 앞에서 올리면 로그인이 실패했을 때 세션은 그대로인데
+    // 버전만 어긋나, 살아 있는 세션의 401 이 전부 «죽은 세션» 으로 판정되어 재발급이 멈춘다.
+    bumpSessionVersion();
+
     await SecureStore.setItemAsync('accessToken', accessToken);
     await SecureStore.setItemAsync('refreshToken', refreshToken);
     await SecureStore.setItemAsync('userEmail', data.email);
@@ -92,12 +100,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    const accessToken = await SecureStore.getItemAsync('accessToken');
-    const refreshToken = await SecureStore.getItemAsync('refreshToken');
+    // 서버 호출보다 **먼저** 올린다 (이슈 #170). 로그아웃은 서버 응답과 무관하게 로컬 세션을
+    // 정리하므로(아래 catch), 이 시점에 세션은 이미 끝난 것으로 본다. 늦게 올리면 서버 왕복
+    // 동안 완료된 재발급이 토큰을 다시 써넣어 «로그아웃했는데 로그인 상태» 가 된다.
+    bumpSessionVersion();
+
     try {
-      if (accessToken && refreshToken) {
-        await authService.logout({ accessToken, refreshToken });
-      }
+      // 본문 없이 부른다 (#137). Authorization 헤더는 요청 인터셉터가 붙인다 —
+      // 토큰이 없으면 서버가 401 을 주고, 그 경우에도 아래 로컬 정리는 그대로 돈다.
+      await authService.logout();
     } catch {
       // 서버 에러는 무시하고 로컬 세션은 정리
     }
@@ -162,6 +173,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // 서버에 logout API 를 호출하지 않고 로컬만 정리 (토큰 만료 케이스용)
   forceLogout: async () => {
+    bumpSessionVersion();   // 이슈 #170 — logout 과 같은 이유
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('refreshToken');
     await SecureStore.deleteItemAsync('userEmail');
