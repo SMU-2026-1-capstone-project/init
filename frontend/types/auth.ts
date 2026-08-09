@@ -32,6 +32,15 @@ export interface LogoutRequest {
   refreshToken: string;
 }
 
+// 백엔드 ReissueRequestDto (이슈 #135)
+//
+// refresh 하나만 보낸다. 이 API 는 access 가 **만료된 뒤**에 부르는 것이 정상 경로라
+// 인증을 안 태우고, 신원은 refresh token 자신의 서명에서 나온다.
+// 응답은 LoginResponse 와 같은 모양이다 — access·refresh 가 **둘 다** 새 값으로 온다(회전).
+export interface ReissueRequest {
+  refreshToken: string;
+}
+
 // 클라이언트에서 보관하는 사용자 식별 정보
 // 백엔드에 getMe 엔드포인트가 없어서 토큰에 담긴 정보로만 구성
 export interface AuthUser {
