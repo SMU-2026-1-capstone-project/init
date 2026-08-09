@@ -164,6 +164,46 @@ class ReattachFailurePathTest {
     }
 
     /**
+     * 시간 축도 rep 축처럼 이어붙여 보내는가 (이슈 #156).
+     *
+     * <p>AI 는 프레임 시각을 «첫 프레임 도착부터의 경과» 로 만든다. 재부착으로 AI 상태를 새로
+     * 만들면 그 기준이 재부착 시점이 되어 이후 프레임의 {@code timestamp_sec} 이 0 부터 다시
+     * 시작하고, 리포트의 «최악 구간 시각» 이 세션 앞부분과 겹치는 값으로 표시된다. 그래서
+     * Spring 이 {@code session.start_time} 으로부터 이미 흐른 시간을 실어 보낸다 —
+     * {@code initial_rep_count} 가 rep 축에서 하는 일과 같다.
+     *
+     * <p>이 검사가 없으면 «rep 은 이어지는데 시각만 리셋되는» 상태가 조용히 성립한다.
+     */
+    @Test
+    @DisplayName("세션 시작부터의 경과 초가 elapsed_sec 로 실려 나간다 (#156)")
+    void 경과시간이_요청에_실린다() {
+        when(sessionService.findReattachableSession(SESSION_ID, MEMBER_ID))
+                .thenReturn(sessionStartedMinutesAgo(3));
+        when(blockingStub.reattachAnalysis(any(ReattachRequest.class)))
+                .thenReturn(ReattachResponse.newBuilder()
+                        .setSuccess(true).setSessionId(SESSION_ID).setRepCount(3).build());
+
+        service.reattachSession(SESSION_ID, MEMBER_ID);
+
+        org.mockito.ArgumentCaptor<ReattachRequest> captor =
+                org.mockito.ArgumentCaptor.forClass(ReattachRequest.class);
+        verify(blockingStub).reattachAnalysis(captor.capture());
+
+        // 3분 전에 시작했으므로 180초 근처. 테스트 실행 시간만큼의 오차는 허용한다.
+        assertThat(captor.getValue().getElapsedSec())
+                .as("재부착 요청에 경과 시간이 안 실리면 AI 의 시각 기준이 0 으로 리셋된다")
+                .isBetween(180.0, 185.0);
+    }
+
+    private Session sessionStartedMinutesAgo(int minutes) {
+        Member member = Member.builder().id(MEMBER_ID).selectedPersona(SelectedPersona.BEGINNER).build();
+        Exercise exercise = Exercise.builder().id(1L).expectedDurationMinutes(15).build();
+        return Session.builder()
+                .id(SESSION_ID).member(member).exercise(exercise)
+                .startTime(LocalDateTime.now().minusMinutes(minutes)).build();
+    }
+
+    /**
      * 이슈 #76 회귀 방지.
      *
      * <p>여기서 지키는 것은 "gRPC 를 트랜잭션 밖에서 한다"는 <b>경계 자체</b>다. 트랜잭션 안에서

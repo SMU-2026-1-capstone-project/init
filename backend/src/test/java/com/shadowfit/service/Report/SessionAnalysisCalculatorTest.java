@@ -232,6 +232,42 @@ class SessionAnalysisCalculatorTest {
         assertThat(result.getTimeStamp()).isEqualTo("01:20");
     }
 
+    /**
+     * 이 계산기는 {@code timestamp_sec} 이 <b>세션 시작 기준 경과 초</b> 라는 전제 위에 있다 (#156).
+     *
+     * <p>예전에는 그 전제가 깨져 있었다. 실시간 경로의 클라가 {@code Date.now() / 1000}(epoch)를
+     * 보냈고, 변환이 한 군데도 없어 그 값이 그대로 여기까지 왔다. 재현해보니 {@code "01:15"} 대신
+     * <b>{@code "29770991:08"}</b> 이 나왔다 — 에러가 아니라 <b>조용히 틀린 표시</b>다.
+     *
+     * <p>지금은 서버(ai-server)가 도착 시각으로 경과를 만든다. 이 테스트는 그 계약을 <b>소비처
+     * 쪽에서</b> 고정한다 — 생산자가 다시 epoch 를 흘려보내면 여기서 걸린다.
+     */
+    @Test
+    @DisplayName("★ 시각은 세션 시작 기준 경과 초다 — epoch 가 들어오면 표시가 깨진다 (#156)")
+    void timestampIsElapsedSeconds_notEpoch() {
+        // 정상: 서버가 만든 경과 초
+        List<PoseFrameProjection> elapsed = List.of(
+                frame(1, 70.0, 50.0, 130.0),
+                frame(1, 75.0, 50.0, 95.0),   // 바닥 = 대표
+                frame(1, 80.0, 50.0, 120.0)
+        );
+        assertThat(calculator.calculate(session, elapsed).getTimeStamp()).isEqualTo("01:15");
+
+        // 회귀 감시: 같은 순간을 epoch 로 주면 «분» 자리가 세션 길이와 무관한 크기가 된다.
+        // 어떤 운동도 2천만 분을 넘지 않으므로, 이 검사가 곧 «origin 이 뒤바뀌었다» 의 탐지기다.
+        double epochBase = 1_786_259_393.0;
+        List<PoseFrameProjection> epoch = List.of(
+                frame(1, epochBase + 70.0, 50.0, 130.0),
+                frame(1, epochBase + 75.0, 50.0, 95.0),
+                frame(1, epochBase + 80.0, 50.0, 120.0)
+        );
+        int minutes = Integer.parseInt(
+                calculator.calculate(session, epoch).getTimeStamp().split(":")[0]);
+        assertThat(minutes)
+                .as("epoch 가 흘러들면 분 자리가 폭발한다 — 이 값이 정상 범위면 origin 이 섞인 것이다")
+                .isGreaterThan(1_000_000);
+    }
+
     @Test
     @DisplayName("무릎각이 전부 0(미상)이면 예전처럼 중앙 프레임 — 고를 근거가 없을 때는 임의로 고르지 않는다")
     void representativeTimestamp_fallsBackToMiddleWhenAngleUnknown() {
