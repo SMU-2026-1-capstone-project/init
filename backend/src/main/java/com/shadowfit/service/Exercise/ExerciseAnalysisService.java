@@ -37,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.reactive.function.client.WebClient;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -401,9 +400,13 @@ public class ExerciseAnalysisService {
         // 이후 프레임의 timestamp_sec 이 0 부터 다시 시작한다. 그러면 리포트의 «최악 구간 시각» 이
         // 세션 앞부분과 겹치는 값으로 표시된다 — 여기서 이미 흐른 시간을 실어 보내 메운다.
         //
-        // 음수가 나올 일은 없지만(startTime 은 과거다) 시계 조정 등으로 뒤집히면 AI 쪽에서 0 으로
-        // 잘라낸다. 여기서도 막지 않는 이유는 «어느 한쪽만 믿는 상태» 를 만들지 않기 위해서다.
-        double elapsedSec = Duration.between(session.getStartTime(), LocalDateTime.now()).toMillis() / 1000.0;
+        // 값을 **pose_data 에서 되읽는** 것이 핵심이다. 바로 위 rep 축과 같은 데이터원이고, 그래서
+        // 원점도 같다 — 저장된 timestamp_sec 자체가 AI 가 «첫 프레임» 을 0 으로 잡아 만든 값이다.
+        //
+        // session.start_time 기준 경과로 계산하면 안 된다(초판이 그렇게 했다가 고쳤다). 그건 원점이
+        // «세션 생성» 이라, AI 가 «운동 시간이 아니다» 라며 의도적으로 뺀 자세 잡는 시간이 다시
+        // 들어간다. 준비에 20초 걸린 세션이면 재부착 이후 시각이 통째로 20초 앞서 표시된다.
+        double elapsedSec = poseDataRepository.findMaxTimestampSecBySessionId(sessionId);
 
         ReattachRequest.Builder requestBuilder = ReattachRequest.newBuilder()
                 .setSessionId(sessionId)

@@ -39,6 +39,18 @@ public interface PoseDataRepository extends JpaRepository<PoseData, Long> {
     @Query("SELECT COALESCE(MAX(p.repNumber), 0) FROM PoseData p WHERE p.session.id = :sessionId")
     int findMaxRepNumberBySessionId(@Param("sessionId") Long sessionId);
 
+    // 재부착 시 AI 에 주입할 «이미 흐른 초» (이슈 #156). 바로 위 rep 축 복원과 **같은 데이터원**을
+    // 쓰는 것이 핵심이다 — timestamp_sec 은 AI 가 «첫 프레임 도착» 을 0 으로 잡아 만든 값이라,
+    // 여기서 그대로 되읽으면 재부착 후에도 원점이 하나로 유지된다.
+    //
+    // session.start_time 으로부터의 경과를 쓰면 안 된다. 그건 원점이 «세션 생성» 이라, AI 가
+    // 의도적으로 뺀 «자세 잡는 시간» 이 다시 들어가 재부착 이후 시각이 그만큼 부풀려진다.
+    //
+    // ⚠️ 대가: 마지막 프레임 이후 재부착까지의 공백(AI 장애 구간)은 시간 축에 안 잡힌다. 그 구간엔
+    //    분석된 프레임이 없어 «운동 시각» 을 붙일 근거도 없고, 무엇보다 원점을 섞지 않는 쪽을 택했다.
+    @Query("SELECT COALESCE(MAX(p.timestampSec), 0.0) FROM PoseData p WHERE p.session.id = :sessionId")
+    double findMaxTimestampSecBySessionId(@Param("sessionId") Long sessionId);
+
     /**
      * 세션의 <b>rep 단위</b> 평균 sync_rate 목록 (이슈 #75).
      *
