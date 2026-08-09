@@ -1,7 +1,12 @@
 package com.shadowfit.integration;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.shadowfit.dto.login.CustomUserInfoDto;
+import com.shadowfit.global.error.GlobalExceptionHandler;
 import com.shadowfit.global.security.jwt.JwtUtil;
+import org.slf4j.LoggerFactory;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.SelectedPersona;
 import com.shadowfit.model.member.UserRole;
@@ -108,4 +113,41 @@ class MalformedRequestBodyTest {
                 .doesNotContain("com.shadowfit")
                 .doesNotContain("com.fasterxml");
     }
+
+    /**
+     * 🔴 <b>로그에도 클라이언트 값이 남으면 안 된다</b> (CodeRabbit 지적, PR #181).
+     *
+     * <p>응답만 막는 것으로는 부족하다 — Jackson 의 {@code InvalidFormatException} 메시지는
+     * <b>클라이언트가 보낸 값을 그대로 담는다</b>(예: {@code Cannot deserialize value of type
+     * java.lang.Long from String "..."}). 그걸 {@code log.warn} 에 실으면 응답에서 막은 유출이
+     * 로그로 옮겨갈 뿐이다. 로그는 수집·보관·열람 주체가 더 넓어 오히려 노출면이 크다.
+     *
+     * <p>{@code /exercises/sessions} 를 쓰는 이유: {@code VideoRequestDto.exerciseId} 가
+     * {@code Long} 이라 문자열을 넣으면 값이 포함된 파서 메시지가 만들어진다.
+     */
+    @Test
+    @DisplayName("파서 메시지의 클라이언트 값이 로그에도 남지 않는다")
+    void doesNotLeakClientValueIntoLogs() throws Exception {
+        Logger handlerLogger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        handlerLogger.addAppender(appender);
+        try {
+            mockMvc.perform(post("/exercises/sessions")
+                            .header("Authorization", "Bearer " + accessToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"exerciseId\":\"" + LEAK_CANARY + "\"}"))
+                    .andExpect(status().isBadRequest());
+
+            assertThat(appender.list).isNotEmpty();
+            assertThat(appender.list)
+                    .extracting(ILoggingEvent::getFormattedMessage)
+                    .noneMatch(msg -> msg.contains(LEAK_CANARY));
+        } finally {
+            handlerLogger.detachAppender(appender);
+        }
+    }
+
+    /** 로그에 이 문자열이 나타나면 클라이언트 입력이 그대로 실린 것이다. */
+    private static final String LEAK_CANARY = "CANARY-SHOULD-NOT-BE-LOGGED";
 }
