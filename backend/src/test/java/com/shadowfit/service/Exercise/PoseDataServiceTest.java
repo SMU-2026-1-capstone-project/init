@@ -199,6 +199,109 @@ class PoseDataServiceTest {
         assertThat(((Number) rows.get(0).get("TIMESTAMP_SEC")).doubleValue()).isEqualTo(0.2);
     }
 
+    /**
+     * rep 하나치 프레임. {@link #realisticBatch}와 같은 V 자 궤적이되 <b>rep 마다 시각이 겹치지
+     * 않도록</b> 오프셋을 준다 — 여러 rep 을 이어 붙여 비교하는 아래 두 테스트에서 행을
+     * 시각으로 식별해야 하기 때문이다.
+     */
+    private List<PoseDataRequest> repFrames(int repNumber, int frameCount, double syncRate, double tOffset) {
+        List<PoseDataRequest> frames = new java.util.ArrayList<>();
+        for (int i = 0; i < frameCount; i++) {
+            int fromBottom = Math.abs(i - frameCount / 2);
+            frames.add(frame(tOffset + i / 10.0, syncRate, repNumber, 90.0 + fromBottom * 5.0));
+        }
+        return frames;
+    }
+
+    private List<java.util.Map<String, Object>> savedRows() {
+        return jdbcTemplate.queryForList(
+                "SELECT timestamp_sec, smoothed_knee_angle, rep_number FROM pose_data "
+                        + "WHERE session_id = ? ORDER BY timestamp_sec", session.getId());
+    }
+
+    private void clearRows() {
+        jdbcTemplate.update("DELETE FROM pose_data WHERE session_id = ?", session.getId());
+    }
+
+    /**
+     * ★ <b>커밋 횟수 실험(ㄱ안)의 전제를 고정하는 테스트다.</b>
+     *
+     * <p>{@code docs/decisions/commit-count-and-mysql-metrics.md} §2-1 이 *"25프레임×1요청과
+     * 125프레임×1요청은 같은 행을 쓴다 — 바뀌는 것은 커밋 횟수뿐"* 이라고 적었고, ③ 실험의
+     * 조작이 «커밋 횟수 하나» 라는 주장이 여기 걸려 있다. <b>이게 깨지면 그 실험은 두 가지를
+     * 동시에 바꾸는 것이 되어 설계가 무너진다.</b>
+     *
+     * <p>성립하는 이유는 {@code downsample} 의 윈도우가 <b>리스트 시작점 기준으로 정렬</b>되기
+     * 때문이다 — rep 당 프레임 수가 윈도우(5)의 배수면 이어 붙여도 경계가 같은 자리에 떨어진다.
+     */
+    @Test
+    @DisplayName("★ 다운샘플은 배치 경계에 무관하다 — rep 당 프레임이 윈도우(5)의 배수일 때")
+    void downsample_isBatchInvariant_whenFramesPerRepIsMultipleOfWindow() {
+        final int framesPerRep = 25; // 5의 배수
+        final int repCount = 5;
+
+        // A: 지금 구조 — rep 마다 한 요청(= 한 트랜잭션, 커밋 5회)
+        for (int r = 0; r < repCount; r++) {
+            poseDataService.savePoseDataBatch(session.getId(),
+                    repFrames(r + 1, framesPerRep, 70.0, r * 10.0));
+        }
+        List<java.util.Map<String, Object>> perRep = savedRows();
+
+        clearRows();
+
+        // B: ㄱ안 — 5 rep 을 한 요청으로(= 커밋 1회)
+        List<PoseDataRequest> merged = new java.util.ArrayList<>();
+        for (int r = 0; r < repCount; r++) {
+            merged.addAll(repFrames(r + 1, framesPerRep, 70.0, r * 10.0));
+        }
+        poseDataService.savePoseDataBatch(session.getId(), merged);
+        List<java.util.Map<String, Object>> batched = savedRows();
+
+        // 행 수뿐 아니라 «어느 프레임이 남았는가» 까지 같아야 한다. 행 수만 보면 대표 프레임이
+        // 바뀌어도 통과해버리고, 그러면 실험은 «커밋 횟수» 말고 «저장된 자세» 도 바꾼 것이 된다.
+        assertThat(batched).hasSize(repCount * framesPerRep / 5);
+        assertThat(batched).isEqualTo(perRep);
+    }
+
+    /**
+     * ★ 위 불변성의 <b>경계 조건</b>. 같은 문서 §2-1 이 ㄱ안을 «측정용» 으로만 추천하고
+     * 채택 판단을 분리한 근거가 이것이다.
+     *
+     * <p>실제 rep 의 프레임 수는 사용자가 얼마나 천천히 앉았는지에 따라 달라지므로 <b>5의 배수라는
+     * 보장이 없다.</b> 배수가 아니면 윈도우가 rep 경계를 넘어가고, 그때 남는 대표 프레임은 서로
+     * 다른 두 rep 에서 뽑힐 수 있다 — 저장되는 {@code rep_number} 도 그 승자의 것이 된다.
+     *
+     * <p>즉 ghz rig(`--reps 25`)에서는 성립하지만 <b>운영에 채택하면 성립하지 않는다.</b>
+     * 이 테스트는 그 차이를 «나중에 발견» 하지 않으려고 지금 고정해둔다.
+     */
+    @Test
+    @DisplayName("★ 경계 — rep 당 프레임이 윈도우의 배수가 아니면 배치 경계가 결과를 바꾼다")
+    void downsample_isNotBatchInvariant_whenFramesPerRepIsNotMultipleOfWindow() {
+        final int framesPerRep = 23; // 5의 배수가 아니다 — 실제 rep 은 이쪽이 정상이다
+        final int repCount = 5;
+
+        for (int r = 0; r < repCount; r++) {
+            poseDataService.savePoseDataBatch(session.getId(),
+                    repFrames(r + 1, framesPerRep, 70.0, r * 10.0));
+        }
+        List<java.util.Map<String, Object>> perRep = savedRows();
+
+        clearRows();
+
+        List<PoseDataRequest> merged = new java.util.ArrayList<>();
+        for (int r = 0; r < repCount; r++) {
+            merged.addAll(repFrames(r + 1, framesPerRep, 70.0, r * 10.0));
+        }
+        poseDataService.savePoseDataBatch(session.getId(), merged);
+        List<java.util.Map<String, Object>> batched = savedRows();
+
+        // rep 마다 마지막 윈도우가 3프레임짜리 자투리로 끝나던 것이, 이어 붙이면 다음 rep 의
+        // 프레임으로 채워진다. 행 수부터 다르다: 5 × ceil(23/5)=25 vs ceil(115/5)=23
+        assertThat(perRep).hasSize(25);
+        assertThat(batched).hasSize(23);
+        assertThat(batched).isNotEqualTo(perRep);
+    }
+
     @Test
     @DisplayName("배치 지표 — 수신 프레임 수와 다운샘플 후 저장 행수가 stage 태그로 기록됨")
     void savePoseDataBatch_recordsFrameMetrics() {
