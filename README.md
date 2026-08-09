@@ -1,14 +1,14 @@
 # ShadowFit — 통합 레포
 
 
-> 제품 소개·핵심 기능·아키텍처는 [조직 프로필](https://github.com/SMU-2026-1-capstone-project)을 참고하세요. 이 문서는 **이 레포를 어떻게 실행하고 개발하는지**만 다룹니다.
+> 제품 소개·핵심 기능·아키텍처는 [조직 프로필](https://github.com/Shadowfit)을 참고하세요. 이 문서는 **이 레포를 어떻게 실행하고 개발하는지**만 다룹니다.
 
 ---
 
 ## 빠른 시작
 
 ```bash
-git clone https://github.com/SMU-2026-1-capstone-project/init.git
+git clone https://github.com/Shadowfit/init.git
 cd init
 cp .env.example .env   # 값 채우기
 docker compose up -d   # mysql + backend + ai-server 전부 기동
