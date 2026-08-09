@@ -140,14 +140,40 @@ backend/src/test/java/com/shadowfit/global/observability/SessionMetricsExportNam
 
 레지스트리를 직접 만들어 9종을 한 번씩 기록한 뒤 scrape 결과에서 이름·태그·백분위 라벨을 검사한다. **이 테스트가 깨지면 대시보드 JSON 도 같이 고쳐야 한다.**
 
+## MySQL 지표 (mysqld_exporter) — 2026-08-09 추가
+
+`obs` 프로파일에 같이 들어 있다. **기본으로는 안 뜬다.**
+
+계정을 한 번 만들어야 한다 — 앱 계정(`shadowfit`)을 재사용하지 않는다:
+
+```bash
+docker exec -i shadowfit-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < mysql/exporter-user.sql
+docker compose --profile obs up -d mysqld-exporter
+```
+
+익스포터에 필요한 권한(`PROCESS`·`REPLICATION CLIENT`·`performance_schema` SELECT)은 서버 전역 상태를 읽는 권한이라 앱 계정이 가지면 안 되고, 반대로 앱 계정의 DML 권한은 익스포터가 가질 이유가 없다. 두 계정의 필요 권한이 **교집합 없이** 갈린다. `MAX_USER_CONNECTIONS 3` 을 걸어 익스포터가 커넥션을 흘려도 피시험 대상보다 먼저 실패하게 했다.
+
+**포트를 호스트에 열지 않는다** — Prometheus 가 같은 도커 네트워크에서 `9104` 를 긁는다. 백엔드 관리 포트(9090)를 prod 에서 안 여는 것과 같은 이유다.
+
+> ⚠️ **`prometheus.yml` 을 고쳤으면 Prometheus 를 재시작해야 한다.** 설정은 바인드 마운트라 파일은 바로 바뀌지만, **이미 떠 있는 컨테이너는 안 읽는다.** `docker compose --profile obs up -d prometheus` 는 «이미 Running» 이라며 아무것도 안 하고 끝난다 — 타깃을 추가하고도 `/api/v1/targets` 에 **아예 안 나타나서** 익스포터를 의심하게 된다. `docker restart shadowfit-prometheus` 로 올린다.
+
+**실측 확인 (2026-08-09, 로컬)** — 판정에 쓰기로 한 지표가 실제로 존재하고 반응하는지 먼저 확인했다. 3차 실험이 *"수집한 적 없는 지표"* 로 결론을 냈다가 철회한 자리라, EC2 에 돈을 쓰기 전에 확인하는 절차를 넣었다:
+
+| 지표 | 확인 |
+|---|---|
+| `mysql_global_status_innodb_os_log_fsyncs` | ✅ 커밋 60회에 806 → 1,021 로 **반응** |
+| `mysql_global_status_handlers_total{handler="commit"}` | ✅ 존재 |
+| `mysql_global_status_threads_running` · `innodb_row_lock_waits` · `buffer_pool_pages` | ✅ 존재 |
+
+> 🔴 **`Com_commit` 은 커밋 횟수 지표로 쓰지 말 것.** `commands_total{command="commit"}` 은 **명시적 `COMMIT` 문만** 세고 autocommit 커밋은 안 센다 — 위 확인에서 같은 구간에 `Handler_commit` 이 1,042 인데 이쪽은 **0** 이었다. 둘 다 세는 `Handler_commit` 을 쓴다.
+
 ## 🔴 한계 · 넣지 않은 것
 
 - **ai-server (FastAPI) 지표 없음** — Python 쪽에 계측이 아예 없다. 타깃만 적으면 영원히 DOWN 인 타깃이 하나 생겨 "관측 스택이 고장난 것처럼" 보이므로 아예 뺐다
-- **mysqld_exporter 없음** — ~~MySQL 내부 지표는 `loadtest/` 스크립트가 `SHOW STATUS` 로 이미 뜨고 있다. 중복이고 컨테이너만 는다~~
-  🔴 **2026-08-09 정정 — 이 근거가 틀렸다. «중복» 이 아니다.**
+- ~~**mysqld_exporter 없음**~~ → ✅ **2026-08-09 도입** ([#151](https://github.com/Shadowfit/init/issues/151), 아래 절)
+  뺐던 근거는 ~~*"MySQL 내부 지표는 `loadtest/` 스크립트가 `SHOW STATUS` 로 이미 뜨고 있다. 중복이고 컨테이너만 는다"*~~ 였고, **«중복» 이 아니었다.**
   `loadtest/measure_bufferpool.sh`(`Innodb_buffer_pool_*` 6종)·`measure_lock.sh` 가 `SHOW STATUS` 를 쓰는 것은 맞다. 그런데 그건 **특정 실험이 전후로 찍는 스냅샷**이고, exporter 가 주는 것은 **부하 중 시계열**이다. 같은 것으로 보고 «중복» 이라 판정했다.
   실제로 어긋난 사례: 2026-08-08 fsync 천장 실험이 쓴 [`../loadtest/results/ceiling-fsync-2026-08-08/conn_sweep.sh`](../loadtest/results/ceiling-fsync-2026-08-08/conn_sweep.sh) 는 **MySQL 지표를 하나도 걷지 않는다.** 스냅샷 스크립트는 그 실험에 물려 있지도 않았다.
-  → 도입 여부는 다시 판단할 사안이다 ([#151](https://github.com/Shadowfit/init/issues/151)).
 - **알림(Alertmanager) 없음** — 상시 운영이 아니라 볼 때만 켜는 구조라 울릴 대상이 없다
 - **고아 행 게이지는 실시간이 아니다** — 스케줄러가 미리 채운 값을 읽는다(대용량 anti-join 을 스크레이프마다 돌리면 그 자체가 부하). **최대 갱신주기만큼 지연**이 있다
 - **보존 7일** — 그보다 오래된 것은 사라진다. 실험 결과를 남기려면 그래프를 캡처하거나 수치를 문서에 적을 것
