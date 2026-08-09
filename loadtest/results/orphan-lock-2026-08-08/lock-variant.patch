@@ -1,0 +1,47 @@
+diff --git a/backend/src/main/java/com/shadowfit/repository/exercise/SessionRepository.java b/backend/src/main/java/com/shadowfit/repository/exercise/SessionRepository.java
+index 50b09ef..fa61b79 100644
+--- a/backend/src/main/java/com/shadowfit/repository/exercise/SessionRepository.java
++++ b/backend/src/main/java/com/shadowfit/repository/exercise/SessionRepository.java
+@@ -2,8 +2,10 @@ package com.shadowfit.repository.exercise;
+ 
+ import com.shadowfit.model.exercise.Session;
+ import com.shadowfit.model.exercise.Status;
++import jakarta.persistence.LockModeType;
+ import org.springframework.data.jpa.repository.EntityGraph;
+ import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Lock;
+ import org.springframework.data.jpa.repository.Query;
+ import org.springframework.data.repository.query.Param;
+ import org.springframework.stereotype.Repository;
+@@ -24,6 +26,14 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
+     // 개별 세션 삭제(deleteSession) 전용 — exercise fetch join 불필요, 소유권만 WHERE절로 확인.
+     Optional<Session> findByIdAndMemberId(Long sessionId, Long memberId);
+ 
++    // ⚠️ 측정용 변형 (이슈 #87 ㄱ-1). 엔티티가 아니라 id 스칼라만 뽑아 하이드레이션 비용을 뺀다 —
++    // FOR UPDATE 는 그대로 붙으므로 "락만의 비용"이 분리된다.
++    // Session 의 연관이 둘 다 LAZY 라 이 쿼리는 exercise_sessions 한 테이블만 잠근다. EAGER 면
++    // 조인된 users 까지 잠겨 탈퇴(users→sessions)와 락 순서가 엇갈린다.
++    @Lock(LockModeType.PESSIMISTIC_WRITE)
++    @Query("SELECT s.id FROM Session s WHERE s.id = :id")
++    Optional<Long> findIdForUpdate(@Param("id") Long id);
++
+     // 현재 조회 중인 세션 자체를 "이전 세션"으로 잘못 뽑지 않도록 excludeSessionId로 제외
+     // (CodeRabbit 리뷰로 발견 — 현재 세션이 해당 운동의 가장 최근 완료 세션이면 자기 자신과
+     // 비교하는 조용한 버그가 있었음, ReportService.getSessionReport §3).
+diff --git a/backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java b/backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java
+index 439da88..581f61e 100644
+--- a/backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java
++++ b/backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java
+@@ -65,9 +65,9 @@ public class PoseDataService {
+         // 세션 존재 검증 — pose_data는 파티셔닝을 위해 FK(CASCADE)를 제거해서(2026-07-20,
+         // docs/decisions/pose-data-partition-fk-tradeoff.md), 이 체크가 DB의 백업이 아니라
+         // 참조무결성을 보장하는 유일한 장치가 됨. 기존 SESSION_NOT_FOUND 계약도 그대로 유지.
+-        if (!sessionRepository.existsById(sessionId)) {
+-            throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
+-        }
++        // ⚠️ 측정용 변형 (이슈 #87 ㄱ-1). existsById(잠금 없음) → id 스칼라 FOR UPDATE.
++        sessionRepository.findIdForUpdate(sessionId)
++                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+ 
+         // 위 검증이 통과한 순간부터 이 트랜잭션이 커밋될 때까지가 고아 행이 생길 수 있는 창이다
+         // (이슈 #87). 그 사이에 회원 탈퇴가 세션을 지우고 pose_data 정리까지 끝내버리면, 아래

@@ -61,7 +61,7 @@ class MemberControllerIntegrationTest {
     @Test
     @DisplayName("회원가입 — 인증 없이 호출 가능, 200 + username 반환")
     void signup_noAuthRequired_returns200() throws Exception {
-        MemberRequestDto dto = new MemberRequestDto("newuser", "new@test.com", "pw1234", Sex.MALE, UserRole.USER);
+        MemberRequestDto dto = new MemberRequestDto("newuser", "new@test.com", "pw1234", Sex.MALE);
 
         mockMvc.perform(post("/member/signup")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -75,7 +75,7 @@ class MemberControllerIntegrationTest {
     void signup_persistsSex() throws Exception {
         // FEMALE 로 검증한다 — 이 상수가 스키마 ENUM 과 어긋나 있던(FEAMALE) 값이라
         // 철자 정정이 되돌려지면 여기가 같이 깨진다. 스키마 대조는 SchemaEnumConsistencyTest.
-        MemberRequestDto dto = new MemberRequestDto("sexuser", "sex@test.com", "pw1234", Sex.FEMALE, UserRole.USER);
+        MemberRequestDto dto = new MemberRequestDto("sexuser", "sex@test.com", "pw1234", Sex.FEMALE);
 
         mockMvc.perform(post("/member/signup")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -84,6 +84,64 @@ class MemberControllerIntegrationTest {
 
         Member saved = memberRepository.findByEmail("sex@test.com").orElseThrow();
         org.assertj.core.api.Assertions.assertThat(saved.getSex()).isEqualTo(Sex.FEMALE);
+    }
+
+    /**
+     * 이슈 #138 — 공개 회원가입으로 관리자가 될 수 없다.
+     *
+     * <p><b>DTO 가 아니라 raw JSON 을 보내는 이유.</b> {@code MemberRequestDto} 에는 이제 role 필드가
+     * 없어서, DTO 를 직렬화하면 «공격자가 보내는 요청» 을 재현할 수 없다. 공격은 HTTP 본문에 서버가
+     * 모르는 필드를 끼워 넣는 것이므로, 그 형태 그대로 보내야 검증이 된다.
+     *
+     * <p>동시에 이것이 <b>구버전 앱 호환</b>도 확인한다 — 프론트가 아직 {@code role:"USER"} 를 보내고
+     * 있는데(login.tsx), 서버가 모르는 필드로 400 을 내면 기존 앱의 가입이 통째로 깨진다.
+     * 200 을 기대하는 것은 «무시한다»가 의도된 동작이기 때문이다.
+     */
+    @Test
+    @DisplayName("#138 role:ADMIN 을 보내도 무시되고 USER 로 저장된다 (구버전 앱 호환 위해 400 이 아니다)")
+    void signup_withAdminRole_isIgnored() throws Exception {
+        String rawJsonWithRole = """
+                {"username":"attacker","email":"attacker@test.com","password":"pw1234",
+                 "sex":"MALE","role":"ADMIN"}
+                """;
+
+        mockMvc.perform(post("/member/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rawJsonWithRole))
+                .andExpect(status().isOk());
+
+        Member saved = memberRepository.findByEmail("attacker@test.com").orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(saved.getRole()).isEqualTo(UserRole.USER);
+    }
+
+    /**
+     * 이슈 #138 의 「미검증」을 닫는 테스트 — 정적 판독이 아니라 실제로 관리자 API 를 쳐서 확인한다.
+     *
+     * <p>이슈는 세 조각(가입이 role 을 받는다 · CustomUserDetails 가 "ROLE_"+role 로 권한을 만든다 ·
+     * @PreAuthorize 가 그것을 믿는다)을 이어 읽어 «뚫린다»고 판정했지만 재현은 하지 않았다.
+     * 이 테스트는 그 사슬 전체를 통과시켜, <b>수정 후에 실제로 막히는지</b>를 HTTP 로 확인한다.
+     */
+    @Test
+    @DisplayName("#138 가입으로 만든 계정은 관리자 API 에 접근할 수 없다 (403)")
+    void signup_withAdminRole_cannotAccessAdminApi() throws Exception {
+        String rawJsonWithRole = """
+                {"username":"attacker2","email":"attacker2@test.com","password":"pw1234",
+                 "sex":"MALE","role":"ADMIN"}
+                """;
+        mockMvc.perform(post("/member/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rawJsonWithRole))
+                .andExpect(status().isOk());
+
+        // 가입한 계정으로 직접 토큰을 만든다 — 로그인 경로를 타든 여기서 만들든 토큰에 담기는
+        // 권한은 DB 의 role 에서 온다(MemberService.login:66). 저장된 값이 무엇인지가 관건이다.
+        Member attacker = memberRepository.findByEmail("attacker2@test.com").orElseThrow();
+        CustomUserInfoDto info = CustomUserInfoDto.builder()
+                .email(attacker.getEmail()).role(attacker.getRole()).build();
+        String attackerToken = jwtUtil.createAccessToken(info);
+
+        mockMvc.perform(get("/admin/members").header("Authorization", "Bearer " + attackerToken))
+                .andExpect(status().isForbidden());
     }
 
     @Test

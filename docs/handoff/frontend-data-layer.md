@@ -167,7 +167,7 @@ function resolveAiBaseUrl(): string {
 
 const aiApi = axios.create({ baseURL: resolveAiBaseUrl(), timeout: 8000 });
 aiApi.interceptors.request.use((config) => {
-  const token = process.env.EXPO_PUBLIC_INTERNAL_API_TOKEN;
+  const token = process.env.EXPO_PUBLIC_AI_PUBLIC_TOKEN;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -177,8 +177,9 @@ export const aiService = {
 };
 ```
 - **base URL: AI 서버 `:8000` + `/api/v1`** (Spring `:8080` 아님!) → 최종 `POST {host}:8000/api/v1/pose`
-- **인증: `Authorization: Bearer ${EXPO_PUBLIC_INTERNAL_API_TOKEN}`** (AI `InternalAuthMiddleware`가 강제)
-- `EXPO_PUBLIC_INTERNAL_API_TOKEN` 미설정 시 `exercise.tsx`가 폴링 자체를 비활성(현재 DEV 동작과 일치)
+- **인증: `Authorization: Bearer ${EXPO_PUBLIC_AI_PUBLIC_TOKEN}`** (AI `InternalAuthMiddleware`가 강제)
+  - 🔀 **2026-08-09 이름 변경**: `EXPO_PUBLIC_INTERNAL_API_TOKEN` → `EXPO_PUBLIC_AI_PUBLIC_TOKEN`. Spring↔AI gRPC 내부 토큰과 **값을 분리**했다([이슈 #134](https://github.com/Shadowfit/init/issues/134), [`ai-auth-token-flow.md`](../decisions/ai-auth-token-flow.md)). 여기에 내부 토큰을 다시 넣으면 안 된다
+- `EXPO_PUBLIC_AI_PUBLIC_TOKEN` 미설정 시 `exercise.tsx`가 폴링 자체를 비활성(현재 DEV 동작과 일치)
 - 근거: `docker-compose.yml`(8000:8000), AI `app/api/router.py`(prefix `/api/v1`), `app/api/endpoints/pose.py`(`POST /pose`), `app/middleware/auth.py`
 
 ---
@@ -186,7 +187,7 @@ export const aiService = {
 ## 환경변수 (frontend)
 | 변수 | 용도 | 필수 |
 |---|---|---|
-| `EXPO_PUBLIC_INTERNAL_API_TOKEN` | AI 서버 Bearer 인증. 없으면 운동 화면 실시간 포즈 폴링 비활성 | AI 연동 시 필수 |
+| `EXPO_PUBLIC_AI_PUBLIC_TOKEN` | AI 서버 Bearer 인증. 없으면 운동 화면 실시간 포즈 폴링 비활성.<br>⚠️ 서버 `AI_PUBLIC_TOKEN` 과 같은 값, `INTERNAL_API_TOKEN` 과는 **달라야** 함 | AI 연동 시 필수 |
 | `EXPO_PUBLIC_AI_BASE_URL` | AI base URL 강제 override (기본은 Metro host:8000 자동) | 선택 |
 
 ## 별도 이슈 (이번 7개와 무관, 챙길 것)

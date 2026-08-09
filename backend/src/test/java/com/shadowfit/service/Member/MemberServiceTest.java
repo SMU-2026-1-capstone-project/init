@@ -83,7 +83,7 @@ class MemberServiceTest {
         @Test
         @DisplayName("정상 가입 — 비밀번호 인코딩 후 저장, username 반환")
         void signup_success() {
-            MemberRequestDto dto = new MemberRequestDto("user1", EMAIL, "raw-pw", Sex.MALE, UserRole.USER);
+            MemberRequestDto dto = new MemberRequestDto("user1", EMAIL, "raw-pw", Sex.MALE);
             when(memberRepository.existsByEmail(EMAIL)).thenReturn(false);
             when(passwordEncoder.encode("raw-pw")).thenReturn("encoded-pw");
 
@@ -96,10 +96,36 @@ class MemberServiceTest {
             assertThat(captor.getValue().getEmail()).isEqualTo(EMAIL);
         }
 
+        /**
+         * 이슈 #138 — 가입은 권한을 요청자에게서 받지 않는다.
+         *
+         * <p>이 테스트가 지키는 것은 «서버가 USER 로 고정한다»는 계약이고, 그 고정을 보장하는 것은
+         * 검증 로직이 아니라 <b>{@code MemberRequestDto} 에 role 필드가 없다는 사실</b> 하나다.
+         * 그래서 이 테스트는 «필드를 되살리는 변경» 을 잡는 자리다 — 누군가 DTO 에 role 을 다시
+         * 넣고 {@code .role(dto.getRole())} 을 복원하면 여기서 깨진다.
+         *
+         * <p>DTO 에 필드가 없으니 «ADMIN 을 보내는» 것을 이 계층에서는 표현할 수 없다. HTTP 레벨의
+         * 실제 공격 재현은 {@code MemberControllerIntegrationTest.signup_withAdminRole_isIgnored}
+         * 가 raw JSON 으로 담당한다.
+         */
+        @Test
+        @DisplayName("#138 가입 권한은 서버가 USER 로 고정한다 — 클라이언트가 정할 수 없다")
+        void signup_ignoresClientSuppliedRole() {
+            MemberRequestDto dto = new MemberRequestDto("user1", EMAIL, "raw-pw", Sex.MALE);
+            when(memberRepository.existsByEmail(EMAIL)).thenReturn(false);
+            when(passwordEncoder.encode("raw-pw")).thenReturn("encoded-pw");
+
+            memberService.signup(dto);
+
+            ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
+            verify(memberRepository).save(captor.capture());
+            assertThat(captor.getValue().getRole()).isEqualTo(UserRole.USER);
+        }
+
         @Test
         @DisplayName("이미 가입된 이메일이면 USERID_DUPLICATION, 저장 안 함")
         void signup_duplicateEmail_throws() {
-            MemberRequestDto dto = new MemberRequestDto("user1", EMAIL, "raw-pw", Sex.MALE, UserRole.USER);
+            MemberRequestDto dto = new MemberRequestDto("user1", EMAIL, "raw-pw", Sex.MALE);
             when(memberRepository.existsByEmail(EMAIL)).thenReturn(true);
 
             assertThatThrownBy(() -> memberService.signup(dto))

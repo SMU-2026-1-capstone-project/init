@@ -143,7 +143,11 @@ backend/src/test/java/com/shadowfit/global/observability/SessionMetricsExportNam
 ## 🔴 한계 · 넣지 않은 것
 
 - **ai-server (FastAPI) 지표 없음** — Python 쪽에 계측이 아예 없다. 타깃만 적으면 영원히 DOWN 인 타깃이 하나 생겨 "관측 스택이 고장난 것처럼" 보이므로 아예 뺐다
-- **mysqld_exporter 없음** — MySQL 내부 지표는 `loadtest/` 스크립트가 `SHOW STATUS` 로 이미 뜨고 있다. 중복이고 컨테이너만 는다
+- **mysqld_exporter 없음** — ~~MySQL 내부 지표는 `loadtest/` 스크립트가 `SHOW STATUS` 로 이미 뜨고 있다. 중복이고 컨테이너만 는다~~
+  🔴 **2026-08-09 정정 — 이 근거가 틀렸다. «중복» 이 아니다.**
+  `loadtest/measure_bufferpool.sh`(`Innodb_buffer_pool_*` 6종)·`measure_lock.sh` 가 `SHOW STATUS` 를 쓰는 것은 맞다. 그런데 그건 **특정 실험이 전후로 찍는 스냅샷**이고, exporter 가 주는 것은 **부하 중 시계열**이다. 같은 것으로 보고 «중복» 이라 판정했다.
+  실제로 어긋난 사례: 2026-08-08 fsync 천장 실험이 쓴 [`../loadtest/results/ceiling-fsync-2026-08-08/conn_sweep.sh`](../loadtest/results/ceiling-fsync-2026-08-08/conn_sweep.sh) 는 **MySQL 지표를 하나도 걷지 않는다.** 스냅샷 스크립트는 그 실험에 물려 있지도 않았다.
+  → 도입 여부는 다시 판단할 사안이다 ([#151](https://github.com/Shadowfit/init/issues/151)).
 - **알림(Alertmanager) 없음** — 상시 운영이 아니라 볼 때만 켜는 구조라 울릴 대상이 없다
 - **고아 행 게이지는 실시간이 아니다** — 스케줄러가 미리 채운 값을 읽는다(대용량 anti-join 을 스크레이프마다 돌리면 그 자체가 부하). **최대 갱신주기만큼 지연**이 있다
 - **보존 7일** — 그보다 오래된 것은 사라진다. 실험 결과를 남기려면 그래프를 캡처하거나 수치를 문서에 적을 것

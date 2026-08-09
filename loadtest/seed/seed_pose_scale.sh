@@ -5,6 +5,27 @@
 # 행수·payload 디커플링(§0.3): 실제 2.3KB JSON이면 255GB라 로컬 불가 → 더미로 ~11GB.
 # 전제: docker shadowfit-mysql 가동, 버퍼풀 2GB·sort_buffer 64M (docker-compose.yml command).
 #   ⚠️ 기본 버퍼풀 128MB로 돌리면 롤백/풀스캔이 디스크 random I/O로 붕괴(롤백 64행/s) — 반드시 2GB.
+#
+# ── 🔴 이 테이블 정의는 실 pose_data 와 어긋나 있다 (2026-08-09 감사, 이슈 #153) ────────
+#
+#   터지지 않는다 — pose_data_scale 을 아래에서 인라인으로 정의하므로 실 스키마가 바뀌어도
+#   실행은 된다. 문제는 **조용히 다른 테이블을 잰다**는 것이다:
+#
+#     is_correct           여기 있음  ←→  실 pose_data 에서 2026-08-01 삭제
+#     rep_number           여기 없음  ←→  실 pose_data 에 있음 (2026-07-31 추가)
+#     smoothed_knee_angle  여기 없음  ←→  실 pose_data 에 있음 (2026-08-01 추가)
+#
+#   행 크기가 달라졌으므로 **이 시더로 만든 볼륨 위에서 낸 디스크·스캔 비용 결론은 지금
+#   테이블의 것이 아니다.** 새로 재려면 정의부터 맞춰야 한다.
+#
+#   ⚠️ 과거 결과(realmysql-experiments.md §3~4)를 무효로 만들지는 않는다 — 그때는 맞는
+#      정의였다. 무효가 되는 것은 "이 시더를 지금 돌려 나온 값을 현재 테이블의 것으로
+#      인용하는 것"이다.
+#
+#   📌 measure_r.py(#145)·measure_admin_stats_actual.sh(#153)와 같은 계열이다. 셋 다
+#      측정 장치가 대상의 변경을 못 따라온 것이고, 이 건은 그중 **가장 조용한** 축이다 —
+#      앞의 둘은 각각 터지거나 이상한 표를 냈는데 이것은 정상으로 보이는 값을 낸다.
+#
 set -u
 PW=1234
 DB(){ docker exec shadowfit-mysql mysql -uroot -p$PW shadowfit "$@" 2>/dev/null; }

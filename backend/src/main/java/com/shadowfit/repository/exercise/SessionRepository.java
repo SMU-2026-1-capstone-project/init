@@ -102,6 +102,23 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     @Query("SELECT s.id FROM Session s WHERE s.member.id = :memberId AND s.status = :status")
     List<Long> findIdsByMemberIdAndStatus(@Param("memberId") Long memberId, @Param("status") Status status);
 
+    /**
+     * 이 종목으로 만들어진 세션이 <b>한 건이라도</b> 있는가 — 관리자 종목 삭제 가드.
+     *
+     * <p><b>{@code count} 가 아니라 {@code exists} 인 이유.</b> 판정에 필요한 건 0 이냐 아니냐뿐인데
+     * {@code COUNT} 는 조건에 걸린 행을 전부 세야 답이 나온다. 스쿼트({@code id=1})는 사실상 모든
+     * 세션이 달려 있어서, 세면 그 종목의 전 이력을 훑고 결과는 "0 이 아니다" 한 줄로 버려진다.
+     * {@code exists} 는 첫 행에서 멈춘다.
+     *
+     * <p>그 대가로 <b>거부 메시지에 건수를 실을 수 없다</b>("세션 3건이 참조 중"). 관리자가 알아야
+     * 하는 건 "지울 수 있나"이고 몇 건인지는 세션 목록(B)에서 종목으로 걸러 보면 되므로, 여기서
+     * 전수 스캔을 살 이유가 없다고 봤다.
+     *
+     * <p>인덱스는 {@code exercise_sessions.exercise_id} 의 FK 인덱스를 탄다
+     * ({@code V1__baseline.sql:110} — MySQL 이 FK 에 자동 생성).
+     */
+    boolean existsByExerciseId(Long exerciseId);
+
     // ─── 관리자 대시보드 집계 (admin-page-scope.md §3-D) ───────────────────────────
     //
     // 목록(A·B)과 성격이 다르다. 목록은 LIMIT 20 이라 인덱스만 타면 20건만 만지고 끝나지만,

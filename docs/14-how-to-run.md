@@ -171,7 +171,8 @@ Git에는 **소스 코드(레시피)만** 올라가고, **라이브러리(재료
 | `frontend/node_modules/` | 용량이 수백MB~1GB로 너무 큼 | `package.json` + `package-lock.json` | `npm install` |
 | `backend/build/`, `backend/.gradle/` | 빌드 결과물이라 다시 만들 수 있음 | `build.gradle` | `./gradlew build` |
 | MySQL 데이터 | 각자 로컬 환경에서 관리 | `docker-compose.yml` | `docker compose up -d mysql` |
-| `.env` (환경 변수) | 비밀번호/API 키가 포함됨 | 없음 (직접 만들어야 함) | 팀원에게 공유받기 |
+| `.env` (루트 — DB·JWT·내부토큰) | 비밀번호/API 키가 포함됨 | `.env.example` | `cp .env.example .env` 후 값 채우기 |
+| `frontend/.env` (Expo 앱 전용) | 위와 같음. **루트 `.env` 로 대체 안 됨** | `frontend/.env.example` | `cd frontend && cp .env.example .env` ([4-2-1](#4-2-1-frontend-환경-변수-frontendenv----빠뜨리면-실시간-분석이-조용히-안-켜집니다)) |
 
 쉽게 말하면:
 - `package.json` = **레시피** (어떤 재료가 필요한지 적혀 있음) → Git에 올라감
@@ -209,6 +210,26 @@ npm install
 > **시간:** 처음 설치 시 1~3분 정도 걸립니다. 인터넷 속도에 따라 다릅니다.
 >
 > **언제 다시 해야 하나?** `git pull`로 코드를 받았는데 `package.json`이 변경되었을 때 (새 라이브러리가 추가되었을 때). 잘 모르겠으면 `git pull` 후 항상 `npm install`을 해주면 안전합니다.
+
+### 4-2-1. Frontend 환경 변수 (`frontend/.env`) — 🔴 빠뜨리면 실시간 분석이 조용히 안 켜집니다
+
+```bash
+cd frontend
+cp .env.example .env
+# .env 를 열어 EXPO_PUBLIC_INTERNAL_API_TOKEN 에
+# 루트 .env 의 INTERNAL_API_TOKEN 과 **같은 값**을 넣으세요
+```
+
+**루트 `.env` 로는 대체되지 않습니다.** Expo 는 `app.json` 이 있는 디렉터리(= `frontend/`)를 프로젝트 루트로 보고 `.env` 를 읽습니다. 모노레포 루트의 `.env` 는 백엔드·AI·MySQL 용이라 `EXPO_PUBLIC_*` 키가 아예 없습니다.
+
+> 🔴 **증상이 조용해서 알아채기 어렵습니다.** 토큰이 없어도 앱은 **에러 없이** 뜹니다. 로그인도 되고, 카메라도 켜지고, 운동 화면도 정상으로 보입니다. **실시간 자세 분석만 안 돕니다** — [`frontend/app/(tabs)/exercise.tsx:144`](../frontend/app/%28tabs%29/exercise.tsx) 가 토큰이 없으면 프레임 폴링 자체를 켜지 않기 때문입니다. "카메라는 되는데 싱크로율이 안 올라간다" 면 여기부터 확인하세요.
+
+| 변수 | 필수 | 없으면 |
+|---|:--:|---|
+| `EXPO_PUBLIC_INTERNAL_API_TOKEN` | ✅ | 실시간 포즈 폴링 비활성 (위 증상) |
+| `EXPO_PUBLIC_AI_BASE_URL` | — | Metro 호스트의 8000 포트를 자동 사용. AI 서버가 다른 장비에 있을 때만 채웁니다 |
+
+> ⚠️ `EXPO_PUBLIC_INTERNAL_API_TOKEN` 은 **임시방편입니다**([이슈 #134](https://github.com/Shadowfit/init/issues/134)). `EXPO_PUBLIC_` 접두 변수는 빌드 시 앱 번들에 인라인되므로, 이 내부 서비스 토큰이 모든 설치본에 그대로 들어갑니다. 개발을 굴리기 위해 채우는 값이고, 구조 변경은 그 이슈에서 다룹니다.
 
 ### 4-3. Backend 라이브러리 설치 (빌드)
 
@@ -259,9 +280,10 @@ pip install -r requirements.txt
 # 프로젝트 폴더로 이동
 cd shadowfit
 
-# Frontend 라이브러리 설치
+# Frontend 라이브러리 설치 + 환경 변수
 cd frontend
 npm install
+cp .env.example .env        # ← 그다음 EXPO_PUBLIC_INTERNAL_API_TOKEN 을 채울 것 (4-2-1)
 
 # Backend 라이브러리 설치
 cd ../backend

@@ -23,10 +23,14 @@ const aiApi = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// AI 서버 InternalAuthMiddleware: Authorization: Bearer <INTERNAL_API_TOKEN> 강제.
+// AI 서버 InternalAuthMiddleware: Authorization: Bearer <AI_PUBLIC_TOKEN> 강제.
 // 토큰 미설정 시 헤더 없이 보냄(=401) — exercise.tsx 가 토큰 없으면 폴링 자체를 안 함.
+//
+// ⚠️ 이 값은 앱 번들에 인라인된다(EXPO_PUBLIC_ 접두). 그래서 Spring↔AI 내부 gRPC 토큰
+// (INTERNAL_API_TOKEN)과 **값이 분리돼 있다** — 이슈 #134. 여기에 내부 토큰을 다시
+// 붙이면 앱에서 추출한 값으로 Spring 내부 RPC 를 칠 수 있게 되므로 되돌리지 말 것.
 aiApi.interceptors.request.use((config) => {
-  const token = process.env.EXPO_PUBLIC_INTERNAL_API_TOKEN;
+  const token = process.env.EXPO_PUBLIC_AI_PUBLIC_TOKEN;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

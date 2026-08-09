@@ -104,7 +104,9 @@ public class MemberService{
                 .username(dto.getUsername())
                 .email(dto.getEmail())
                 .password(encodedPassword)
-                .role(dto.getRole())
+                // .role(...) 을 부르지 않는다. Member 의 @Builder.Default(UserRole.USER)가
+                // 적용되며, 빌더에서 명시 호출하면 그 default 가 덮어써지므로 — 이 줄이 없는 것이
+                // 곧 "서버가 권한을 고정한다"이다 (이슈 #138, decisions/admin-role-provisioning.md).
                 .sex(dto.getSex())
                 .build();
         memberRepository.save(member);

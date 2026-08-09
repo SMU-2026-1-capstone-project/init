@@ -11,7 +11,9 @@ public class WebConfig implements  WebMvcConfigurer{
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
                 .allowedOriginPatterns("*")
-                .allowedMethods("GET", "POST", "PUT", "DELETE")
+                // PATCH 는 실제 엔드포인트 6곳이 쓴다 (세션 종료 · TTS 설정 · 온보딩 · 관리자 운동 3종).
+                // 빠져 있으면 브라우저가 preflight 단계에서 본 요청을 아예 보내지 않는다.
+                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE")
                 .allowCredentials(true);
     }
 }

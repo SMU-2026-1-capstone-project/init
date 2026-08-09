@@ -129,7 +129,11 @@ volumes:
 >
 > **① AI 8000 은 이제 열려 있다.** 2026-05-24 에 **분기 H2(프론트 → AI 직결)** 를 채택하면서 `docker-compose.yml:95` 에 `"8000:8000"` 이 들어왔다. 위 문단이 걱정한 *"인증 없는 HTTP 경로"* 는 `InternalAuthMiddleware` 로 막았다(`ai-server/app/middleware/auth.py`, `main.py:63`). gRPC 8585 는 여전히 `expose` 만이다.
 >
-> 🔴 **그런데 그 인증에 결함이 있다** ([이슈 #134](https://github.com/Shadowfit/init/issues/134)): 미들웨어가 요구하는 토큰이 **Spring↔AI gRPC 인증과 같은 `INTERNAL_API_TOKEN`** 이고, 프론트는 그것을 `EXPO_PUBLIC_INTERNAL_API_TOKEN` 으로 들고 있다. `EXPO_PUBLIC_` 접두는 **앱 번들에 인라인**되므로 **내부 서비스 토큰이 모든 설치본에 들어간다.**
+> 🟡 **그 인증에 결함이 있었고, 절반만 고쳤다** ([이슈 #134](https://github.com/Shadowfit/init/issues/134)). 예전엔 미들웨어가 요구하는 토큰이 **Spring↔AI gRPC 인증과 같은 `INTERNAL_API_TOKEN`** 이었고, 프론트가 그것을 `EXPO_PUBLIC_` 로 들고 있었다 — `EXPO_PUBLIC_` 접두는 **앱 번들에 인라인**되므로 내부 서비스 토큰이 모든 설치본에 들어갔다.
+>
+> **2026-08-09 에 값을 분리했다**([`ai-auth-token-flow.md`](./decisions/ai-auth-token-flow.md) ㄱ): HTTP 는 `AI_PUBLIC_TOKEN`, gRPC 양방향은 `INTERNAL_API_TOKEN`. **내부 토큰은 이제 클라이언트로 나가지 않는다.**
+>
+> 🔴 **남은 것**: `AI_PUBLIC_TOKEN` 도 번들에 인라인된다 — **토큰을 추출한 누구나 `POST /pose` 를 호출할 수 있다.** 피해가 AI 세션 상태로 한정될 뿐이고, 호출자 신원은 여전히 없다. 근본 해결(세션 단위 단기 토큰)은 **미결정**이다.
 >
 > **② 관리 포트 9090 과 관측 스택이 생겼다** (2026-08-08). 액추에이터를 8080 에서 분리했다 — `/actuator/prometheus` 를 인증 없이 열어야 하는데 8080 은 외부 노출이라 지표가 공개된다.
 >
