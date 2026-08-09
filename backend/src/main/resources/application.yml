@@ -181,7 +181,15 @@ resilience4j:
 
 jwt:
   secret: ${JWT_SECRET}
-  expiration_time: ${JWT_EXPIRATION_TIME:86400}
+  # 30분. 24시간에서 줄였다 (이슈 #137, decisions/token-lifecycle.md §3-0-2).
+  #
+  # ⚠️ **측정값이 아니라 약속(threshold)이다.** 이 프로젝트엔 세션 길이 분포도 SLO 도 사용
+  # 로그도 없어 유도할 근거가 없다. 이 값의 의미는 하나뿐이다 — 블랙리스트를 없앤 대가로
+  # **로그아웃 후 access 가 살아 있는 최대 구간**이 곧 이 값이다.
+  #
+  # 줄일 수 있게 된 전제: 프론트에 재발급 호출이 붙었다(api.ts reissueOnce, #135). 그게 없던
+  # 동안은 수명을 줄이면 그 주기로 사용자가 로그아웃돼서 24시간을 쓸 수밖에 없었다.
+  expiration_time: ${JWT_EXPIRATION_TIME:1800}
   refresh_expiration_time: ${JWT_REFRESH_EXPIRATION_TIME:604800}
 
 internal:

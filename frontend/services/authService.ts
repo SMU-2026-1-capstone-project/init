@@ -3,7 +3,6 @@ import type {
   LoginRequest,
   LoginResponse,
   SignupRequest,
-  LogoutRequest,
   ReissueRequest,
 } from '@/types/auth';
 
@@ -16,9 +15,10 @@ export const authService = {
   signup: (data: SignupRequest) =>
     api.post<string>('/member/signup', data),
 
-  // 백엔드 LogOutRequestDto 가 무엇을 요구하는지 정확히 모르면 토큰 기반으로 보냄
-  logout: (data: LogoutRequest) =>
-    api.post<void>('/member/logout', data),
+  // 본문이 없다 — 서버는 지울 대상을 Authorization 헤더의 요청자로 정한다 (#137 ㄴ-4).
+  // 예전에는 accessToken·refreshToken 을 실어 보냈는데, 전자는 블랙리스트 등록에만 쓰이다
+  // 그 기능이 없어졌고 후자는 요청자 기준으로 바뀐 시점에 이미 안 쓰이고 있었다.
+  logout: () => api.post<void>('/member/logout'),
 
   // 회원 탈퇴
   deleteAccount: (email: string) =>

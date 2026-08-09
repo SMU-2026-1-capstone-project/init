@@ -26,11 +26,8 @@ export interface SignupRequest {
   // 보내도 서버가 무시하지만, 타입에 두면 "정할 수 있는 값"으로 읽힌다.
 }
 
-// 백엔드 LogOutRequestDto - accessToken/refreshToken 둘 다 NotBlank
-export interface LogoutRequest {
-  accessToken: string;
-  refreshToken: string;
-}
+// LogoutRequest 는 없앴다 — POST /member/logout 은 본문을 받지 않는다 (이슈 #137).
+// 서버가 지울 대상을 Authorization 헤더의 요청자로 정하므로 보낼 것이 없다.
 
 // 백엔드 ReissueRequestDto (이슈 #135)
 //

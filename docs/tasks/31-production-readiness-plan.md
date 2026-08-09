@@ -75,9 +75,9 @@
 | | 항목 | 왜 |
 |:--:|---|---|
 | ~~✅~~ | ~~[#138](https://github.com/Shadowfit/init/issues/138) **공개 회원가입이 `role` 을 본문에서 받는다**~~ | 🔄 **닫힘 (`1b73ed2`, 2026-08-09)** — 예측대로 이 축의 절반이었다(2→5, §2-1). 관리자 생성 경로는 [`../decisions/admin-role-provisioning.md`](../decisions/admin-role-provisioning.md) 로 확정 |
-| ✅ | [#135](https://github.com/Shadowfit/init/issues/135) refresh 재발급 경로 부재 | 없어서 access token 유효기간이 **24시간**으로 늘어나 있다 |
-| ✅ | [#137](https://github.com/Shadowfit/init/issues/137) 블랙리스트가 인메모리 | 로그아웃한 토큰이 서버 재기동으로 부활 |
-| ✅ | [#136](https://github.com/Shadowfit/init/issues/136) refresh PK 가 `member_id` | 두 번째 기기 로그인이 첫 기기 토큰을 조용히 덮음 |
+| ~~✅~~ | ~~[#135](https://github.com/Shadowfit/init/issues/135) refresh 재발급 경로 부재~~ | 🔄 **닫힘** — 회전 + 재사용 탐지 + 프론트 연동(`6e57f9a`·`c4dee2c`). access 수명을 줄일 수 있게 된 전제 |
+| ~~✅~~ | ~~[#137](https://github.com/Shadowfit/init/issues/137) 블랙리스트가 인메모리~~ | 🔄 **닫힘 (2026-08-10)** — 저장소를 고르는 대신 **없앴다**(ㄴ-4). access 수명 24시간 → **30분**이 그 대가이자 전제 |
+| ~~✅~~ | ~~[#136](https://github.com/Shadowfit/init/issues/136) refresh PK 가 `member_id`~~ | 🔄 **닫힘** — 결함이 아니라 **정책**으로 확정(ㄱ-1 «1인 1세션»). 스키마 변경 없음. 🔶 프론트 안내 문구는 미착수 |
 | 🔶 | [#134](https://github.com/Shadowfit/init/issues/134) 내부 토큰이 앱 번들에 | 구조 변경이 필요하다(프론트 전용 토큰 or Spring 경유). 위 4개보다 무겁다 |
 | 🔶 | [#149](https://github.com/Shadowfit/init/issues/149) CORS `*` + credentials | PATCH 누락은 버그, 오리진 범위는 하드닝 |
 | 🔶 | Rate limit | [`../19-deployment.md`](../19-deployment.md) §6 `TODO`. 리버스 프록시를 넣으면 앱 코드 없이 닫힌다([`../decisions/reverse-proxy-and-tls.md`](../decisions/reverse-proxy-and-tls.md) §4) |
@@ -160,7 +160,7 @@
 |:--:|---|---|
 | ~~**1**~~ | ~~[#138](https://github.com/Shadowfit/init/issues/138)~~ | ✅ **닫힘 (`1b73ed2`)** — 예측(보안 2→5)이 맞았다 |
 | **1** | 배포 호스트 결정 | **작업이 아니라 결정**인데, 배포/운영 축 9항목 중 7개가 여기에 묶여 있다. 상한 대비 가장 많이 남은 축(1.5 → 7)이고 관측성 3항목도 여기 종속이다. 가장 오래 걸리는 건 여전히 코드가 아니라 결정이다 |
-| **2** | #135·#137·#136 | 인증 나머지. 셋이 **같은 토큰 수명 영역**이라 한 번에 보는 게 싸다. 보안 축을 5 → 8(상한)까지 끌 수 있는 유일한 덩어리이고, 호스트 결정 없이 착수 가능하다 |
+| ~~**2**~~ | ~~#135·#137·#136~~ | ✅ **셋 다 닫힘 (2026-08-10)** — [`../decisions/token-lifecycle.md`](../decisions/token-lifecycle.md) §5. «같은 토큰 수명 영역이라 한 번에 보는 게 싸다» 는 예측이 맞았다: #135 를 넣고 나서야 #137 의 네 번째 선택지(«저장하지 않는다»)가 생겼고, #136 은 코드가 아니라 **정책 확정**으로 닫혔다.<br>🔶 **점수 재판정은 사용자 몫** — 이 축의 남은 항목은 #134(내부 토큰 앱 번들)·#149 오리진 하드닝·rate limit·시크릿 매니저이고, 뒤 둘은 **호스트 결정에 종속**이라 5 → 8 을 지금 다 채울 수는 없다 |
 | **3** | 아웃박스 실패 주입 테스트 | 포폴 서사가 «exactly-once» 를 말하는데 그걸 지탱하는 게 지금 주석뿐이다. **면접 답변이 바뀌는 항목** |
 | **4** | #148 · `application-prod.yml` 신설 | 호스트 없이도 지금 고칠 수 있는 배포 항목 둘. 특히 후자는 **`profiles.active: prod` 가 기본인데 파일이 없어 dev 설정으로 돈다** |
 | **5** | SLO 기준선 | 지표를 늘리기 전에 «얼마면 나쁜가» 가 먼저다. 순서가 뒤집히면 #151 을 채워도 판정에 못 쓴다 |
