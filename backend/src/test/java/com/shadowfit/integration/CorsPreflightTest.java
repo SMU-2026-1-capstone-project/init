@@ -36,9 +36,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * 때문이다. 관리자 프론트가 별도 웹으로 확정돼 있어(docs/decisions/admin-page-scope.md §5-1),
  * 그 화면이 브라우저에 뜨는 순간 드러날 결함이었다.
  *
- * <p>⚠️ 엔드포인트 목록을 <b>하드코딩하지 않는다.</b> 이 결함의 본질은 "PATCH 를 쓰는 컨트롤러가
+ * <p>⚠️ <b>메서드 목록</b>을 하드코딩하지 않는다. 이 결함의 본질은 "PATCH 를 쓰는 컨트롤러가
  * 늘어나는데 CORS 설정이 안 따라온다" 는 드리프트이므로, 실제 {@code RequestMappingHandlerMapping}
  * 에 등록된 메서드 집합을 읽어서 검사한다. 나중에 PUT 만 쓰는 곳에 PATCH 가 새로 생겨도 자동으로 걸린다.
+ *
+ * <p><b>다만 프로브 경로는 하드코딩이다</b> — {@code allowedMethodsHeader()} 가 치는
+ * {@code /admin/exercises/1}. 지금은 CORS 설정이 {@code addMapping("/**")} 하나뿐이라 어느 경로로
+ * 재도 같은 결과가 나오므로 대표성이 있다. 그 대신 <b>PATCH /admin/exercises/{exerciseId}</b> 가
+ * 사라지면 preflight 매칭이 실패해 <b>404</b> 가 나고, 실패 메시지는 CORS 를 가리키지만 실제 원인은
+ * 라우트 소멸이다. 그때는 프로브 경로를 살아 있는 PATCH 엔드포인트로 옮기면 된다.
  *
  * <p>⚠️ 여기서 고정하는 것은 <b>허용 메서드</b>뿐이다. {@code allowedOriginPatterns("*")} +
  * {@code allowCredentials(true)} 조합(= 어떤 오리진이든 그대로 echo)은 이슈 #149 에서 성격이 다른
@@ -102,6 +108,19 @@ class CorsPreflightTest {
                 .contains("PATCH");
     }
 
+    /**
+     * ⚠️ 이 검사는 {@code allowedMethods} 가 <b>메서드를 열거하는 형태</b>라는 데 기댄다.
+     *
+     * <p>preflight 응답의 {@code Access-Control-Allow-Methods} 에 설정된 목록이 통째로 실리는 것은
+     * {@code CorsConfiguration} 이 요청 메서드를 허용 목록에서 찾았을 때의 동작이다. 그런데
+     * {@code allowedMethods("*")} 로 바꾸면 내부 {@code resolvedMethods} 가 null 이 되고, 그러면
+     * <b>요청한 메서드 하나만</b>(= {@code "PATCH"}) 헤더에 실린다. {@code *} 가 열거형보다
+     * <b>더 관대한데도 이 테스트는 실패한다.</b>
+     *
+     * <p>실패 방향은 안전한 쪽(거짓 실패)이라 그대로 두지만, {@code *} 로 바꾸려는 사람이 원인을
+     * 헤매지 않도록 적어둔다 — 그때는 이 검사를 {@code WebConfig} 의 설정값을 직접 읽는 방식으로
+     * 바꿔야 한다.
+     */
     @Test
     @DisplayName("컨트롤러가 실제로 쓰는 메서드는 모두 허용 목록에 있다 — 드리프트 방지")
     void allMappedMethods_areAllowed() throws Exception {
