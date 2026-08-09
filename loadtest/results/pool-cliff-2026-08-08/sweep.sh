@@ -6,7 +6,10 @@
 # 여기서는 app(백엔드) / obs(부하기) 를 분리해 차이가 보이게 한다.
 #
 # ─────────────────────────────────────────────────────────────────────────
-# ⚠️ 이 스크립트는 측정이 끝난 뒤 고쳐졌다 (이슈 #139)
+# ⚠️ 이 스크립트는 측정이 끝난 뒤 고쳐졌다 (이슈 #139 · #141)
+#
+# 고친 것은 **도구**고 데이터가 아니다. 두 건 다 «결과가 틀렸다» 가 아니라 «이 절차를
+# 그대로 복사해 쓰면 안 된다» 쪽이다. #141(호스트 키 검증)은 아래 KNOWN 블록에 있다.
 #
 # 커밋된 sweep2.tsv 는 **수정 전 판본**이 만든 것이다. 수정 전에는 원격 실행이
 # 실패해도 스윕이 계속됐고, 그 실패가 «RPS 0» 이 되어 cliff 판정 변수로 들어갔다:
@@ -29,8 +32,6 @@
 # ─────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 PEM="C:/Users/khjae/AppData/Local/Temp/claude/E--init/b2a0d6c9-7b8c-48b4-90ba-223a20532e31/scratchpad/shadowfit-cliff.pem"
-S="ssh -i $PEM -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
-# ⚠️ 호스트 키 검증을 끈 상태다 — 이슈 #141 로 따로 열려 있다(여기서 고치지 않았다).
 # ⚠️ 퍼블릭 IP 2개(APP/OBS)는 커밋할 때 치환했다. 인스턴스는 측정 직후 전부 삭제했고,
 #    반납된 주소는 지금 다른 계정 것일 수 있다. 재현 시 본인 인스턴스 주소를 넣으면 된다.
 #    사설 IP(172.31.*)는 ghz·Prometheus 원본에도 그대로 박혀 있어 원본 값을 둔다.
@@ -40,6 +41,28 @@ mkdir -p "$OUT"
 LOG="$OUT/sweep2.tsv"
 [ -f "$LOG" ] || printf "c\tpool\trps\tp50_ms\tp95_ms\tp99_ms\tfail\ttotal\n" > "$LOG"
 LO=5; HI=20; N=2000; WARMUP_C=3; WARMUP_SEC=30
+
+# ── 호스트 키 (이슈 #141) ────────────────────────────────────────────────
+# 이전엔 `StrictHostKeyChecking=no` + `UserKnownHostsFile=/dev/null` 이었다. 둘이 같이
+# 있으면 검증이 사실상 없다 — 학습한 키를 버리니 매 접속이 «처음 보는 호스트» 가 되고,
+# 그걸 무조건 수락한다. 이 SSH 가 나르는 것은 원격 명령(컨테이너 재기동·DB DELETE)과
+# env.sh 를 통한 자격증명 참조(DB_PASSWORD·INTERNAL_API_TOKEN·JWT_SECRET)다.
+#
+# 그렇다고 그냥 지우면 안 됐다. EC2 를 반복 재생성하는 실험이라 매번 호스트 키가 바뀌고,
+# `StrictHostKeyChecking=ask` 는 대화형 프롬프트에서 멈춰 자동 스윕을 깬다. 그래서
+# **스윕 시작 전에 한 번 학습(ssh-keyscan)하고, 그 뒤로는 엄격 검증**한다.
+#
+# 이 실험에 실제로 필요한 성질이기도 하다 — «인스턴스를 재생성했는지 아닌지» 가 측정
+# 조건이므로, 세션 도중 키가 바뀌면 조용히 붙는 게 아니라 멈춰야 맞다.
+#
+# ⚠️ 첫 학습 순간은 여전히 TOFU 다. 그 창까지 없애려면 인스턴스 콘솔 출력의 지문과
+#    대조해야 한다 — 부팅 로그를 기다려야 해서 자동화하지 않았다. 필요하면 수동으로:
+#      aws ec2 get-console-output --instance-id <id> --output text | grep -A2 'SSH HOST KEY'
+#    아래 학습 단계가 출력하는 지문과 눈으로 맞추면 된다.
+KNOWN="$OUT/known_hosts"
+touch "$KNOWN"; chmod 600 "$KNOWN" 2>/dev/null
+S="ssh -i $PEM -o UserKnownHostsFile=$KNOWN -o StrictHostKeyChecking=yes -o ConnectTimeout=10"
+SCP_OPTS=(-o "UserKnownHostsFile=$KNOWN" -o StrictHostKeyChecking=yes)
 
 die() {
   echo "" >&2
@@ -52,6 +75,23 @@ die() {
 # 실패한 판을 TSV 에 «숫자가 아닌 것» 으로 남긴다. 이게 이 스크립트의 핵심 규칙이다:
 # 실패는 0 이 아니다. 0 은 «측정했더니 0» 이라는 뜻이고, 실패는 «측정하지 못했다» 다.
 fail_row() { printf "%s\t%s\tFAIL\t-\t-\t-\t-\t-\n" "$1" "$2" >> "$LOG"; }
+
+learn_host() {  # $1 = 호스트, $2 = 이름표
+  local h=$1 tag=$2 keys
+  if ssh-keygen -F "$h" -f "$KNOWN" >/dev/null 2>&1; then
+    echo "  $tag ($h): 이미 학습된 키를 쓴다"
+    return 0
+  fi
+  keys=$(ssh-keyscan -T 10 -H "$h" 2>/dev/null)
+  # 🔴 여기서 빈 값을 그냥 넘기면 known_hosts 가 비어 «엄격 검증» 이 껍데기가 된다.
+  #    #139 와 같은 계열의 실수라 명시적으로 막는다.
+  [ -n "$keys" ] && ssh-keygen -lf - <<< "$keys" >/dev/null 2>&1 \
+    || die "$tag ($h) 의 호스트 키를 못 읽었다 — 인스턴스가 안 떴거나 22 가 막혔다"
+  printf '%s\n' "$keys" >> "$KNOWN"
+  echo "  $tag ($h) 지문:"
+  ssh-keygen -lf - <<< "$keys" | sed 's/^/    /'
+  return 0
+}
 
 restart() {  # $1 = pool
   local pool=$1 rc
@@ -124,8 +164,7 @@ run() {  # $1=c $2=pool  -> stdout "rps fail" / 실패 시 non-zero
     return 1
   fi
 
-  if ! scp -i "$PEM" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -q \
-           ec2-user@$OBS:/tmp/$f "$OUT/$f"; then
+  if ! scp -i "$PEM" "${SCP_OPTS[@]}" -q ec2-user@$OBS:/tmp/$f "$OUT/$f"; then
     echo "  ✗ 결과 회수(scp) 실패 (c=$c pool=$pool) — 원격 /tmp/$f 는 남아 있다" >&2
     fail_row "$c" "$pool"
     return 1
@@ -190,6 +229,14 @@ sys.exit(0 if a >= b else 1)" "$1" "$2"
   [ $rc -le 1 ] || die "판정값이 숫자가 아니다: '$1' vs '$2'"
   return $rc
 }
+
+echo "=== 호스트 키 학습 (이슈 #141) ==="
+learn_host "$APP" "app"
+learn_host "$OBS" "obs"
+echo "  → 이후 접속은 StrictHostKeyChecking=yes 로 검증한다."
+echo "     세션 도중 키가 바뀌면 접속이 거부되고 스윕이 멈춘다 — 그게 의도다."
+echo "     (IP 를 재사용해 옛 키가 남아 거부되면: rm $KNOWN)"
+echo
 
 echo "=== 스윕 v2 (부하기 분리) 시작 $(date +%T) ==="
 for c in 10 20 30 50 100; do

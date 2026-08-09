@@ -131,6 +131,21 @@ in-flight 취소(`Unavailable — use of closed network connection`)다. 이 프
 피하려던 것이었다. **한 결함을 피하려다 이미 해결돼 있던 다른 결함을 되살렸다.** §1 의 본 판들은
 `-n 12000` 으로 돌려 실패 0 이다.
 
+### 스크립트가 SSH 호스트 키 검증을 끄고 돌았다 (이슈 #141, 사후 수정)
+
+`conn_sweep.sh` 가 `StrictHostKeyChecking=no` + `UserKnownHostsFile=/dev/null` 로 붙었다. 둘이
+같이 있으면 검증이 **사실상 없다** — 학습한 키를 버리니 매 접속이 «처음 보는 호스트» 가 되고
+그걸 무조건 수락한다.
+
+⚠️ **측정 결과에는 영향이 없다.** 이건 «절차» 결함이지 «수치» 결함이 아니다. 대상은 측정 직후
+삭제된 임시 EC2 였고 같은 VPC·짧은 세션이었다. **그래도 이 스크립트는 재현용으로 커밋됐고**,
+다음 사람이 그대로 복사해 쓰는 것이 전제다.
+
+고친 뒤: 시작할 때 `ssh-keyscan` 으로 **한 번 학습**하고 지문을 출력한 다음, 그 뒤로는
+`StrictHostKeyChecking=yes` 로 검증한다. 자동화는 유지되고 «세션 도중 키가 바뀌면 멈춘다» 를
+얻는다. ⚠️ 첫 학습 순간은 여전히 TOFU 이며, 그 창까지 없애는 방법(콘솔 출력 지문 대조)은
+`../pool-cliff-2026-08-08/sweep.sh` 헤더에 명령까지 적어뒀다 — 자동화하지는 않았다.
+
 ### 안 본 것
 
 - **커밋 횟수를 줄이는 앱 레벨 변경**은 측정하지 않았다(§5 첫 줄) — 유일하게 내구성을 안 깎는 레버인데 미검증
@@ -150,4 +165,4 @@ in-flight 취소(`Unavailable — use of closed network connection`)다. 이 프
 | `ghz/fsync2.json` | `flush=2`·`sync_binlog=1` 중간 확인 (355.8 RPS) |
 | `ghz/conn.tsv` | 커넥션 스윕 원본 로그 |
 | `results.tsv` | 전 판 요약 (ghz 원본에서 재생성 가능) |
-| `conn_sweep.sh` | §2 실행 스크립트 |
+| `conn_sweep.sh` | §2 실행 스크립트. ⚠️ **측정 후 고쳐졌다** — SSH 호스트 키 검증(§7 이슈 #141). 커밋된 `conn.tsv`·`results.tsv` 는 수정 전 판본의 산출물이다 |
