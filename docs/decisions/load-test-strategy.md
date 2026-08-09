@@ -14,12 +14,32 @@
 3-tier 구조와 부하 흐름:
 
 ```
-프론트 ──실시간 프레임(base64, 10fps)──> AI서버(FastAPI, MediaPipe)
+프론트 ──실시간 프레임(base64, ~3fps)──> AI서버(FastAPI, MediaPipe)
    │                                          │ CPU bound, 단일 인스턴스, in-memory session_state
    └──REST(로그인·세션·리포트)──> 백엔드(Spring+MySQL) <──gRPC 콜백──┘
 ```
 
-[`./ai-load-budget.md`](./ai-load-budget.md) §3 측정 분해상 **MediaPipe 추론이 CPU 시간의 95%+** 점유. 프레임당 20~50ms CPU, 4코어 ≈ 동시 6~8세션이 한계. 단일 인스턴스 + `session_state` in-memory 라 수평 확장도 막혀 있음([`./ai-backend-coupling.md`](./ai-backend-coupling.md) 분기 D).
+[`./ai-load-budget.md`](./ai-load-budget.md) §3 측정 분해상 **MediaPipe 추론이 CPU 시간의 95%+** 점유. 단일 인스턴스 + `session_state` in-memory 라 수평 확장도 막혀 있음([`./ai-backend-coupling.md`](./ai-backend-coupling.md) 분기 D).
+
+> ✅ **동시 세션 한계 실측 (2026-08-09)** — [`loadtest/results/ai-concurrency-2026-08-09/`](../../loadtest/results/ai-concurrency-2026-08-09/README.md).
+> 이 줄에 있던 *"프레임당 20~50ms CPU, 4코어 ≈ 동시 6~8세션"* 은 **추정이었고, 이제 실측이 있다.**
+>
+> | | 추정(구) | 실측 |
+> |---|---|---|
+> | 클라 fps | 10fps | **~3fps** (`exercise.tsx:150` `intervalMs=330`) |
+> | 프레임당 추론 | 20~50ms | **103.4ms** (p50 100.5 · p95 129.1) |
+> | 동시 세션 | 4코어 ≈ 6~8 | **물리 2코어에서 총 18.3 fps 포화 ÷ 3fps ≈ 동시 6세션.** 코어 선형 가정 시 4물리코어 ≈ ~12 |
+>
+> **결론의 자릿수는 안 바뀐다** — 두 오차가 반대 방향이라 상쇄된다. DAU 1,000 의 피크 동시 ~67세션(§4.2) 대비
+> **여전히 5~10배 부족**하고, 이제 근거가 추정이 아니라 실측이다.
+>
+> ⚠️ 103.4ms 는 i3-6100 + Docker Desktop 값이라 **절대값으로 인용하지 말 것**. 코어 «개수» 와는 무관하지만
+> 코어 «속도» 에는 비례한다. 그리고 논리 4코어에서 처리량이 1.73배까지만 올랐다 — **물리 2코어 + HT** 가 그대로 드러난다.
+>
+> 🔴 그리고 이 측정에서 별건이 나왔다 — [#164](https://github.com/Shadowfit/init/issues/164):
+> 검출기가 스레드 로컬(`mediapipe_detector.py:107`)인데 FastAPI 는 스레드풀에서 돌려(`pose.py:52`),
+> **동시 세션이 한 스레드를 공유하면 서로의 트래킹을 깨뜨려 프레임이 버려진다**(최악의 경우 검출률 20/20 → 11/20).
+> 이건 처리량 문제가 아니라 **품질 문제**라 위 «동시 N세션» 계산과 별개로 걸린다.
 
 → **시스템 전체 병목은 AI 추론.** 백엔드(Spring+MySQL)는 이 구조에서 가장 안 터지는 tier.
 → 백엔드의 "부하" 는 throughput(QPS)이 아니라 **누적 데이터량에서의 쿼리 저하** 에서 나옴 (§4).

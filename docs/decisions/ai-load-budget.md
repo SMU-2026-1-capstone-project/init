@@ -39,10 +39,22 @@ AI(FastAPI) 한 인스턴스가 다음을 모두 처리한다:
 
 빈도·체감 비용·TTS 기여 여부를 한 표로:
 
-| 단계 | 빈도 (10fps · 5분 세션 가정) | 단건 비용 (체감) | 세션 누적 | TTS 기여? |
+> 🔴 **정정 (2026-08-09) — 아래 표의 «10fps» 와 «20~50ms» 두 전제가 다 틀렸다.**
+> 원본은 [`loadtest/results/ai-concurrency-2026-08-09/`](../../loadtest/results/ai-concurrency-2026-08-09/README.md).
+>
+> | 전제 | 표의 값 | 실제 |
+> |---|---|---|
+> | 클라 전송 fps | 10fps | **~3fps** — `frontend/app/(tabs)/exercise.tsx:150` 이 `intervalMs = 330`. ai-server 도 `session_state.py:47` 에서 `MIN_FRAME_INTERVAL_SEC = 0.300` 으로 상한을 건다(#143) |
+> | MediaPipe 프레임당 | 20~50ms | **103.4ms 실측** (p50 100.5 / p95 129.1). 단 i3-6100 + Docker Desktop 기준이라 **서버급 CPU 에서는 더 빠를 것** — 절대값으로 인용하지 말 것 |
+>
+> **두 오차가 서로 반대 방향이라 «세션당 CPU 누적» 은 우연히 비슷하다** (10fps×35ms ≈ 3fps×103ms).
+> 그래서 아래 «CPU 시간의 95%+ 를 MediaPipe 가 점유» 라는 **결론은 그대로 유효**하고,
+> 틀린 것은 빈도(3,000회 → ~900회)와 단건 비용이다.
+
+| 단계 | 빈도 (~~10fps~~ **3fps** · 5분 세션 가정) | 단건 비용 (체감) | 세션 누적 | TTS 기여? |
 |------|:--:|:--:|:--:|:--:|
 | base64 디코드 + BGR→RGB | 3,000회 | 하 (~1ms) | ~3s | — |
-| **MediaPipe 추론** | 3,000회 | **상 (~20~50ms CPU, GPU 면 ~5ms)** | **~1~3분 CPU 누적** | — |
+| **MediaPipe 추론** | ~~3,000회~~ **~900회** | **상 (~~20~50ms~~ **실측 103ms** CPU, GPU 면 ~5ms)** | **~1.5분 CPU 누적** | — |
 | 각도 추출 + EMA smoothing | 3,000회 | 무시 (~0.1ms) | ~0.3s | — |
 | rep 감지 state machine | 3,000회 | 무시 | ~0.1s | — |
 | **DTW sync_rate** (window=10, 관절 4~6개) | rep 당 1회 (≈75회) | **중 (~5~20ms, rep 프레임 수 비례)** | **~1s** | — |
