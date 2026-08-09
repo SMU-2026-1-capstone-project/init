@@ -58,6 +58,14 @@ public enum ErrorCode {
     // 말할 수 있는 근거가 그것이다. 상태값으로 막으면 앱이 죽어 IN_PROGRESS 로 남은 세션 때문에
     // 운동 중이 아닌 사용자에게 이 메시지가 나가고, 그때 이 안내는 거짓말이 된다.
     WITHDRAWAL_BLOCKED_BY_ACTIVE_SESSION(409, "W010", "운동을 종료한 뒤 탈퇴할 수 있습니다."),
+    // 관리자 운동 종목 삭제 거부. exercise_references·exercise_feedback_templates 는 FK 가
+    // ON DELETE CASCADE 라 같이 지워지지만, exercise_sessions 만 CASCADE 가 없다
+    // (V1__baseline.sql:83·278 vs :110). 즉 "이 종목으로 운동한 이력이 한 건이라도 있으면
+    // 지울 수 없다"가 스키마가 이미 내린 결정이고, 이 코드는 그걸 500 대신 409 로 옮긴 것이다.
+    //
+    // 세션이 있는데도 지우려면 이력을 먼저 처리해야 하는데, 그건 "운동 종목 삭제"가 아니라
+    // "회원 운동 기록 삭제"라 별개 결정이다. 그래서 여기서는 거부만 한다.
+    EXERCISE_DELETE_NOT_ALLOWED(409, "W011", "운동 이력이 있는 종목은 삭제할 수 없습니다."),
 
     // --- F10-1 Filtering Engine ---
     LOW_SYNC_RATE(400, "V001", "운동 싱크로율이 너무 낮아 기록되지 않았습니다."),
