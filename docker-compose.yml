@@ -99,6 +99,10 @@ services:
       DEBUG: "false"
       TZ: Asia/Seoul
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+      # 프론트 → AI HTTP 직결 전용. 앱 번들에 배포되는 값이라 위 내부 토큰과 분리한다
+      # (이슈 #134, decisions/ai-auth-token-flow.md ㄱ). 프론트는 같은 값을
+      # EXPO_PUBLIC_AI_PUBLIC_TOKEN 으로 갖는다.
+      AI_PUBLIC_TOKEN: ${AI_PUBLIC_TOKEN}
       POSE_MODEL_COMPLEXITY: 1
       BACKEND_URL: http://shadowfit-backend:8080/api/v1
     healthcheck:

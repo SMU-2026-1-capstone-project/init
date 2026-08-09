@@ -73,7 +73,7 @@
 
 **이건 재개 기능과 무관하게 지금 새고 있는 부분이다.** 재개를 만들든 안 만들든 고쳐야 한다.
 
-> 참고: 폴러는 `EXPO_PUBLIC_INTERNAL_API_TOKEN` 이 설정돼 있어야만 돈다(`exercise.tsx:144-145`). 이 값이 없는 환경에서는 위 증상이 안 보인다.
+> 참고: 폴러는 `EXPO_PUBLIC_AI_PUBLIC_TOKEN` 이 설정돼 있어야만 돈다(`exercise.tsx:144-145`). 이 값이 없는 환경에서는 위 증상이 안 보인다. (2026-08-09 이전 이름은 `EXPO_PUBLIC_INTERNAL_API_TOKEN` — [이슈 #134](https://github.com/Shadowfit/init/issues/134) 로 분리됐다.)
 
 ---
 

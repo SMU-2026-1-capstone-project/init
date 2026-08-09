@@ -138,10 +138,11 @@ export default function ExerciseScreen() {
   // ── AI 폴링 (분기 H2) ────────────────────────────────────
   // takePictureAsync 는 셔터·인코딩 비용이 크므로 10fps 는 비현실적.
   // ~3fps (330ms) 로 시작, 실제 디바이스에서 부담되면 더 줄여도 됨.
-  // INTERNAL_API_TOKEN 미설정 시 폴링 비활성 (DEV 시연 모드 — DEV 패널만 동작)
+  // AI_PUBLIC_TOKEN 미설정 시 폴링 비활성 (DEV 시연 모드 — DEV 패널만 동작)
+  // 내부 gRPC 토큰과 값이 분리돼 있다 (이슈 #134) — aiService.ts 주석 참고
   useEffect(() => {
     if (!isRecording || sessionId == null) return;
-    const token = process.env.EXPO_PUBLIC_INTERNAL_API_TOKEN;
+    const token = process.env.EXPO_PUBLIC_AI_PUBLIC_TOKEN;
     if (!token) return;
 
     let cancelled = false;

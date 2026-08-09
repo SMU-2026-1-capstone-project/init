@@ -18,8 +18,12 @@
 >
 > | 지점 | 확인한 것 |
 > |---|---|
-> | `ai-server/app/middleware/auth.py:41` | `token != settings.INTERNAL_API_TOKEN` → **Spring↔AI gRPC 와 같은 토큰**을 요구한다 |
-> | `frontend/services/aiService.ts:29` | `process.env.EXPO_PUBLIC_INTERNAL_API_TOKEN` 을 읽어 `Authorization: Bearer` 로 붙인다 |
+> | `ai-server/app/middleware/auth.py:41` | ~~`token != settings.INTERNAL_API_TOKEN` → **Spring↔AI gRPC 와 같은 토큰**을 요구한다~~ |
+> | `frontend/services/aiService.ts:29` | ~~`process.env.EXPO_PUBLIC_INTERNAL_API_TOKEN` 을 읽어 `Authorization: Bearer` 로 붙인다~~ |
+>
+> 🔀 **2026-08-09 — 위 두 줄은 해소됐다.** 값을 분리했다([`ai-auth-token-flow.md`](../decisions/ai-auth-token-flow.md) ㄱ): HTTP 미들웨어는 `AI_PUBLIC_TOKEN`, gRPC 양방향은 `INTERNAL_API_TOKEN`. 프론트는 `EXPO_PUBLIC_AI_PUBLIC_TOKEN` 을 읽는다. **내부 토큰은 더 이상 번들에 들어가지 않는다.**
+>
+> 🔴 **다만 아래 문단의 지적 자체가 사라진 것은 아니다** — 새 토큰도 번들에 인라인되므로 «설치본을 가진 누구나 `/pose` 를 호출할 수 있다» 는 그대로다. 달라진 것은 그 토큰으로 **Spring 내부 gRPC 를 칠 수 없다**는 점뿐이다.
 >
 > **`EXPO_PUBLIC_` 접두 변수는 빌드 시 클라이언트 번들에 인라인된다** — 즉 **모든 앱 설치본에 내부 서비스 토큰이 들어간다.** 그 토큰은 `docker-compose.yml` 이 Spring·AI 양쪽에 같은 값으로 주입하는 것이고, Spring 의 `InternalAuthInterceptor` 가 gRPC 6565 인증에 쓰는 것과 동일하다.
 >
