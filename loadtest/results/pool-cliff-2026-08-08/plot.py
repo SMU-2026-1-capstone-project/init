@@ -35,8 +35,15 @@ Prometheus query_range 결과(JSON)를 SVG 꺾은선으로 그린다. 의존성 
 
 스크레이프 간격이 **15초**인데 판 하나가 **9.6~9.8초**다. 판별로 잘라 보면 샘플이
 0~1개인 판이 나온다. 이건 그리기 문제가 아니라 **데이터에 없는 것**이고 plot.py 가
-채워줄 수 없다. 대신 창 안 샘플 수를 **표준출력과 SVG 부제 양쪽에** 적어서, 점 몇
-개짜리 선을 추세로 읽지 않도록 한다.
+채워줄 수 없다.
+
+대신 부제에 `샘플 31/44` 처럼 **실제 개수와 «빈틈 없이 찍혔다면 몇 개일지»** 를 나란히
+적는다. 뒤엣값은 관측된 스크레이프 간격에서 유도한 것이지 «이만큼은 있어야 한다» 는
+기준선이 아니다 — 차이의 대부분은 백엔드 재시작으로 빠진 스크레이프다.
+
+⚠️ **«샘플 몇 개 미만이면 못 믿는다» 같은 임계는 걸지 않았다.** 그 숫자를 정할 근거가
+없다. 대신 «선이 그려지는가» 라는 사실만 표시한다 — 꺾은선은 점 2개부터 그려지므로,
+점이 1개인 계열은 부제에 «선이 아니라 점이다» 로 뜬다. 판단은 보는 사람이 한다.
 
 ⚠️ 그래프에 보이는 톱니·끊김은 대부분 **백엔드 재시작**이다. 스윕이 풀 크기를
 바꿀 때마다 컨테이너를 새로 띄우므로 그 구간 지표가 사라진다. 고장이 아니다.
@@ -52,8 +59,11 @@ W, H = 960, 300
 PAD_L, PAD_R, PAD_T, PAD_B = 70, 190, 48, 40
 COLORS = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2"]
 
-# 창 안 샘플이 이 수 미만이면 «추세» 로 읽으면 안 된다고 표시한다.
-SPARSE_SAMPLES = 3
+# 꺾은선은 점 2개부터 그려진다. 이건 임의 기준이 아니라 렌더러의 사실이라, 점이 1개인
+# 계열은 «선이 없는 그림» 이 된다 — 그 사실만 적는다. «몇 개부터 적은가» 같은 임계는
+# 근거가 없어 걸지 않고, 대신 샘플 수와 «스크레이프 간격으로 채워졌을 때의 개수» 를
+# 나란히 보여줘서 판단은 보는 사람이 하게 한다.
+MIN_POINTS_FOR_LINE = 2
 
 
 def load(path):
@@ -157,13 +167,18 @@ def render(series, title, out, window=None, step=None):
 
     # 부제 — 이 그림이 «어느 구간» 인지 그림 자체가 말하게 한다(이슈 #140).
     n = len(xs)
-    sub = "%s ~ %s UTC · 샘플 %d개" % (
-        utc(x0).strftime("%H:%M:%S"), utc(x1).strftime("%H:%M:%S"), n)
+    head = "%s ~ %s UTC · " % (utc(x0).strftime("%H:%M:%S"), utc(x1).strftime("%H:%M:%S"))
     if step:
-        sub += " · 스크레이프 %ds" % step
-    sparse = n < SPARSE_SAMPLES
-    if sparse:
-        sub += "  ⚠️ 점이 너무 적다 — 추세로 읽지 말 것"
+        # 빈틈 없이 찍혔다면 몇 개일지 — 관측된 간격에서 유도한 값이지 기준선이 아니다.
+        # 실제가 이보다 적으면 그만큼 스크레이프가 빠진 것이다(대개 백엔드 재시작).
+        full = len(series) * (int((x1 - x0) // step) + 1)
+        sub = head + "샘플 %d/%d개 · 스크레이프 %ds" % (n, full, step)
+    else:
+        sub = head + "샘플 %d개" % n
+    # 선이 없는 계열이 있는지 — 임계가 아니라 «그려지는가» 라는 사실이다.
+    lineless = sum(1 for _, pts in series if len(pts) < MIN_POINTS_FOR_LINE)
+    if lineless:
+        sub += "  ⚠️ %d개 계열은 점 1개 — 선이 아니라 점이다" % lineless
     if window is None:
         sub += "  ⚠️ 구간 미지정 — y축이 창 전체에 지배된다"
 
@@ -173,7 +188,7 @@ def render(series, title, out, window=None, step=None):
     L.append('<text x="%d" y="20" font-size="14" font-weight="600" fill="#111827">%s</text>'
              % (PAD_L, esc(title)))
     L.append('<text x="%d" y="36" font-size="11" fill="%s">%s</text>'
-             % (PAD_L, "#b45309" if (sparse or window is None) else "#6b7280", esc(sub)))
+             % (PAD_L, "#b45309" if (lineless or window is None) else "#6b7280", esc(sub)))
     # y 격자 5칸
     for i in range(5):
         v = y0 + (y1 - y0) * i / 4
@@ -283,7 +298,8 @@ def main():
         cnt = sum(len(p) for _, p in picked)
         out = os.path.join(args.dir, "..", f"{name}.svg")
         if render(picked, TITLES.get(name, name), out, window=window, step=step):
-            warn = "  ⚠️ 점이 너무 적다" if cnt < SPARSE_SAMPLES else ""
+            lineless = sum(1 for _, p in picked if len(p) < MIN_POINTS_FOR_LINE)
+            warn = f"  ⚠️ {lineless}개 계열은 점 1개" if lineless else ""
             print(f"wrote {os.path.basename(out)}  ({len(picked)} 계열, 샘플 {cnt}개){warn}")
             n += 1
     print(f"총 {n} 개")

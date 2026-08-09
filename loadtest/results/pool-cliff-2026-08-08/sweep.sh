@@ -200,10 +200,10 @@ if ok == 0:
 if rps <= 0:
     print(f"  ✗ RPS 가 0 이다 ({f})", file=sys.stderr)
     raise SystemExit(5)
-if fail > tot * 0.05:
-    print(f"  ⚠️ 실패율 {fail}/{tot} ({fail/tot:.1%}) — 이 판의 RPS 를 "
-          f"plateau 로 쓰면 판정이 흔들린다", file=sys.stderr)
 
+# 위 셋은 «사건의 유무»(0 인가 아닌가)이지 «얼마까지 참는가» 가 아니다. 후자는 넣지
+# 않는다 — 실패율 몇 %부터 «판정이 흔들린다» 고 할 근거가 없다. 실패 건수는 TSV 와
+# 호출부 출력에 사실로 남고, 판단은 그걸 보는 사람이 한다.
 open(log, 'a').write(
     f"{c}\t{pool}\t{rps}\t{d.get(50,-1)}\t{d.get(95,-1)}\t{d.get(99,-1)}\t{fail}\t{tot}\n")
 print(f"{rps} {fail}")
@@ -216,19 +216,22 @@ PY
 # 숫자 비교 — 예전엔 값을 파이썬 소스에 문자열로 끼워 넣어서, 빈 값이나 비숫자가
 # 오면 python 이 종료 코드 1 로 죽고 그게 «작다» 로 읽혔다(= 없는 cliff 를 만든다).
 # 지금은 argv 로 넘기고 «비숫자» 를 «작다» 와 구분해 중단시킨다.
-ge() {
+numcmp() {  # $1 op $2 — op 는 ge | gt
   local rc
   python -c "
 import sys
+op = sys.argv[1]
 try:
-    a, b = float(sys.argv[1]), float(sys.argv[2])
+    a, b = float(sys.argv[2]), float(sys.argv[3])
 except ValueError:
     sys.exit(2)
-sys.exit(0 if a >= b else 1)" "$1" "$2"
+sys.exit(0 if (a >= b if op == 'ge' else a > b) else 1)" "$1" "$2" "$3"
   rc=$?
-  [ $rc -le 1 ] || die "판정값이 숫자가 아니다: '$1' vs '$2'"
+  [ $rc -le 1 ] || die "판정값이 숫자가 아니다: '$2' vs '$3'"
   return $rc
 }
+ge() { numcmp ge "$1" "$2"; }
+gt() { numcmp gt "$1" "$2"; }
 
 echo "=== 호스트 키 학습 (이슈 #141) ==="
 learn_host "$APP" "app"
@@ -244,7 +247,8 @@ for c in 10 20 30 50 100; do
 
   R_HI=$(run $c $HI) || die "c=$c 의 plateau 판(pool=$HI)이 실패했다"
   read PLATEAU _ <<< "$R_HI"
-  ge "$PLATEAU" 0.1 || die "plateau(pool=$HI)=$PLATEAU — 판정선을 만들 수 없다"
+  # «0 보다 큰가» 만 본다. «얼마 이상이어야 쓸 만한 plateau 인가» 는 근거가 없어 안 건다.
+  gt "$PLATEAU" 0 || die "plateau(pool=$HI)=$PLATEAU — 0 이하라 판정선을 만들 수 없다"
   THRESH=$(python -c "import sys; print(round(float(sys.argv[1]) * 0.9, 1))" "$PLATEAU") \
     || die "판정선 계산 실패 (PLATEAU=$PLATEAU)"
   echo "  plateau(pool=$HI)=$PLATEAU  판정선=$THRESH"
