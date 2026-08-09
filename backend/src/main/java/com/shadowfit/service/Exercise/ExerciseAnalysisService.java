@@ -395,11 +395,25 @@ public class ExerciseAnalysisService {
         // 여기서 되찾을 수 있다는 것이 재부착이 성립하는 근거다.
         int restoredRepCount = poseDataRepository.findMaxRepNumberBySessionId(sessionId);
 
+        // 시간 축도 rep 축과 똑같이 이어붙여야 한다 (이슈 #156). AI 는 프레임 시각을 «첫 프레임
+        // 도착부터의 경과» 로 만드는데, 재부착으로 상태를 새로 만들면 그 기준이 재부착 시점이 되어
+        // 이후 프레임의 timestamp_sec 이 0 부터 다시 시작한다. 그러면 리포트의 «최악 구간 시각» 이
+        // 세션 앞부분과 겹치는 값으로 표시된다 — 여기서 이미 흐른 시간을 실어 보내 메운다.
+        //
+        // 값을 **pose_data 에서 되읽는** 것이 핵심이다. 바로 위 rep 축과 같은 데이터원이고, 그래서
+        // 원점도 같다 — 저장된 timestamp_sec 자체가 AI 가 «첫 프레임» 을 0 으로 잡아 만든 값이다.
+        //
+        // session.start_time 기준 경과로 계산하면 안 된다(초판이 그렇게 했다가 고쳤다). 그건 원점이
+        // «세션 생성» 이라, AI 가 «운동 시간이 아니다» 라며 의도적으로 뺀 자세 잡는 시간이 다시
+        // 들어간다. 준비에 20초 걸린 세션이면 재부착 이후 시각이 통째로 20초 앞서 표시된다.
+        double elapsedSec = poseDataRepository.findMaxTimestampSecBySessionId(sessionId);
+
         ReattachRequest.Builder requestBuilder = ReattachRequest.newBuilder()
                 .setSessionId(sessionId)
                 .setExerciseId(exerciseId)
                 .setPersona(session.getMember().getSelectedPersona().name())
-                .setInitialRepCount(restoredRepCount);
+                .setInitialRepCount(restoredRepCount)
+                .setElapsedSec(elapsedSec);
 
         // 기준 좌표는 AI 가 보관하지 않는다 — 시작 때와 똑같이 Spring 이 DB 에서 읽어 실어 보낸다.
         for (ExerciseReference ref : referenceRepository.findByExerciseId(exerciseId)) {

@@ -173,11 +173,13 @@ export default function ExerciseScreen() {
 
       if (cancelled) return;
       try {
+        // timestamp_sec 은 더 보내지 않는다 (이슈 #156). 여기서 보내던 Date.now()/1000 은
+        // epoch 라 «세션 시작 기준 경과 초» 가 아니었고, 변환하는 곳이 한 군데도 없어 그대로
+        // 리포트까지 흘러 시각 표시가 무의미해졌다. 이제 서버가 도착 시각으로 만든다.
         const res = await aiService.detectPose({
           image,
           exercise_type: exerciseType,
           session_id: sessionId,
-          timestamp_sec: Date.now() / 1000,
         });
         if (cancelled) return;
         const r = res.data;
