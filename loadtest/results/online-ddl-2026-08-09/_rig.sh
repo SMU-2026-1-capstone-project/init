@@ -24,21 +24,53 @@ OUT=${OUT:-$HERE}
 SESSIONS=${SESSIONS:-13334}
 ROWS_PER_SESSION=750
 
+# ── pt-osc 전용 계정 ─────────────────────────────────────────────────────
+#
+# 🔴 root 로는 pt-osc 가 아예 못 붙는다. percona-toolkit 의 Perl DBD::mysql 이
+#    caching_sha2_password(8.0 기본값)를 비-SSL 연결에서 못 읽는다:
+#      Authentication plugin 'caching_sha2_password' reported error:
+#      Authentication requires secure connection.   → rc=2, 1초 만에 즉사
+#    DSN 에 mysql_ssl=1 을 넣는 우회도 안 된다 — pt-osc 는 그 키를 모르고
+#    «Unknown MySQL server host 'mysql_ssl=1'» 로 호스트명 취급한다.
+#    그래서 mysql_native_password 로 인증하는 전용 계정을 따로 둔다.
+#    로컬 실험 컨테이너 한정이다. 이 계정 정의를 다른 환경으로 옮기지 말 것.
+PTOSC_USER=${PTOSC_USER:-ptosc}
+PTOSC_PW=${PTOSC_PW:-ptosc1234}
+
 FAILED=()
+
+# mysql 클라이언트 stderr 는 버리지 않고 파일로 뺀다.
+#   버리던 이유(stdout 오염 방지)는 맞았지만, 그 대가로 «왜 실패했는가» 가 통째로 사라져
+#   1차 실행의 진단이 길어졌다. 파일로 빼면 stdout 은 깨끗하고 사유도 남는다.
+MYSQL_ERR=${MYSQL_ERR:-$OUT/mysql_stderr.log}
 
 die() {
   echo "" >&2
   echo "🔴 중단 — $*" >&2
   echo "   이 지점 이후는 측정되지 않았다. 남은 행만 보고 판정하지 말 것." >&2
+  echo "   서버 응답: $MYSQL_ERR (경고 줄 제외하고 볼 것)" >&2
   exit 1
 }
 
-DB()  { docker exec -i "$CONTAINER" mysql -uroot -p"$PW" "$DB_NAME" "$@" 2>/dev/null; }
-DBQ() { DB -N -e "$1"; }
+DB()  { docker exec -i "$CONTAINER" mysql -uroot -p"$PW" "$DB_NAME" "$@" 2>>"$MYSQL_ERR"; }
+DBQ() { DB -N -e "$1" | tr -d '\r'; }
 
 require_container() {
   docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true \
     || die "$CONTAINER 가 안 돌고 있다 — docker compose up -d mysql"
+}
+
+# 팔 B 가 붙을 수 있게 만든다. 위 PTOSC_USER 주석의 인증 함정 참고.
+ensure_ptosc_user() {
+  DB -e "
+    CREATE USER IF NOT EXISTS '$PTOSC_USER'@'%' IDENTIFIED WITH mysql_native_password BY '$PTOSC_PW';
+    ALTER USER '$PTOSC_USER'@'%' IDENTIFIED WITH mysql_native_password BY '$PTOSC_PW';
+    GRANT ALL PRIVILEGES ON *.* TO '$PTOSC_USER'@'%' WITH GRANT OPTION;
+    FLUSH PRIVILEGES;" || die "pt-osc 계정을 못 만들었다"
+  local p
+  p=$(DBQ "SELECT plugin FROM mysql.user WHERE user='$PTOSC_USER' AND host='%';" | tr -d '[:space:]')
+  [ "$p" = "mysql_native_password" ] \
+    || die "pt-osc 계정 인증 플러그인이 '$p' 다 — caching_sha2_password 면 팔 B 가 rc=2 로 즉사한다"
 }
 
 # ── 시딩 ─────────────────────────────────────────────────────────────────
@@ -54,8 +86,20 @@ require_container() {
 #    1/10 로 줄이고 간격을 그대로 두면 37일치가 되어 **행이 파티션 1~2개에 몰린다.**
 #    그러면 파티션 전환(=행 재배치) 비용의 성격 자체가 달라져 축소 규모가 원본의
 #    축소가 아니게 된다. 간격을 10배로 늘려 «같은 날짜 폭, 1/10 밀도» 를 유지한다.
+#
+# 🔴 완화(flush=2)에 들어간 뒤로는 die 가 아니라 seed_die 를 쓴다. 그냥 die 로 빠지면
+#    innodb_flush_log_at_trx_commit=2 가 그대로 남아 **다음 판이 다른 내구성으로 측정된다.**
+seed_die() {
+  DB -e "SET GLOBAL innodb_flush_log_at_trx_commit=1;" >/dev/null 2>&1
+  die "$*"
+}
+
 seed_scale() {
   local t0 t1
+  # 🔴 이전 판의 writer 가 살아 있으면 시딩 중에도 계속 INSERT 해서 아래 «행수 1,000만»
+  #    검사가 반드시 깨진다. 1차 실행이 정확히 이걸로 죽었다 — stop_writer 가 못 죽인 writer 가
+  #    다음 판 테이블에 2,497행을 흘려 넣었다. 여기서 먼저 막는다.
+  assert_no_writer
   echo "  [시딩] ${SESSIONS} 세션 → 1,000만 행 (인덱스 없이)"
   t0=$(date +%s)
   DB -e "
@@ -82,6 +126,7 @@ seed_scale() {
   " || die "시딩 준비 실패"
 
   # 시딩 한정 완화 — 끝에서 되돌린다. 되돌리기가 빠지면 **다음 판이 다른 내구성으로 측정된다.**
+  # 여기부터 seed_die 를 쓴다(위 주석).
   DB -e "SET GLOBAL innodb_flush_log_at_trx_commit=2;" || die "flush 완화 실패"
 
   local i s e
@@ -95,18 +140,18 @@ seed_scale() {
                   TIMESTAMP('2026-01-01 06:00:00') + INTERVAL (s.n*40) MINUTE + INTERVAL FLOOR(r.n*1.2) SECOND
            FROM _seq s CROSS JOIN _seq r
            WHERE s.n >= $s AND s.n < $e AND r.n < $ROWS_PER_SESSION;" \
-      || die "청크 시딩 실패 (세션 $s~$e)"
+      || seed_die "청크 시딩 실패 (세션 $s~$e)"
   done
   DB -e "INSERT INTO pose_data_scale
            (session_id, timestamp_sec, joint_coordinates, sync_rate, is_correct, feedback_message, created_at)
          SELECT $SESSIONS, r.n*1.2, '{}', 75.0, 1, 'ok',
                 TIMESTAMP('2026-01-01 06:00:00') + INTERVAL (($SESSIONS-1)*40) MINUTE + INTERVAL FLOOR(r.n*1.2) SECOND
-         FROM _seq r WHERE r.n < 250;" || die "끝세션 시딩 실패"
+         FROM _seq r WHERE r.n < 250;" || seed_die "끝세션 시딩 실패"
 
   DB -e "CREATE INDEX idx_session_timestamp ON pose_data_scale (session_id, timestamp_sec);
          SET GLOBAL innodb_flush_log_at_trx_commit=1;
          ANALYZE TABLE pose_data_scale;
-         DROP TABLE IF EXISTS _seq;" || die "인덱스 빌드/복구 실패"
+         DROP TABLE IF EXISTS _seq;" || seed_die "인덱스 빌드/복구 실패"
   t1=$(date +%s)
 
   # 🔴 «시딩했다» 와 «시딩됐다» 는 다르다. 행 수는 이 실험이 고정해야 하는 조건이라,
@@ -149,23 +194,77 @@ install_writer() {
 }
 
 start_writer() {  # $1=arm 이름 $2=최대 지속 초 $3=시도 간격 ms
-  DB -e "TRUNCATE TABLE ddl_writer_log;" || die "writer 로그 초기화 실패"
-  # -d 로 떼어놓고 DDL 이 끝나면 stop_writer 가 세션을 끊는다.
+  DB -e "TRUNCATE TABLE ddl_writer_log; DELETE FROM ddl_writer_ctl;" || die "writer 로그/제어 초기화 실패"
+  # -d 로 떼어놓고 DDL 이 끝나면 stop_writer 가 멈춘다.
   docker exec -d "$CONTAINER" mysql -uroot -p"$PW" "$DB_NAME" \
     -e "CALL ddl_writer('$1', $2, $3);"
   sleep 3   # DDL 전 정상 구간(=평상시 latency 기준선)을 몇 건 확보한다
   local n
   n=$(DBQ "SELECT COUNT(*) FROM ddl_writer_log;")
   [ "${n:-0}" -gt 0 ] || die "writer 가 3초 안에 한 건도 못 썼다 — 안 떴다고 본다"
+
+  # 🔴 «떴다» 만으로는 부족하다. conn_id 를 안 남겼으면 stop_writer 가 또 못 죽인다.
+  #    그건 DDL 을 24분 돌린 **뒤에** 드러나므로, 여기서 미리 끊는다.
+  WRITER_CONN=$(DBQ "SELECT conn_id FROM ddl_writer_ctl WHERE id=1;" | tr -d '[:space:]')
+  [ -n "${WRITER_CONN:-}" ] \
+    || die "writer 가 conn_id 를 안 남겼다 — writer.sql 이 옛 버전이다(제어 테이블 없음). stop_writer 가 못 죽인다"
 }
 
+# conn_id 가 아직 살아 있으면 rc=0
+#
+# 🔴 «못 읽었다» 를 «죽었다» 로 세지 않는다. DBQ 는 docker exec 라 컨테이너가 바쁘면
+#    빈 문자열을 낼 수 있는데, 그걸 0 으로 접으면 **살아 있는 writer 를 죽었다고 통과시킨다.**
+#    이 rig 는 같은 계열 착각으로 두 번 깨졌다(rc≠0 을 «거절됨 ✅» 으로, 없는 테이블을
+#    «트리거 0개 ✅» 로). 답이 0/1 이 아니면 판정을 미루고 **살아 있는 쪽으로 센다** —
+#    틀렸을 때 손해가 작은 방향이다(한 판 더 기다릴 뿐, 오염된 판이 표에 안 들어간다).
+writer_alive() {  # $1 = conn_id. 살아있음/판정불가 → rc=0, 확실히 죽음 → rc=1
+  [ -n "${1:-}" ] || return 1
+  local n
+  n=$(DBQ "SELECT COUNT(*) FROM performance_schema.processlist WHERE id=$1;" | tr -d '[:space:]')
+  case "$n" in
+    0) return 1 ;;                 # 확실히 없다
+    ''|*[!0-9]*)                   # 빈 답·숫자 아님 = 판정 불가
+      echo "  ⚠️ processlist 를 못 읽었다(응답 '$n') — 살아 있는 쪽으로 세고 계속 기다린다" >&2
+      return 0 ;;
+    *) return 0 ;;                 # 1 이상 = 살아 있다
+  esac
+}
+
+# 🔴 1차 실행(2026-08-09)이 죽은 자리다 — 자세한 진단은 writer.sql 의 제어 테이블 주석.
+#    요약: `info LIKE 'CALL ddl_writer%'` 로는 프로시저를 못 찾는다. 살아남은 writer 가
+#    다음 판 시딩에 2,497행을 흘려 넣어 «행수 1,000만» 검사를 깨뜨렸다.
+#
+#    이제 두 단이다. ① stop 플래그로 협조 종료를 기다린다 — 진행 중이던 INSERT 를 안 끊어서
+#    writer 로그의 끝이 잘리지 않는다. ② 안 멈추면 KILL. 둘 다 실패하면 **die 한다.**
+#    조용히 넘어가면 오염된 다음 판이 «측정됐다» 는 얼굴로 표에 들어간다.
 stop_writer() {
-  # 프로시저는 p_seconds 가 지나면 스스로 끝난다. 그 전에 끝내려면 세션을 죽인다.
-  local ids id
-  ids=$(DBQ "SELECT id FROM performance_schema.processlist
-             WHERE info LIKE 'CALL ddl_writer%' OR info LIKE '%pose_data_scale%writer%';")
-  for id in $ids; do DB -e "KILL $id;" >/dev/null 2>&1; done
-  sleep 1
+  local cid=${WRITER_CONN:-} i
+  [ -n "$cid" ] || cid=$(DBQ "SELECT conn_id FROM ddl_writer_ctl WHERE id=1;" | tr -d '[:space:]')
+  DB -e "UPDATE ddl_writer_ctl SET stop=1 WHERE id=1;" >/dev/null 2>&1
+
+  for i in $(seq 1 15); do
+    writer_alive "$cid" || { WRITER_CONN=""; return 0; }
+    sleep 1
+  done
+  echo "  ⚠️ writer 가 협조 종료를 안 받는다 — KILL 로 넘어간다(로그 끝이 한 건 잘릴 수 있다)" >&2
+  [ -n "$cid" ] && DB -e "KILL $cid;" >/dev/null 2>&1
+  for i in $(seq 1 15); do
+    writer_alive "$cid" || { WRITER_CONN=""; return 0; }
+    sleep 1
+  done
+  die "writer(conn ${cid:-?})가 30초를 줘도 안 죽는다 — 다음 판 시딩이 오염된다"
+}
+
+# 시딩 직전 가드. 이전 판의 writer 가 남아 있으면 «행수 1,000만» 이 반드시 깨진다.
+assert_no_writer() {
+  local has cid
+  has=$(DBQ "SELECT COUNT(*) FROM information_schema.tables
+             WHERE table_schema='$DB_NAME' AND table_name='ddl_writer_ctl';" | tr -d '[:space:]')
+  [ "${has:-0}" = "1" ] || return 0   # writer 를 아직 안 깐 단계(probe 등) — 볼 게 없다
+  cid=$(DBQ "SELECT conn_id FROM ddl_writer_ctl WHERE id=1;" | tr -d '[:space:]')
+  writer_alive "$cid" \
+    && die "이전 판의 writer(conn $cid)가 아직 살아 있다 — 시딩 중에도 INSERT 해서 행수 검사가 깨진다"
+  return 0
 }
 
 # writer 로그 → 한 줄 요약. 이 실험의 1차 산출물이 여기서 나온다.

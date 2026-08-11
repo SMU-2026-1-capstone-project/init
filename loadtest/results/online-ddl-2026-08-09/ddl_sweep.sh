@@ -16,6 +16,7 @@ WRITER_GAP_MS=${WRITER_GAP_MS:-200}      # 초당 5회. 정지 구간을 200ms �
 require_container
 init_log
 install_writer
+ensure_ptosc_user
 
 # ── 판 순서 (설계 §4 라틴 방격) ──────────────────────────────────────────
 #
@@ -26,6 +27,18 @@ install_writer
 # ⚠️ 설계 문서 §4 의 «버림판 1» 은 «팔당 1판» 으로 구체화했다. 팔 하나만 버리면
 #    나머지 팔의 첫 판이 여전히 «첫 판» 이라 버림의 목적이 절반만 달성된다.
 SEQ=(discard:A discard:B r1:A r2:B r3:B r4:A r5:A r6:B)
+
+# 판 목록을 밖에서 갈아끼울 수 있다. 버림 2판만 먼저 돌려 팔 B 실소요를 재는 용도다
+# (설계 §9: «버림판이 소요시간 프로브를 겸한다»). 예: SWEEP_SEQ="discard:A discard:B"
+#
+# ⚠️ 쪼개 돌리면 버림판의 목적이 반만 남는다. 버림판은 «첫 판이 페이지 캐시·버퍼풀 상태를
+#    가장 크게 탄다» 를 흡수하는 장치인데, 버림판과 본판 사이에 컨테이너를 재시작하면
+#    본판의 r1 이 다시 «첫 판» 이 된다. 쪼갤 거면 **같은 컨테이너 가동 중에 이어서** 돌릴 것.
+if [ -n "${SWEEP_SEQ:-}" ]; then
+  read -r -a SEQ <<< "$SWEEP_SEQ"
+  echo "⚠️ SWEEP_SEQ 로 판 목록을 덮어썼다: ${SEQ[*]}"
+  echo "   버림판만 돌린 뒤 본판을 따로 돌릴 거면 컨테이너를 재시작하지 말 것(위 주석)."
+fi
 TOTAL=${#SEQ[@]}
 
 # ── 팔 A — 차단 ALTER (baseline) ─────────────────────────────────────────
@@ -50,6 +63,10 @@ run_arm_a() {  # $1 = 태그 → stdout: 소요 초. 실패 시 non-zero
 #                           그때는 replica 지연 감시가 도구의 핵심 기능이 된다.
 # --print --statistics    : 어느 인덱스로 청크를 나눴는지, 청크 크기가 어떻게 조정됐는지
 #                           로그에 남긴다. 설계 §7 의 «복합 PK» 항목이 여기서 확인된다.
+#
+# 🔴 root 가 아니라 $PTOSC_USER 로 붙는다 — root 로는 인증에서 rc=2 로 즉사한다.
+#    사유는 _rig.sh 의 PTOSC_USER 주석. 이 계정 없이 돌리면 팔 B 4판이 전부 «DDL실패» 로
+#    찍히고, 그건 도구의 성질이 아니라 rig 의 결함이다.
 run_arm_b() {  # $1 = 태그 → stdout: 소요 초. 실패 시 non-zero
   local tag=$1 t0 t1 rc
   t0=$(date +%s)
@@ -57,7 +74,7 @@ run_arm_b() {  # $1 = 태그 → stdout: 소요 초. 실패 시 non-zero
     pt-online-schema-change \
       --alter "$PARTITION_SPEC" \
       --execute --print --statistics --recursion-method=none \
-      "h=127.0.0.1,P=3306,u=root,p=$PW,D=$DB_NAME,t=pose_data_scale" \
+      "h=127.0.0.1,P=3306,u=$PTOSC_USER,p=$PTOSC_PW,D=$DB_NAME,t=pose_data_scale" \
     > "$OUT/${tag}_ptosc.log" 2>&1
   rc=$?
   t1=$(date +%s)

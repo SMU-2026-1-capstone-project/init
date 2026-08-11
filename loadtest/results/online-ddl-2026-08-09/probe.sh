@@ -210,6 +210,59 @@ echo "## [3] 도구"
 
 if docker image inspect percona/percona-toolkit >/dev/null 2>&1; then
   note "percona-toolkit 이미지 있음 ✅"
+
+  # ── [3b] pt-osc 가 실제로 붙고, 이 DDL 을 받는가 ────────────────────────
+  #
+  # 🔴 이미지가 있는 것과 도구가 도는 것은 다르다. 확인 안 하면 팔 B 4판이 전부
+  #    실패한 뒤에야 드러나는데, 그게 시딩 4번 뒤(=2시간 뒤)다.
+  #
+  #    함정 두 개가 실제로 있었다:
+  #      ① root 로는 못 붙는다. Perl DBD::mysql 이 caching_sha2_password(8.0 기본)를
+  #         비-SSL 에서 못 읽는다 → «Authentication requires secure connection», rc=2.
+  #         DSN 에 mysql_ssl=1 을 넣는 우회도 안 된다(호스트명으로 파싱된다).
+  #      ② --alter 로 PARTITION BY 를 받는지가 미검증이었다.
+  #
+  #    소형 테이블에 진짜로 던져서 둘을 한 번에 가른다. 1,000만 행이 아니라 3행이라 몇 초다.
+  ensure_ptosc_user
+  DB -e "
+    DROP TABLE IF EXISTS ptosc_smoke;
+    CREATE TABLE ptosc_smoke (
+      id bigint NOT NULL AUTO_INCREMENT,
+      session_id bigint NOT NULL,
+      created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id, created_at)
+    ) ENGINE=InnoDB;
+    INSERT INTO ptosc_smoke (session_id, created_at) VALUES
+      (1,'2026-01-15 00:00:00'),(2,'2026-03-15 00:00:00'),(3,'2026-06-15 00:00:00');
+  " >/dev/null 2>&1 || bad "스모크 테이블을 못 만들었다"
+
+  docker run --rm --network "container:$CONTAINER" percona/percona-toolkit \
+    pt-online-schema-change \
+      --alter "$PARTITION_SPEC" \
+      --execute --print --statistics --recursion-method=none \
+      "h=127.0.0.1,P=3306,u=$PTOSC_USER,p=$PTOSC_PW,D=$DB_NAME,t=ptosc_smoke" \
+    > "$OUT/probe_ptosc_smoke.log" 2>&1
+  SMOKE_RC=$?
+  SMOKE_PARTS=$(DBQ "SELECT COUNT(*) FROM information_schema.partitions
+                     WHERE table_schema='$DB_NAME' AND table_name='ptosc_smoke'
+                       AND partition_name IS NOT NULL;" | tr -d '[:space:]')
+
+  # 🔴 rc=0 만 보면 안 된다. [1] 에서 rc 로 문법 에러를 «거절» 로 읽은 것과 같은 계열이다.
+  #    도구가 조용히 포기해도 0 을 낼 수 있으므로 **파티션이 실제로 걸렸는지**까지 본다.
+  if [ $SMOKE_RC -eq 0 ] && [ "${SMOKE_PARTS:-0}" = "14" ]; then
+    note "pt-osc 접속 ✅ · --alter 로 PARTITION BY 수용 ✅ (소형 14개 파티션 확인)"
+    note "  방식: 빈 새 테이블에 ALTER 를 걸고 원본을 청크 복사한다 — 원문 probe_ptosc_smoke.log"
+    SWAP=$(grep -E 'Swapping tables|Swapped original' "$OUT/probe_ptosc_smoke.log" | head -2)
+    [ -n "$SWAP" ] && printf '%s\n' "$SWAP" | sed 's/^/      /'
+    note "  ⚠️ 위 두 시각의 차이가 3행짜리 테이블에서의 컷오버 비용이다. 0 이 아니면"
+    note "     설계 §1 Q3(«무중단의 실제 차단 시간»)의 답이 0 이 아닐 수 있다는 신호다."
+  else
+    echo "  🔴 pt-osc 스모크 실패 (rc=$SMOKE_RC, 파티션 ${SMOKE_PARTS:-0}개) — 팔 B 를 못 돈다." >&2
+    tail -5 "$OUT/probe_ptosc_smoke.log" | sed 's/^/      /' >&2
+    echo "     본 측정으로 넘어가면 팔 B 4판이 전부 실패한 뒤에야 이게 드러난다." >&2
+    FAIL_HARD=1
+  fi
+  DB -e "DROP TABLE IF EXISTS ptosc_smoke;" >/dev/null 2>&1
 else
   note "percona-toolkit 이미지 없음 → 받아야 한다:  docker pull percona/percona-toolkit"
   bad "팔 B 를 못 돈다"
