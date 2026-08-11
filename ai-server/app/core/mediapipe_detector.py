@@ -247,6 +247,24 @@ class DetectorPool:
         with self._guard:
             return len(self._detectors), self._capacity
 
+    def shutdown(self) -> int:
+        """남아 있는 검출기를 전부 닫는다. 반환값 = 닫은 개수(= 종료 시점의 활성 세션 수).
+
+        프로세스가 죽으면 OS 가 회수하므로 «누수» 는 아니다. 그래도 명시적으로 닫는 이유:
+        진행 중 세션이 몇 개인 채로 내려갔는지가 **로그에 남는다.** 무중단 배포가 없는 지금
+        (배포 대상 0대) 그 숫자가 곧 «배포 때 몇 명이 끊겼나» 다.
+        """
+        with self._guard:
+            dets = list(self._detectors.values())
+            self._detectors.clear()
+            self._locks.clear()
+        for d in dets:
+            try:
+                d.close()
+            except Exception:                      # 종료 경로다 — 하나 실패해도 나머지는 닫는다
+                pass
+        return len(dets)
+
 
 _pool: DetectorPool | None = None
 _pool_guard = threading.Lock()
