@@ -45,7 +45,7 @@ AI(FastAPI) 한 인스턴스가 다음을 모두 처리한다:
 > | 전제 | 표의 값 | 실제 |
 > |---|---|---|
 > | 클라 전송 fps | 10fps | **~3fps** — `frontend/app/(tabs)/exercise.tsx:150` 이 `intervalMs = 330`. ai-server 도 `session_state.py:47` 에서 `MIN_FRAME_INTERVAL_SEC = 0.300` 으로 상한을 건다(#143) |
-> | MediaPipe 프레임당 | 20~50ms | **103.4ms 실측** (p50 100.5 / p95 129.1). 단 i3-6100 + Docker Desktop 기준이라 **서버급 CPU 에서는 더 빠를 것** — 절대값으로 인용하지 말 것 |
+> | MediaPipe 프레임당 | 20~50ms | **103.4ms 실측** (p50 100.5 / p95 129.1). 단 i3-6100 + Docker Desktop 기준. ✅ **2026-08-11: «서버급에서는 더 빠를 것» 이 확인됐다 — Xeon 8488C 베어메탈에서 17.6ms(5.9배).** [`../../loadtest/results/ai-recalibrate-2026-08-11/`](../../loadtest/results/ai-recalibrate-2026-08-11/) |
 >
 > **두 오차가 서로 반대 방향이라 «세션당 CPU 누적» 은 우연히 비슷하다** (10fps×35ms ≈ 3fps×103ms).
 > 그래서 아래 «CPU 시간의 95%+ 를 MediaPipe 가 점유» 라는 **결론은 그대로 유효**하고,
