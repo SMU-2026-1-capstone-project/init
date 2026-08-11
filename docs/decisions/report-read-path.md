@@ -189,7 +189,7 @@ List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long session
 
 > 기존 `findBySessionIdOrderByTimestampSecAsc`는 교체 후 미사용(테스트는 `findAll`/`count`만 씀) → 제거 선택.
 
-**측정 기대치**(이미 [`realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §②b): payload 1,716.8KB→22.4KB(−98.7%), warm 쿼리 12.1ms→1.5ms(8x). 바이트는 −98.7%인데 시간은 −87%인 이유 = 750 row lookup 등 고정비용은 남고 off-page JSON I/O만 사라지기 때문(바이트≠시간 선형).
+**실측**(이미 [`realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §②b — 2026-06-02, warm, 750행/세션, **로컬 412만 행, 3컬럼 시절 프로젝션**): payload 1,716.8KB→22.4KB(−98.7%), warm 쿼리 12.1ms→1.5ms(8x). 바이트는 −98.7%인데 시간은 −87%인 이유 = 750 row lookup 등 고정비용은 남고 off-page JSON I/O만 사라지기 때문(바이트≠시간 선형).
 
 **AWS 1억 행 재검증(2026-07-15)**: payload 1,740.1KB→22.6KB(−98.7%, 동일), warm 쿼리 **40.6ms→1.4ms(29~41x)**. 412만 행 때의 8x보다 배수가 커진 것은 버퍼풀(2GB) 대비 테이블이 25배(~230GB) 커지며 작업셋 비율이 나빠져 off-page 랜덤 I/O가 캐시에 덜 걸린 탓 — 결론이 강화된 방향이다. ⚠️ 이 쿼리는 precompute가 세션당 1회 도는 비동기 잡이라 **사용자 체감 지연이 아니라 잡의 자원 소모 절감**으로 읽어야 한다.
 
