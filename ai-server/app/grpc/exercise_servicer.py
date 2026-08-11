@@ -22,6 +22,7 @@ from app.core.analyzer_registry import resolve_exercise_type, supported_exercise
 from app.core.angle_calculator import extract_angles
 from app.grpc import spring_client
 from app.grpc.correlation import wrap as correlation_wrap
+from app.core.mediapipe_detector import get_pool
 from app.grpc.session_state import get_registry
 from app.models.pose import Landmark
 
@@ -102,6 +103,23 @@ class ExerciseServicer(exercise_pb2_grpc.ExerciseServiceServicer):
                 session_id,
             )
 
+        # 검출기 자리 확보 (#164). 풀 크기 = 동시 활성 세션 상한이고, 그 상한은 컨테이너
+        # 메모리에서 유도된다(검출기 1개 = 98.7MB). 자리가 없으면 «받아놓고 느려지는» 대신
+        # 여기서 거절한다 — 받아버리면 진행 중인 다른 세션까지 같이 나빠진다.
+        used, cap = get_pool().status()
+        if not get_pool().acquire(session_id):
+            logger.warning(
+                "세션 %s 거절 — 검출기 풀 소진 (%d/%d). 동시 세션 상한에 걸렸다. "
+                "더 받으려면 컨테이너 메모리 한도(AI_MEM_LIMIT)를 올릴 것.",
+                session_id, used, cap,
+            )
+            return exercise_pb2.AnalyzeResponse(
+                success=False,
+                session_id=session_id,
+                exercise_id=exercise_id,
+                status=exercise_pb2.SessionStatus.FAILED,
+            )
+
         get_registry().create(
             session_id=session_id,
             exercise_id=exercise_id,
@@ -176,6 +194,16 @@ class ExerciseServicer(exercise_pb2_grpc.ExerciseServiceServicer):
                 message="기준 좌표를 복원하지 못했습니다.",
             )
 
+        # 재부착도 검출기가 있어야 프레임을 처리한다. 이미 있으면 acquire 가 True 를 돌려준다.
+        if not get_pool().acquire(session_id):
+            used, cap = get_pool().status()
+            logger.warning("세션 %s 재부착 거절 — 검출기 풀 소진 (%d/%d)", session_id, used, cap)
+            return exercise_pb2.ReattachResponse(
+                success=False,
+                session_id=session_id,
+                message="동시 세션 상한에 걸렸습니다.",
+            )
+
         state, already_active = get_registry().create_if_absent(
             session_id=session_id,
             exercise_id=request.exercise_id,
@@ -212,6 +240,9 @@ class ExerciseServicer(exercise_pb2_grpc.ExerciseServiceServicer):
         logger.info("[Spring → AI] StopAnalysis 수신 (session=%s)", session_id)
 
         state = get_registry().remove(session_id)
+        # 검출기 반납 — 세션이 없었더라도 자리는 회수한다(상태와 풀이 어긋난 경우 대비).
+        # close() 하면 메모리가 100% 회수된다(M2 실측). 안 하면 세션 회전마다 98.7MB 씩 샌다.
+        get_pool().release(session_id)
         if state is None:
             return exercise_pb2.StopResponse(
                 success=False,
