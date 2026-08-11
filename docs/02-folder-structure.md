@@ -194,7 +194,6 @@ shadowfit/
 │   │   └── test/                              # 테스트
 │   │       └── java/com/shadowfit/
 │   ├── src/main/proto/exercise.proto  # ai-server/app/proto/ 와 수동 동기
-│   ├── src/main/proto/user.proto      # 🔴 선언만 있고 구현·호출 0건 (이슈 #133)
 │   ├── build.gradle
 │   └── settings.gradle
 │

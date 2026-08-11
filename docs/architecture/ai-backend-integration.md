@@ -17,7 +17,7 @@
 | **관측성** — correlation id 가 gRPC 양방향·`@Async`·스케줄러를 넘어 전파 | §1 · §6 |
 | **`ReattachAnalysis`** — AI 상태 소실 시 세션 이어하기 (RPC 신설) | §3 · §4 재부착 |
 | **`ReportFeedbackBatch`** — proto·Spring 수신부는 있는데 **AI 가 안 부른다** | §3 · §9 |
-| **`user.proto`/`UserService`** — 선언만 있고 **양쪽 다 구현·호출 없음** | §3 · §9 |
+| ~~**`user.proto`/`UserService`** — 선언만 있고 **양쪽 다 구현·호출 없음**~~ → **삭제됨(2026-08-12, #133)** | §3 · §9 |
 | 라이브러리 버전 드리프트 (gRPC 1.62.2→1.83.1 등) | §7 |
 | Flyway·관리포트 9090·관측 스택 | §7 |
 
@@ -30,7 +30,7 @@
 | 차원 | 현재 방식 |
 |------|---------|
 | 통신 프로토콜 | gRPC (양방향, 동기 unary RPC) |
-| 스키마 공유 | `exercise.proto` 양쪽 저장소에 동일 파일 중복. ⚠️ `user.proto` 는 Spring 쪽에만 있고 **아무도 안 쓴다**(§3-1) |
+| 스키마 공유 | `exercise.proto` 양쪽 저장소에 동일 파일 중복. (`user.proto` 는 아무도 안 써서 2026-08-12 삭제 — #133) |
 | 인증 | 내부 공유 토큰(`INTERNAL_API_TOKEN`) 기반, gRPC metadata `Authorization: Bearer …` |
 | 네트워크 | Docker Compose `shadowfit-net` 브리지, 컨테이너명 DNS |
 | 호출 패턴 | Spring → AI: 비동기(`@Async`, 202 Accepted) / AI → Spring: 콜백 (3회 재시도) |
@@ -105,11 +105,11 @@ Docker 네트워크는 `shadowfit-net` 브리지 한 개. 외부 노출은 backe
 | | 상태 | 근거 |
 |---|---|---|
 | **`ReportFeedbackBatch`** | **반쪽** — proto 양쪽 ✅ · Spring 수신부 ✅([`ExerciseGrpcService.java:120`](../../backend/src/main/java/com/shadowfit/service/Exercise/ExerciseGrpcService.java)) · **AI 호출부 ❌** | `ai-server/app/grpc/spring_client.py` 가 부르는 것은 `report_pose_data_batch`·`report_complete_analysis` **둘뿐**이고, `ai-server/` 전체에 `FeedbackBatch` 사용처가 0건이다 |
-| **`user.proto` / `UserService.GetUserInfo`** | **완전히 죽어 있다** | 선언은 `backend/src/main/proto/user.proto` 에만 있고, **양쪽 어디에도 구현·호출이 없다**(전 저장소 검색 0건). `ai-server/app/proto/` 에는 파일 자체가 없다 |
+| ~~**`user.proto` / `UserService.GetUserInfo`**~~ | **삭제됨 (2026-08-12, #133)** | 선언은 `backend/src/main/proto/user.proto` 에만 있었고 **양쪽 어디에도 구현·호출이 없었다**(전 저장소 검색 0건). `ai-server/app/proto/` 에는 파일 자체가 없었다 — 한 번도 양쪽 계약이 된 적이 없다. 지우는 쪽으로 닫았다 |
 
 > 📌 **`ReportFeedbackBatch` 는 이미 알려진 갭이다** — [`../tasks/30-ai-remaining-work.md`](../tasks/30-ai-remaining-work.md) §1 이 *"결함 분류 → 송신 통째로 미구현, 1순위"* 로 잡아뒀다. *"proto·테이블·시드가 다 있는데 AI 가 안 불러서 TTS 피드백 기능 전체가 시연용 더미로만 존재한다."* 이 문서에는 그 사실이 없어서, **결합 구조만 보면 동작하는 경로처럼 보였다.**
 >
-> 🔴 **`user.proto` 는 어느 문서에도 없다.** Java 클래스는 생성되고 있고(빌드에 포함) 쓰는 사람이 없다. 지우거나 쓰거나 정하는 게 맞다 — 남겨두면 다음 사람이 "닉네임은 gRPC 로 가져오나?" 를 먼저 의심한다.
+> ✅ **`user.proto` 는 2026-08-12 에 삭제됐다(#133).** 「지우거나 쓰거나 정하는 게 맞다」는 위 판단을 **지우는 쪽**으로 닫은 것이다. 근거: 전 저장소에서 구현·호출 0건이고 `ai-server` 쪽엔 파일 자체가 없어 한 번도 계약이 된 적이 없다. 그때까지 Java 클래스(`UserProto`·`UserServiceGrpc` 등)가 빌드마다 생성되고 있었고, 그게 다음 사람에게 "닉네임은 gRPC 로 가져오나?" 를 의심하게 만드는 비용이었다.
 
 핵심 메시지:
 - `AnalyzeRequest`: `exercise_id(int64)`, `session_id(int64)`, `reference_poses(PoseDataRequest[])`
@@ -278,7 +278,7 @@ AI 컨테이너가 재시작되면 in-memory `SessionState` 가 사라지는데,
 
 - **proto 중복 파일** — 양쪽이 손으로 동기화. 한쪽만 바꾸면 런타임에 직렬화 실패까지 잡히지 않음. 실제로 2026-08-07 에 **머지로 계약 불일치 2건이 드러났다**(`e027889`).
 - ⚠️ **`ReportFeedbackBatch` 가 반쪽이다** — proto·Spring 수신부·DB 테이블·시드까지 있는데 **AI 가 안 부른다.** TTS 피드백 기능 전체가 시연용 더미로만 존재한다(§3-1). [`../tasks/30-ai-remaining-work.md`](../tasks/30-ai-remaining-work.md) §1 이 1순위로 잡아둔 항목.
-- 🔴 **`user.proto`/`UserService` 가 죽은 채 남아 있다** — 선언만 있고 양쪽 다 구현·호출이 없다(§3-1). Java 클래스는 계속 생성된다. **어느 문서에도 안 적혀 있던 것**이라 여기 처음 기록한다.
+- ✅ **`user.proto`/`UserService` 는 삭제됐다(2026-08-12, #133)** — 선언만 있고 양쪽 다 구현·호출이 없었다(§3-1). Java 클래스가 계속 생성되던 것도 같이 사라졌다. **어느 문서에도 안 적혀 있던 것**이라 여기 처음 기록했고, 그 기록이 삭제 결정으로 이어졌다.
 - **양방향 모두 유실이 가능하다 — 성질이 다를 뿐이다.** AI → Spring 완료 콜백은 3회 실패 시 **흔적이 로그뿐**이고, Spring → AI 종료 통보는 상한 10회 초과 시 **`FAILED` 행으로 남는다**(§6). 🔴 **둘 다 «사람이 보고 재처리하는 절차» 는 없다.** «아웃박스로 닫혔다» 는 서술은 과장이라 걷어냈다(2026-08-08 리뷰).
 - **AI in-memory 세션 상태** — AI 컨테이너 재시작 시 진행 중 세션 소실은 그대로다. ✅ 다만 **복구 경로가 생겼다** — `ReattachAnalysis`(§4 재부착)로 DB 값에서 되살릴 수 있다. ⚠️ **자동은 아니다** — 프론트가 재부착을 호출해야 하고, 아무도 안 부르면 결국 스케줄러가 `FAILED` 처리한다.
 - **단일 AI 인스턴스 가정** — 메모리 `SessionState`가 인스턴스 로컬이라 수평 확장 불가. (재부착은 이 문제를 **줄이지 않는다** — 상태가 여전히 인스턴스 로컬이다.)
