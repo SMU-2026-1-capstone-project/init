@@ -183,7 +183,21 @@ public void onNext(StopResponse value) {
 }
 ```
 
-AI가 재시작돼 세션을 잃은 상태에서 Stop이 도착하면 `success=false`가 오지만, Spring은 이걸 **정상 응답으로 처리하고 INFO 로그만 남긴다**. 결과는 영영 안 오는데 경보는 어디에도 안 뜬다. 즉 §3-2의 한계는 "outbox를 넣으면 부딪히게 될 문제"가 아니라 **현행 코드의 무증상 유실**이고, outbox와 독립적으로 먼저 고칠 수 있다(§7-확정 ④ — 선행 소품 PR로 분리).
+~~AI가 재시작돼 세션을 잃은 상태에서 Stop이 도착하면 `success=false`가 오지만, Spring은 이걸 **정상 응답으로 처리하고 INFO 로그만 남긴다**. 결과는 영영 안 오는데 경보는 어디에도 안 뜬다.~~
+
+> ✅ **2026-08-11 확인 — 이 서술은 낡았다. §7-확정 ④ 의 선행 작업이 이미 반영돼 있다.**
+> [`ExerciseAnalysisService.java:478-500`](../../backend/src/main/java/com/shadowfit/service/Exercise/ExerciseAnalysisService.java) 은 지금
+> `success=false` 를 **분기해서 다룬다** — `sessionMetrics.aiStopResult("session-missing")` 으로 **지표에 집계**하고
+> `log.warn` 으로 남긴다(INFO 아님). 게다가 `possiblyRedelivered` 를 구분해 «회수분 재송신»(첫 송신이 이미
+> 처리됐을 수 있다)과 «진짜 유실»을 갈라 놨다([#152](https://github.com/Shadowfit/init/issues/152)).
+>
+> 🔴 **문서 드리프트의 방향이 평소와 반대다.** 보통은 «문서가 됐다고 하는데 코드가 안 돼 있는» 쪽인데,
+> 여기는 **코드가 고쳐졌는데 문서가 «아직 안 됐다» 고 말하고 있었다.** 그래서 이 서술을 근거로
+> «무증상 유실이 남아 있다» 는 이슈를 올릴 뻔했다(2026-08-11). 완료 시 원 서술을 지우지 말고
+> 위처럼 취소선 + 확인 근거로 남기는 편이 안전하다.
+
+여전히 유효한 것: §3-2 의 한계 자체 — **outbox 는 «통보의 전달»을 보장할 뿐 «AI 분석 상태의 내구성»을 주지 않는다.**
+관측은 생겼지만 결과가 회수되지 않는다는 사실은 그대로다.
 
 ---
 
