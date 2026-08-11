@@ -1,0 +1,59 @@
+=== M1 — 검출기가 스레드를 옮겨 다녀도 되는가 ===
+    model_complexity=1 · 세션 4 × 40프레임 · **완전 순차**(동시성 없음) · 스레드 4
+
+[전제 확인] 각 «사람» 을 전용 검출기로 단독 실행
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+W0000 00:00:1786429427.509874   18060 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429427.671614    9172 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429427.854847   14184 landmark_projection_calculator.cc:186] Using NORM_RECT without IMAGE_DIMENSIONS is only supported for the square ROI. Provide IMAGE_DIMENSIONS or use PROJECTION_MATRIX.
+   사람0 x=-0.30 s=0.58 → 12/12 O
+W0000 00:00:1786429430.734693    3120 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429430.801564   11876 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+   사람1 x=+0.32 s=0.90 → 12/12 O
+W0000 00:00:1786429433.033163    5220 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429433.108965   18044 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+   사람2 x=-0.06 s=0.90 → 12/12 O
+W0000 00:00:1786429434.744912   18068 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429434.813936   16120 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+   사람3 x=+0.26 s=0.58 → 12/12 O
+
+| 팔   | 구성                           | 의미                   |     검출률 |     프레임당ms |         세션이 거친 스레드 |
+|-----|------------------------------|----------------------|---------|------------|--------------------|
+W0000 00:00:1786429436.341756    6412 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429436.404397    3220 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429436.877586    6864 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429436.950697   17800 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429437.650697   18112 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429437.733277   19116 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429438.242949   17180 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429438.322588   19256 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+| A   | 세션 전용 스레드                    | ㄷ 안 = 기준선            | 100.0% |       49.6 |       [1, 1, 1, 1] |
+W0000 00:00:1786429447.012050   17784 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429447.048354   16492 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429447.092726   18652 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429447.132232   17452 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429447.138481   17928 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429447.197892    3272 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429447.209544    1660 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429447.294043   10996 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+| B   | 회전 스레드 + 세션 검출기              | ㄴ 안 ← 이게 급소          | 100.0% |       36.8 |       [4, 4, 4, 4] |
+W0000 00:00:1786429454.301400   18000 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429454.343694   18000 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429454.584009    1108 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429454.639854    1108 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429454.841290   12780 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429454.890704   12780 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429455.116969    6684 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786429455.168501   18808 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+| C   | 회전 스레드 + 스레드 검출기             | 현행 = 대조군             |  25.0% |       39.0 |       [4, 4, 4, 4] |
+
+## 판정
+  A(기준) 100.0% · B(ㄴ) 100.0% · C(현행) 25.0%
+  B 와 A 의 차 : +0.0%p   ← 0 에 가까우면 «옮겨도 된다»
+  B 와 C 의 차 : +75.0%p   ← 0 에 가까우면 «옮기면 깨진다»
+
+  ⇒ **ㄴ 유효.** 검출기는 순차 호출이면 스레드를 옮겨도 상태가 보존된다.
+
+  ⚠️ 5%p 는 판정 편의를 위한 선이지 근거 있는 임계가 아니다. 위 세 수치를 직접 볼 것.
+  ⚠️ 합성 인체다(#164 캐비엇 ③).
