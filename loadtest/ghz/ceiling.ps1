@@ -27,7 +27,8 @@ $root = Split-Path -Parent (Split-Path -Parent $here)
 Set-Location $here
 $results = Join-Path $here "results"
 if (-not (Test-Path $results)) { New-Item -ItemType Directory -Path $results | Out-Null }
-$ghz = Join-Path $root "loadtest\.bin\ghz.exe"
+. (Join-Path $PSScriptRoot "_ghz-path.ps1")
+$ghz = Resolve-Ghz
 $metaFile = Join-Path $results "metadata.json"
 [System.IO.File]::WriteAllText($metaFile, ('{"authorization":"Bearer ' + $env:INTERNAL_API_TOKEN + '"}'), (New-Object System.Text.UTF8Encoding($false)))
 

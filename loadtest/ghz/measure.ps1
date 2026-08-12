@@ -67,12 +67,9 @@ if ($Summarize) { Show-Summary $out "$Label (재요약)"; return }
 
 if (-not $env:INTERNAL_API_TOKEN) { Write-Error "INTERNAL_API_TOKEN 미설정."; exit 1 }
 
-# ghz 경로 (.bin 우선)
-$ghz = "ghz"
-if (-not (Get-Command ghz -ErrorAction SilentlyContinue)) {
-  $bin = Join-Path (Split-Path -Parent $here) ".bin\ghz.exe"
-  if (Test-Path $bin) { $ghz = $bin } else { Write-Error "ghz 없음"; exit 1 }
-}
+# ghz 경로 — 규칙은 _ghz-path.ps1 한 곳에만 있다 (#194)
+. (Join-Path $PSScriptRoot "_ghz-path.ps1")
+$ghz = Resolve-Ghz
 
 # 메타데이터 파일
 $metaFile = Join-Path $results "metadata.json"

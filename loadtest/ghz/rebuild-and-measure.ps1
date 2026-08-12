@@ -36,7 +36,8 @@ $token = $env:INTERNAL_API_TOKEN
 $results = Join-Path $here "results"
 $metaFile = Join-Path $results "metadata.json"
 [System.IO.File]::WriteAllText($metaFile, ('{"authorization":"Bearer ' + $token + '"}'), (New-Object System.Text.UTF8Encoding($false)))
-$ghz = Join-Path $root "loadtest\.bin\ghz.exe"
+. (Join-Path $PSScriptRoot "_ghz-path.ps1")
+$ghz = Resolve-Ghz
 Write-Host "[rebuild] gRPC 기동 대기..."
 $ready = $false; $w = 0
 while (-not $ready -and $w -lt 300) {

@@ -26,7 +26,8 @@ $results = Join-Path $here "results"
 if (-not (Test-Path $results)) { New-Item -ItemType Directory -Path $results | Out-Null }
 $metaFile = Join-Path $results "metadata.json"
 [System.IO.File]::WriteAllText($metaFile, ('{"authorization":"Bearer ' + $token + '"}'), (New-Object System.Text.UTF8Encoding($false)))
-$ghz = Join-Path (Split-Path -Parent $here) ".bin\ghz.exe"
+. (Join-Path $PSScriptRoot "_ghz-path.ps1")
+$ghz = Resolve-Ghz
 
 Write-Host "[await] gRPC 기동 대기 (smoke 폴링)..."
 $ready = $false; $w = 0

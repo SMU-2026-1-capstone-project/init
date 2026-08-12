@@ -55,6 +55,17 @@ function Test-SessionsSeeded {
     "SELECT COUNT(*) FROM exercise_sessions WHERE id IN ($($Sessions.SqlIn));" 2>$null | Select-Object -Last 1)
   $ErrorActionPreference = $prev
 
+  # «세션이 없다» 와 «물어보지도 못했다» 는 다른 사건이다. 구분하지 않으면 docker 데몬이
+  # 내려간 상황에서 «시드를 적용하세요» 라고 안내하게 되고, 시드를 아무리 넣어도 안 고쳐진다.
+  # (2026-08-12 에 실제로 그렇게 나왔다 — Docker Desktop 이 죽어 있었다.)
+  if ("$have".Trim() -notmatch '^\d+$') {
+    Write-Host "[preflight] 세션 수를 못 물어봤습니다 — MySQL 컨테이너에 질의가 실패했습니다." -ForegroundColor Red
+    Write-Host "            docker 데몬과 shadowfit-mysql 컨테이너 상태를 먼저 확인하세요:" -ForegroundColor Red
+    Write-Host "            docker ps --filter name=shadowfit-mysql" -ForegroundColor Red
+    Write-Host "            (이건 «시드가 없다» 가 아닙니다. 시드를 넣어도 안 고쳐집니다.)" -ForegroundColor Red
+    return $false
+  }
+
   if ("$have".Trim() -eq "$($Sessions.Count)") {
     Write-Host "[preflight] 세션 $($Sessions.Lo)~$($Sessions.Hi) = $have/$($Sessions.Count) ✅" -ForegroundColor DarkGray
     return $true

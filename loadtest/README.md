@@ -63,6 +63,16 @@ go install github.com/bojand/ghz/cmd/ghz@latest   # go 있으면
 ```
 릴리스 바이너리: https://github.com/bojand/ghz/releases
 
+> **스크립트가 ghz 를 찾는 순서: ① 저장소 `loadtest/.bin/ghz.exe` → ② PATH** ([#194](https://github.com/Shadowfit/init/issues/194)).
+> 규칙은 `ghz/_ghz-path.ps1` 한 곳에 있고 bash 판도 같은 순서다. 둘 중 아무 쪽이나 채우면 rig 전체가 돈다.
+>
+> `.bin/` 을 먼저 보는 이유는 재현성이다 — 저장소 안에 일부러 받아둔 바이너리가 있으면 그걸로 재는 게 맞다.
+> 머신 전역 PATH 사정에 따라 판마다 다른 버전이 돌면 그 차이는 결과에 남지 않고 조용하다.
+> 그래서 판 시작 시 **어느 바이너리를 썼는지 버전과 함께 한 줄 찍는다**: `[ghz] 저장소 .bin — …\ghz.exe (v0.121.0)`
+>
+> ⚠️ `.bin/` 은 gitignore 대상(`loadtest/.gitignore:6`)이라 **clone 만으로는 생기지 않는다.**
+> 전에는 스크립트마다 찾는 방법이 세 갈래여서, 어느 쪽으로 설치하든 절반이 「미설치」라며 죽었다.
+
 ### 실행
 
 ```powershell

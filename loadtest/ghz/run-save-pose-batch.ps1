@@ -35,10 +35,10 @@ if (-not $env:INTERNAL_API_TOKEN) {
   Write-Error "INTERNAL_API_TOKEN 미설정. `$env:INTERNAL_API_TOKEN = '<server-token>' 후 재실행."
   exit 1
 }
-if (-not (Get-Command ghz -ErrorAction SilentlyContinue)) {
-  Write-Error "ghz 미설치. README.md §설치 참조 (scoop install ghz / go install)."
-  exit 1
-}
+# ghz 경로 — 규칙은 _ghz-path.ps1 한 곳에만 있다 (#194). 전에는 이 스크립트만 PATH 를
+# 요구해서, 저장소 .bin 에 바이너리를 두고도 «미설치» 라는 말을 들었다.
+. (Join-Path $PSScriptRoot "_ghz-path.ps1")
+$ghz = Resolve-Ghz
 if (-not (Test-Path $DataFile)) {
   Write-Error "$DataFile 없음. gen_batch_multi.py 또는 README 의 생성 블록으로 생성."
   exit 1
@@ -69,16 +69,16 @@ $common = @(
 switch ($Mode) {
   "smoke" {
     Write-Host "[smoke] 경로·인증 검증 — 5 call, c=1" -ForegroundColor Cyan
-    ghz @common -n 5 -c 1 $Target
+    & $ghz @common -n 5 -c 1 $Target
   }
   "baseline" {
     Write-Host "[baseline] 순차 — 200 call, c=1 (batch 1건 지연 p50/95/99). 동시성 1 이라 페이로드 분산과 무관" -ForegroundColor Cyan
-    ghz @common -n 200 -c 1 -O html -o "$results\baseline.html" $Target
+    & $ghz @common -n 200 -c 1 -O html -o "$results\baseline.html" $Target
     Write-Host "리포트: $results\baseline.html" -ForegroundColor Green
   }
   "ramp" {
     Write-Host "[ramp] 동시성 step 5->100 (10s/step) — throughput 천장 + 콜백 p99" -ForegroundColor Cyan
-    ghz @common `
+    & $ghz @common `
       --concurrency-schedule=step `
       --concurrency-start=5 --concurrency-step=5 --concurrency-end=100 `
       --concurrency-step-duration=10s `
