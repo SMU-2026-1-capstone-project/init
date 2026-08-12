@@ -19,6 +19,52 @@
 4. **종료 동작 확인** — `AUTO_SHUTDOWN=1` 을 쓸 거면 인스턴스의
    `InstanceInitiatedShutdownBehavior` 가 `stop` 인지 본다. `terminate` 면 **EBS까지 날아간다**
 
+### IAM — `iam/` 의 두 파일
+
+플레이스홀더 두 개(`__BUCKET__`·`__PREFIX__`)만 바꿔 쓴다. `__PREFIX__` 는 `S3_BASE` 의
+프리픽스와 같아야 한다 — `S3_BASE=s3://my-bucket/shadowfit` 이면 `shadowfit`.
+
+```bash
+BUCKET=my-bucket
+PREFIX=shadowfit
+
+sed -e "s/__BUCKET__/$BUCKET/g" -e "s/__PREFIX__/$PREFIX/g" \
+    loadtest/aws/iam/policy-s3-results.json > /tmp/policy.json
+
+aws iam create-role --role-name shadowfit-measure \
+    --assume-role-policy-document file://loadtest/aws/iam/trust-ec2.json
+aws iam put-role-policy --role-name shadowfit-measure \
+    --policy-name s3-results --policy-document file:///tmp/policy.json
+
+aws iam create-instance-profile --instance-profile-name shadowfit-measure
+aws iam add-role-to-instance-profile --instance-profile-name shadowfit-measure \
+    --role-name shadowfit-measure
+```
+
+인스턴스 시작 시 이 인스턴스 프로파일을 붙이거나, 이미 떠 있으면
+`aws ec2 associate-iam-instance-profile --instance-id i-xxx --iam-instance-profile Name=shadowfit-measure`.
+
+**권한을 이렇게 자른 이유:**
+
+| 넣은 것 | 왜 |
+|---|---|
+| `s3:ListBucket` (버킷 단위) | `aws s3 sync` 가 목적지를 나열해 무엇을 올릴지 정한다. 로컬 스모크에서 이게 없을 때 나온 에러가 정확히 `AccessDenied ... ListObjectsV2` 였다 |
+| `s3:PutObject` | 업로드 본체 |
+| `s3:GetObject` | sync 가 기존 객체와 비교할 때 쓴다. 없어도 대개 도는데, **8시간 뒤에 막히는 것보다 지금 넣는 쪽이 싸다** |
+| `s3:AbortMultipartUpload` | 큰 파일(pt-osc 로그·writer 원시 tsv)이 멀티파트로 올라가다 끊기면 조각이 남는다. 정리 권한 |
+
+| 뺀 것 | 왜 |
+|---|---|
+| **`s3:DeleteObject`** | `sync` 를 `--delete` 없이 쓰므로 필요 없다. **이 역할로는 결과를 지울 수 없다** — 무인 실행이라 사고의 방향을 한쪽으로 막아두는 편이 낫다 |
+| `s3:*` / 전체 버킷 쓰기 | 객체 권한은 `__PREFIX__/*` 로만. 다른 프리픽스는 못 건드린다 |
+
+⚠️ **버킷이 SSE-KMS(고객 관리 키)면 `kms:GenerateDataKey`·`kms:Decrypt` 를 그 키에 대해
+따로 줘야 한다.** 기본 SSE-S3 면 필요 없다. 이걸 빠뜨리면 `preflight` 의 쓰기 시험에서
+바로 막히므로 8시간을 잃지는 않는다.
+
+⚠️ 버킷 리전은 인스턴스와 맞추는 편이 싸다(교차 리전 전송료). 보존 기간(수명주기 규칙)은
+**정하지 않았다** — 근거 없는 기본값을 넣지 않는다.
+
 ## 실행
 
 ```bash
