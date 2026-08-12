@@ -15,7 +15,8 @@
 - **본인 담당**: 백엔드 전체 — 적재·조회 경로, gRPC 결합, 신뢰성, 관측성, DB 설계·튜닝
 - **본인 담당 아님**: 자세 분석 알고리즘(MediaPipe·DTW)은 팀 내 AI 담당
 - **스택**: Spring Boot 3.5.16 / Java 21 · MySQL 8.0 · gRPC · Flyway · Docker · Prometheus·Grafana(측정 오염을 막으려 `profiles: ["obs"]` 로 분리 — 기본 구동은 3개)
-- **규모 전제**: DAU 1,000 가정 · `pose_data` 1억 행 합성 시딩(더미 11GB / 실제 JSON 230GB)
+- **규모 전제**: DAU 1,000 가정 · `pose_data` 1억 행 합성 시딩 — **실제로 만든 것은 더미 JSON 11GB**(행수·payload 디커플링). 실제 2.3KB JSON 이면 **230GB**(1억 × 2.3KB 단순 곱)라 로컬에 못 올린다
+  - ⚠️ **이 값은 유도치이고, 레포 안에서 두 값으로 돈다** — rig 스크립트와 [`realmysql-experiments.md`](./realmysql-experiments.md) 는 같은 것을 **255GB** 로 적는다. 오버헤드 포함 여부 차이로 보이나 **어느 쪽도 산식이 안 적혀 있고, 실제로 만들어 본 적이 없다.** 여기서는 단순 곱(230GB)을 쓰고 그 사실을 밝혀 둔다
 
 ---
 
@@ -52,8 +53,8 @@
 - **gRPC deadline + 서킷브레이커** — 단 `INVALID_ARGUMENT`(요청이 틀림)는 건강 신호가 아니므로 서킷 집계에서 제외
 - **precompute-on-write** — 리포트 조회 때마다 하던 `pose_data` 재스캔을 세션 종료 시 1회로
 - **파티션 TTL 자동화** — 만료 파티션 DROP + 미래 파티션 선확보. `pfuture MAXVALUE`로 적재 실패 자체를 구조적으로 차단
-- **자원 상한을 «실측에서 유도»한다** — 동시 세션 상한을 숫자로 박지 않고 `(컨테이너 메모리 한도 − 기본 RSS) ÷ 검출기 1개 98.7MB`로 계산한다. 환경(로컬/EC2)이 바뀌어도 코드가 안 바뀌고, **근거 없는 기준값이 코드에 안 들어간다.** 한도도 설정도 없으면 기동을 거부한다
-- **관측성** — correlation id 전파 + 커스텀 지표 9종 + Prometheus·Grafana
+- **자원 상한을 «실측에서 유도»한다** — 동시 세션 상한을 숫자로 박지 않고 `(컨테이너 메모리 한도 − 기본 RSS) ÷ 검출기 1개 98.7MB`([실측](../../loadtest/results/detector-memory-2026-08-11/))로 계산한다. 환경(로컬/EC2)이 바뀌어도 코드가 안 바뀌고, **근거 없는 기준값이 코드에 안 들어간다.** 한도도 설정도 없으면 기동을 거부한다
+- **관측성** — correlation id 5단계 전파 + 커스텀 지표 **9종**(코드 확인: [`SessionMetrics.java`](../../backend/src/main/java/com/shadowfit/global/observability/SessionMetrics.java) — 상태전이·낙관락충돌·배치행수·AI중단결과·아웃박스 3종·고아행 2종) + Prometheus·Grafana
 
 ## 정직하게 적는 한계
 
@@ -74,22 +75,24 @@
 
 ## 직무별 매핑
 
-| DBA 업무 | 이 프로젝트에서 | 결과 |
-|---|---|---|
-| **쿼리 튜닝** | JSON off-page over-fetch 제거 | payload −98.7% (조건: ①표 참조) |
-| **인덱스 설계·검증** | `EXPLAIN`으로 이미 최적임을 확인 후 **가설 폐기**, `IGNORE INDEX` 강제 풀스캔과 직접 대조 | 약 9,000배 |
-| **보존정책 운영** | 월별 RANGE 파티션 + 자동 DROP/선확보 스케줄러 | DELETE 대비 625배 |
-| **용량 산정** | 커넥션 풀 사이징 EC2 4차 실측 · **자원 상한을 실측 상수에서 유도**(메모리 한도 ÷ 98.7MB) | plateau 시작점 = 10 · 코어당 16.4세션 |
-| **내구성 트레이드오프** | fsync 완화 시 3.47배 — **채택하지 않음** | 안 아픈 것을 고치며 데이터 안전을 파는 셈이라 판단 |
-| **대용량 데이터 이관** | 1억 행 시딩 파이프라인 가속 | 48분 → 16분 |
-| **스키마 변경 운영** | 96분 차단 ALTER를 pt-osc와 대조 | **진행 중** |
-| **잠금·격리수준** | `performance_schema.data_locks`로 락 실물 관찰, MVCC/SERIALIZABLE 대조 | 재현 rig 보유 |
+> 수치의 **조건은 ①표와 같다**(같은 실측을 다르게 부르는 것이므로). 여기서 처음 나오는 값에는 조건을 직접 단다.
+
+| DBA 업무 | 이 프로젝트에서 | 결과 | 근거 |
+|---|---|---|---|
+| **쿼리 튜닝** | JSON off-page over-fetch 제거 | payload −98.7% (조건: ①표) | [§②b](./realmysql-experiments.md) |
+| **인덱스 설계·검증** | `EXPLAIN`으로 이미 최적임을 확인 후 **가설 폐기**, `IGNORE INDEX` 강제 풀스캔과 직접 대조 | 약 9,000배 (조건: ①표) | [`realmysql-experiments.md`](./realmysql-experiments.md) · rig [`measure_admin_index.sh`](../../loadtest/measure_admin_index.sh) |
+| **보존정책 운영** | 월별 RANGE 파티션 + 자동 DROP/선확보 스케줄러 | DELETE 대비 625배 (조건: ①표) | [§②d](./realmysql-experiments.md) |
+| **용량 산정** | 커넥션 풀 사이징 EC2 4차 실측 · **자원 상한을 실측 상수에서 유도**(메모리 한도 ÷ 98.7MB) | plateau 시작점 = 10 · 코어당 16.4세션 (조건: ①표) | [§5-1(9)](../decisions/pose-ingest-downsampling.md) · [`ai-recalibrate`](../../loadtest/results/ai-recalibrate-2026-08-11/) |
+| **내구성 트레이드오프** | fsync 완화 시 3.47배 — **채택하지 않음** | 안 아픈 것을 고치며 데이터 안전을 파는 셈이라 판단. ⚠️ **3.47배는 단일 핫세션 조건의 값**이고 다세션에선 1.03배로 사라진다 | [`ceiling-fsync`](../../loadtest/results/ceiling-fsync-2026-08-08/) · [#166](https://github.com/Shadowfit/init/issues/166) |
+| **대용량 데이터 이관** | 1억 행 시딩 파이프라인 가속 | 48분 → 16분. **조건**: 세션 범위 3분할 동시 INSERT. 같은 작업의 다른 레버 셋(버퍼풀 128MB→2GB · 인덱스 후행 빌드 · `innodb_sort_buffer_size` 1M→64M)은 별도 | [§3 가속 교훈](./realmysql-experiments.md) · rig [`seed/README.md`](../../loadtest/seed/README.md) |
+| **스키마 변경 운영** | 96분 차단 ALTER를 pt-osc와 대조 | **진행 중** | [`online-ddl-vs-blocking-alter.md`](../decisions/online-ddl-vs-blocking-alter.md) |
+| **잠금·격리수준** | `performance_schema.data_locks`로 락 실물 관찰, MVCC/SERIALIZABLE 대조 | 재현 rig 보유. ⚠️ **락 «비용» 은 이 환경에서 못 쟀다** — 판 간 변동이 재려던 효과보다 커서 앞선 −35.3% 도 기각했다 | rig [`measure_lock.sh`](../../loadtest/measure_lock.sh) · [`measure_mvcc.sh`](../../loadtest/measure_mvcc.sh) · [#87](https://github.com/Shadowfit/init/issues/87) |
 
 ## 방법론
 
 - **반증 조건을 먼저 쓴다.** 가설과 함께 「무엇이 나오면 틀린 것인가」를 측정 전에 적는다
 - **결론이 뒤집히면 뒤집힌 채로 남긴다.** 쓰기 천장은 4차까지 재측정하며 결론이 세 번 바뀌었고, 그 과정이 그대로 문서에 있다
-- **수치에는 조건을 단다.** 「3.47배」를 인용한 13곳에 조건을 소급 표기한 커밋이 있다
+- **수치에는 조건을 단다.** 「3.47배」를 인용한 13곳에 조건을 소급 표기한 커밋이 있다(`0d68b52`) — 값이 틀린 게 아니라 조건이 안 적혀 있었다
 - **측정 장치의 오염을 의심한다.** wall-clock 왕복 오버헤드가 sub-100ms 측정을 삼킨 전례를 찾아 `SET profiling`으로 우회했다
 
 ## 아직 비어 있는 것 (숨기지 않는다)
