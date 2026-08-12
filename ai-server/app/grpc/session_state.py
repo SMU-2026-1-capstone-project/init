@@ -8,6 +8,7 @@ StopAnalysis 또는 CompleteAnalysis 콜백 직후 제거된다.
 from __future__ import annotations
 
 import threading
+import time
 from collections import deque
 from dataclasses import dataclass, field
 
@@ -177,12 +178,38 @@ def accept_frame(state: SessionState, now: float) -> bool:
     return True
 
 
+# 종료한 세션 id 를 얼마나 기억할 것인가 (#191).
+#
+# 아웃박스는 at-least-once 라 같은 StopAnalysis 가 두 번 올 수 있다. 두 번째가 왔을 때
+# «이미 처리했다» 와 «세션을 정말 잃었다» 를 구분하려면 첫 처리를 기억하고 있어야 한다.
+#
+# 값의 근거 — Spring 이 회수분을 다시 보낼 수 있는 가장 이른 시점이다:
+#   lease 60s   (backend outbox.publisher.lock-timeout-seconds, 기본값)
+#   + 폴링 1s   (outbox.publisher.poll-interval-ms, 기본값)
+#   + 데드라인 5s (ExerciseAnalysisService.GRPC_CALL_TIMEOUT_SECONDS)
+#   = 66s
+#
+# ⚠️ 이 값은 **Spring 설정의 복사본**이다. 위 셋 중 하나라도 바뀌면 여기도 바꿔야 한다.
+#    단일 출처로 만들려면 Spring 이 «이 요청은 회수분일 수 있다» 를 요청에 실어 보내야 하는데,
+#    그건 proto 계약 변경이고 지금은 생성 산출물이 두 벌인 상태(#132)라 그 위에 얹지 않았다.
+#
+#    어긋났을 때의 결말은 안전한 쪽이다: 창이 짧으면 두 번째 호출이 그냥 success=False 로
+#    떨어지고, 그건 이 변경 이전의 동작이다(Spring 이 회수분이면 세션을 안 건드린다, #152).
+#    즉 «조용히 틀리는» 게 아니라 «조용히 원래대로» 다.
+STOPPED_SESSION_RETENTION_SEC = 66.0
+
+
 class SessionStateRegistry:
     """sessionId → SessionState 매핑. 모든 접근은 Lock 하에 수행."""
 
-    def __init__(self) -> None:
+    def __init__(self, retention_sec: float = STOPPED_SESSION_RETENTION_SEC) -> None:
         self._lock = threading.Lock()
         self._sessions: dict[int, SessionState] = {}
+        # sessionId → 종료 처리한 시각(monotonic). remove() 가 채우고 was_recently_stopped()
+        # 가 읽는다. 값은 int+float 둘뿐이라 세션당 비용이 사실상 없다 — 검출기(98.7MB)를
+        # 붙들고 있는 것과는 다른 이야기다.
+        self._recently_stopped: dict[int, float] = {}
+        self._retention_sec = retention_sec
 
     def create(
         self,
@@ -246,9 +273,39 @@ class SessionStateRegistry:
         with self._lock:
             return self._sessions.get(session_id)
 
-    def remove(self, session_id: int) -> SessionState | None:
+    def remove(self, session_id: int, now: float | None = None) -> SessionState | None:
+        """상태를 꺼내고, **꺼냈다는 사실**을 보유 기간 동안 남긴다 (#191).
+
+        Args:
+            now: `time.monotonic()` 값. 테스트가 시간을 주입할 수 있게 인자로 받는다
+                 (`accept_frame` 과 같은 방식).
+        """
+        stamp = time.monotonic() if now is None else now
         with self._lock:
-            return self._sessions.pop(session_id, None)
+            state = self._sessions.pop(session_id, None)
+            # 상태가 없었어도 기록한다. 없었다는 건 «이미 지웠다» 이거나 «애초에 없었다» 인데,
+            # 전자라면 그 시점부터 다시 보유 기간을 세는 편이 재송신 창을 더 넓게 덮는다.
+            self._recently_stopped[session_id] = stamp
+            self._prune_stopped(stamp)
+            return state
+
+    def was_recently_stopped(self, session_id: int, now: float | None = None) -> bool:
+        """보유 기간 안에 종료 처리된 세션인가 — «이미 처리됨» 과 «정말 잃음» 의 구분점."""
+        stamp = time.monotonic() if now is None else now
+        with self._lock:
+            self._prune_stopped(stamp)
+            return session_id in self._recently_stopped
+
+    def _prune_stopped(self, now: float) -> None:
+        """만료분 정리. 호출부가 Lock 을 잡고 있어야 한다.
+
+        쓰기·읽기 양쪽에서 부른다. 읽기에서도 정리하지 않으면, 세션이 더 안 들어오는 동안
+        만료된 id 가 남아 «보유 기간이 지났는데 True» 가 나온다.
+        """
+        cutoff = now - self._retention_sec
+        expired = [sid for sid, at in self._recently_stopped.items() if at < cutoff]
+        for sid in expired:
+            del self._recently_stopped[sid]
 
     def exists(self, session_id: int) -> bool:
         with self._lock:
