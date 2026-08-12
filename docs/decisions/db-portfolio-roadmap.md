@@ -1,7 +1,7 @@
 # 이 프로젝트를 백엔드 DB 포폴로 만들기 — 로드맵
 
-작성일: 2026-06-05
-상태: **분석/추천 (결정 전)** — 기능 선택·착수는 사용자 confirm 후 박제
+작성일: 2026-06-05 / 갱신: 2026-08-12 (§3·§4 를 §10 및 실제 코드와 동기화)
+상태: **1·2순위는 결정 완료**(1위 폐기 / 2위 완료). 3순위 이하만 «분석/추천(결정 전)» — 착수는 사용자 confirm 후 박제
 대상 진로: 백엔드(Spring) 신입. DB 역량 증명이 목표.
 연관: [`youtube-coordinate-harvest.md`](./youtube-coordinate-harvest.md), [`report-aggregation.md`](./report-aggregation.md), [`redis-introduction.md`](./redis-introduction.md), [`ai-load-budget.md`](./ai-load-budget.md), `loadtest/ghz/`
 
@@ -47,7 +47,7 @@
 ## 3. 현 자산 (이미 갖춘 것)
 
 - 낙관적 락 `exercise_sessions.version` + 충돌 3회 재시도 — 동시성
-- 멱등성: `session_feedback_logs` uniqueKey + `INSERT IGNORE`
+- ~~멱등성: `session_feedback_logs` uniqueKey + `INSERT IGNORE`~~ 🔴 **자산으로 셀 수 없다(2026-08-12)** — 장치는 실재하나 그 경로에 **호출자가 없어 한 번도 돈 적이 없다**(#193). 실제로 도는 두 콜백 중 `SavePoseDataBatch` 는 멱등 장치가 **없다**(#188, [`./pose-batch-idempotency-vs-partition.md`](./pose-batch-idempotency-vs-partition.md))
 - 복합 인덱스 `pose_data(session_id, timestamp_sec)`
 - write 감축 의도: pose_data "1초 평균" 설계 ([§7 갭](#7-정직하게-짚을-갭))
 - rep 단위 **배치 적재** (`SavePoseDataBatch`) — 단건 INSERT 회피
@@ -59,12 +59,16 @@
 
 ## 4. 기능 후보 — 우선순위
 
-각 후보는 "왜 CRUD 아님 + 측정 지표"를 가진다. **⭐ = 현재 추천 (결정 전)**.
+각 후보는 "왜 CRUD 아님 + 측정 지표"를 가진다. ⭐ 는 2026-06-05 초안 시점의 추천이었다.
+
+> 🔴 **이 표의 1·2위는 더 이상 «후보» 가 아니다 (2026-08-12 정정).** 1위는 **폐기**, 2위는 **완료**됐다.
+> 결정 경위와 실측은 **[§10](#10-미결정-항목-2026-06-12-재조정) 이 최신**이며, 이 표가 그것을
+> 따라가지 못해 문서가 자기모순이었다. 3위 이하는 초안 그대로이므로 착수 전 재검토가 필요하다.
 
 | 순위 | 기능 | DB 기법 | 임팩트 | 차별화 | 비용 |
 |---|---|---|---|---|---|
-| 1 ⭐ | **활동 피드 팬아웃** (소셜) | fan-out-on-write vs on-read, 소셜그래프 M:N, 알림 fan-out | ★★★ | ★★★ | 중 |
-| 2 ⭐ | **pose_data 파티셔닝 + 보존정책** | 시간 파티셔닝, 청크 삭제(락 회피), 아카이빙 | ★★★ | ★★ | 중 |
+| ~~1 ⭐~~ 🔴 **폐기** | ~~**활동 피드 팬아웃** (소셜)~~ | ~~fan-out-on-write vs on-read, 소셜그래프 M:N, 알림 fan-out~~ | — | — | — |
+| ~~2 ⭐~~ ✅ **완료** | **pose_data 파티셔닝 + 보존정책** | 시간 파티셔닝, DROP PARTITION 폐기, 미래 파티션 자동 생성 | ★★★ | ★★ | (완료) |
 | 3 | 주간/월간 통계 사전집계 | 배치 집계테이블(materialized 흉내), `@Scheduled` | ★★ | ★★ | 중 |
 | 4 | 리더보드 (그룹/전체) | 윈도우 함수, **Redis ZSET**, 배치 갱신 | ★★ | ★★ | 저 |
 | 5 | 시계열 피로도·추세 (코칭) | 윈도우 `LAG`/이동평균, baseline 집계, Redis hot-state | ★★ | ★★ | 저 |
@@ -73,16 +77,47 @@
 | 8 | 운동 추천 (item 동시출현) | 사전집계 배치 + 캐시, 무거운 집계 쿼리 | ★★ | ★ | 중 |
 | 9 | 전문가 연계 (리포트 전달) | RBAC/공유 권한, 상태머신, multi-tenant 집계 | ★★ | ★ | 중 |
 
-### 4-1. 1순위 활동 피드 팬아웃 — 왜 톱픽인가
+### 4-1. ~~1순위 활동 피드 팬아웃~~ — 🔴 폐기 (§10)
+
+**도메인이 받쳐주지 않아 폐기**했다 — "혼자 운동" 도메인에 소셜 피드를 얹는 것은 억지라는 판단
+([`../portfolio/portfolio-narrative.md`](../portfolio/portfolio-narrative.md) §4: 헤드라인 제외).
+신규 테이블 `friendships`·`activity_feed`·`notifications` 는 **만들지 않았다.**
+
+기술적 매력(write amplification, on-write vs on-read)이 컸던 만큼 폐기 이유가 **기술이 아니라
+도메인 적합성**이었다는 점이 남길 가치가 있다 — 되살리려면 그 전제부터 다시 세워야 한다.
+
+<details><summary>초안 시점의 근거 (보존용)</summary>
+
 - "파트너가 하체 운동을 완료했습니다" = **fan-out 문제** (트위터 타임라인). 캡스톤이 거의 못 다룸 → 차별화 최고.
 - 활동 1건 → 친구 N명 피드에 N행 = **write amplification**. 사용자가 "차별화 높다"고 한 **쓰기 축과 동일한 문제**.
 - "인플루언서(팔로워 多) 활동 시 팬아웃 폭발 → on-write vs on-read 선택" 은 면접관이 즉시 알아보는 서사.
 - 필요 신규 테이블(안): `friendships`(self M:N + 상태), `activity_feed`, `notifications`.
 
-### 4-2. 2순위 pose_data 파티셔닝 — 가장 순수한 DB 스토리
-- 대부분 캡스톤엔 천연 대용량 테이블이 없음. pose_data는 초당 수십 행 쏟아지는 시계열 → **누적 월 ~1억 행** (§5).
-- "1초 평균 감축(이미 함) → 그래도 쌓이면 → 시간 파티셔닝 → 오래된 파티션 아카이브/드롭" = 운영까지 가는 완결 서사.
-- ⚠️ **실스키마 반영 시 FK+파티션 비호환 블로커 발견** (MySQL/InnoDB 제약) + 회원 탈퇴 CASCADE 대체 설계 필요 — [`./pose-data-partition-fk-tradeoff.md`](./pose-data-partition-fk-tradeoff.md) (OPEN), [GitHub #41](https://github.com/Shadowfit/init/issues/41)
+</details>
+
+### 4-2. ~~2순위~~ pose_data 파티셔닝 — ✅ 완료, 운영까지 갔다
+
+초안이 그린 "감축 → 파티셔닝 → 아카이브/드롭" 서사가 **끝까지 구현됐다.**
+
+| 단계 | 상태 |
+|---|---|
+| 저장 감축(다운샘플 R≈5) | ✅ `PoseDataService.DOWNSAMPLE_WINDOW`, PR #53 (2026-07-25) |
+| 시간 파티셔닝 | ✅ `PARTITION BY RANGE (unix_timestamp(created_at))` 월별 (DB 실측 2026-08-12) |
+| 만료 파티션 폐기 | ✅ `PoseDataPartitionScheduler.dropExpiredPartitions` — `DROP PARTITION` |
+| 미래 파티션 자동 생성 | ✅ 같은 스케줄러 `ensureFuturePartitions` (`REORGANIZE PARTITION pfuture`) |
+| 실측 근거 | ✅ ALTER 96분 / DROP PARTITION 1.8초 / DELETE 대비 **625배** ([`../portfolio/realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §4-②d) |
+| 볼륨 | ✅ 1억 행 시드 (133,334세션 × 750행, ~11GB) |
+
+FK 비호환 블로커도 **해소됐다** — FK 를 제거하고 애플리케이션 검증으로 대체했다
+([`./pose-data-partition-fk-tradeoff.md`](./pose-data-partition-fk-tradeoff.md), [#41](https://github.com/Shadowfit/init/issues/41)).
+
+**대신 그 대가가 남았다.** FK 도 유니크 키도 없어져 **참조무결성과 멱등성을 애플리케이션이 떠맡았다**:
+
+- 고아 행 창(세션 검증 ↔ INSERT 사이) — [#87](https://github.com/Shadowfit/init/issues/87)
+- 파티션 컬럼(`created_at`) 강제 포함 때문에 **순진한 멱등 키를 걸 수 없다** —
+  [#188](https://github.com/Shadowfit/init/issues/188), [`./pose-batch-idempotency-vs-partition.md`](./pose-batch-idempotency-vs-partition.md)
+
+즉 이 칸은 «완료» 지만 **파생 부채가 열려 있고, 그 부채가 지금 쓰기 축의 다음 작업**이다.
 
 ---
 
