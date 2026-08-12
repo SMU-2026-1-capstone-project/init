@@ -14,10 +14,38 @@ docker compose up -d mysql
 docker pull percona/percona-toolkit
 
 bash loadtest/results/online-ddl-2026-08-09/probe.sh      # 전제 확인 — 반드시 먼저
-bash loadtest/results/online-ddl-2026-08-09/ddl_sweep.sh  # 본 측정 (~3시간)
+bash loadtest/results/online-ddl-2026-08-09/ddl_sweep.sh  # 본 측정
 ```
 
 `probe.sh` 가 실패하면 `ddl_sweep.sh` 로 넘어가지 않는다. 특히 **[1] 이 «성공» 으로 나오면 실험 전제가 무너진 것**이다 — 도구 없이 무중단이 되는데 도구를 재는 셈이므로 설계부터 다시 본다.
+
+### 소요 시간 — 버림판 2판 실측 기준
+
+| 구간 | 팔 A (차단 ALTER) | 팔 B (pt-osc) |
+|---|---|---|
+| 시딩 (1,000만 행) | 1,261s | 745s |
+| DDL | **990s** | **2,360s** |
+| 판당 | ~37분 | ~52분 |
+
+기본 `SEQ` 8판(A×4·B×4) 기준 **≈ 5.9시간**. `probe_import_speed.txt` 의 파일 복원 시딩(판당 851s→39s)을 채택하면 **≈ 3.8시간**.
+
+> ⚠️ 이 자리에 «~3시간» 이라고 적혀 있었다. 그건 팔 B 를 재기 **전**의 추정(판당 시딩 5분 + 팔 A 7분)이었고, 실측과 두 배 어긋났다. 위 표는 `discard_run.log` 에서 온 값이다.
+> ⚠️ 로컬 디스크 기준이다. EBS 로 옮기면 달라진다 — **1판이 끝나면 재추정할 것.**
+
+### 리허설 — 축소 규모로 전 경로 먼저 밟기
+
+무인 실행(야간·EC2) 전에는 **1/100 규모로 8판을 먼저 돌린다.** 시딩·writer·팔 A·팔 B(pt-osc 트리거·컷오버)·검증·집계까지 같은 경로를 **~15분**에 전부 밟는다.
+
+```bash
+SESSIONS=134 bash loadtest/results/online-ddl-2026-08-09/probe.sh
+SESSIONS=134 bash loadtest/results/online-ddl-2026-08-09/ddl_sweep.sh
+```
+
+`SESSIONS` 를 덮으면 기대 행수와 청크 수가 같이 따라온다(#197 에서 고쳤다 — 그전엔 상수라 가드에서 죽었다). `SESSIONS=134` → 100,000 행, 기본값 `13334` → 정확히 10,000,000 행.
+
+> 🔴 **리허설 결과를 측정값으로 인용하지 말 것.** 이건 «경로가 도는가» 만 본다. 축소하면 `created_at` 분산이 좁아져 행이 사실상 한 파티션에 몰리고(세션당 40분 간격), 팔 간 차이도 노이즈에 묻힌다. 파티션 14개는 그대로 생기므로 `verify_partitioned` 는 통과한다 — **통과가 곧 유효 측정이 아니다.**
+>
+> 리허설 뒤에는 `SESSIONS` 를 **비우고**(기본값) 본 측정을 돌린다.
 
 ## 파일
 

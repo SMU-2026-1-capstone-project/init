@@ -21,8 +21,23 @@ OUT=${OUT:-$HERE}
 
 # 축소 규모 — 설계 §9 결정: 1,000만 행.
 #   13,333 세션 × 750행 + 끝세션 250행 = 정확히 10,000,000
+#
+# 🔴 SESSIONS 를 덮으면 아래 EXPECTED_ROWS·청크 수가 **같이** 따라와야 한다(#197).
+#    예전엔 SESSIONS 만 변수고 기대 행수(10000000)와 청크 수(seq 0 13)가 상수였다 —
+#    손잡이처럼 보이는데 돌리면 가드에서 죽는, 이 rig 두 번째 «손잡이인 줄 알았다» 다(#183).
 SESSIONS=${SESSIONS:-13334}
 ROWS_PER_SESSION=750
+TAIL_ROWS=250          # 끝세션. 750 의 배수로는 딱 떨어지지 않는 나머지를 여기서 맞춘다
+SEED_CHUNK=1000        # 한 INSERT 문이 삼키는 세션 수
+
+# 기본값에서 13333×750+250 = 10,000,000 — 정판 조건은 그대로다.
+EXPECTED_ROWS=$(( (SESSIONS - 1) * ROWS_PER_SESSION + TAIL_ROWS ))
+# 세션 0 ~ SESSIONS-2 를 SEED_CHUNK 씩 끊는다. 마지막 청크는 seed_scale 이 잘라 쓴다.
+SEED_CHUNKS=$(( (SESSIONS - 2) / SEED_CHUNK ))
+
+# _seq 가 0~99,999 라 그 위는 시딩이 조용히 모자란다. 가드에서 죽기 전에 여기서 끊는다.
+[ "$SESSIONS" -ge 2 ] && [ "$SESSIONS" -le 100000 ] \
+  || { echo "🔴 SESSIONS 는 2~100000 이어야 한다 (받은 값 '$SESSIONS') — _seq 범위 제약" >&2; exit 1; }
 
 # ── pt-osc 전용 계정 ─────────────────────────────────────────────────────
 #
@@ -100,7 +115,7 @@ seed_scale() {
   #    검사가 반드시 깨진다. 1차 실행이 정확히 이걸로 죽었다 — stop_writer 가 못 죽인 writer 가
   #    다음 판 테이블에 2,497행을 흘려 넣었다. 여기서 먼저 막는다.
   assert_no_writer
-  echo "  [시딩] ${SESSIONS} 세션 → 1,000만 행 (인덱스 없이)"
+  printf "  [시딩] %s 세션 → %'d 행 (인덱스 없이)\n" "$SESSIONS" "$EXPECTED_ROWS"
   t0=$(date +%s)
   DB -e "
     DROP TABLE IF EXISTS pose_data_scale;
@@ -130,8 +145,8 @@ seed_scale() {
   DB -e "SET GLOBAL innodb_flush_log_at_trx_commit=2;" || die "flush 완화 실패"
 
   local i s e
-  for i in $(seq 0 13); do
-    s=$((i*1000)); e=$(((i+1)*1000))
+  for i in $(seq 0 "$SEED_CHUNKS"); do
+    s=$((i*SEED_CHUNK)); e=$(((i+1)*SEED_CHUNK))
     [ $e -gt $((SESSIONS-1)) ] && e=$((SESSIONS-1))
     [ $s -ge $((SESSIONS-1)) ] && break
     DB -e "INSERT INTO pose_data_scale
@@ -146,7 +161,7 @@ seed_scale() {
            (session_id, timestamp_sec, joint_coordinates, sync_rate, is_correct, feedback_message, created_at)
          SELECT $SESSIONS, r.n*1.2, '{}', 75.0, 1, 'ok',
                 TIMESTAMP('2026-01-01 06:00:00') + INTERVAL (($SESSIONS-1)*40) MINUTE + INTERVAL FLOOR(r.n*1.2) SECOND
-         FROM _seq r WHERE r.n < 250;" || seed_die "끝세션 시딩 실패"
+         FROM _seq r WHERE r.n < $TAIL_ROWS;" || seed_die "끝세션 시딩 실패"
 
   DB -e "CREATE INDEX idx_session_timestamp ON pose_data_scale (session_id, timestamp_sec);
          SET GLOBAL innodb_flush_log_at_trx_commit=1;
@@ -158,10 +173,10 @@ seed_scale() {
   #    확인 없이 지나가면 다른 크기의 테이블을 잰 판이 표에 들어간다.
   local n flush
   n=$(DBQ "SELECT COUNT(*) FROM pose_data_scale;")
-  [ "$n" = "10000000" ] || die "행 수가 1,000만이 아니다 — 실제 '$n'"
+  [ "$n" = "$EXPECTED_ROWS" ] || die "행 수가 $EXPECTED_ROWS 이 아니다 — 실제 '$n'"
   flush=$(DBQ "SELECT @@innodb_flush_log_at_trx_commit;")
   [ "$flush" = "1" ] || die "내구성 복구가 안 됐다 — flush='$flush' (다음 판이 오염된다)"
-  echo "  [시딩] 완료 $((t1-t0))s — 1,000만 행 확인, flush=1 복구 확인"
+  printf "  [시딩] 완료 %ss — %'d 행 확인, flush=1 복구 확인\n" "$((t1-t0))" "$EXPECTED_ROWS"
 }
 
 # ── 대상 DDL ─────────────────────────────────────────────────────────────
@@ -338,8 +353,9 @@ verify_partitioned() {  # $1 = 태그
                  AND partition_name IS NOT NULL;")
   [ "${parts:-0}" = "14" ] || { echo "  ✗ 파티션이 14개가 아니다 (실제 '${parts:-없음}') — $1" >&2; return 1; }
   rows=$(DBQ "SELECT COUNT(*) FROM pose_data_scale;")
-  [ "${rows:-0}" -ge 10000000 ] || { echo "  ✗ 행이 유실됐다 (실제 '$rows' < 1,000만) — $1" >&2; return 1; }
-  echo "  검증: 파티션 14개 · 행 $rows (시드 1,000만 + writer 분)"
+  [ "${rows:-0}" -ge "$EXPECTED_ROWS" ] \
+    || { echo "  ✗ 행이 유실됐다 (실제 '$rows' < $EXPECTED_ROWS) — $1" >&2; return 1; }
+  echo "  검증: 파티션 14개 · 행 $rows (시드 $EXPECTED_ROWS + writer 분)"
   return 0
 }
 
