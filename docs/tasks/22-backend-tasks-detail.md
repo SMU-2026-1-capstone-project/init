@@ -80,7 +80,7 @@
    - 입력: `Session` + 그 세션의 `PoseData` 요약(평균 syncRate, worst 구간, totalReps)
    - 출력: `{summary, improvementTips, detailedAnalysis}` 텍스트 3종
    - 호출: OpenAI Chat Completions 또는 Anthropic Messages API
-   - 프롬프트는 한국어 ([`project-korean-only`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_korean_only.md))
+   - 프롬프트는 한국어 ([[project_korean_only]])
 2. `service/Report/ReportService.java` — `generateReportForSession(sessionId)` 추가, `GptFeedbackService` 호출 후 `Report` 엔티티 저장
 3. `service/Exercise/ExerciseAnalysisService.java` 또는 gRPC 콜백 `CompleteAnalysis` 처리부 — **세션 종료 콜백 수신 시 비동기로 리포트 생성 트리거** (`@Async` 또는 `ApplicationEventPublisher`)
 4. `application.yml` — `openai.api-key: ${OPENAI_API_KEY}` 또는 `anthropic.api-key: ${ANTHROPIC_API_KEY}`
@@ -131,7 +131,7 @@
 ### 리스크/의존
 - **enum 유지 vs 엔티티 전환 선택이 결정 필요** — 현재 enum 인데 시연용으론 A 로 충분. 운영 단계에서 카테고리를 비개발자가 추가해야 하면 B 필요
 - B 선택 시 추정 3h → 6h+ 로 증가 (영향 범위가 큼)
-- 시작 전 사용자 확인 권장 ([`feedback-preview-scope-before-bulk-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_preview_scope_before_bulk_changes.md))
+- 시작 전 사용자 확인 권장 ([[feedback_preview_scope_before_bulk_changes]])
 
 ---
 
@@ -272,8 +272,8 @@
 - 스쿼트 외 운동 추가 + 세트 단위 분석 결과 저장/조회 가능
 
 ### 리스크/의존
-- [`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) 에 의해 **현재 스쿼트만 다룸 → 세트 개념 자체가 필요 없음**. 새 운동 추가 결정 전까지 보류
-- AI 측 분석기가 세트 구분을 어떻게 할지 (AI-03 와 협의 필요) → [`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 정책상 AI 원작자와 합의 필요
+- [[project_squat_first]] 에 의해 **현재 스쿼트만 다룸 → 세트 개념 자체가 필요 없음**. 새 운동 추가 결정 전까지 보류
+- AI 측 분석기가 세트 구분을 어떻게 할지 (AI-03 와 협의 필요) → [[feedback_minimize_python_changes]] 정책상 AI 원작자와 합의 필요
 
 ---
 

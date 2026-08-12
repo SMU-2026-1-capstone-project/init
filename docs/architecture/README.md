@@ -80,7 +80,7 @@
 |------|------|---------|
 | [../decisions/ai-backend-coupling.md](../decisions/ai-backend-coupling.md) | **OPEN** (사용자 결정 대기) | 콜백 신뢰성·proto 동기화·세션 상태 외 3개 분기 |
 
-새 분기점이 생기면 같은 디렉터리에 새 결정 문서를 추가합니다 ([`feedback-decision-doc`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_decision_doc.md) 메모리 정책).
+새 분기점이 생기면 같은 디렉터리에 새 결정 문서를 추가합니다 ([[feedback_decision_doc]] 메모리 정책).
 
 ---
 

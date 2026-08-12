@@ -39,9 +39,9 @@
 
 ### 1.3 제약
 
-- AI 코드 변경 최소화 ([`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md)) — 단, 요구사항이 8종 분류·batch 송신을 AI 책임으로 명시하므로 *이번 한 번* 의 AI 변경은 정당화 필요·불가피
-- 스쿼트 단일 운동 ([`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md)) — 8종 중 스쿼트와 무관한 것(`ELBOW_BENT` 등)은 당장 분류 안 해도 됨
-- 한국어 단일 멘트 ([`project-korean-only`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_korean_only.md))
+- AI 코드 변경 최소화 ([[feedback_minimize_python_changes]]) — 단, 요구사항이 8종 분류·batch 송신을 AI 책임으로 명시하므로 *이번 한 번* 의 AI 변경은 정당화 필요·불가피
+- 스쿼트 단일 운동 ([[project_squat_first]]) — 8종 중 스쿼트와 무관한 것(`ELBOW_BENT` 등)은 당장 분류 안 해도 됨
+- 한국어 단일 멘트 ([[project_korean_only]])
 
 ### 1.4 평가 가치 우선순위 (사용자 명시, 2026-05-25)
 

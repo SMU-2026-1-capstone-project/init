@@ -483,7 +483,7 @@
 
 ### 05-16 — AI 실통합·정리의 날
 
-이 날 하루에 결합 표면의 평행/잔재 컴포넌트들이 한꺼번에 정리됐다. 사용자가 "너무 많이 바뀐다"고 경계심을 표명한 작업 — [`feedback-preview-scope-before-bulk-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_preview_scope_before_bulk_changes.md)의 계기.
+이 날 하루에 결합 표면의 평행/잔재 컴포넌트들이 한꺼번에 정리됐다. 사용자가 "너무 많이 바뀐다"고 경계심을 표명한 작업 — [[feedback_preview_scope_before_bulk_changes]]의 계기.
 
 #### 1a50c14 (05-16) — feat: AI 서버 mock 제거하고 실제 gRPC 통합으로 전환
 
@@ -569,7 +569,7 @@
 - `mysql/my.cnf` (+8) — `[client] default-character-set=utf8mb4`, `[mysql]` 동일
 - `docker-compose.yml` (+1) — `command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci`
 
-**결합 결과**: AI가 콜백으로 보내는 한글 `feedback_message`가 DB 진입 시 깨지지 않게 됨. ([`project-korean-only`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_korean_only.md))
+**결합 결과**: AI가 콜백으로 보내는 한글 `feedback_message`가 DB 진입 시 깨지지 않게 됨. ([[project_korean_only]])
 
 #### 8e3fdf1 (05-16) — chore: mysql/*.cnf LF 강제
 

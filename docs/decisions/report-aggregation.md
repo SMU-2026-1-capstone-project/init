@@ -95,7 +95,7 @@ BE-02 시작 시점 코드 실태 (22 문서 정정 사항 포함):
 
 | 옵션 | 비고 |
 |------|------|
-| **a. 운동별 종합 1원소** ⭐ | DTO 형태 그대로 ([`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) 단일 운동 정책) |
+| **a. 운동별 종합 1원소** ⭐ | DTO 형태 그대로 ([[project_squat_first]] 단일 운동 정책) |
 | b. 시계열 `[{t, sync}, ...]` | DTO 형태와 불일치 (22 문서 표기 오류) |
 | c. 빈 리스트 (LLM 이 채울 자리) | 사용자 화면 항상 빔 |
 

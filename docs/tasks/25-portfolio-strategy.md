@@ -25,10 +25,10 @@
 
 ## 0. 전제 (메모리에 박힌 것)
 
-- [`project-two-semester-schedule`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_two_semester_schedule.md) — 1학기 MVP → 방학 3개월 → 2학기 10주
-- [`user-career-target`](../../../C:/Users/khjae/.claude/projects/E--init/memory/user_career_target.md) — **백엔드(Spring) 포지션 지원**, AI 아님. 풀스택 추천 X
-- [`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) — 현재 스쿼트만. 운동 확장은 2학기 콘텐츠
-- [`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) — ai-server 는 다른 사람. 결합·인증·콜백 영역만 본인 어필 가능
+- [[project_two_semester_schedule]] — 1학기 MVP → 방학 3개월 → 2학기 10주
+- [[user_career_target]] — **백엔드(Spring) 포지션 지원**, AI 아님. 풀스택 추천 X
+- [[project_squat_first]] — 현재 스쿼트만. 운동 확장은 2학기 콘텐츠
+- [[feedback_minimize_python_changes]] — ai-server 는 다른 사람. 결합·인증·콜백 영역만 본인 어필 가능
 
 ---
 

@@ -20,10 +20,10 @@
 출처: [`21-task-assignment.md`](./21-task-assignment.md) §3 의 항목별 풀이.
 범위: 각 작업이 **어떤 파일을 / 무엇을 / 왜 / 어디까지** 만져야 하는지 + 현재 코드 상태 확인. 담당자(=ai-server 원작자)가 받아서 바로 시작할 수 있는 단위.
 
-> **정책 알림** ([`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md))
+> **정책 알림** ([[feedback_minimize_python_changes]])
 > ai-server 는 다른 사람 설계. 이 문서의 모든 항목은 **원작자가 진행하거나, 진행 전에 사용자 확인**. 우리(Spring 쪽 작업자)가 자의적으로 손대지 않음.
 >
-> ~~**현재 상태**: 시연용 동작에 추가 필요한 작업 없음. 모든 항목은 [`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) 정책상 **새 운동 추가 결정 시점**까지 보류.~~
+> ~~**현재 상태**: 시연용 동작에 추가 필요한 작업 없음. 모든 항목은 [[project_squat_first]] 정책상 **새 운동 추가 결정 시점**까지 보류.~~
 >
 > 🔴 **위 «현재 상태» 는 2026-05-24 시점 기록이다 — 지금 상태로 읽지 말 것** (2026-08-08). *"추가 필요한 작업 없음"* 은 두 군데서 틀렸다: ① 종목 확장이 2학기 Week 3~4 로 못박혀 **AI-01~03 은 보류가 아니라 순서를 정할 대상**이고, ② 이 목록에 **없는 항목**(결함 분류 → `ReportFeedbackBatch` 송신)이 지금 AI 트랙 **1순위**다. 현재 상태의 정본은 [`30-ai-remaining-work.md`](./30-ai-remaining-work.md).
 >

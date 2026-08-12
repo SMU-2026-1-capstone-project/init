@@ -151,7 +151,7 @@
 
 | 작업 | 추정 | 비고 |
 |------|------|------|
-| `decisions/recommendation-algorithm.md` 작성 (시연 후 LLM/협업필터링 업그레이드 여지 기록, 시연용은 규칙 기반 1안) | 1h | [`feedback-decision-doc`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_decision_doc.md) 적용 |
+| `decisions/recommendation-algorithm.md` 작성 (시연 후 LLM/협업필터링 업그레이드 여지 기록, 시연용은 규칙 기반 1안) | 1h | [[feedback_decision_doc]] 적용 |
 | BE-08 (추천 2 endmpoint) — 규칙 기반: 가장 약한 카테고리 + 최근 빈도 낮은 운동 보강 | 4h | BE-07 의 패턴 분석 결과를 입력 |
 | `RoutineRecommendationService` + 추천 근거 한 줄 생성 로직 | 2h | "최근 하체 운동이 적어서" 같은 텍스트 |
 | Goal·패턴·추천 통합 e2e 검증 — 한 사용자 시나리오로 처음부터 끝까지 | 3h | |

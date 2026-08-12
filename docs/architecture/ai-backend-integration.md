@@ -283,7 +283,7 @@ AI 컨테이너가 재시작되면 in-memory `SessionState` 가 사라지는데,
 - **AI in-memory 세션 상태** — AI 컨테이너 재시작 시 진행 중 세션 소실은 그대로다. ✅ 다만 **복구 경로가 생겼다** — `ReattachAnalysis`(§4 재부착)로 DB 값에서 되살릴 수 있다. ⚠️ **자동은 아니다** — 프론트가 재부착을 호출해야 하고, 아무도 안 부르면 결국 스케줄러가 `FAILED` 처리한다.
 - **단일 AI 인스턴스 가정** — 메모리 `SessionState`가 인스턴스 로컬이라 수평 확장 불가. (재부착은 이 문제를 **줄이지 않는다** — 상태가 여전히 인스턴스 로컬이다.)
 - **gRPC reflection / health check 표준 미적용** — 헬스체크는 AI HTTP `/health`만, gRPC 채널 상태는 별도 모니터 없음. ⚠️ 서킷브레이커가 회로를 열어도 **그 사실을 볼 지표가 ai-server 쪽엔 없다**(§7-1 — 관측 스택이 Spring 만 덮는다).
-- **proto에 `exercise_type` 없음** — 스쿼트 외 운동 추가 시 proto + 양쪽 코드 변경 필요 ([`project-squat-first`](../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) 결정으로 후순위).
+- **proto에 `exercise_type` 없음** — 스쿼트 외 운동 추가 시 proto + 양쪽 코드 변경 필요 ([[project_squat_first]] 결정으로 후순위).
 
 ---
 

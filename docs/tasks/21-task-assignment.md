@@ -64,7 +64,7 @@
 | BE-06 | 운동 목표 엔티티·CRUD API — `Goal` 도메인 신설 | 🟢 | — | 5h | | 📋 |
 | BE-07 | 사용자 운동 패턴 분석 API — 주기성·강도 추세 | 🟢 | 데이터 축적 후 | 8h+ | | 📋 |
 | BE-08 | 개인화 루틴 추천 API — 알고리즘 설계 필요 | 🟢 | BE-07 | 10h+ | | 📋 |
-| BE-09 | 운동 세트 개념 도입 — DB 컬럼·DTO·gRPC 메시지 추가 ([`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) 와 협의) | ⚪ | 새 운동 추가 시점 | 5h | | 🟦 |
+| BE-09 | 운동 세트 개념 도입 — DB 컬럼·DTO·gRPC 메시지 추가 ([[project_squat_first]] 와 협의) | ⚪ | 새 운동 추가 시점 | 5h | | 🟦 |
 | **BE-10** | AI gRPC 헬스체크 + Resilience4j Circuit Breaker (H2 채택 부속) | ✅ **완료(2026-07-11)** | H2 확정 | 4h | | ✅ |
 | **BE-11** | 콜백 PoseData 검증 게이트 (H2 채택 부속) | 🔴 | H2 확정 | 3h | | 📋 |
 | **BE-12** | 콜백 처리 Outbox 패턴 (H2 채택 부속, 운영 신뢰성) | 🟡 | BE-11 | 5h | | 📋 |
@@ -84,7 +84,7 @@
 >
 > 전수 조사와 근거는 [`30-ai-remaining-work.md`](./30-ai-remaining-work.md) (2026-08-07 신설).
 >
-> ⚠️ [`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 정책은 **완화됐다** — ai-server 변경은 이제 가능하고, 변경 사실을 알리고 면적을 최소화하면 된다. *"정책으로 손대지 않음"* 은 더 이상 이 표를 보류로 둘 근거가 못 된다.
+> ⚠️ [[feedback_minimize_python_changes]] 정책은 **완화됐다** — ai-server 변경은 이제 가능하고, 변경 사실을 알리고 면적을 최소화하면 된다. *"정책으로 손대지 않음"* 은 더 이상 이 표를 보류로 둘 근거가 못 된다.
 
 | ID | 작업 | 우선 | 의존성 | 추정 | 담당 | 상태 |
 |----|------|-----|--------|------|------|------|
