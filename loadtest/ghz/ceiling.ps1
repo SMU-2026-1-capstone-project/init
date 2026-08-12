@@ -19,10 +19,8 @@ param(
   [switch]$SkipPreflight
 )
 
-# 페이로드가 쓰는 세션 범위 — 리셋과 프리플라이트가 같은 값을 본다 (measure.ps1 과 같은 규약).
-$SessionLo = 901
-$SessionHi = 1900
-if ($DataFile -eq "batch.json") { $SessionLo = 801; $SessionHi = 801 }
+# 세션 집합은 페이로드에서 직접 읽는다 (measure.ps1 과 같은 규약).
+. (Join-Path $PSScriptRoot "_payload-sessions.ps1")
 $ErrorActionPreference = "Continue"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $root = Split-Path -Parent (Split-Path -Parent $here)
@@ -33,22 +31,13 @@ $ghz = Join-Path $root "loadtest\.bin\ghz.exe"
 $metaFile = Join-Path $results "metadata.json"
 [System.IO.File]::WriteAllText($metaFile, ('{"authorization":"Bearer ' + $env:INTERNAL_API_TOKEN + '"}'), (New-Object System.Text.UTF8Encoding($false)))
 
-function ResetRows {
-  docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -e "DELETE FROM pose_data WHERE session_id BETWEEN $SessionLo AND $SessionHi;" 2>$null | Out-Null
-}
+$S = Get-PayloadSessions -DataFile $DataFile
+function ResetRows { $null = Reset-PayloadRows -Sessions $S }
 
 # 프리플라이트 — 세션이 없으면 전 요청이 SESSION_NOT_FOUND 로 거절된 채 스윕이 «완주» 하고,
 # 곡선이 그려진다. 평탄점이 나오지만 그건 거절 처리의 천장이다. 그 판을 아예 시작하지 않는다.
-$expected = $SessionHi - $SessionLo + 1
 if (-not $SkipPreflight) {
-  $have = (docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -N -e `
-    "SELECT COUNT(*) FROM exercise_sessions WHERE id BETWEEN $SessionLo AND $SessionHi;" 2>$null | Select-Object -Last 1)
-  if ("$have".Trim() -ne "$expected") {
-    Write-Host "[preflight] 실패 — $DataFile 이 쓰는 세션 $SessionLo~$SessionHi 중 $have/$expected 개만 존재합니다." -ForegroundColor Red
-    Write-Host "            docker exec -i shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit < ..\seed\seed-multi-sessions.sql" -ForegroundColor Red
-    exit 1
-  }
-  Write-Host "[preflight] 세션 $SessionLo~$SessionHi = $have/$expected ✅" -ForegroundColor DarkGray
+  if (-not (Test-SessionsSeeded -Sessions $S)) { exit 1 }
 }
 
 # warmup (JVM JIT·풀)

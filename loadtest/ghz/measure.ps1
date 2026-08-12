@@ -28,11 +28,9 @@ param(
   [int]$WarmupSec = 0          # 본측정 전 warmup 부하 시간(초). 0 이면 생략. 공정비교용 JVM/풀 워밍업
 )
 
-# 페이로드가 쓰는 세션 범위. 리셋·프리플라이트가 같은 값을 봐야 한다 — 갈리면 리셋이 아무것도
-# 안 지우고도 조용히 성공하고, 판이 거듭될수록 행이 누적된다(«동일 상태 리셋» 전제가 깨진다).
-$SessionLo = 901
-$SessionHi = 1900
-if ($DataFile -eq "batch.json") { $SessionLo = 801; $SessionHi = 801 }
+# 세션 집합은 페이로드에서 직접 읽는다 — 리셋 대상과 요청이 가는 곳이 갈릴 수 없게.
+# 상수로 두면 gen_batch_multi.py --sessions 를 다른 범위로 재생성했을 때 조용히 어긋난다.
+. (Join-Path $PSScriptRoot "_payload-sessions.ps1")
 
 # native exe(mysql/docker/ghz) 가 stderr 로 경고를 내면 PowerShell 5.1 이 NativeCommandError 로
 # 승격시켜 스크립트를 죽인다(World-writable config 경고 등). 측정 스크립트라 Continue 로 두고
@@ -83,25 +81,15 @@ $metaFile = Join-Path $results "metadata.json"
 # 0) 프리플라이트 — 페이로드가 쓰는 세션이 DB 에 있나.
 # 없으면 ghz 는 210초 동안 전 요청이 SESSION_NOT_FOUND 로 거절되는 판을 «완주»하고, 결과 JSON 은
 # count 가 채워진 채 OK 0 으로 남는다. 숫자가 나오므로 «측정은 됐는데 성능이 이상하다» 로 읽힌다.
-# 30초 쓰고 쓰레기를 얻는 실패를 1초 만에 이유를 말하는 실패로 바꾼다.
-$expected = $SessionHi - $SessionLo + 1
+$S = Get-PayloadSessions -DataFile $DataFile
 if (-not $SkipPreflight) {
-  $have = (docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -N -e `
-    "SELECT COUNT(*) FROM exercise_sessions WHERE id BETWEEN $SessionLo AND $SessionHi;" 2>$null | Select-Object -Last 1)
-  if ("$have".Trim() -ne "$expected") {
-    Write-Host "[preflight] 실패 — $DataFile 이 쓰는 세션 $SessionLo~$SessionHi 중 $have/$expected 개만 존재합니다." -ForegroundColor Red
-    Write-Host "            시드를 먼저 적용하세요:" -ForegroundColor Red
-    Write-Host "            docker exec -i shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit < ..\seed\seed-multi-sessions.sql" -ForegroundColor Red
-    exit 1
-  }
-  Write-Host "[preflight] 세션 $SessionLo~$SessionHi = $have/$expected ✅" -ForegroundColor DarkGray
+  if (-not (Test-SessionsSeeded -Sessions $S)) { exit 1 }
 }
 
 # 1) 동일 상태 리셋 — 페이로드가 쓰는 세션들의 누적 행 삭제 (세션 row 자체는 보존)
 if (-not $SkipReset) {
-  Write-Host "[reset] DELETE pose_data WHERE session_id BETWEEN $SessionLo AND $SessionHi ..." -ForegroundColor Yellow
-  docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -e "DELETE FROM pose_data WHERE session_id BETWEEN $SessionLo AND $SessionHi;" 2>$null | Out-Null
-  $cnt = (docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -N -e "SELECT COUNT(*) FROM pose_data WHERE session_id BETWEEN $SessionLo AND $SessionHi;" 2>$null | Select-Object -Last 1)
+  Write-Host "[reset] pose_data 삭제 — 세션 $($S.Count)개 ($($S.Lo)~$($S.Hi)) ..." -ForegroundColor Yellow
+  $cnt = Reset-PayloadRows -Sessions $S
   Write-Host "[reset] 남은 행: $cnt" -ForegroundColor Yellow
 }
 
@@ -112,8 +100,7 @@ if ($WarmupSec -gt 0) {
     --metadata-file $metaFile --data-file $DataFile `
     -c 20 -z "${WarmupSec}s" $Target *> $null
   # warmup 이 적재한 행 제거 → 본측정 클린 상태 보장
-  docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -e "DELETE FROM pose_data WHERE session_id BETWEEN $SessionLo AND $SessionHi;" 2>$null | Out-Null
-  $wc = (docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -N -e "SELECT COUNT(*) FROM pose_data WHERE session_id BETWEEN $SessionLo AND $SessionHi;" 2>$null | Select-Object -Last 1)
+  $wc = Reset-PayloadRows -Sessions $S
   Write-Host "[$Label] warmup 완료, 본측정 전 행: $wc" -ForegroundColor DarkYellow
 }
 

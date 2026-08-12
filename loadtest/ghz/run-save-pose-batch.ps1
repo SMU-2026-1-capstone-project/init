@@ -46,16 +46,9 @@ if (-not (Test-Path $DataFile)) {
 
 # 프리플라이트 — 페이로드가 쓰는 세션이 DB 에 있나. 없으면 ghz 는 판을 정상 완주하고
 # «count 는 찼는데 OK 가 0» 인 결과 JSON 을 남긴다. 그건 측정이 아니라 거절 처리 벤치마크다.
-$SessionLo = 901; $SessionHi = 1900
-if ($DataFile -eq "batch.json") { $SessionLo = 801; $SessionHi = 801 }
-$expected = $SessionHi - $SessionLo + 1
-$have = (docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -N -e `
-  "SELECT COUNT(*) FROM exercise_sessions WHERE id BETWEEN $SessionLo AND $SessionHi;" 2>$null | Select-Object -Last 1)
-if ("$have".Trim() -ne "$expected") {
-  Write-Error ("$DataFile 이 쓰는 세션 $SessionLo~$SessionHi 중 $have/$expected 개만 존재. 시드 먼저:`n" +
-    "  docker exec -i shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit < ..\seed\seed-multi-sessions.sql")
-  exit 1
-}
+. (Join-Path $PSScriptRoot "_payload-sessions.ps1")
+$S = Get-PayloadSessions -DataFile $DataFile
+if (-not (Test-SessionsSeeded -Sessions $S)) { exit 1 }
 
 $results = Join-Path $here "results"
 if (-not (Test-Path $results)) { New-Item -ItemType Directory -Path $results | Out-Null }

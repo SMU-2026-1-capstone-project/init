@@ -26,16 +26,24 @@ command -v ghz >/dev/null || { echo "ghz 미설치 (README §설치)"; exit 1; }
 
 # 프리플라이트 — 페이로드가 쓰는 세션이 없으면 ghz 는 판을 완주하고 «OK 0» 결과를 남긴다.
 # 숫자가 나오므로 실패로 안 보인다. 시작 전에 막는다.
-SESSION_LO=901; SESSION_HI=1900
-[ "$DATA_FILE" = "batch.json" ] && { SESSION_LO=801; SESSION_HI=801; }
-EXPECTED=$((SESSION_HI - SESSION_LO + 1))
+#
+# 세션 집합은 페이로드에서 직접 읽는다(ps1 판의 _payload-sessions.ps1 과 같은 규약) — 상수로
+# 두면 gen_batch_multi.py --sessions 를 다른 범위로 재생성했을 때 조용히 어긋난다.
+SESSION_IDS=$(grep -o '"sessionId"[[:space:]]*:[[:space:]]*[0-9]\+' "$DATA_FILE" | grep -o '[0-9]\+$' | sort -un)
+[ -n "$SESSION_IDS" ] || { echo "$DATA_FILE 에서 sessionId 를 못 찾았다 — 페이로드 형식 확인 필요"; exit 1; }
+EXPECTED=$(printf '%s\n' "$SESSION_IDS" | wc -l | tr -d ' ')
+SQL_IN=$(printf '%s\n' "$SESSION_IDS" | paste -sd, -)
+
+# `set -e` 아래에서 HAVE=$(cmd) 는 cmd 실패 시 그대로 스크립트를 끝낸다 — docker 미기동·컨테이너
+# 부재가 «세션이 없다» 가 아니라 «조용한 종료» 로 나온다. || true 로 받아 아래에서 함께 판정한다.
 HAVE=$(docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -N \
-  -e "SELECT COUNT(*) FROM exercise_sessions WHERE id BETWEEN $SESSION_LO AND $SESSION_HI;" 2>/dev/null | tail -1)
+  -e "SELECT COUNT(*) FROM exercise_sessions WHERE id IN ($SQL_IN);" 2>/dev/null | tail -1) || true
 if [ "${HAVE:-0}" != "$EXPECTED" ]; then
-  echo "$DATA_FILE 이 쓰는 세션 $SESSION_LO~$SESSION_HI 중 ${HAVE:-0}/$EXPECTED 개만 존재. 시드 먼저:"
+  echo "$DATA_FILE 이 쓰는 세션 $EXPECTED 개 중 ${HAVE:-0} 개만 존재. 시드 먼저:"
   echo "  docker exec -i shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit < ../seed/seed-multi-sessions.sql"
   exit 1
 fi
+echo "[preflight] 세션 ${HAVE}/${EXPECTED} ✅"
 
 mkdir -p results
 
