@@ -33,12 +33,16 @@ $ready = $false; $w = 0
 while (-not $ready -and $w -lt 300) {
   Start-Sleep -Seconds 5; $w += 5
   Set-Location $here
+  # 기동 확인용 핑이라 batch.json(단일 801) 을 그대로 쓴다 — 측정이 아니므로 #166 의 «가짜 천장»
+  # 과 무관하고, dev-seed 의 801 만 있으면 되어 다세션 시드 적용 전에도 «서버가 떴나» 를 물을 수
+  # 있다. 이 핑이 넣는 25행은 아래 measure.ps1 의 리셋 범위 밖이므로 여기서 지운다.
   & $ghz --insecure --call ExerciseService.SavePoseDataBatch --metadata-file $metaFile --data-file "batch.json" -n 1 -c 1 localhost:6565 *> $null
   if ($LASTEXITCODE -eq 0) { $ready = $true }
 }
 if (-not $ready) { Write-Error "[await] gRPC 기동 안 됨"; exit 1 }
+docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -e "DELETE FROM pose_data WHERE session_id=801;" 2>$null | Out-Null
 Write-Host "[await] gRPC ready (대기 ${w}s). 측정 시작."
 ""
 
-# 3) config 측정 (measure.ps1 재사용: 801 리셋 → ramp → 요약)
+# 3) config 측정 (measure.ps1 재사용: 901~1900 리셋 → 프리플라이트 → ramp → 요약)
 & (Join-Path $here "measure.ps1") -Label $Label

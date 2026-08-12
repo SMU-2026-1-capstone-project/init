@@ -278,6 +278,8 @@ y 는 정규화 좌표라 **1.0 이 화면 아래 끝**이다. 하체 3부위가
 
 `ExerciseService.SavePoseDataBatch` gRPC, `batch.json`(session 801, **R=25 합성 데이터**), ghz, target `localhost:6565`. 결과 원본은 `loadtest/ghz/results/`(gitignore). 용어 정의는 [`./load-test-glossary.md`](./load-test-glossary.md).
 
+> 📌 **이 판이 쓴 `batch.json` 은 더 이상 rig 의 기본값이 아니다** (2026-08-12, [#166](https://github.com/Shadowfit/init/issues/166)). 기본은 `batch_multi.json`(session 901~1900) 으로 바뀌었다. 아래 표의 수치는 **단일 핫세션 조건**의 기록으로 읽어야 한다 — 무엇이 왜 갈리는지는 §7.8 말미의 재정정을 볼 것.
+
 | 모드 | 동시성 | 표본 | RPS | p50 | p90 | p95 | p99 | avg | slowest | 에러 |
 |------|--------|------|-----|-----|-----|-----|-----|-----|---------|------|
 | baseline | 1 | 200 | 12.9 | 59.5ms | 98.5ms | 121.6ms | 446.6ms | 77.0ms | 838ms | 0 (OK 200/200) |

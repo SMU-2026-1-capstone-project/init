@@ -15,7 +15,9 @@
 | 파일 | 용도 |
 |------|------|
 | `gen_batch.py` | `PoseDataBatchRequest` 1건(= rep 1회 프레임들) JSON 생성기. `--reps` = R 값 |
-| `batch.json` | 생성된 데이터 템플릿 (session 801, R=25, ~52KB / 프레임 ~2.1KB). **실측 R 로 재생성 권장** |
+| `gen_batch_multi.py` | 위의 다세션 판 — 세션 N개를 순회하는 **메시지 배열** 생성 |
+| **`batch_multi.json`** | **기본 페이로드** (session 901~1900, R=25). ghz 가 요청마다 다음 세션으로 순회 |
+| `batch.json` | 단일 핫세션 판 (session 801, R=25, ~52KB / 프레임 ~2.1KB). **기본값 아님** — 아래 참조 |
 | `run-save-pose-batch.ps1` | Windows 실행 (smoke / baseline / ramp) |
 | `run-save-pose-batch.sh` | bash 실행 (Git Bash / Linux) |
 | `results/` | 실행 출력. **일회성 리포트는 안 남기고, 실험 결과는 커밋한다** — 아래 |
@@ -24,7 +26,23 @@
 
 1. **백엔드 gRPC 가 :6565 에 떠 있음** — reflection 켜진 상태 (`application.yml` `grpc.server.reflection-enabled: true`).
    ghz 가 reflection 으로 스키마 자동 인식 → proto 파일·import 경로 지정 불필요.
-2. **세션 row 존재** — `batch.json` 의 `sessionId`(기본 801)가 DB 에 있어야 함
+> 🔴 **기본 페이로드는 `batch_multi.json` 이다 (2026-08-12, [#166](https://github.com/Shadowfit/init/issues/166)).**
+> 전 요청이 `session_id=801` 하나로 가면 모든 INSERT 가 같은 인덱스 리프로 몰려 커밋이 직렬화되고,
+> 그때 나오는 천장은 시스템의 천장이 아니라 **그 경합의 천장**이다. 3차(2026-08-08)의
+> «천장 = 커밋 fsync» 결론이 그 위에서 나왔고, 4차가 같은 코드·같은 행수에서 페이로드만 바꿔
+> **220.4 → 649.4 RPS** 로 반증했다.
+>
+> `batch.json` 은 지우지 않았다 — 단일 핫세션은 이제 버그가 아니라 **4차가 규명한 조건**이고,
+> 그 조건을 재현할 수단이 필요하다. 쓰려면 명시적으로: `-DataFile batch.json` / `DATA_FILE=batch.json`.
+> 스크립트가 세션 범위(801 vs 901~1900)를 따라 리셋·프리플라이트 대상을 같이 바꾼다.
+
+2. **세션 row 존재** — 페이로드의 `sessionId` 들이 DB 에 있어야 함. 기본값이면 **901~1900 (1,000개)**:
+   ```bash
+   docker exec -i shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit < seed/seed-multi-sessions.sql
+   ```
+   없으면 판이 «완주» 하고 `count` 는 찬 채 `OK 0` 인 결과가 남는다 — 실패로 안 보인다.
+   그래서 스크립트가 판 시작 전에 **프리플라이트**로 막는다 (`-SkipPreflight` 로 해제).
+   단일 핫세션 판(`batch.json`)을 쓸 때만 아래 더미 801 이 필요하다:
    ([`PoseDataService.savePoseDataBatch`](../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java) 가 `findById` 로 세션 먼저 조회 → 없으면 `SESSION_NOT_FOUND`).
    더미 801 은 [`mysql/dev-seed.sql`](../mysql/dev-seed.sql) 에 있다.
    ⚠️ **자동으로 안 들어간다** — Flyway 도입(이슈 #115) 후 initdb 마운트가 없어졌고, 이 픽스처는
