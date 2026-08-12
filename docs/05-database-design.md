@@ -177,7 +177,7 @@ CREATE TABLE exercise_feedback_templates (
     UNIQUE KEY uk_exercise_feedback (exercise_id, feedback_type)
 );
 ```
-세션 시작 시 클라이언트가 `GET /exercises/{exerciseId}/feedback-templates` 로 받아 device TTS 로 재생. 다국어 분리 컬럼 없음 ([`project-korean-only`](../../C:/Users/khjae/.claude/projects/E--init/memory/project_korean_only.md)).
+세션 시작 시 클라이언트가 `GET /exercises/{exerciseId}/feedback-templates` 로 받아 device TTS 로 재생. 다국어 분리 컬럼 없음 ([[project_korean_only]]).
 
 ### session_feedback_logs (세션별 TTS 발화 이벤트 로그) — 2026-05 추가
 ```sql
@@ -226,7 +226,7 @@ CREATE TABLE outbox_events (
 | **`correlation_id` 를 컬럼으로 둔다** | 발행기는 `@Scheduled` 스레드라 MDC 가 비어 있고, outbox 는 스레드가 아니라 **시간·프로세스 경계**를 넘는다. 런타임 캡처로는 원리상 이을 수 없어 **행에 저장**해야 원 요청과 이어진다. MDC 와 달리 이 값은 **인스턴스 재시작을 견딘다** |
 | **`locked_by` + `lock_expires_at`** | 발행기가 둘 이상일 때 같은 행을 두 번 집는 것 방지(조건부 갱신=CAS). 리뷰에서 지적받아 추가(`eebf852`) |
 
-**운영 파라미터**: 폴링 간격 `outbox.publisher.poll-interval-ms`(기본 1000), 재시도 상한 `outbox.publisher.max-retry`(기본 10). 지표 3종(`shadowfit_outbox_pending`·`dispatch`·`lag`)이 Prometheus 로 나간다 — **적체는 "지금 몇 건"이 아니라 기울기가 답**이라 시계열로 본다([`../monitoring/README.md`](../../monitoring/README.md)).
+**운영 파라미터**: 폴링 간격 `outbox.publisher.poll-interval-ms`(기본 1000), 재시도 상한 `outbox.publisher.max-retry`(기본 10). 지표 3종(`shadowfit_outbox_pending`·`dispatch`·`lag`)이 Prometheus 로 나간다 — **적체는 "지금 몇 건"이 아니라 기울기가 답**이라 시계열로 본다([`../monitoring/README.md`](../monitoring/README.md)).
 
 > 🔴 **2026-08-08 정정 — 이 문서에 이 테이블이 6주간 없었다.** 스키마 문서가 «기능 테이블» 은 다 담았는데 **«전달 보장» 테이블이 빠졌다.** 같은 결의 누락이 [`02-folder-structure.md`](./02-folder-structure.md) 에도 있었다(`model/outbox/`·`global/observability/` 없음) — **기능이 아닌 것은 문서 갱신 트리거가 안 울린다**는 패턴이다.
 
