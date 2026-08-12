@@ -147,9 +147,16 @@ backend/src/test/java/com/shadowfit/global/observability/SessionMetricsExportNam
 계정을 한 번 만들어야 한다 — 앱 계정(`shadowfit`)을 재사용하지 않는다:
 
 ```bash
-docker exec -i shadowfit-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < mysql/exporter-user.sql
+set -a; . ./.env; set +a          # MYSQL_EXPORTER_PASSWORD·MYSQL_ROOT_PASSWORD 필요
+./mysql/apply-exporter-user.sh
 docker compose --profile obs up -d mysqld-exporter
 ```
+
+> 🔴 **`mysql/exporter-user.sql` 을 직접 실행하지 말 것.** 그건 `__EXPORTER_PASSWORD__` 자리표시자가 든 **템플릿**이고, 래퍼가 `.env` 의 `MYSQL_EXPORTER_PASSWORD` 로 치환해 넣는다 ([#167](https://github.com/Shadowfit/init/issues/167)).
+>
+> 전에는 SQL 이 비밀번호를 하드코딩하고 compose 가 같은 값을 `${MYSQL_EXPORTER_PASSWORD:-exporter}` 로 **따로** 정했다. 기본값이 우연히 같아 로컬에서는 붙었지만, 환경변수를 실제로 넣는 순간 익스포터는 새 값으로 접속하고 계정은 옛 값이라 **인증이 막힌다.** 그 실패는 조용하다 — 타깃이 DOWN 이 되어 MySQL 지표만 통째로 비고, 그건 3차 실험이 *"수집한 적 없는 지표"* 로 결론을 냈던 그 상황과 같은 모양이다.
+>
+> 이제 값은 `.env` 한 곳에서만 온다. compose 의 기본값도 뺐으므로 **미설정이면 obs 프로파일이 즉시 실패한다** — 조용한 불일치가 성립하지 않는다. 비밀번호를 바꿨으면 위 스크립트를 **다시** 돌려 계정도 맞춘다(템플릿이 `CREATE` 뒤에 `ALTER` 를 함께 내므로 재실행이 항상 현재 값으로 수렴한다).
 
 익스포터에 필요한 권한(`PROCESS`·`REPLICATION CLIENT`·`performance_schema` SELECT)은 서버 전역 상태를 읽는 권한이라 앱 계정이 가지면 안 되고, 반대로 앱 계정의 DML 권한은 익스포터가 가질 이유가 없다. 두 계정의 필요 권한이 **교집합 없이** 갈린다. `MAX_USER_CONNECTIONS 3` 을 걸어 익스포터가 커넥션을 흘려도 피시험 대상보다 먼저 실패하게 했다.
 
