@@ -299,7 +299,7 @@ Spring 측 `backend/src/test/java/com/shadowfit/integration/ExerciseSessionFlowI
 
 ## 9. AI 서버 (Python) 테스트
 
-코드상 디렉터리는 있지만 본 가이드 범위 밖. AI 측 테스트 변경은 [`feedback-minimize-python-changes`](../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 정책에 따라 원작자 영역.
+코드상 디렉터리는 있지만 본 가이드 범위 밖. AI 측 테스트 변경은 [[feedback_minimize_python_changes]] 정책에 따라 원작자 영역.
 
 기존 파일 참고용:
 - `ai-server/tests/test_camera.py`, `test_reference_builder.py`, `test_squat_analyzer.py`, `test_sync_feedback.py`, `test_pose_filter.py`

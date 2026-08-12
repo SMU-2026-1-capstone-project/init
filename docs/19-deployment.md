@@ -296,7 +296,7 @@ docker compose down -v
 - HTTPS·도메인 (수동 / Let's Encrypt / 클라우드 CDN)
 - 로그 보관 기간 (개인정보보호 관점)
 
-새 분기점이 결정되면 [`feedback-decision-doc`](../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_decision_doc.md) 정책에 따라 [`decisions/`](./decisions/) 하위에 분석 문서 작성.
+새 분기점이 결정되면 [[feedback_decision_doc]] 정책에 따라 [`decisions/`](./decisions/) 하위에 분석 문서 작성.
 
 ---
 

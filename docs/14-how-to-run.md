@@ -539,7 +539,7 @@ docker exec -it shadowfit-mysql mysql -u shadowfit -pshadowfit -e "SHOW DATABASE
 - **Swagger UI** (API 문서): http://localhost:8080/swagger-ui.html
 - Swagger 페이지가 열리면 백엔드가 정상 작동 중입니다
 
-> 🔴 **`/actuator/*` 는 8080 이 아닙니다** (2026-08-08 추가). 관리·지표 엔드포인트는 **9090** 으로 분리했습니다([`../monitoring/README.md`](../../monitoring/README.md)). 8080 에 같은 경로를 치면 **404** 입니다.
+> 🔴 **`/actuator/*` 는 8080 이 아닙니다** (2026-08-08 추가). 관리·지표 엔드포인트는 **9090** 으로 분리했습니다([`../monitoring/README.md`](../monitoring/README.md)). 8080 에 같은 경로를 치면 **404** 입니다.
 >
 > ```bash
 > curl http://localhost:9090/actuator/health     # 헬스체크
