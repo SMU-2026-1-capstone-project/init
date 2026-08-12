@@ -216,20 +216,24 @@ npm install
 ```bash
 cd frontend
 cp .env.example .env
-# .env 를 열어 EXPO_PUBLIC_INTERNAL_API_TOKEN 에
-# 루트 .env 의 INTERNAL_API_TOKEN 과 **같은 값**을 넣으세요
+# .env 를 열어 EXPO_PUBLIC_AI_PUBLIC_TOKEN 에
+# 루트 .env 의 AI_PUBLIC_TOKEN 과 **같은 값**을 넣으세요
+#
+# 🔴 INTERNAL_API_TOKEN 이 아닙니다 — 그건 서버 밖으로 나가면 안 되는 값입니다
 ```
 
 **루트 `.env` 로는 대체되지 않습니다.** Expo 는 `app.json` 이 있는 디렉터리(= `frontend/`)를 프로젝트 루트로 보고 `.env` 를 읽습니다. 모노레포 루트의 `.env` 는 백엔드·AI·MySQL 용이라 `EXPO_PUBLIC_*` 키가 아예 없습니다.
 
-> 🔴 **증상이 조용해서 알아채기 어렵습니다.** 토큰이 없어도 앱은 **에러 없이** 뜹니다. 로그인도 되고, 카메라도 켜지고, 운동 화면도 정상으로 보입니다. **실시간 자세 분석만 안 돕니다** — [`frontend/app/(tabs)/exercise.tsx:144`](../frontend/app/%28tabs%29/exercise.tsx) 가 토큰이 없으면 프레임 폴링 자체를 켜지 않기 때문입니다. "카메라는 되는데 싱크로율이 안 올라간다" 면 여기부터 확인하세요.
+> 🔴 **증상이 조용해서 알아채기 어렵습니다.** 토큰이 없어도 앱은 **에러 없이** 뜹니다. 로그인도 되고, 카메라도 켜지고, 운동 화면도 정상으로 보입니다. **실시간 자세 분석만 안 돕니다** — [`frontend/app/(tabs)/exercise.tsx:146`](../frontend/app/%28tabs%29/exercise.tsx) 이 토큰이 없으면 프레임 폴링 자체를 켜지 않기 때문입니다. "카메라는 되는데 싱크로율이 안 올라간다" 면 여기부터 확인하세요.
 
 | 변수 | 필수 | 없으면 |
 |---|:--:|---|
-| `EXPO_PUBLIC_INTERNAL_API_TOKEN` | ✅ | 실시간 포즈 폴링 비활성 (위 증상) |
+| `EXPO_PUBLIC_AI_PUBLIC_TOKEN` | ✅ | 실시간 포즈 폴링 비활성 (위 증상) |
 | `EXPO_PUBLIC_AI_BASE_URL` | — | Metro 호스트의 8000 포트를 자동 사용. AI 서버가 다른 장비에 있을 때만 채웁니다 |
 
-> ⚠️ `EXPO_PUBLIC_INTERNAL_API_TOKEN` 은 **임시방편입니다**([이슈 #134](https://github.com/Shadowfit/init/issues/134)). `EXPO_PUBLIC_` 접두 변수는 빌드 시 앱 번들에 인라인되므로, 이 내부 서비스 토큰이 모든 설치본에 그대로 들어갑니다. 개발을 굴리기 위해 채우는 값이고, 구조 변경은 그 이슈에서 다룹니다.
+> ⚠️ **이 토큰은 비밀이 아닙니다.** `EXPO_PUBLIC_` 접두 변수는 빌드 시 앱 번들에 인라인되므로 모든 설치본에 그대로 들어가고, 앱에서 추출할 수 있습니다. HTTPS 를 붙여도 고쳐지지 않습니다 — 전송을 감쌀 뿐 번들 안의 값을 감추지 못하기 때문입니다.
+>
+> 그래서 Spring↔AI gRPC 내부 토큰(`INTERNAL_API_TOKEN`)과 **값을 분리했습니다**([이슈 #134](https://github.com/Shadowfit/init/issues/134), 닫힘). 이 값의 유출 피해를 AI 서버 HTTP 로 한정하는 것이 목적입니다. 🔴 **여기에 `INTERNAL_API_TOKEN` 을 넣으면 앱에서 추출한 값으로 Spring 내부 RPC 를 칠 수 있게 됩니다** — 되돌리지 마세요.
 
 ### 4-3. Backend 라이브러리 설치 (빌드)
 
@@ -283,7 +287,7 @@ cd shadowfit
 # Frontend 라이브러리 설치 + 환경 변수
 cd frontend
 npm install
-cp .env.example .env        # ← 그다음 EXPO_PUBLIC_INTERNAL_API_TOKEN 을 채울 것 (4-2-1)
+cp .env.example .env        # ← 그다음 EXPO_PUBLIC_AI_PUBLIC_TOKEN 을 채울 것 (4-2-1)
 
 # Backend 라이브러리 설치
 cd ../backend
