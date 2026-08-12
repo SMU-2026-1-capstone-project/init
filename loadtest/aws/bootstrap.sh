@@ -67,14 +67,22 @@ echo "  커밋: $(git -C "$WORKDIR" rev-parse --short HEAD)"
 # 🔴 rig 의 기본 PW 와 compose 의 MYSQL_ROOT_PASSWORD 가 어긋나면 **전 판이 실패한다.**
 #    여기서 한 곳에서 만들어 그 어긋남을 없앤다.
 step ".env"
+#
+# 🔴 `compose up mysql` 이어도 **compose 는 파일 전체를 해석한다.** 그래서 우리가 안 띄우는
+#    서비스의 필수 변수까지 있어야 한다 — `docker-compose.yml:220` 의
+#    `MYSQL_EXPORTER_PASSWORD:?` 가 없으면 mysql 하나 띄우는 것도 실패한다.
+#    첫 EC2 실행(2026-08-13)이 정확히 여기서 죽었다.
 cat > "$WORKDIR/.env" <<EOF
 MYSQL_DATABASE=$DB_NAME
 MYSQL_USER=shadowfit
 MYSQL_ROOT_PASSWORD=$PW
 MYSQL_PASSWORD=$PW
 MYSQL_PORT=3306
+MYSQL_EXPORTER_PASSWORD=$PW
+DB_USERNAME=shadowfit
+DB_PASSWORD=$PW
 EOF
-echo "  MYSQL_ROOT_PASSWORD 를 rig 기본값과 맞췄다"
+echo "  MYSQL_ROOT_PASSWORD 를 rig 기본값과 맞췄다 (+ 해석만 되면 되는 변수들)"
 
 # ── 컨테이너 ─────────────────────────────────────────────────────────────
 step "MySQL 컨테이너"
