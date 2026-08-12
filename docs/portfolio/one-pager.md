@@ -16,7 +16,8 @@
 - **본인 담당 아님**: 자세 분석 알고리즘(MediaPipe·DTW)은 팀 내 AI 담당
 - **스택**: Spring Boot 3.5.16 / Java 21 · MySQL 8.0 · gRPC · Flyway · Docker · Prometheus·Grafana(측정 오염을 막으려 `profiles: ["obs"]` 로 분리 — 기본 구동은 3개)
 - **규모 전제**: DAU 1,000 가정 · `pose_data` 1억 행 합성 시딩 — **실제로 만든 것은 더미 JSON 11GB**(행수·payload 디커플링). 실제 2.3KB JSON 이면 **230GB**(1억 × 2.3KB 단순 곱)라 로컬에 못 올린다
-  - ⚠️ **이 값은 유도치이고, 레포 안에서 두 값으로 돈다** — rig 스크립트와 [`realmysql-experiments.md`](./realmysql-experiments.md) 는 같은 것을 **255GB** 로 적는다. 오버헤드 포함 여부 차이로 보이나 **어느 쪽도 산식이 안 적혀 있고, 실제로 만들어 본 적이 없다.** 여기서는 단순 곱(230GB)을 쓰고 그 사실을 밝혀 둔다
+  - **산식**: 1억 × 2.3KB = 230GB, **JSON 바이트만** 센 값이다(테이블은 다른 컬럼과 페이지 오버헤드로 더 크다). **실측 교차검증**: AWS `pose_data_real_scale`(진짜 JSON)에서 375만 행의 JSON 합이 8.19GB → 1억 행 환산 **≈218GB** 로 정합 ([§3](./realmysql-experiments.md))
+  - 📌 실제로 **1억 행 real-JSON 테이블은 AWS 에서 만들어 봤다**(`pose_data_real_scale`, m6i.xlarge + EBS 700GB). 로컬에 못 올릴 뿐이다
 
 ---
 
