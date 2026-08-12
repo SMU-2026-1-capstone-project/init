@@ -18,6 +18,34 @@
 3. 인스턴스 — 4차 실측 관례(c7i.2xlarge / m6i.xlarge), gp3 100GB 면 1,000만 행 스윕에 충분
 4. **종료 동작 확인** — `AUTO_SHUTDOWN=1` 을 쓸 거면 인스턴스의
    `InstanceInitiatedShutdownBehavior` 가 `stop` 인지 본다. `terminate` 면 **EBS까지 날아간다**
+5. **요금 태그** — 아래
+
+### 요금을 기록하려면 (태그)
+
+이 repo 에는 지금까지 **EC2 요금 기록이 한 줄도 없다.** 4차까지 인스턴스를 여러 번 띄웠는데
+`loadtest/results/*/README.md` 어디에도 금액이 없어서, 「AWS 실측 얼마 드나」에 **추정으로밖에
+답할 수 없다.** 태그 하나면 그 칸이 열린다.
+
+시작할 때 붙이는 게 가장 확실하다:
+
+```bash
+aws ec2 run-instances ... \
+  --tag-specifications \
+    'ResourceType=instance,Tags=[{Key=Project,Value=shadowfit-measure}]' \
+    'ResourceType=volume,Tags=[{Key=Project,Value=shadowfit-measure}]'
+```
+
+**볼륨에도 붙인다** — 인스턴스를 끈 뒤 남은 볼륨 요금이 어디로 갔는지 나중에 가르려면 필요하다.
+
+`preflight` 가 태그를 읽어 **없으면 경고한다.** 인스턴스가 살아 있을 때만 고칠 수 있어서다.
+(태그를 IMDS 로 읽으려면 인스턴스의 «메타데이터의 태그 허용» 이 켜져 있어야 한다. 꺼져 있으면
+경고만 뜨고 측정은 그대로 돈다 — 막지 않는다.)
+
+끝나면 `MANIFEST.txt` 의 `# 요금` 절에 **곱해야 할 것들**(타입·리전·가동 시간·볼륨)이 남는다.
+실제 청구액은 인스턴스 안에서 알 수 없으므로 하루 이틀 뒤 Cost Explorer 에서
+`Project=shadowfit-measure` 로 필터해 **`(미기입)` 칸을 채운다.**
+
+> 다음 라운드부터는 이 값이 선례가 된다 — 추정이 아니라 실측으로 답할 수 있다.
 
 ### IAM — `iam/` 의 두 파일
 

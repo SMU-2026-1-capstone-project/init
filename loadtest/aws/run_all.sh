@@ -52,6 +52,28 @@ PHASE_LOG=$OUTDIR/phases.tsv
 say() { echo; echo "════════ $* ════════"; }
 note() { echo "  $*"; }
 
+RUN_T0=$(date +%s)
+
+# ── IMDS ─────────────────────────────────────────────────────────────────
+#
+# 🔴 IMDSv2 가 요구되는 인스턴스(요즘 AMI 기본값)에서는 토큰 없이 부르면 401 이다.
+#    토큰을 먼저 받고, 실패하면 v1 로 떨어진다. 이걸 안 하면 매니페스트의 인스턴스
+#    타입·AZ 가 통째로 빈칸이 되는데 — **그게 바로 요금을 나중에 못 뽑는 이유가 된다.**
+IMDS_TOKEN=""
+imds_init() {
+  IMDS_TOKEN=$(curl -sf --max-time 3 -X PUT "http://169.254.169.254/latest/api/token" \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null)
+}
+imds() {  # $1 = 경로. 못 읽으면 빈 문자열
+  if [ -n "$IMDS_TOKEN" ]; then
+    curl -sf --max-time 3 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
+      "http://169.254.169.254/latest/meta-data/$1" 2>/dev/null
+  else
+    curl -sf --max-time 3 "http://169.254.169.254/latest/meta-data/$1" 2>/dev/null
+  fi
+}
+imds_init
+
 # ── S3 ───────────────────────────────────────────────────────────────────
 sync_s3() {  # 조용히. 실패해도 측정은 계속한다 — 다음 주기에 다시 시도한다
   aws s3 sync "$OUTDIR" "$S3_DEST" --only-show-errors 2>&1 | head -5
@@ -128,6 +150,20 @@ phase_preflight() {
   [ "${free:-0}" -ge 20 ] || { note "🔴 20GB 미만"; ok=1; }
 
   note "WRITER_MAX_SEC=$WRITER_MAX_SEC (기본 5400 에서 상향됨)"
+
+  # 🔴 요금 태그는 **살아 있을 때만** 붙일 수 있다. 지금 경고하면 고칠 수 있고,
+  #    끄고 나서 알면 이 라운드의 실제 청구액은 영영 못 가른다. 이 repo 에 지금까지
+  #    EC2 요금 기록이 한 줄도 없는 이유가 그것이다.
+  local tags; tags=$(imds "tags/instance" | tr '\n' ' ')
+  if echo "$tags" | grep -qi "Project"; then
+    note "✅ 요금 태그 있음 — Cost Explorer 에서 이 측정만 뽑을 수 있다"
+  elif [ -z "$tags" ]; then
+    note "⚠️ 인스턴스 태그를 못 읽었다 — 태그가 없거나 «메타데이터의 태그 허용» 이 꺼져 있다."
+    note "   지금 붙일 것: aws ec2 create-tags --resources \$(imds instance-id) --tags Key=Project,Value=shadowfit-measure"
+  else
+    note "⚠️ Project 태그가 없다 (현재: $tags) — 요금을 이 측정에 귀속시킬 수 없다"
+  fi
+
   return $ok
 }
 
@@ -200,9 +236,9 @@ phase_collect() {
     echo "# 측정 조건 — $RUN_ID"
     echo "생성          : $(date -Is)"
     echo "커밋          : $(git -C "$ROOT" rev-parse HEAD 2>/dev/null) ($(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null))"
-    echo "인스턴스 타입 : $(curl -s --max-time 3 http://169.254.169.254/latest/meta-data/instance-type)"
-    echo "인스턴스 ID   : $(curl -s --max-time 3 http://169.254.169.254/latest/meta-data/instance-id)"
-    echo "AZ            : $(curl -s --max-time 3 http://169.254.169.254/latest/meta-data/placement/availability-zone)"
+    echo "인스턴스 타입 : $(imds instance-type)"
+    echo "인스턴스 ID   : $(imds instance-id)"
+    echo "AZ / 리전     : $(imds placement/availability-zone) / $(imds placement/region)"
     echo "vCPU / RAM    : $(nproc) / $(awk '/MemTotal/ {printf "%.0fGB", $2/1048576}' /proc/meminfo 2>/dev/null)"
     echo "커널          : $(uname -r)"
     echo "디스크        : $(df -h "$ROOT" | awk 'NR==2 {print $2, "여유", $4}')"
@@ -257,6 +293,28 @@ stop_syncer
 if [ -f "$OUTDIR/MANIFEST.txt" ]; then
   { echo; echo "# 단계 (최종)"; cat "$PHASE_LOG"; } >> "$OUTDIR/MANIFEST.txt"
 fi
+
+# ── 요금 ─────────────────────────────────────────────────────────────────
+#
+# 실제 청구액은 인스턴스 안에서 알 수 없다(단가를 모른다). 대신 **곱해야 할 것들**을
+# 남긴다 — 타입 · 가동 시간 · 볼륨. 청구액은 나중에 Cost Explorer 에서 태그로 뽑아
+# 이 칸에 채운다. 이 repo 에 EC2 요금 기록이 한 줄도 없어서 «AWS 실측 얼마 드나» 에
+# 추정으로밖에 답할 수 없었다. 그 칸을 여기서 연다.
+RUN_SEC=$(( $(date +%s) - RUN_T0 ))
+UP_SEC=$(awk '{printf "%d", $1}' /proc/uptime 2>/dev/null || echo 0)
+{
+  echo
+  echo "# 요금 (청구액은 나중에 채운다)"
+  echo "인스턴스 타입   : $(imds instance-type)"
+  echo "리전            : $(imds placement/region)"
+  echo "태그            : $(imds tags/instance | tr '\n' ' ')"
+  echo "인스턴스 가동   : $(awk -v s="$UP_SEC" 'BEGIN{printf "%.2f", s/3600}')시간 (부팅부터 지금까지 — 요금 대상은 이쪽)"
+  echo "러너 소요       : $(awk -v s="$RUN_SEC" 'BEGIN{printf "%.2f", s/3600}')시간"
+  echo "루트 볼륨       : $(lsblk -dno SIZE,TYPE 2>/dev/null | head -1)"
+  echo "실제 청구액     : (미기입) — Cost Explorer 에서 태그 Project=shadowfit-measure 로 필터해 채울 것"
+  echo
+  echo "⚠️ 인스턴스를 끈 뒤에도 **볼륨이 남으면 요금이 계속 나간다.** 삭제까지 확인할 것"
+} >> "$OUTDIR/MANIFEST.txt"
 
 if sync_s3; then
   FINAL_OK=1; note "✅ $S3_DEST"
