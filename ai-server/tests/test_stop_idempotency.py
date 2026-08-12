@@ -62,11 +62,47 @@ def test_두번째_중단은_상태가_없지만_최근_종료로_판정된다()
 
 
 def test_한번도_없던_세션은_최근_종료가_아니다():
-    """(나) 쪽 — 여기서 False 가 나와야 Spring 이 빠른 실패를 되찾는다."""
+    """(나) 쪽 — 여기서 False 가 나와야 Spring 이 유실 세션을 감지한다.
+
+    🔴 **같은 id 로 물어야 한다.** 처음엔 remove(999) 뒤에 was_recently_stopped(12345) 를
+    봤는데, id 가 달라서 «remove 가 없는 세션까지 기록해버리는» 결함을 통째로 못 잡았다.
+    StopAnalysis 는 remove() 한 그 id 를 그대로 다시 묻기 때문에, 테스트도 같아야 한다.
+    """
     registry = SessionStateRegistry()
 
     assert registry.remove(999, now=100.0) is None
-    assert registry.was_recently_stopped(12345, now=100.0) is False
+    assert registry.was_recently_stopped(999, now=100.0) is False, (
+        "한 번도 없던 세션의 첫 중단은 «이미 처리됨» 이 아니다"
+    )
+
+
+def test_없는_세션을_지워도_기록이_남지_않는다():
+    """CodeRabbit 이 PR #172 에서 잡은 결함의 회귀 테스트.
+
+    remove() 가 상태 유무와 무관하게 기록하면 StopAnalysis 의 (나) 분기가 도달 불가가 되고,
+    Spring 은 정말 유실된 세션을 SENT 로 종결한다 — 고치려던 것보다 나쁜 상태다.
+    """
+    registry = SessionStateRegistry()
+
+    registry.remove(777, now=100.0)
+
+    assert registry._recently_stopped == {}, (
+        "꺼낸 상태가 없으면 종료 기록도 남기지 않아야 한다"
+    )
+
+
+def test_중복_중단이_보유_기간을_밀지_않는다():
+    """재송신이 올 때마다 시각을 갱신하면 창이 무한정 밀린다."""
+    registry = _registry_with_session(1)
+    registry.remove(1, now=100.0)
+
+    # 보유 기간이 끝나기 직전에 재송신이 한 번 더 온다
+    registry.remove(1, now=100.0 + STOPPED_SESSION_RETENTION_SEC - 1)
+
+    바깥 = 100.0 + STOPPED_SESSION_RETENTION_SEC + 1
+    assert registry.was_recently_stopped(1, now=바깥) is False, (
+        "최초 종료 시각 기준으로 만료돼야 한다"
+    )
 
 
 def test_보유_기간이_지나면_잊는다():

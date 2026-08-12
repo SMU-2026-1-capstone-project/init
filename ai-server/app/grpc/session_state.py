@@ -283,9 +283,20 @@ class SessionStateRegistry:
         stamp = time.monotonic() if now is None else now
         with self._lock:
             state = self._sessions.pop(session_id, None)
-            # 상태가 없었어도 기록한다. 없었다는 건 «이미 지웠다» 이거나 «애초에 없었다» 인데,
-            # 전자라면 그 시점부터 다시 보유 기간을 세는 편이 재송신 창을 더 넓게 덮는다.
-            self._recently_stopped[session_id] = stamp
+            # 🔴 **실제로 꺼냈을 때만** 기록한다.
+            #
+            # 처음엔 «없었어도 기록해두면 재송신 창을 넓게 덮는다» 고 적었는데 정반대였다.
+            # 호출부(StopAnalysis)가 remove() 직후 같은 id 로 was_recently_stopped() 를 묻기
+            # 때문에, 없어도 기록하면 그 물음이 **항상 True** 가 되어 (나) 분기가 도달 불가가
+            # 된다. 한 번도 없던 세션의 첫 중단 요청까지 «이미 처리됨» 으로 답하게 되고,
+            # 그러면 Spring 은 정말 유실된 세션을 SENT 로 종결한 뒤 빠른 실패를 영영 안 탄다 —
+            # 고치려던 것보다 나쁜 상태다. CodeRabbit 이 PR #172 리뷰에서 잡았다.
+            #
+            # 중복 중단은 여기 안 들어오므로 최초 종료 시각이 그대로 유지된다. 보유 기간은
+            # «언제 실제로 끝났나» 부터 세는 게 맞다 — 재송신이 올 때마다 갱신하면 창이
+            # 무한정 밀린다.
+            if state is not None:
+                self._recently_stopped[session_id] = stamp
             self._prune_stopped(stamp)
             return state
 

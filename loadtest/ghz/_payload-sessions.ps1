@@ -76,7 +76,14 @@ function Test-SessionsSeeded {
   return $false
 }
 
-<# 페이로드가 쓰는 세션들의 누적 pose_data 삭제 (세션 row 자체는 보존). 남은 행 수를 돌려준다. #>
+<# 페이로드가 쓰는 세션들의 누적 pose_data 삭제 (세션 row 자체는 보존). 남은 행 수(항상 "0")를 돌려준다.
+
+  리셋 실패는 **측정 실패**다. 전에는 docker exec 이 실패해도 빈 문자열을 돌려줬고, 호출부는
+  그걸 «남은 행: » 으로 찍은 뒤 측정을 계속했다(ceiling.ps1 은 반환값을 보지도 않았다). 그러면
+  이전 판의 pose_data 가 깔린 채로 잰 결과가 정상 측정값으로 저장된다 — #166 이 잡으려던
+  «리셋이 안 먹은 채로 판이 돈다» 가 형태만 바꿔 되살아난다. CodeRabbit 이 PR #172 에서 잡았다.
+  그래서 여기서 throw 한다. 조용히 0을 돌려주느니 판을 안 도는 게 낫다.
+#>
 function Reset-PayloadRows {
   param([Parameter(Mandatory = $true)]$Sessions)
 
@@ -84,8 +91,19 @@ function Reset-PayloadRows {
   $ErrorActionPreference = "Continue"
   docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -e `
     "DELETE FROM pose_data WHERE session_id IN ($($Sessions.SqlIn));" 2>$null | Out-Null
+  $delExit = $LASTEXITCODE
   $cnt = (docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -N -e `
     "SELECT COUNT(*) FROM pose_data WHERE session_id IN ($($Sessions.SqlIn));" 2>$null | Select-Object -Last 1)
+  $cntExit = $LASTEXITCODE
   $ErrorActionPreference = $prev
-  return "$cnt".Trim()
+
+  if ($delExit -ne 0) { throw "리셋 실패 — DELETE 가 exit=$delExit 로 끝났습니다. MySQL 컨테이너 상태를 확인하세요 (docker ps --filter name=shadowfit-mysql)." }
+  if ($cntExit -ne 0) { throw "리셋 확인 실패 — COUNT 가 exit=$cntExit 로 끝났습니다. 지웠는지 확인하지 못했으므로 측정을 시작하지 않습니다." }
+
+  $left = "$cnt".Trim()
+  # 숫자가 아니면 «못 물어봤다» 다 — 프리플라이트와 같은 구분 (docker 데몬이 내려간 경우 등).
+  if ($left -notmatch '^\d+$') { throw "리셋 확인 실패 — COUNT 응답이 숫자가 아닙니다('$left'). 측정을 시작하지 않습니다." }
+  if ($left -ne "0") { throw "리셋 후에도 pose_data 가 $left 행 남았습니다 — 이 상태로 재면 이전 판이 결과에 섞입니다." }
+
+  return $left
 }

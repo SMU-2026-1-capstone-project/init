@@ -45,6 +45,12 @@ if (-not $SkipPreflight) {
 if ($WarmupSec -gt 0) {
   Write-Host "[ceiling] warmup ${WarmupSec}s (c=20)..." -ForegroundColor DarkYellow
   & $ghz --insecure --call ExerciseService.SavePoseDataBatch --metadata-file $metaFile --data-file $DataFile -c 20 -z "${WarmupSec}s" "localhost:6565" *> $null
+  # warmup 은 출력을 버리므로 실패해도 안 보인다. 확인 안 하면 «워밍업했다» 는 전제만 남고
+  # 실제로는 cold JVM·빈 풀에서 스윕이 돌아, 낮은 c 구간이 통째로 왜곡된다 (PR #172 리뷰).
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "[ceiling] warmup 실패 (exit=$LASTEXITCODE) — cold 상태로 재면 곡선이 왜곡됩니다. 중단합니다." -ForegroundColor Red
+    exit 1
+  }
   ResetRows
 }
 

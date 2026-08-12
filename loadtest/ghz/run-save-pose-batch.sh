@@ -50,7 +50,11 @@ echo "[ghz] $GHZ_ORIGIN — $GHZ ($("$GHZ" --version 2>&1 | head -1))"
 #
 # 세션 집합은 페이로드에서 직접 읽는다(ps1 판의 _payload-sessions.ps1 과 같은 규약) — 상수로
 # 두면 gen_batch_multi.py --sessions 를 다른 범위로 재생성했을 때 조용히 어긋난다.
-SESSION_IDS=$(grep -o '"sessionId"[[:space:]]*:[[:space:]]*[0-9]\+' "$DATA_FILE" | grep -o '[0-9]\+$' | sort -un)
+# || true 가 필요하다: set -euo pipefail 아래에서 grep 이 아무것도 못 찾으면 exit 1 이고,
+# 그러면 이 치환에서 스크립트가 **바로 끝나** 아래 형식 오류 메시지가 출력되지 않는다.
+# 「sessionId 를 못 찾았다」를 알려주려고 쓴 줄이 정작 도달 불가였다 (PR #172 리뷰).
+# 바로 아래 HAVE=$(...) 에 같은 이유로 || true 를 붙여놓고 이 줄에서 놓쳤다.
+SESSION_IDS=$(grep -o '"sessionId"[[:space:]]*:[[:space:]]*[0-9]\+' "$DATA_FILE" | grep -o '[0-9]\+$' | sort -un || true)
 [ -n "$SESSION_IDS" ] || { echo "$DATA_FILE 에서 sessionId 를 못 찾았다 — 페이로드 형식 확인 필요"; exit 1; }
 EXPECTED=$(printf '%s\n' "$SESSION_IDS" | wc -l | tr -d ' ')
 SQL_IN=$(printf '%s\n' "$SESSION_IDS" | paste -sd, -)

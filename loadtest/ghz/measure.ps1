@@ -96,6 +96,12 @@ if ($WarmupSec -gt 0) {
   & $ghz --insecure --call ExerciseService.SavePoseDataBatch `
     --metadata-file $metaFile --data-file $DataFile `
     -c 20 -z "${WarmupSec}s" $Target *> $null
+  # warmup 은 출력을 버리므로 실패해도 안 보인다. 확인 안 하면 «cold/warm 차이를 제거했다» 는
+  # 이 스크립트의 전제(공정비교)가 깨진 채로 before/after 를 비교하게 된다 (PR #172 리뷰).
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "warmup 실패 (exit=$LASTEXITCODE) — cold 상태로 재면 공정비교가 성립하지 않습니다."
+    exit 1
+  }
   # warmup 이 적재한 행 제거 → 본측정 클린 상태 보장
   $wc = Reset-PayloadRows -Sessions $S
   Write-Host "[$Label] warmup 완료, 본측정 전 행: $wc" -ForegroundColor DarkYellow
