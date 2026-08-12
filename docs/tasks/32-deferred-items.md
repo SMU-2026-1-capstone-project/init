@@ -68,26 +68,38 @@
 
 ---
 
-## P2. 🔴 `exercises` 시드 누락 (버그)
+## ~~P2. 🔴 `exercises` 시드 누락 (버그)~~ → ❌ **오탐이었다 (2026-08-12 정정)**
 
-**무엇** — [`mysql/dev-seed.sql:11`](../../mysql/dev-seed.sql) 이 이렇게 적어 뒀다:
+**시드는 있다.** [`V2__seed_master_data.sql:26,30,33`](../../backend/src/main/resources/db/migration/V2__seed_master_data.sql)
+이 스쿼트(id=1, `analysis_supported=TRUE`) · 런지(2) · 플랭크(3) 3종을 넣는다.
+버그가 아니므로 이슈를 올리지 않았다.
 
-> *"운영에도 필요한 마스터 데이터(**exercises**, 피드백 템플릿)는 여기 없다"*
+### 왜 «없다» 고 판정했나 — grep 패턴이 좁았다
 
-그래서 마이그레이션에 있어야 하는데, **전수 확인 결과 `INSERT INTO exercises` 가 어디에도 없다.**
-`V1__baseline.sql` · `V2__seed_master_data.sql` · `V3__add_refresh_token_rotation.sql` ·
-`dev-seed.sql` 전부에서 나오는 건 `exercise_feedback_templates`(3건) · `users` · `session_feedback_logs` 뿐이다.
+초판은 `INSERT INTO exercises` 로 전수 확인했는데, **V2 는 `REPLACE INTO exercises` 를 쓴다.**
+같은 파일에서 피드백 템플릿만 `INSERT INTO` 라 «템플릿은 있고 종목은 없다» 로 보였다.
+(마이그레이션이 재적용돼도 안전하도록 종목만 `REPLACE` 를 쓴 것이고, 의도된 차이다.)
 
-**영향** — 새 환경에 올리면 **운동 종목이 비어 있다.** 이건 **E1(시연이 처음부터 끝까지 한 번에 돈다)에 직결**된다.
+### 그리고 인용이 반쪽이었다
 
-**미검증** — 관리자 API 로 만드는 것이 «의도된 운영 절차» 인지 확인하지 않았다.
-의도된 것이면 버그가 아니라 **문서와 실제의 불일치**이고, 그래도 `dev-seed.sql:11` 의 문장은 고쳐야 한다.
+초판은 [`mysql/dev-seed.sql:11`](../../mysql/dev-seed.sql) 을 *"운영에도 필요한 마스터 데이터(exercises,
+피드백 템플릿)는 여기 없다"* 까지만 인용했는데, 그 문장은 다음 줄에서 **어디에 있는지를 직접 가리킨다**:
 
-**열 조건** — **없다. 이건 미루는 항목이 아니다.**
-버그이므로 GitHub 이슈로 올린다([[feedback_troubleshooting_to_issues]]). 다른 셋과 독립적이다.
+```
+-- 운영에도 필요한 마스터 데이터(exercises, 피드백 템플릿)는 여기 없다 →
+--   backend/src/main/resources/db/migration/V2__seed_master_data.sql
+```
 
-**부수** — `mysql/schema.sql` 과 `mysql/data.sql` 이 **빈 디렉터리**로 남아 있다.
-Flyway 전환(#115) 때 바인드마운트가 만든 잔재. 지우면 된다.
+따라서 *"`dev-seed.sql:11` 의 문장은 고쳐야 한다"* 도 철회한다 — **그 서술은 처음부터 맞았다.**
+
+⚠️ **여전히 미검증** — SQL 파일이 있다는 것까지만 확인했다. 새 환경에서 Flyway 가 V2 를
+끝까지 적용하는지는 **돌려보지 않았다.** E1(시연 한 바퀴)이 이걸 겸해서 덮는다.
+
+📌 **남는 교훈** — «전수 확인» 이라고 적었지만 실제로 전수인 것은 **grep 패턴 하나**였다.
+DML 을 셀 때 `INSERT` 만 보면 `REPLACE`·`INSERT ... ON DUPLICATE KEY`·`LOAD DATA` 가 통째로 샌다.
+
+**부수(이건 실재)** — ~~`mysql/schema.sql` 과 `mysql/data.sql` 이 **빈 디렉터리**로 남아 있다.~~
+→ ✅ **삭제 완료(2026-08-12).** Flyway 전환(#115) 때 바인드마운트가 만든 잔재였다.
 
 ---
 
@@ -198,15 +210,15 @@ TTL 을 며칠로 잡을지에 근거가 없다.
 ## 열리는 순서
 
 ```
-P2 (시드 누락, 버그) ── 독립. 지금 열어도 된다
+P2 (시드 누락)          ── ❌ 오탐. 열 것이 없다
 P5 (Tier 0 자세 그리기) ── 독립. 싸다. 판단만 남았다
 P1 (재측정) ──▶ P3 (입장 제한)      ← 상한값의 근거가 P1 의 산출물
 P4 (redo)  ── 안 연다. 문단으로 닫힘
 P5-Tier2   ── 안 연다. 기존 미수행 결정 유지
 ```
 
-**P4 와 P5-Tier2 는 이미 닫혔다**(문서에 박제되는 것이 산출물).
-실질적으로 열려 있는 건 **P2 · P5-Tier0 · P1→P3 사슬** 셋이다.
+**P4 와 P5-Tier2 는 이미 닫혔다**(문서에 박제되는 것이 산출물). **P2 는 오탐으로 닫혔다.**
+실질적으로 열려 있는 건 **P5-Tier0 · P1→P3 사슬** 둘이다.
 
 ---
 
@@ -217,3 +229,7 @@ P5-Tier2   ── 안 연다. 기존 미수행 결정 유지
 - 2026-08-11: **P5 추가** — `joint_coordinates` write-only 발견. Tier 0/1/2 로 분리하고
   **Tier 2 는 기존 미수행 결정(realmysql §217) 유지로 종결**. Tier 0 은 비용이 아니라
   §4(목적지) 때문에 보류이며 **판단은 사용자 몫**으로 남긴다.
+- 2026-08-12: **P2 를 오탐으로 정정·종결.** 시드는 `V2__seed_master_data.sql` 에 `REPLACE INTO`
+  로 있었고, 초판의 «전수 확인» 은 `INSERT INTO` 한 패턴이었다. `dev-seed.sql:11` 문장을
+  고쳐야 한다는 지적도 철회(그 줄은 V2 경로를 직접 가리킨다). 이슈는 올리지 않았다.
+  부수 항목이던 빈 디렉터리 `mysql/schema.sql`·`mysql/data.sql` 은 삭제했다.
