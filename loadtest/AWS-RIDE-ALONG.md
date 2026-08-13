@@ -1,7 +1,8 @@
 # EC2 탑승 목록 — 인프라를 띄울 때 같이 돌릴 것
 
 작성일: 2026-08-12
-상태: **2회 탑승 완료 (P1 2026-08-12 · P3 2026-08-13)** — 남은 主 는 P2·P4, 착수·채택은 사용자 confirm 후 박제
+상태: **2회 탑승 완료 (P1 2026-08-12 · P3 2026-08-13) · 3회차 진행 중 (P3-b, 2026-08-14 새벽)**
+      — 남은 主 는 P2·P4·P5, 착수·채택은 사용자 confirm 후 박제
 연관: [`../docs/decisions/online-ddl-vs-blocking-alter.md`](../docs/decisions/online-ddl-vs-blocking-alter.md), [`../docs/portfolio/one-pager.md`](../docs/portfolio/one-pager.md), [`results/`](results/)
 
 ---
@@ -37,6 +38,7 @@
 | ~~**P3**~~ | ~~**백업/복구 RTO·RPO**~~ | 「몇 분인가」는 디스크 성능이 지배한다. 단 「PITR 이 되는가」는 이진 사실이라 **로컬에서 먼저** 확인하고 올린다 | ✅ **완료 (2026-08-13)** — [결과](results/backup-restore-aws-2026-08-13/README.md). 미검증 2건은 §6 결정 로그 | **실측 3.11시간**(러너 2.97h — 본 측정만 2h54m) |
 | **P3-b** | **백업 재측정 — 내구성·행 크기** | 🔴 08-13 라운드가 두 곳에서 다른 것을 쟀다. ① 팔 B 복구가 **페이지 캐시**를 쟀고([#201](https://github.com/Shadowfit/init/issues/201)), ② 설계에서 확정됐던 **real-JSON 대조**가 rig 에 없었다([#202](https://github.com/Shadowfit/init/issues/202)). 둘 다 **디스크가 지배**해서 로컬로는 못 닫는다 | 🟢 **rig 수정 완료** — `sync_ms`·`restore_durable_s` 칸 추가, 복구 직전 캐시 비움, `STAGE=real` 무대 | 러너 3.5~4h |
 | **P4** | **복제 지연 · 반동기 대가** | 인스턴스 2대가 전제. ⭐ **반동기 대가는 AZ 간 RTT 에 지배**되므로 로컬에선 구조적으로 과소평가된다 | 🟡 **설계 완료 (2026-08-13)** · rig 없음 — [`../docs/decisions/replication-lag-and-semisync.md`](../docs/decisions/replication-lag-and-semisync.md) | 게이트 2~3h + 측정 2~3h |
+| **P5** | **세션 분산도 스윕** (1·2·5·20·100) | 🔴 정본 baseline **649.4 RPS 가 «100세션» 에서 나온 값**인데 그 100 은 잰 값이 아니다. 이 앱은 회원당 활성 세션이 1개라 **동시 세션 수 = 동시에 운동 중인 사람 수**다 — baseline 이 가정한 부하보다 분산된 조건일 수 있다. 4대 구성이라 로컬 불가 | 🟢 **설계·rig 완료 (2026-08-14)** — [`../docs/decisions/session-spread-sweep.md`](../docs/decisions/session-spread-sweep.md) · [rig](results/session-spread-2026-08-13/README.md) | 主 25판 + 從 6판 · **지켜보는 1~2h**(무인 아님) |
 
 > P2 가 눈에 띈다 — **이미 한 번 헤드라인을 무효화한 것과 같은 계열의 조건**이 아직 정본에
 > 열린 채로 남아 있다. P1 과 같은 라운드에 태울 수 있으면 가장 싸다(단 §7 오염 주의).
@@ -48,6 +50,7 @@
 | **R1** | **worst-section 쿼리 1회** | `reports` 중 `detailed_analysis` 가 채워진 행이 있는지, `pose_data` 가 비어 있는지. **로컬에선 이미 확인했고 EC2 배포분만 미확인**이다. 쿼리 한 번이면 끝난다 | [`worst-section-rep-resolution.md:261`](../docs/decisions/worst-section-rep-resolution.md) — §0 의 그 항목 |
 | **R2** | **MySQL 지표 수집** | pool-cliff 초판이 «병목이 백엔드 CPU 로 이동» 을 적었다 **철회**한 사유가 정확히 **MySQL 지표 미수집**이었다. 이번엔 처음부터 걷는다 (OS 샘플러와 같은 결) | [`pose-ingest-downsampling.md:387`](../docs/decisions/pose-ingest-downsampling.md) |
 | **R3** | **3-way 조인 hash join** | `reports ⋈ sessions ⋈ users`. ⑤ 옵티마이저 카드가 «AWS엔 그 테이블들이 비어 있어 범위 밖» 으로 닫아둔 미완부 | [`realmysql-experiments.md:225`](../docs/portfolio/realmysql-experiments.md) |
+| **R4** | **커넥션 수 스윕 (네트워크 축)** | 「`--connections` 1→16 이 230→211」이 **HTTP/2 멀티플렉싱 때문인지 fsync 에 가려진 것인지** 안 갈렸다. 완화 조건에서 다시 돌리면 갈린다. ⚠️ **P5 라운드 전용** — 부하기·페이로드가 그 rig 것이라 다른 라운드엔 못 얹는다 | [`four-axes-depth-experiments.md` §3-2](../docs/decisions/four-axes-depth-experiments.md) · rig `conn_ridealong.sh` |
 
 ⚠️ **R1 과 R3 은 값 분포 한계에 걸린다.** 시딩이 단일 템플릿 복제라 카디널리티가 균일하다.
 분포에 의존하는 결론은 내지 말고, **구조·존재 여부만** 본다.

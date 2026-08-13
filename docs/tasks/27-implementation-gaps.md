@@ -31,6 +31,11 @@
   - 왜 값이 있나: 실제 DAU 1,000 이 어느 쪽에 가까운지 모르는 채 *"다세션이 현실적"* 이라고만 쓰고 있다. **«100세션이면 충분히 분산» 이라는 것도 측정한 적 없다**
   - 비용: EC2 4대 · 5판 · 30분 남짓 (rig 는 `commit-count-2026-08-09/` 에 그대로 있다 — `gen_batch_multi.py --sessions` 범위만 바꾸면 된다)
   - ⚠️ **같이 고칠 것**: 이번 rig 는 판별 시간 창을 TSV 에 안 남겨 ghz 리포트에서 역산해야 했고(`analyze_metrics.py`), `buffer_pool_dirty_pages` 를 스크레이프에 안 넣어 «판 순서 효과» 의 새 후보를 검증 못 했다
+  - ✅ **설계·rig 완료 (2026-08-14)** — [`../decisions/session-spread-sweep.md`](../decisions/session-spread-sweep.md) ·
+    [rig](../../loadtest/results/session-spread-2026-08-13/README.md). 위 «같이 고칠 것» 2건은 rig 에 반영했고
+    (`spread.tsv` 의 시간 창·dirty pages), **번짐 반경 채널**(무관한 세션에 쓰는 writer)과
+    **從 커넥션 스윕**(네트워크 축)이 추가됐다. 탑승 목록에는 **P5** 로 올라갔다.
+    **착수는 아직** — 미결정 5건은 설계 §8
 
 - [x] **소량 DELETE 반복 시 파편화 실험** — **완료(2026-08-09)**, [`loadtest/results/delete-fragmentation-2026-08-09/`](../../loadtest/results/delete-fragmentation-2026-08-09/README.md).
   `outbox_events` 행 모양으로 200,000행 고정 · 25,000행/사이클. **FIFO 삭제는 누적 없음**(3회전 내내 1,348페이지,
