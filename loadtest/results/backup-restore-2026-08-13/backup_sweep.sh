@@ -229,6 +229,12 @@ run_one() {  # $1 = round, $2 = 팔(A|B|C)
   start_disk_sampler "${tag}_disk.txt"
   start_writer "$arm" "$WRITER_MAX_SEC" "$WRITER_GAP_MS"
 
+  # 🔴 **백업 «직전» 행수를 잡아둔다.** 검증을 «백업 후 원본» 과 하면 절대 안 맞는다 —
+  #    writer 가 백업 중에도 쓰므로 복구본(백업 시점 스냅샷)은 항상 그보다 적다.
+  #    스모크에서 6판이 전부 «불일치» 로 찍힐 뻔했다(차이 10~12행 = 백업 중 쓴 양).
+  #    올바른 판정은 **복구본이 [백업 직전, 백업 직후] 구간 안에 있는가** 다.
+  local n_before; n_before=$(DBQ "SELECT COUNT(*) FROM pose_data_scale;")
+
   echo "  [백업] 팔 $arm"
   case $arm in
     A) bkp=$(backup_arm_a "$tag") ;;
@@ -263,9 +269,25 @@ run_one() {  # $1 = round, $2 = 팔(A|B|C)
         "$round" "$arm" "$backup_s" "$artifact_mb" >> "$LOG"
       FAILED+=("$tag:복구실패"); fresh_restore_target; return 1
     fi
-    dst_fp=$(verify_restored) || dst_fp="검증불가"
-    if [ "$dst_fp" = "$src_fp" ]; then verdict="일치"
-    else verdict="불일치(src=$src_fp dst=$dst_fp)"; FAILED+=("$tag:검증불일치"); fi
+    # 복구본 행수가 [백업 직전, 백업 직후] 안에 있으면 일관된 스냅샷이다.
+    # 🔴 **체크섬은 비교하지 않는다** — 행 집합이 다르면 체크섬도 당연히 다르다.
+    #    writer 를 멈추면 완벽 대조가 가능하지만 그러면 Q3(백업 중 멈추는가)를 못 잰다.
+    #    「일관성」은 구간으로, 「읽히는가」는 체크섬 산출 성공 여부로 본다.
+    local n_after dst_n dst_cs
+    n_after=$(echo "$src_fp" | awk '{print $1}')
+    dst_fp=$(verify_restored) || dst_fp=""
+    if [ -z "$dst_fp" ]; then
+      verdict="복구본을 못 읽음"; FAILED+=("$tag:검증불가")
+    else
+      dst_n=$(echo "$dst_fp" | awk '{print $1}'); dst_cs=$(echo "$dst_fp" | awk '{print $2}')
+      if [ "$dst_n" -ge "$n_before" ] && [ "$dst_n" -le "$n_after" ]; then
+        verdict="일치(${dst_n} ∈ [${n_before},${n_after}])"
+      else
+        verdict="구간이탈(dst=${dst_n} 범위=[${n_before},${n_after}])"
+        FAILED+=("$tag:검증구간이탈")
+      fi
+      [ "$dst_cs" = "-" ] || verdict="$verdict cs=$dst_cs"
+    fi
     fresh_restore_target
   fi
 
@@ -284,7 +306,7 @@ run_one() {  # $1 = round, $2 = 팔(A|B|C)
     "$round" "$arm" "$backup_s" "$artifact_mb" "$restore_s" \
     "$att" "$err" "$mx" "$p50" "$dpk" "$verdict" >> "$LOG"
 
-  echo "  → 백업 ${backup_s}s(${artifact_mb}MB) · 복구 ${restore_s}s · 검증 $verdict"
+  echo "  → 백업 ${backup_s}s(${artifact_mb}MB) · 복구 $([ "$restore_s" = "-" ] && echo "미측정" || echo "${restore_s}s") · 검증 $verdict"
   echo "    시도 ${att}건(에러 ${err}) · 최대정지 ${mx}ms · 평시 p50 ${p50}ms · 디스크피크 ${dpk}MB"
   return 0
 }
