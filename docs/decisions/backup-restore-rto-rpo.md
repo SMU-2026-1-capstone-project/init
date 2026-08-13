@@ -373,7 +373,7 @@ Windows/Docker Desktop 에선 안 된다** — 로컬 단계에선 컨테이너 
   - 🔴 **결함 1 — 팔 B 복구 시간이 페이지 캐시를 쟀다**([#201](https://github.com/Shadowfit/init/issues/201)).
     10.4GB 를 9초에 부었는데 볼륨 상한이 125MB/s 라 물리적으로 불가능하다. `cp` 가 fsync 하지
     않아 캐시까지만 쓰고 반환했다. **판정 방향은 유지, 배수는 철회.**
-  - 🔴 **결함 2 — real-JSON 축소 대조 1판이 안 돌았다.** §9-1 에서 사용자 confirm 으로 확정된
+  - 🔴 **결함 2 — real-JSON 축소 대조 1판이 안 돌았다**([#202](https://github.com/Shadowfit/init/issues/202))**.** §9-1 에서 사용자 confirm 으로 확정된
     규모의 **후반부가 rig 에 구현되지 않았다.** 하필 그 대조가 막으려던 것이 Q2 이므로
     (`mysqldump` 는 off-page 를 탄다) **지금의 21분은 real-JSON 에서 더 나빠질 값**이다.
     「1억 행 백업/복구를 쟀다」는 맞지만 **「행 크기 영향까지 봤다」는 아니다.**
