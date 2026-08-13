@@ -30,6 +30,11 @@ S3_DEST="${S3_BASE%/}/$RUN_ID"
 #   P3 백업/복구 라운드:
 #     PHASES="preflight backup_rehearsal backup ridealong collect"
 #
+#   P3-b 재측정 라운드 (#201 내구성 · #202 real 대조):
+#     PHASES="preflight backup_rehearsal backup backup_real ridealong collect"
+#     🔴 `backup_real` 은 반드시 `backup` **뒤**다 — 무대(`pose_data_scale`)를 real 로 다시
+#        세우므로 순서가 뒤집히면 1억 행 본 측정이 다른 무대 위에서 돈다.
+#
 # 🔴 `ddl` 과 `backup` 을 **같이 넣지 말 것.** 둘 다 디스크가 지배해서 한 라운드에 섞으면
 #    서로 오염된다(AWS-RIDE-ALONG §7 이 P1↔P2 에 건 경고와 같다). 라운드를 나눈다.
 PHASES=${PHASES:-"preflight rehearsal ddl ridealong collect"}
@@ -55,6 +60,8 @@ TIMEOUT_DDL=${TIMEOUT_DDL:-43200}                # 12시간 (로컬 추정 5.9�
 # 그래서 상한을 넉넉히 준다 — 걸려서 끊기는 것보다 낫다.
 TIMEOUT_BACKUP=${TIMEOUT_BACKUP:-43200}          # 12시간
 BACKUP_SESSIONS=${BACKUP_SESSIONS:-133334}       # 1억 행 (133,334 × 750)
+TIMEOUT_BACKUP_REAL=${TIMEOUT_BACKUP_REAL:-7200} # 2시간 (무대 ~1.5GB, 판 4개)
+BACKUP_REAL_SESSIONS=${BACKUP_REAL_SESSIONS:-1000}  # 1,000 × 750행 ≈ 75만 행 ≈ 1.5GB
 TIMEOUT_RIDEALONG=${TIMEOUT_RIDEALONG:-900}
 
 export PW DB_NAME CONTAINER
@@ -220,6 +227,17 @@ phase_backup_rehearsal() {
     timeout --kill-after=60 "$TIMEOUT_REHEARSAL" bash "$BACKUP_RIG/probe.sh"        || return 1
   OUT=$out SESSIONS=$REHEARSAL_SESSIONS DO_CHECKSUM=0 \
     timeout --kill-after=60 "$TIMEOUT_REHEARSAL" bash "$BACKUP_RIG/backup_sweep.sh" || return 1
+
+  # 🔴 real 무대도 **여기서 한 번 밟는다**(#202). 안 밟으면 그 경로의 첫 실행이 본 판이 되고,
+  #    거기서 죽으면 무인 라운드에서 몇 시간을 버린다 — 08-12 가 정확히 그 사고였다.
+  #    20세션 × 750행 = 15,000행이라 몇십 초면 끝난다.
+  if [ "${REHEARSAL_SKIP_REAL:-0}" = "1" ]; then
+    note "real 리허설 건너뜀 (REHEARSAL_SKIP_REAL=1)"
+  else
+    note "real 무대 경로 점검 — 20세션 × 750행. **이 판의 수치도 측정값이 아니다**"
+    OUT=$out/real STAGE=real REAL_SESSIONS=20 DO_CHECKSUM=0 \
+      timeout --kill-after=60 "$TIMEOUT_REHEARSAL" bash "$BACKUP_RIG/backup_sweep.sh" || return 1
+  fi
   return 0
 }
 
@@ -233,6 +251,21 @@ phase_backup() {
     timeout --kill-after=120 "$TIMEOUT_BACKUP" bash "$BACKUP_RIG/probe.sh"        || return 1
   OUT=$out SESSIONS=$BACKUP_SESSIONS \
     timeout --kill-after=120 "$TIMEOUT_BACKUP" bash "$BACKUP_RIG/backup_sweep.sh" || return 1
+  return 0
+}
+
+# real-JSON 축소 대조 (#202) — 설계 §9-1 「확정된 것」의 후반부.
+#
+# 🔴 **본 측정과 같은 표에 올리는 값이 아니다.** 더미 1억 행 ↔ real 75만 행은 규모가 다르다.
+#    여기서 보는 것은 「행 «크기» 가 팔 A(논리)를 얼마나 더 불리하게 만드는가」 하나뿐이다.
+# 🔴 **`backup` 다음에 둔다.** 이 단계가 `pose_data_scale` 을 real 페이로드로 다시 세우므로
+#    순서가 뒤집히면 본 측정이 real 무대 위에서 돌아 조건이 통째로 바뀐다.
+phase_backup_real() {
+  local out=$OUTDIR/backup_real
+  mkdir -p "$out"
+  note "real 대조 — ${BACKUP_REAL_SESSIONS}세션 × 750행(실 JSON ≈2KB/행), 팔 A·B 각 버림1+본판1"
+  OUT=$out STAGE=real REAL_SESSIONS=$BACKUP_REAL_SESSIONS \
+    timeout --kill-after=120 "$TIMEOUT_BACKUP_REAL" bash "$BACKUP_RIG/backup_sweep.sh" || return 1
   return 0
 }
 
@@ -344,6 +377,14 @@ for p in $PHASES; do
       else
         note "⏭  백업 본 측정 건너뜀 — 리허설이 실패했다(환경 결함이 측정 결과로 찍히면 안 된다)"
         printf "backup\tSKIP\t0\t%s\n" "$(date -Is)" >> "$PHASE_LOG"
+      fi ;;
+    backup_real)
+      # 리허설 판정을 그대로 따른다 — 같은 rig 를 쓰므로 리허설이 깨졌으면 이것도 못 믿는다.
+      if [ "${BACKUP_REHEARSAL_OK:-1}" = "1" ]; then
+        run_phase backup_real phase_backup_real
+      else
+        note "⏭  real 대조 건너뜀 — 리허설이 실패했다"
+        printf "backup_real\tSKIP\t0\t%s\n" "$(date -Is)" >> "$PHASE_LOG"
       fi ;;
     ridealong) run_phase ridealong phase_ridealong ;;
     collect)   run_phase collect   phase_collect ;;

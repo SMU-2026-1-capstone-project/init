@@ -14,6 +14,29 @@
 # 단계:
 #   preflight  G5 — XtraBackup 백업이 «실제로 복구되는가» (이진). 실패 시 팔 B 를 뺀다
 #   sweep      본 측정
+#
+# ── 무대(STAGE) ──────────────────────────────────────────────────────────
+#   dummy (기본) : `joint_coordinates='{}'` 더미 JSON. 1억 행 본 측정의 무대
+#   real         : 실제 33 랜드마크 JSON(~2KB/행)을 `_pose_template` 에서 복제한 축소 무대.
+#                  설계 §9-1 「확정된 것」의 후반부(«real-JSON 소규모 대조 1판»)다 — #202.
+#
+#   🔴 **두 무대는 같은 표에 절대 안 올린다.** 행 수도 기계도 같지 않다. real 은
+#      「행 «크기» 가 팔 A 를 얼마나 더 불리하게 만드는가」만 본다(배수·방향만).
+#   🔴 **무대 이름은 둘 다 `pose_data_scale` 이다**(테이블명이 아니라 «내용» 이 다르다).
+#      writer·검증·디스크 샘플러가 전부 이 이름에 붙어 있어서, 이름을 바꾸면 rig 4곳이
+#      같이 흔들린다. 그래서 real 무대도 같은 DDL·같은 이름으로 세운다.
+#
+# ── 복구 시간의 정의 (#201) ──────────────────────────────────────────────
+#   초판(2026-08-13)은 팔 B 복구를 **9초**로 찍었다. 10.4GB 를 gp3 125MB/s 볼륨에서
+#   9초에 옮기는 것은 불가능하고, 실제로는 `cp` 가 **페이지 캐시까지만 쓰고 반환**한 것이다.
+#   팔 A 는 InnoDB 를 거쳐 redo 로 내구성이 서는데 팔 B 는 안 섰다 — **두 팔이 다른 것을 쟀다.**
+#
+#   이제 세 값을 다 남긴다. 정의를 하나로 정하고 나머지를 버리지 않는다:
+#     restore_s          «서버가 다시 쓰기를 받기까지» (초판과 같은 정의 — 비교 가능)
+#     sync_ms            그 뒤 `sync` 가 끝나기까지 = **아직 디스크에 안 내려간 분량**
+#     restore_durable_s  둘의 합 = «크래시를 견디는 상태까지»
+#   그리고 **복구 직전에 캐시를 비운다**(`DROP_CACHES_BEFORE_RESTORE`). 복구는 장애 중에
+#   하는 일이라 「방금 백업해서 캐시가 따뜻한」 상태는 현실이 아니다. 양 팔에 똑같이 건다.
 
 set -uo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -45,6 +68,13 @@ WRITER_MAX_SEC=${WRITER_MAX_SEC:-7200}
 WRITER_GAP_MS=${WRITER_GAP_MS:-200}       # 초당 5회 — 정지 구간을 200ms 해상도로
 DO_CHECKSUM=${DO_CHECKSUM:-1}             # 1억 행에서 비싸다. 끄면 행수만 검증한다
 DROP_CACHES=${DROP_CACHES:-1}             # §9-1 ③ — EC2(root)에선 켠다. Docker Desktop 에선 불가
+DROP_CACHES_BEFORE_RESTORE=${DROP_CACHES_BEFORE_RESTORE:-1}   # #201 — 복구는 장애 중에 한다
+
+# ── 무대 ─────────────────────────────────────────────────────────────────
+STAGE=${STAGE:-dummy}                     # dummy | real
+REAL_SESSIONS=${REAL_SESSIONS:-1000}      # real 무대: 세션 수 × 템플릿 750행
+REAL_TEMPLATE_ROWS=${REAL_TEMPLATE_ROWS:-750}
+case "$STAGE" in dummy|real) ;; *) echo "🔴 STAGE 는 dummy|real 이어야 한다 (받은 값 '$STAGE')"; exit 1 ;; esac
 
 mkdir -p "$WORK"
 
@@ -70,6 +100,22 @@ reset_between_rounds() {
     echo 3 > /proc/sys/vm/drop_caches 2>/dev/null \
       || echo "  ⚠️ drop_caches 실패(권한). OS 캐시가 안 비워졌다 — 조건에 남길 것"
   fi
+}
+
+# 캐시를 비운다 — `reset_between_rounds` 안의 그 동작을 단독으로도 쓴다(#201).
+drop_caches_now() {  # $1 = 실패했을 때 찍을 맥락
+  sync 2>/dev/null
+  echo 3 > /proc/sys/vm/drop_caches 2>/dev/null \
+    || echo "  ⚠️ drop_caches 실패(권한) — ${1:-} 캐시가 안 비워졌다. **조건에 남길 것**" >&2
+}
+
+# 🔴 **이 함수가 #201 의 답이다.** 복구가 끝난 «직후» 아직 안 내려간 분량을 시간으로 잰다.
+#    0 에 가까우면 그 팔의 복구 시간은 이미 내구성까지 포함한 값이고, 크면 그만큼이
+#    「빨라 보였을 뿐」이다. 판정을 사람이 나중에 하도록 **값으로** 남긴다.
+sync_ms() {
+  local t0 t1
+  t0=$(now_ms); sync 2>/dev/null; t1=$(now_ms)
+  echo $(( t1 - t0 ))
 }
 
 # 🔴 복구 대상은 **매번 새 컨테이너·새 볼륨**이다. 재사용하면 이전 판의 데이터가 남아
@@ -130,7 +176,7 @@ backup_arm_a() {  # $1 = tag → stdout: "백업초 산출물MB"
   echo "$(( (t1 - t0) / 1000 )) $(( $(stat -c%s "$f") / 1024 / 1024 ))"
 }
 
-restore_arm_a() {  # $1 = tag → stdout: 복구초
+restore_arm_a() {  # $1 = tag → stdout: "복구초 sync_ms"
   local tag=$1; local f="$WORK/${tag}.sql" t0 t1
   fresh_restore_target
   docker run -d --name "$RESTORE_CONTAINER" -e MYSQL_ROOT_PASSWORD="$PW" \
@@ -141,7 +187,9 @@ restore_arm_a() {  # $1 = tag → stdout: 복구초
   docker exec -i "$RESTORE_CONTAINER" mysql -uroot -p"$PW" < "$f" 2>/dev/null
   local rc=$?; t1=$(now_ms)
   [ $rc -eq 0 ] || return 1
-  echo "$(( (t1 - t0) / 1000 ))"
+  # 팔 A 는 커밋마다 redo 를 내리므로(flush=1) 여기서 남는 건 대개 더티 페이지다.
+  # 그래도 **같은 자를 양 팔에 댄다** — 「안 나올 것」이라는 예상도 값으로 확인한다.
+  echo "$(( (t1 - t0) / 1000 )) $(sync_ms)"
 }
 
 # ── 팔 B — XtraBackup (물리) ─────────────────────────────────────────────
@@ -159,7 +207,7 @@ backup_arm_b() {  # $1 = tag → stdout: "백업초 산출물MB"
   echo "$(( (t1 - t0) / 1000 )) $(dir_mb "$d")"
 }
 
-restore_arm_b() {  # $1 = tag → stdout: 복구초 (prepare + 기동까지가 RTO 다)
+restore_arm_b() {  # $1 = tag → stdout: "복구초 sync_ms" (prepare + 기동까지가 RTO 다)
   local tag=$1; local d="$WORK/xb_$tag" t0 t1
   fresh_restore_target
   t0=$(now_ms)
@@ -176,7 +224,9 @@ restore_arm_b() {  # $1 = tag → stdout: 복구초 (prepare + 기동까지가 R
     -v "$RESTORE_VOLUME:/var/lib/mysql" "$MYSQL_IMAGE" >/dev/null 2>&1 || return 1
   wait_restore_ready || return 1
   t1=$(now_ms)
-  echo "$(( (t1 - t0) / 1000 ))"
+  # 🔴 여기가 초판이 틀린 자리다(#201). `cp -a` 는 fsync 하지 않아 위 구간이 **페이지 캐시까지**
+  #    일 수 있다. 그 분량을 시간으로 뽑아 옆 칸에 세운다.
+  echo "$(( (t1 - t0) / 1000 )) $(sync_ms)"
 }
 
 # ── 팔 C — 파일 스냅샷 (대조군, 전체 백업 아님) ──────────────────────────
@@ -219,10 +269,112 @@ backup_arm_c() {  # $1 = tag → stdout: "백업초 산출물MB"
   echo "$(( (t1 - t0) / 1000 )) $(dir_mb "$d")"
 }
 
+# ── real 무대 시딩 (#202) ────────────────────────────────────────────────
+#
+# 더미 무대와 **DDL·테이블명이 같고 페이로드만 다르다.** 그래야 「행 크기」 하나만 바뀐다.
+# 템플릿은 `loadtest/seed/gen_pose_template.py`(33 랜드마크 JSON ≈2,076B/행)를 쓴다 —
+# 새로 만들지 않는다. 그 스크립트의 정직 단서(원본과 바이트가 같지 않다·루트가 배열이다)가
+# 그대로 승계된다.
+seed_real() {
+  local gen="$SELF_DIR/../../seed/gen_pose_template.py"
+  local sql="$WORK/_pose_template.sql" t0 t1 py
+  [ -f "$gen" ] || { echo "🔴 템플릿 생성기가 없다: $gen" >&2; return 1; }
+
+  # 🔴 python 이 없으면 **다른 페이로드로 대신 재지 않는다.** 여기서 멈추는 편이
+  #    「real 무대를 쟀다」는 얼굴의 다른 무대보다 낫다(#202 가 생긴 이유가 그것이다).
+  py=$(command -v python3 || command -v python) \
+    || { echo "🔴 python3 가 없다 — real 무대를 세울 수 없다. **대체 페이로드로 재지 않는다**" >&2; return 1; }
+
+  assert_no_writer
+  local rows=$(( REAL_SESSIONS * REAL_TEMPLATE_ROWS ))
+  printf "무대 시딩 — STAGE=real · %s 세션 × %s행 = %'d 행 (실 JSON ≈2KB/행)\n" \
+    "$REAL_SESSIONS" "$REAL_TEMPLATE_ROWS" "$rows"
+  [ "$REAL_SESSIONS" -ge 1 ] && [ "$REAL_SESSIONS" -le 10000 ] \
+    || { echo "🔴 REAL_SESSIONS 는 1~10000 이어야 한다 (받은 값 '$REAL_SESSIONS')" >&2; return 1; }
+
+  t0=$(date +%s)
+  "$py" "$gen" --rows "$REAL_TEMPLATE_ROWS" --out "$sql" >/dev/null \
+    || { echo "🔴 템플릿 생성 실패" >&2; return 1; }
+  docker exec -i "$CONTAINER" mysql -uroot -p"$PW" "$DB_NAME" < "$sql" \
+    || { echo "🔴 템플릿 적재 실패" >&2; return 1; }
+
+  # 무대 자체는 더미와 **같은 DDL**이다(위 seed_scale 과 한 글자도 다르면 안 된다).
+  DB -e "
+    DROP TABLE IF EXISTS pose_data_scale;
+    CREATE TABLE pose_data_scale (
+      id bigint NOT NULL AUTO_INCREMENT,
+      session_id bigint NOT NULL,
+      timestamp_sec double NOT NULL,
+      joint_coordinates text COLLATE utf8mb4_unicode_ci NOT NULL,
+      sync_rate double DEFAULT NULL,
+      is_correct tinyint(1) DEFAULT 1,
+      feedback_message varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+      created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    DROP TABLE IF EXISTS _seq_real;
+    CREATE TABLE _seq_real (n INT PRIMARY KEY);
+    INSERT INTO _seq_real
+    WITH d AS (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
+               UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9)
+    SELECT a.n*1000 + b.n*100 + c.n*10 + e.n FROM d a, d b, d c, d e;
+  " || { echo "🔴 real 무대 준비 실패" >&2; return 1; }
+
+  # 시딩 한정 완화 — 끝에서 되돌린다(seed_scale 과 같은 규약. 안 되돌리면 다음 판이 다른
+  # 내구성으로 측정된다).
+  DB -e "SET GLOBAL innodb_flush_log_at_trx_commit=2;" || return 1
+
+  local s e chunk=100
+  for (( s=0; s<REAL_SESSIONS; s+=chunk )); do
+    e=$(( s + chunk )); [ $e -gt "$REAL_SESSIONS" ] && e=$REAL_SESSIONS
+    DB -e "INSERT INTO pose_data_scale
+             (session_id, timestamp_sec, joint_coordinates, sync_rate, is_correct, feedback_message, created_at)
+           SELECT s.n+1, t.timestamp_sec, CAST(t.joint_coordinates AS CHAR), t.sync_rate, 1,
+                  NULLIF(t.feedback_message,''),
+                  TIMESTAMP('2026-01-01 06:00:00') + INTERVAL s.n MINUTE
+                    + INTERVAL FLOOR(t.timestamp_sec) SECOND
+           FROM _seq_real s CROSS JOIN _pose_template t
+           WHERE s.n >= $s AND s.n < $e;" \
+      || { DB -e "SET GLOBAL innodb_flush_log_at_trx_commit=1;"; echo "🔴 real 시딩 실패 (세션 $s~$e)" >&2; return 1; }
+  done
+
+  DB -e "CREATE INDEX idx_session_timestamp ON pose_data_scale (session_id, timestamp_sec);
+         SET GLOBAL innodb_flush_log_at_trx_commit=1;
+         ANALYZE TABLE pose_data_scale;
+         DROP TABLE IF EXISTS _seq_real;
+         DROP TABLE IF EXISTS _pose_template;" \
+    || { echo "🔴 인덱스 빌드/정리 실패" >&2; return 1; }
+  rm -f "$sql"
+  t1=$(date +%s)
+
+  # 🔴 «시딩했다» 와 «시딩됐다» 는 다르다 — 그리고 이 무대는 **행 크기가 조건**이라
+  #    행 수만 세면 안 된다. 페이로드가 실제로 크게 들어갔는지까지 확인한다.
+  local n avg flush mb
+  n=$(DBQ "SELECT COUNT(*) FROM pose_data_scale;")
+  [ "$n" = "$rows" ] || { echo "🔴 행 수가 $rows 이 아니다 — 실제 '$n'" >&2; return 1; }
+  avg=$(DBQ "SELECT ROUND(AVG(LENGTH(joint_coordinates))) FROM pose_data_scale;")
+  [ "${avg:-0}" -ge 1500 ] \
+    || { echo "🔴 평균 페이로드가 ${avg}B 다 — real 무대가 아니다(더미가 들어갔다)" >&2; return 1; }
+  flush=$(DBQ "SELECT @@innodb_flush_log_at_trx_commit;")
+  [ "$flush" = "1" ] || { echo "🔴 내구성 복구가 안 됐다 — flush='$flush'" >&2; return 1; }
+  mb=$(DBQ "SELECT ROUND((data_length+index_length)/1024/1024) FROM information_schema.tables
+            WHERE table_schema='$DB_NAME' AND table_name='pose_data_scale';")
+  printf "  [시딩] 완료 %ss — %'d 행 · 평균 페이로드 %sB · 테이블 %sMB · flush=1 복구 확인\n" \
+    "$((t1-t0))" "$n" "$avg" "$mb"
+  { echo "# real 무대 조건 ($(date -Is))"
+    echo "행수            : $n ($REAL_SESSIONS 세션 × $REAL_TEMPLATE_ROWS)"
+    echo "평균 페이로드   : ${avg}B (더미 무대는 2B — '{}')"
+    echo "테이블 크기     : ${mb}MB"
+    echo "템플릿          : loadtest/seed/gen_pose_template.py --rows $REAL_TEMPLATE_ROWS"
+    echo "⚠️ writer 가 넣는 행은 페이로드가 '{}' 다 — 정지 관측용이라 무대 크기에 영향 없음"
+  } > "$OUT/REAL_STAGE.txt"
+}
+
 # ── 한 판 ────────────────────────────────────────────────────────────────
 run_one() {  # $1 = round, $2 = 팔(A|B|C)
   local round=$1 arm=$2; local tag="${round}_${arm}"
-  local bkp restore_s summary src_fp dst_fp verdict
+  local bkp restore_s rsync_ms restore_durable_s summary src_fp dst_fp verdict
 
   echo; echo "──────── $tag ────────"
 
@@ -248,7 +400,7 @@ run_one() {  # $1 = round, $2 = 팔(A|B|C)
   src_fp=$(src_fingerprint)
 
   if [ $brc -ne 0 ] || [ -z "$bkp" ]; then
-    printf "%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\n" "$round" "$arm" >> "$LOG"
+    printf "%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n" "$round" "$arm" "$STAGE" >> "$LOG"
     FAILED+=("$tag:백업실패"); return 1
   fi
   local backup_s artifact_mb
@@ -257,18 +409,25 @@ run_one() {  # $1 = round, $2 = 팔(A|B|C)
   # 팔 C 는 **전체 백업이 아니다.** 복구를 재지 않는다 — 재면 A·B 와 같은 표에 놓이게 되고
   # 그건 성격이 다른 것을 나란히 세우는 일이다(설계 §2).
   if [ "$arm" = "C" ]; then
-    restore_s="-"; verdict="대조군(복구 미측정)"
+    restore_s="-"; rsync_ms="-"; restore_durable_s="-"; verdict="대조군(복구 미측정)"
   else
+    # 🔴 복구 «직전» 에 캐시를 비운다(#201). 방금 백업해서 따뜻해진 캐시 위에서 복구를 재면
+    #    「빠른 복구」가 아니라 「캐시에서 꺼낸 시간」이 나온다. 양 팔에 똑같이 건다.
+    [ "$DROP_CACHES_BEFORE_RESTORE" = "1" ] && drop_caches_now "복구 직전"
+
     echo "  [복구] 별도 컨테이너로"
+    local rout
     case $arm in
-      A) restore_s=$(restore_arm_a "$tag") ;;
-      B) restore_s=$(restore_arm_b "$tag") ;;
+      A) rout=$(restore_arm_a "$tag") ;;
+      B) rout=$(restore_arm_b "$tag") ;;
     esac
-    if [ -z "$restore_s" ]; then
-      printf "%s\t%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\n" \
-        "$round" "$arm" "$backup_s" "$artifact_mb" >> "$LOG"
+    read -r restore_s rsync_ms <<< "${rout:-}"
+    if [ -z "${restore_s:-}" ]; then
+      printf "%s\t%s\t%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\n" \
+        "$round" "$arm" "$STAGE" "$backup_s" "$artifact_mb" >> "$LOG"
       FAILED+=("$tag:복구실패"); fresh_restore_target; return 1
     fi
+    restore_durable_s=$(( restore_s + (${rsync_ms:-0} + 500) / 1000 ))
     # 복구본 행수가 [백업 직전, 백업 직후] 안에 있으면 일관된 스냅샷이다.
     # 🔴 **체크섬은 비교하지 않는다** — 행 집합이 다르면 체크섬도 당연히 다르다.
     #    writer 를 멈추면 완벽 대조가 가능하지만 그러면 Q3(백업 중 멈추는가)를 못 잰다.
@@ -302,11 +461,12 @@ run_one() {  # $1 = round, $2 = 팔(A|B|C)
   fi
 
   local dpk; dpk=$(disk_peak "${tag}_disk.txt")
-  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
-    "$round" "$arm" "$backup_s" "$artifact_mb" "$restore_s" \
+  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+    "$round" "$arm" "$STAGE" "$backup_s" "$artifact_mb" \
+    "$restore_s" "$rsync_ms" "$restore_durable_s" \
     "$att" "$err" "$mx" "$p50" "$dpk" "$verdict" >> "$LOG"
 
-  echo "  → 백업 ${backup_s}s(${artifact_mb}MB) · 복구 $([ "$restore_s" = "-" ] && echo "미측정" || echo "${restore_s}s") · 검증 $verdict"
+  echo "  → 백업 ${backup_s}s(${artifact_mb}MB) · 복구 $([ "$restore_s" = "-" ] && echo "미측정" || echo "${restore_s}s (+sync ${rsync_ms}ms → 내구 ${restore_durable_s}s)") · 검증 $verdict"
   echo "    시도 ${att}건(에러 ${err}) · 최대정지 ${mx}ms · 평시 p50 ${p50}ms · 디스크피크 ${dpk}MB"
   return 0
 }
@@ -338,14 +498,26 @@ phase_g5() {
 # ── 실행 ─────────────────────────────────────────────────────────────────
 require_container
 install_writer
-[ -f "$LOG" ] || printf "round\tarm\tbackup_s\tartifact_mb\trestore_s\tattempts\terrors\tmax_stall_ms\tp50_ms\tdisk_peak_mb\tverify\n" > "$LOG"
+[ -f "$LOG" ] || printf "round\tarm\tstage\tbackup_s\tartifact_mb\trestore_s\tsync_ms\trestore_durable_s\tattempts\terrors\tmax_stall_ms\tp50_ms\tdisk_peak_mb\tverify\n" > "$LOG"
 
-echo "무대 시딩 — SESSIONS=$SESSIONS"
-seed_scale
+if [ "$STAGE" = "real" ]; then
+  seed_real || { echo "🔴 real 무대를 못 세웠다 — 이 스윕을 중단한다"; exit 1; }
+else
+  echo "무대 시딩 — STAGE=dummy · SESSIONS=$SESSIONS"
+  seed_scale
+fi
 
 # 판 순서 — 팔이 2개(A·B)라 라틴 방격 대신 위치 상쇄 배열(무중단 DDL 과 같은 규약).
 # 팔 C 는 대조군이라 버림 없이 1판.
-SEQ=(${SWEEP_SEQ:-discard:A discard:B r1:A r2:B r3:B r4:A r5:A r6:B c1:C})
+#
+# 🔴 real 무대는 **대조**다(설계 §9-1, #202). 팔당 버림판 1 + 본판 1 만 돌린다 —
+#    본 측정과 같은 판 수를 돌리면 「같은 급의 수치」로 오해된다. 팔 C 도 안 태운다
+#    (Q3「멎는가」는 무대 크기가 아니라 잠금 메커니즘이고, 더미 무대에서 이미 답했다).
+if [ "$STAGE" = "real" ]; then
+  SEQ=(${SWEEP_SEQ:-discard:A discard:B r1:A r2:B})
+else
+  SEQ=(${SWEEP_SEQ:-discard:A discard:B r1:A r2:B r3:B r4:A r5:A r6:B c1:C})
+fi
 
 if ! phase_g5; then
   echo "⚠️ G5 실패 — 팔 B 를 판 목록에서 뺀다. 팔 A·C 는 계속한다(설계 §2 «억지로 채우지 않는다»)"
