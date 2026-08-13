@@ -52,6 +52,11 @@ SELF_DIR=$HERE
 # `_rig.sh` 는 `OUT=${OUT:-$HERE}` 라 **이미 설정돼 있으면 존중한다** — 러너가 넘기는
 # `OUT=$OUTDIR/backup` 도 그대로 살아남는다. 미설정일 때만 내 디렉터리로 채운다.
 OUT=${OUT:-$SELF_DIR}
+# 🔴 **source 앞에서 만든다.** `_rig.sh` 가 `MYSQL_ERR=$OUT/mysql_stderr.log` 를 잡는데,
+#    디렉터리가 없으면 첫 `DB()` 의 리다이렉트가 통째로 실패하고 «프로시저가 안 만들어졌다»
+#    로 보인다 — 원인은 MySQL 이 아니라 없는 폴더다. `probe.sh:42` 가 같은 이유로 이미
+#    이 줄을 갖고 있었고, 이쪽에만 없었다(#203).
+mkdir -p "$OUT" || { echo "🔴 OUT 을 못 만든다: $OUT" >&2; exit 1; }
 source "$RIG"
 
 LOG=$OUT/backup.tsv
