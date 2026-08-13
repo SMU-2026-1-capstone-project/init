@@ -1,0 +1,22 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DIGEST_TEXT	COUNT_STAR	sum_s	SUM_ROWS_EXAMINED
+CHECKSUM TABLE `pose_data_scale`	1	87.670727974	0
+SELECT COUNT ( * ) FROM `pose_data_scale`	2	36.912979391	0
+CALL `ddl_writer` (...)	1	32.101039796	0
+SELECT `SLEEP` (?)	1	2.714531961	1
+TRUNCATE TABLE `ddl_writer_log`	1	0.04270599	0
+SELECT ? `k` , COUNT ( * ) `v` FROM `reports` UNION ALL SELECT ? , COUNT ( * ) FROM `reports` WHERE `detailed_analysis` IS NOT NULL UNION ALL SELECT ? , COUNT ( * ) FROM `pose_data` UNION ALL SELECT ? , COUNT ( * ) FROM `exercise_sessions`	1	0.031325355	0
+FLUSH TABLES `pose_data_scale` FOR EXPORT	1	0.023394424	0
+SELECT COUNT ( * ) FROM `performance_schema` . `processlist` WHERE `id` = ?	2	0.011385313	1
+SELECT COUNT ( * ) FROM `information_schema` . `tables` WHERE `table_schema` = ? AND TABLE_NAME = ?	1	0.009394597	4
+DELETE FROM `ddl_writer_ctl`	1	0.008423815	0
+SHOW GLOBAL STATUS	1	0.006202769	494
+UPDATE `ddl_writer_ctl` SET STOP = ? WHERE `id` = ?	1	0.00493958	1
+SELECT @@`version_comment` LIMIT ?	21	0.004059097	21
+SHOW GLOBAL VARIABLES	1	0.002869785	631
+SELECT COUNT ( * ) , `IFNULL` ( SUM ( `errno` != ? ) , ? ) , `IFNULL` ( MAX ( `elapsed_ms` ) , ? ) , `IFNULL` ( MAX ( CASE WHEN `rn` = `mid` THEN `elapsed_ms` END ) , ? ) , `IFNULL` ( MAX ( `gap_ms` ) , ? ) FROM ( SELECT `elapsed_ms` , `errno` , ROW_NUMBER ( ) OVER ( ORDER BY `elapsed_ms` ) `rn` , COUNT ( * ) OVER ( ) DIV ? `mid` , TIMESTAMPDIFF ( MICROSECOND , LAG ( `started_at` ) OVER ( ORDER BY `seq` ) , `started_at` ) / ? `gap_ms` FROM `ddl_writer_log` ) `t`	1	0.002843919	140
+SELECT `id` FROM `information_schema` . `processlist` WHERE `info` LIKE ? LIMIT ?	2	0.002603022	2
+SELECT COUNT ( * ) FROM `ddl_writer_log`	1	0.000473393	0
+SELECT `seq` , `arm` , `started_at` , `elapsed_ms` , `errno` FROM `ddl_writer_log` ORDER BY `seq`	1	0.000251345	140
+SELECT `conn_id` FROM `ddl_writer_ctl` WHERE `id` = ?	1	0.000188891	1
+KILL ?	1	0.000040571	0
