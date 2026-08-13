@@ -43,7 +43,8 @@
 | 다운샘플 R≈5 (대표 프레임 추출) | 처리량 **1.7배**(98.3 → 168.7 RPS), p99 **4.9배**, 저장 행 **5배↓** | 2026-08-08 EC2 3대, c=100·pool=10, cold vs cold, `DOWNSAMPLE_WINDOW=1` 대조군. ⚠️ **단일 핫세션 페이로드**(`batch.json`, session 801) — fsync 3.47배를 1.03배로 만든 그 조건이고, **다세션에서 재측정한 적 없다** | [`pool-cliff §3`](../../loadtest/results/pool-cliff-2026-08-08/README.md) · [`pose-ingest-downsampling.md`](../decisions/pose-ingest-downsampling.md) |
 | 인덱스 유무 대조 | 약 **9,000배** | 실제 2.1KB JSON·412만 행. 더미 JSON이면 660배로 **과소평가**된다(행 크기가 배수를 증폭) | [`realmysql-experiments.md`](./realmysql-experiments.md) · rig `loadtest/measure_admin_index.sh` |
 | offset → keyset 페이지네이션 | 최대 **489,868배** | 1억 행. offset은 깊이에 O(N), keyset은 평탄. ⚠️ keyset 절대값은 SSH 왕복 오버헤드(~50ms)가 바닥에 깔려 **액면가로 안 쓴다** — 배수 결론만 유효 | [`realmysql-experiments.md`](./realmysql-experiments.md) · rig `loadtest/measure_pagination.sh` |
-| 무중단 스키마 변경 | `ALTER ... PARTITION BY` = **96분**(5,767초) 차단 | 더미 JSON 1억 행 풀 리빌드(~24,700행/초). `ALGORITHM=INPLACE`는 서버가 거절(errno 1845, "Try ALGORITHM=COPY"). 🔴 **pt-osc 대조는 «미실행»** — rig·사전확인은 통과했고 버림판 2판까지 돌았지만 **본 측정은 0판**(`ddl.tsv` 헤더만) | [`online-ddl-vs-blocking-alter.md`](../decisions/online-ddl-vs-blocking-alter.md) · [rig](../../loadtest/results/online-ddl-2026-08-09/README.md) |
+| 무중단 스키마 변경 — 차단 비용 | `ALTER ... PARTITION BY` = **96분**(5,767초) 차단 | 더미 JSON 1억 행 풀 리빌드(~24,700행/초). `ALGORITHM=INPLACE`는 서버가 거절(errno 1845, "Try ALGORITHM=COPY") | [`online-ddl-vs-blocking-alter.md`](../decisions/online-ddl-vs-blocking-alter.md) · [rig](../../loadtest/results/online-ddl-2026-08-09/README.md) |
+| 무중단 스키마 변경 — pt-osc 대조 ⭐ | 쓰기 정지 **최소 187배 단축**(68.1~69.4초 → 0.03~0.364초). 대가는 DDL **1.64배**(69 → 113초) + **binlog 441MB**(차단 ALTER 는 0MB). 디스크 최대치는 **두 팔이 같다** | 2026-08-12 EC2 m6i.xlarge, `pose_data_scale` **996만 행**, 버림 2판 + 본판 6판(`A B B A A B` 위치 상쇄), errors 0. ⚠️ **위 96분과 다른 규모·다른 기계** — 배수는 같은 라운드 안에서만 유효하고, 절대 시간은 하드웨어 종속이라 인용 금지 | [결과](../../loadtest/results/online-ddl-aws-2026-08-12/README.md) · [`online-ddl-vs-blocking-alter.md`](../decisions/online-ddl-vs-blocking-alter.md) |
 | 동시성 결함 — 검출기가 세션이 아니라 **스레드**에 붙어 있었다 | 검출률 **~30% → 95.6%** | 2026-08-11, 4세션·3fps·개발 장비. 실사용 페이스에서 프레임의 44~78%가 «직전에 다른 세션을 본 스레드»에 배정돼 트래킹이 깨졌다. ⚠️ **«바쁠수록 안전하고 한가할수록 위험»** — 포화 상태에선 충돌 0~2.6%로, 원 이슈의 추측과 반대. ⚠️ 합성 프레임 | [#164](https://github.com/Shadowfit/init/issues/164) |
 | AI 추론 용량 재측정 | 프레임당 **103.4ms → 17.6ms**, 물리 코어당 **16.4세션** | 2026-08-11 `c7i.2xlarge`(Xeon 8488C) 베어메탈. **«DAU 1,000에 5~10배 부족»은 개발 장비(i3-6100) 탓이었다.** ⚠️ 상한이지 권장치가 아니다 | [`ai-recalibrate`](../../loadtest/results/ai-recalibrate-2026-08-11/) |
 
@@ -86,7 +87,7 @@
 | **용량 산정** | 커넥션 풀 사이징 EC2 4차 실측 · **자원 상한을 실측 상수에서 유도**(메모리 한도 ÷ 98.7MB) | plateau 시작점 = 10 · 코어당 16.4세션 (조건: ①표) | [§5-1(9)](../decisions/pose-ingest-downsampling.md) · [`ai-recalibrate`](../../loadtest/results/ai-recalibrate-2026-08-11/) |
 | **내구성 트레이드오프** | fsync 완화 시 3.47배 — **채택하지 않음** | 안 아픈 것을 고치며 데이터 안전을 파는 셈이라 판단. ⚠️ **3.47배는 단일 핫세션 조건의 값**이고 다세션에선 1.03배로 사라진다 | [`ceiling-fsync`](../../loadtest/results/ceiling-fsync-2026-08-08/) · [#166](https://github.com/Shadowfit/init/issues/166) |
 | **대용량 데이터 이관** | 1억 행 시딩 파이프라인 가속 | 48분 → 16분. **조건**: 세션 범위 3분할 동시 INSERT. 같은 작업의 다른 레버 셋(버퍼풀 128MB→2GB · 인덱스 후행 빌드 · `innodb_sort_buffer_size` 1M→64M)은 별도 | [§3 가속 교훈](./realmysql-experiments.md) · rig [`seed/README.md`](../../loadtest/seed/README.md) |
-| **스키마 변경 운영** | 96분 차단 ALTER를 pt-osc와 대조 | 🔴 **본 측정 미실행** — 96분(before)은 실측이고, pt-osc(after)는 rig·전제확인까지만 | [`online-ddl-vs-blocking-alter.md`](../decisions/online-ddl-vs-blocking-alter.md) · [rig](../../loadtest/results/online-ddl-2026-08-09/README.md) |
+| **스키마 변경 운영** | 차단 ALTER를 pt-osc와 대조 — **무중단이 무엇을 사고 무엇을 파는지** | 쓰기 정지 **최소 187배 단축**, 대가는 DDL 1.64배 + binlog 441MB. 디스크는 두 팔이 동일 (조건: ①표) | [결과](../../loadtest/results/online-ddl-aws-2026-08-12/README.md) · [`online-ddl-vs-blocking-alter.md`](../decisions/online-ddl-vs-blocking-alter.md) |
 | **잠금·격리수준** | `performance_schema.data_locks`로 락 실물 관찰, MVCC/SERIALIZABLE 대조 | 재현 rig 보유. ⚠️ **락 «비용» 은 이 환경에서 못 쟀다** — 판 간 변동이 재려던 효과보다 커서 앞선 −35.3% 도 기각했다 | rig [`measure_lock.sh`](../../loadtest/measure_lock.sh) · [`measure_mvcc.sh`](../../loadtest/measure_mvcc.sh) · [#87](https://github.com/Shadowfit/init/issues/87) |
 
 ## 방법론
@@ -100,8 +101,8 @@
 
 | 축 | 상태 |
 |---|---|
-| 무중단 스키마 변경 | 설계·rig·사전확인 완료, **본 측정 미실행**(버림판 2판만 완주) |
-| 백업/복구 (RTO·RPO) | **미착수** — 배포 문서에 TODO로 남아 있음 |
+| ~~무중단 스키마 변경~~ | ✅ **채워짐 (2026-08-12)** — pt-osc 대조 6판 실측. 남은 미검증: `gh-ost` 적용 가능 여부, 트리거 오버헤드의 크기 |
+| 백업/복구 (RTO·RPO) | **미착수** — 설계는 완료([`backup-restore-rto-rpo.md`](../decisions/backup-restore-rto-rpo.md)), rig 없음 |
 | 복제/HA | **의도적 미적용** — 규모상 실수요 0. 가짜 복제 데모를 만들지 않기로 판단 |
 
 ---

@@ -104,6 +104,21 @@
   - **왜 ALTER인가 (CREATE vs ALTER)**: 시딩은 **일부러 비파티션 일반 테이블**로 채움(파티션 걸면 INSERT마다 라우팅 계산으로 시딩 느려짐). 이미 1억 행 든 테이블에 파티션을 거니 `CREATE` 불가 → `ALTER TABLE ... PARTITION BY`만 가능. 그런데 이건 메타데이터만 바꾸는 게 아니라 **임시 테이블(`#sql-…`) 생성 → 1억 행 전부 읽어 파티션별 재배치 → 인덱스 재빌드 → 원본 교체**(=`copy to tmp table`).
   - **같은 `ALTER`라도 비용 정반대** ⭐: `PARTITION BY`(전환)=1억 행 풀 리빌드 71분 vs `DROP PARTITION`(만료)=O(1) 메타데이터. 이 대비가 카드 핵심 — "파티션 전환은 비싸니 운영이면 처음부터 파티션 테이블로 만들거나 pt-osc 무중단, 일단 걸어두면 만료는 DROP으로 거의 공짜".
   - **운영 캐비엇**: 이 in-place `ALTER ... PARTITION BY`는 1억 행 **copy-to-tmp 풀 리빌드**(로컬 실측 ~85분, ~24,700행/초, 그동안 테이블 락) → 현업 운영 DB라면 `pt-online-schema-change`/`ALGORITHM=INPLACE`로 무중단 전환할 이유. 회고 포인트.
+  - **✅ 결과 — 그 「무중단 전환할 이유」를 실측으로 바꿈 (2026-08-12, EC2 m6i.xlarge, `pose_data_scale` 996만 행)**: 위 캐비엇은 **권고**였다. 팔 A(차단 `ALTER`) ↔ 팔 B(`pt-osc`) 를 같은 rig 에서 버림 2판 + 본판 6판(`A B B A A B` 위치 상쇄)으로 대조했다. 상세 [`online-ddl-aws-2026-08-12`](../../loadtest/results/online-ddl-aws-2026-08-12/README.md).
+
+    | | 팔 A (차단 ALTER) | 팔 B (pt-osc) |
+    |---|---|---|
+    | DDL 소요 | 68~70초 | 112~114초 (**1.64배 느림**) |
+    | **최대 쓰기 정지** | **68,109~69,355 ms** | **30~364 ms** (**최소 187배 짧음**) |
+    | writer 성공 | 18회 | 553~558회 |
+    | binlog 증가 | **0 MB** | **441 MB** |
+    | 디스크 최대 | 2,359~2,377 MB | 2,348~2,352 MB |
+
+    - ⭐ **팔 A 의 최대 정지(≈69초) ≈ 팔 A 의 DDL 소요(≈69초)** — 「느리지만 조금씩 통과」가 아니라 **전 구간 차단**이다. errors 는 6판 전부 0 이라 writer 는 죽은 게 아니라 **기다린** 것이고, 그래서 이 정지값이 의미를 갖는다.
+    - ⭐ **디스크는 두 팔이 같다.** 「pt-osc 는 복사본을 만드니 디스크를 더 쓴다」가 여기선 틀린다 — 팔 A 의 `ALGORITHM=COPY` 도 똑같이 전체 사본을 만들기 때문이다. **pt-osc 의 대가는 디스크가 아니라 binlog** 다(441MB, 복제 지연으로 이어지는 비용이라 P4 의 질문이 된다).
+    - **애초에 선택지가 둘뿐이었다**: `PARTITION BY RANGE` 는 서버가 `INPLACE` 를 거절한다(errno 1845). `LOCK` 절을 빼도 같은 1845 라 거절 사유는 **INPLACE 자체**다 → 「온라인 DDL 쓰면 되잖아」가 이 DDL 엔 성립하지 않는다.
+    - **pt-osc 의 실제 동작**: 복합 PK `(id, created_at)` 를 별도 인덱스 없이 `FORCE INDEX(PRIMARY)` 로 청킹, 트리거 3개(`_ins`·`_upd`·`_del`) 생성 후 `RENAME TABLE` 원자 스왑.
+    - ⚠️ **위 로컬 96분(1억 행)과 다른 규모·다른 기계다.** 배수는 **같은 라운드 안에서만** 유효하고 절대 시간은 하드웨어 종속이라 인용하지 않는다. 트리거 오버헤드를 환경에서 분리하지도 못했다(팔 B 가 CPU 를 더 쓰는데 writer 를 동시에 돌린다).
 - **설계**: (b) projection before/after payload·응답 / (c) offset N=10만 vs cursor 응답 곡선 / (d) 파티션 후 `EXPLAIN`의 `partitions` 컬럼 pruning 확인 + **DROP PARTITION vs DELETE WHERE 실측 시간**(O(1) vs 락·undo).
 - **결과 (b) projection ✅ (2026-06-02, warm, 세션 750행, 412만 행 테이블)**:
   - payload **1,716.8 KB → 22.4 KB (−98.7%)**, warm 쿼리 **12.1ms → 1.5ms (8x, −87%)**. **인덱스는 동일** — 차이는 `joint_coordinates`(2.3KB JSON)가 InnoDB **off-page(overflow) 저장**이라 SELECT 시 추가 random I/O, projection이 회피(Ch.15).

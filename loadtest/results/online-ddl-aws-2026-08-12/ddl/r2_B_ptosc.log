@@ -1,0 +1,89 @@
+No slaves found.  See --recursion-method if host 462577e5a384 has slaves.
+Not checking slave lag because no slaves were found and --check-replica-lag was not specified.
+Operation, tries, wait:
+  analyze_table, 10, 1
+  copy_rows, 10, 0.25
+  create_triggers, 10, 1
+  drop_triggers, 10, 1
+  swap_tables, 10, 1
+  update_foreign_keys, 10, 1
+Altering `shadowfit`.`pose_data_scale`...
+Creating new table...
+CREATE TABLE `shadowfit`.`_pose_data_scale_new` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `session_id` bigint NOT NULL,
+  `timestamp_sec` double NOT NULL,
+  `joint_coordinates` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sync_rate` double DEFAULT NULL,
+  `is_correct` tinyint(1) DEFAULT '1',
+  `feedback_message` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`,`created_at`),
+  KEY `idx_session_timestamp` (`session_id`,`timestamp_sec`)
+) ENGINE=InnoDB AUTO_INCREMENT=10485878 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+Created new table shadowfit._pose_data_scale_new OK.
+Altering new table...
+ALTER TABLE `shadowfit`.`_pose_data_scale_new` PARTITION BY RANGE (UNIX_TIMESTAMP(created_at)) (
+  PARTITION p2026_01 VALUES LESS THAN (UNIX_TIMESTAMP('2026-02-01 00:00:00')),
+  PARTITION p2026_02 VALUES LESS THAN (UNIX_TIMESTAMP('2026-03-01 00:00:00')),
+  PARTITION p2026_03 VALUES LESS THAN (UNIX_TIMESTAMP('2026-04-01 00:00:00')),
+  PARTITION p2026_04 VALUES LESS THAN (UNIX_TIMESTAMP('2026-05-01 00:00:00')),
+  PARTITION p2026_05 VALUES LESS THAN (UNIX_TIMESTAMP('2026-06-01 00:00:00')),
+  PARTITION p2026_06 VALUES LESS THAN (UNIX_TIMESTAMP('2026-07-01 00:00:00')),
+  PARTITION p2026_07 VALUES LESS THAN (UNIX_TIMESTAMP('2026-08-01 00:00:00')),
+  PARTITION p2026_08 VALUES LESS THAN (UNIX_TIMESTAMP('2026-09-01 00:00:00')),
+  PARTITION p2026_09 VALUES LESS THAN (UNIX_TIMESTAMP('2026-10-01 00:00:00')),
+  PARTITION p2026_10 VALUES LESS THAN (UNIX_TIMESTAMP('2026-11-01 00:00:00')),
+  PARTITION p2026_11 VALUES LESS THAN (UNIX_TIMESTAMP('2026-12-01 00:00:00')),
+  PARTITION p2026_12 VALUES LESS THAN (UNIX_TIMESTAMP('2027-01-01 00:00:00')),
+  PARTITION p2027_01 VALUES LESS THAN (UNIX_TIMESTAMP('2027-02-01 00:00:00')),
+  PARTITION pfuture  VALUES LESS THAN MAXVALUE
+)
+Altered `shadowfit`.`_pose_data_scale_new` OK.
+2026-08-12T16:15:11 Creating triggers...
+-----------------------------------------------------------
+Event : DELETE 
+Name  : pt_osc_shadowfit_pose_data_scale_del 
+SQL   : CREATE TRIGGER `pt_osc_shadowfit_pose_data_scale_del` AFTER DELETE ON `shadowfit`.`pose_data_scale` FOR EACH ROW BEGIN DECLARE CONTINUE HANDLER FOR 1146 begin end; DELETE IGNORE FROM `shadowfit`.`_pose_data_scale_new` WHERE `shadowfit`.`_pose_data_scale_new`.`id` <=> OLD.`id` AND `shadowfit`.`_pose_data_scale_new`.`created_at` <=> OLD.`created_at`; END  
+Suffix: del 
+Time  : AFTER 
+-----------------------------------------------------------
+-----------------------------------------------------------
+Event : UPDATE 
+Name  : pt_osc_shadowfit_pose_data_scale_upd 
+SQL   : CREATE TRIGGER `pt_osc_shadowfit_pose_data_scale_upd` AFTER UPDATE ON `shadowfit`.`pose_data_scale` FOR EACH ROW BEGIN DECLARE CONTINUE HANDLER FOR 1146 begin end; DELETE IGNORE FROM `shadowfit`.`_pose_data_scale_new` WHERE !(OLD.`id` <=> NEW.`id` AND OLD.`created_at` <=> NEW.`created_at`) AND `shadowfit`.`_pose_data_scale_new`.`id` <=> OLD.`id` AND `shadowfit`.`_pose_data_scale_new`.`created_at` <=> OLD.`created_at`; REPLACE INTO `shadowfit`.`_pose_data_scale_new` (`id`, `session_id`, `timestamp_sec`, `joint_coordinates`, `sync_rate`, `is_correct`, `feedback_message`, `created_at`) VALUES (NEW.`id`, NEW.`session_id`, NEW.`timestamp_sec`, NEW.`joint_coordinates`, NEW.`sync_rate`, NEW.`is_correct`, NEW.`feedback_message`, NEW.`created_at`); END  
+Suffix: upd 
+Time  : AFTER 
+-----------------------------------------------------------
+-----------------------------------------------------------
+Event : INSERT 
+Name  : pt_osc_shadowfit_pose_data_scale_ins 
+SQL   : CREATE TRIGGER `pt_osc_shadowfit_pose_data_scale_ins` AFTER INSERT ON `shadowfit`.`pose_data_scale` FOR EACH ROW BEGIN DECLARE CONTINUE HANDLER FOR 1146 begin end; REPLACE INTO `shadowfit`.`_pose_data_scale_new` (`id`, `session_id`, `timestamp_sec`, `joint_coordinates`, `sync_rate`, `is_correct`, `feedback_message`, `created_at`) VALUES (NEW.`id`, NEW.`session_id`, NEW.`timestamp_sec`, NEW.`joint_coordinates`, NEW.`sync_rate`, NEW.`is_correct`, NEW.`feedback_message`, NEW.`created_at`);END  
+Suffix: ins 
+Time  : AFTER 
+-----------------------------------------------------------
+2026-08-12T16:15:11 Created triggers OK.
+2026-08-12T16:15:11 Copying approximately 9959994 rows...
+INSERT LOW_PRIORITY IGNORE INTO `shadowfit`.`_pose_data_scale_new` (`id`, `session_id`, `timestamp_sec`, `joint_coordinates`, `sync_rate`, `is_correct`, `feedback_message`, `created_at`) SELECT `id`, `session_id`, `timestamp_sec`, `joint_coordinates`, `sync_rate`, `is_correct`, `feedback_message`, `created_at` FROM `shadowfit`.`pose_data_scale` FORCE INDEX(`PRIMARY`) WHERE ((`id` > ?) OR (`id` = ? AND `created_at` >= ?)) AND ((`id` < ?) OR (`id` = ? AND `created_at` <= ?)) LOCK IN SHARE MODE /*pt-online-schema-change 1 copy nibble*/
+SELECT /*!40001 SQL_NO_CACHE */ `id`, `id`, `created_at` FROM `shadowfit`.`pose_data_scale` FORCE INDEX(`PRIMARY`) WHERE ((`id` > ?) OR (`id` = ? AND `created_at` >= ?)) ORDER BY `id`, `created_at` LIMIT ?, 2 /*next chunk boundary*/
+Copying `shadowfit`.`pose_data_scale`:  27% 01:20 remain
+Copying `shadowfit`.`pose_data_scale`:  54% 00:50 remain
+Copying `shadowfit`.`pose_data_scale`:  81% 00:20 remain
+2026-08-12T16:17:02 Copied rows OK.
+2026-08-12T16:17:02 Analyzing new table...
+2026-08-12T16:17:02 Swapping tables...
+RENAME TABLE `shadowfit`.`pose_data_scale` TO `shadowfit`.`_pose_data_scale_old`, `shadowfit`.`_pose_data_scale_new` TO `shadowfit`.`pose_data_scale`
+2026-08-12T16:17:02 Swapped original and new tables OK.
+2026-08-12T16:17:02 Dropping old table...
+DROP TABLE IF EXISTS `shadowfit`.`_pose_data_scale_old`
+2026-08-12T16:17:02 Dropped old table `shadowfit`.`_pose_data_scale_old` OK.
+2026-08-12T16:17:02 Dropping triggers...
+DROP TRIGGER IF EXISTS `shadowfit`.`pt_osc_shadowfit_pose_data_scale_del`
+DROP TRIGGER IF EXISTS `shadowfit`.`pt_osc_shadowfit_pose_data_scale_upd`
+DROP TRIGGER IF EXISTS `shadowfit`.`pt_osc_shadowfit_pose_data_scale_ins`
+2026-08-12T16:17:02 Dropped triggers OK.
+# Event              Count
+# ================== =====
+# INSERT               217
+# mysql_warning_1062   524
+Successfully altered `shadowfit`.`pose_data_scale`.
