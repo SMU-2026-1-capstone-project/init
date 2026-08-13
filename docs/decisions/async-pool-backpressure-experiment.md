@@ -113,7 +113,7 @@ AI 정지 → `DEADLINE_EXCEEDED` 가 실패로 집계 → **5건 만에 서킷 
 | 필요한 것 | 이미 있는 것 |
 |---|---|
 | AI 정지 수단 | `docker pause` — 아웃박스 §6 ①-a 에서 **이미 쓴 수법** |
-| 큐·워커 지표 | Micrometer 가 `applicationTaskExecutor` 를 자동 계측. `executor.queued` · `executor.active` · `executor.pool.size` · `executor.completed` |
+| 큐·워커 지표 | ⚠️ **이 줄은 틀렸다 — 0-b 참고.** Micrometer 가 자동 계측하는 것은 맞으나 `applicationTaskExecutor` 가 `@Lazy` 라 **첫 `@Async` 호출 전에는 지표가 아예 없다.** 그리고 `/actuator/metrics` 는 401 이라 **`/actuator/prometheus`** 로 읽어야 한다 |
 | 서킷 상태 | `/actuator/circuitbreakers` · `/actuator/circuitbreakerevents` — `application.yml:170` 에 **이미 노출돼 있다** |
 | 디스크·OS 샘플러 | `_rig.sh` 의 `start_disk_sampler` (`:315`) — four-axes §4 가 CPU·컨텍스트 스위치 확장을 권고 |
 | 결과 디렉터리 관례 | `loadtest/results/<축>-<날짜>/` |
@@ -137,14 +137,57 @@ AI 정지 → `DEADLINE_EXCEEDED` 가 실패로 집계 → **5건 만에 서킷 
 > 나중에 완화를 논할 때 «스레드를 늘린다» 는 선택지가 **애초에 존재하지 않는다** —
 > 손댈 곳은 `queue-capacity` 다. 이걸 모르고 튜닝했으면 안 먹는 노브를 돌렸을 것이다.
 
-### 0-b단계 — 런타임 확인 (남음, 부하 없음)
+### 0-b단계 — 런타임 확인 ✅ **완료 (2026-08-13)** — 🔴 **예상과 다르다**
 
-설정이 그렇다고 런타임이 그런 것은 아니다. 스택이 올라온 상태에서
-`executor.pool.core` · `executor.pool.max` · `executor.queued` 를 한 번 읽어
-0-a 와 일치하는지만 본다. **부하를 걸지 않으므로 다른 세션의 작업과 충돌하지 않는다.**
+원래 계획은 «`executor.pool.core`·`executor.pool.max`·`executor.queued` 를 한 번 읽어 0-a 와
+일치하는지만 본다» 였다. 부하가 없으므로 다른 세션과 충돌하지 않는다는 판단도 그대로 유효했다.
+(문서가 «`shadowfit-backend` 가 떠 있지 않다» 고 적어 둔 것은 **낡았다** — 2026-08-13 확인 시 4시간째 up.)
 
-⚠️ 현재 `shadowfit-backend` 가 떠 있지 않다(2026-08-11 확인. `shadowfit-mysql`·`shadowfit-ai` 는 up).
-[[project_concurrent_sessions]] — 컨테이너를 올리기 전에 다른 세션 작업 여부를 확인할 것.
+**결론: `applicationTaskExecutor` 의 런타임 지표가 존재하지 않는다.**
+
+읽은 것 (`/actuator/prometheus`):
+
+```
+executor_pool_core_threads{name="taskScheduler"}     5.0
+executor_pool_max_threads{name="taskScheduler"}      2.147483647E9
+executor_queued_tasks{name="taskScheduler"}          5.0
+executor_completed_tasks_total{name="taskScheduler"} 15239.0
+```
+
+`name=` 태그를 전수로 뽑아 보면 계측된 executor 는 **`taskScheduler` 하나뿐**이고,
+`applicationTaskExecutor` 는 응답 전체에서 **0 회** 등장한다.
+
+**원인 — 0-a 와 같은 수법(바이트코드)으로 확정했다.**
+`TaskExecutorConfigurations$TaskExecutorConfiguration` 의 빈 정의에 `@Lazy` 가 붙어 있다:
+
+```
+ThreadPoolTaskExecutor applicationTaskExecutor(ThreadPoolTaskExecutorBuilder)
+  @Bean(value=["applicationTaskExecutor"])
+  @Lazy                                          ← 이것
+  @ConditionalOnThreading(...)
+```
+
+즉 **첫 `@Async` 호출 전까지 빈이 생성되지 않는다.** 빈이 없으면 Micrometer 가 감쌀 대상도 없고
+지표도 안 생긴다. `taskScheduler` 만 보이는 이유도 같은 논리다 — 그쪽은 lazy 가 아니라 기동 시
+스케줄 등록으로 즉시 만들어진다(완료 15,239 건이 그 증거다).
+
+| | |
+|---|---|
+| ✅ 액추에이터로 executor 지표를 읽는 **경로**는 있다 | 단 `/actuator/metrics` 는 **401** 이다. 9090 화이트리스트가 `/actuator/health`·`/actuator/prometheus` 뿐이라 샘플러는 **`/actuator/prometheus` 를 폴링**해야 한다 |
+| 🔴 0-a 의 «core 8 · queue 2147483647» 이 **런타임에 실현됐는지는 아직 모른다** | 대조할 런타임 객체가 없다. 0-b 가 찾은 것은 «다르다» 가 아니라 **«아직 태어나지 않았다»** 다 |
+
+**본 실험 절차에 미치는 영향 3건:**
+
+1. **큐 샘플러가 폴링할 지표가 부하 전에는 존재하지 않는다.** §3 1단계 앞에
+   «첫 `@Async` 호출로 빈을 깨우고 지표 등장을 확인» 단계가 들어가야 한다
+2. **판 사이 리셋의 «`executor.queued` 가 0 인 것을 확인»** 도 빈이 살아난 뒤에나 가능하다
+3. **`@Lazy` 자체가 오염원이다** — 첫 요청이 풀 생성 비용을 문다. 버림판이 이걸 흡수해야 하고,
+   흡수됐는지 확인할 방법도 같이 필요하다
+
+> 📌 **«부하 없는 곁다리 확인» 이 실험 절차를 바꿨다.** §2 「새로 만들 게 거의 없다」 표의
+> *«큐·워커 지표 → Micrometer 가 `applicationTaskExecutor` 를 자동 계측»* 한 줄이 **틀렸다.**
+> 자동 계측되기는 하는데, **그 전에 빈이 태어나야 한다**는 조건이 빠져 있었다.
+> 0-a 가 «설정» 을 확정했다면 0-b 는 **«설정과 런타임 사이에 lazy 라는 문이 하나 더 있다»** 를 찾았다.
 
 ### 1단계 — 버림판
 
@@ -280,3 +323,12 @@ AI 정지 → `DEADLINE_EXCEEDED` 가 실패로 집계 → **5건 만에 서킷 
   부수 발견: **`max-size` 는 손댈 수 없는 노브다** — 큐가 무제한인 한 무시되므로,
   완화를 논할 때 «스레드를 늘린다» 는 선택지가 애초에 없다. 손댈 곳은 `queue-capacity` 하나다.
   남은 것은 0-b(런타임 대조, 부하 없음)와 §3 2단계 본 실험.
+- 2026-08-13(**0-b 완료**): **런타임에 `applicationTaskExecutor` 지표가 없다.**
+  계측된 executor 는 `taskScheduler` 하나뿐이고 `applicationTaskExecutor` 는 0 회 등장.
+  원인은 빈 정의의 **`@Lazy`** (바이트코드 확인) — 첫 `@Async` 호출 전까지 빈 자체가 없다.
+  **0-a 의 설정값이 런타임에 실현됐는지는 여전히 미확인**이고, 0-b 는 «다르다» 가 아니라
+  **«아직 태어나지 않았다»** 를 찾았다. 부수 발견: `/actuator/metrics` 는 401 이라
+  샘플러는 `/actuator/prometheus` 를 폴링해야 한다.
+  **이 «곁다리 확인» 이 §2 표 한 줄을 반증하고 본 실험 절차를 3 군데 바꿨다** —
+  빈 깨우기 단계 추가 · 리셋 절차 전제 변경 · `@Lazy` 를 오염원 목록에 추가.
+  📌 문서가 «`shadowfit-backend` 가 안 떠 있다» 고 적어 둔 것도 낡아 있었다(실제 4시간째 up).
