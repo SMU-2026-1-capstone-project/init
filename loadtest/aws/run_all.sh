@@ -245,6 +245,10 @@ phase_collect() {
     echo "MySQL         : $(docker exec "$CONTAINER" mysql -uroot -p"$PW" -N -e 'SELECT VERSION();' 2>/dev/null | tr -d '\r')"
     echo "버퍼풀        : $(docker exec "$CONTAINER" mysql -uroot -p"$PW" -N -e "SELECT @@innodb_buffer_pool_size;" 2>/dev/null | tr -d '\r')"
     echo "WRITER_MAX_SEC: $WRITER_MAX_SEC"
+    # 🔴 #198 — 이 한 줄이 없어서 08-12 라운드를 회수할 때 버킷 이름을 사람에게 물어야 했다.
+    #    러너 로그(`/root/run_all.log`)에도 찍히지만 그건 $OUTDIR 밖이라 S3 로 안 올라가고
+    #    인스턴스와 함께 죽는다. **살아남는 파일에 적어야 한다.**
+    echo "S3 결과       : $S3_DEST"
     echo
     echo "# 단계"
     cat "$PHASE_LOG"

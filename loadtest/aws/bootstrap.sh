@@ -106,6 +106,42 @@ docker exec shadowfit-mysql mysqladmin ping -h localhost --silent >/dev/null 2>&
 step "percona-toolkit 이미지"
 docker pull -q percona/percona-toolkit || die "percona-toolkit pull 실패"
 
+# ── 스키마 (Flyway) ──────────────────────────────────────────────────────
+#
+# 🔴 08-12 라운드에서 從 항목 R1·R3 이 **둘 다 «측정 대상 부재» 로 죽었다.** 러너가 DDL 측정에
+#    필요한 mysql 만 띄우고 백엔드를 안 올려서 `reports`·`exercise_sessions`·`users` 가
+#    아예 없었기 때문이다. 인프라가 살아 있을 때만 잴 수 있는 항목이라 놓치면 다음 인스턴스까지
+#    밀린다 (AWS-RIDE-ALONG.md §5 체크리스트 1번).
+#
+#    백엔드를 통째로 띄우지는 않는다 — Java·gradle 빌드가 붙으면 부트스트랩이 몇 배 느려지고,
+#    측정에 필요한 건 «스키마» 지 «애플리케이션» 이 아니다. Flyway 이미지로 마이그레이션만 건다.
+#
+#    ⚠️ 이 단계는 DDL 측정 대상(`pose_data_scale`)을 건드리지 않는다. rig 가 만드는 테이블과
+#       이름이 다르다. 다만 같은 스키마에 작은 테이블 십수 개가 생기므로, 그 사실을 조건으로
+#       남긴다(run_all.sh 의 MANIFEST).
+step "스키마 — Flyway 마이그레이션"
+if [ "${SKIP_FLYWAY:-0}" = "1" ]; then
+  echo "  SKIP_FLYWAY=1 — 건너뛴다. 從 R1·R3 은 «측정 대상 부재» 로 찍힌다"
+else
+  MIG="$WORKDIR/backend/src/main/resources/db/migration"
+  [ -d "$MIG" ] || die "마이그레이션 디렉터리가 없다: $MIG"
+
+  # host 네트워크로 붙는다 — compose 네트워크 이름에 의존하지 않기 위해서다.
+  if docker run --rm --network host \
+      -v "$MIG:/flyway/sql:ro" \
+      flyway/flyway \
+      -url="jdbc:mysql://127.0.0.1:3306/$DB_NAME?allowPublicKeyRetrieval=true&useSSL=false" \
+      -user=root -password="$PW" -connectRetries=10 \
+      migrate; then
+    echo "  ✅ 스키마 생성됨 — 從 R1·R3 이 잴 대상이 생겼다"
+  else
+    # 🔴 여기서 die 하지 않는다. 主 P1/P3 은 rig 가 자기 테이블을 직접 만들어 쓰므로
+    #    스키마가 없어도 돈다. 從 항목만 못 재는 것이라 «측정 전체를 막을» 사유는 아니다.
+    #    다만 조용히 넘어가면 08-12 를 반복하므로 시끄럽게 남긴다.
+    echo "  🔴 Flyway 실패 — 從 R1·R3 은 이번에도 «측정 대상 부재» 가 된다. 主 측정은 계속한다"
+  fi
+fi
+
 # ── 요약 ─────────────────────────────────────────────────────────────────
 step "준비됨"
 cat <<EOF

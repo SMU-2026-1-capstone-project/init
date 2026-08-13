@@ -47,10 +47,20 @@ aws ec2 run-instances ... \
 
 > 다음 라운드부터는 이 값이 선례가 된다 — 추정이 아니라 실측으로 답할 수 있다.
 
-### IAM — `iam/` 의 두 파일
+### IAM — `iam/` 의 세 파일
 
 플레이스홀더 두 개(`__BUCKET__`·`__PREFIX__`)만 바꿔 쓴다. `__PREFIX__` 는 `S3_BASE` 의
 프리픽스와 같아야 한다 — `S3_BASE=s3://my-bucket/shadowfit` 이면 `shadowfit`.
+
+| 파일 | 붙는 대상 | 용도 |
+|---|---|---|
+| `trust-ec2.json` | 역할 신뢰 정책 | EC2 가 이 역할을 맡을 수 있게 |
+| `policy-s3-results.json` | **EC2 역할** | 결과를 **올린다** |
+| `policy-s3-results-read.json` | **운영자 CLI 사용자** | 결과를 **회수한다** ([#199](https://github.com/Shadowfit/init/issues/199)) |
+
+🔴 **세 번째가 없으면 무인 실행의 회수 경로가 안 닫힌다.** 러너는 업로드에 성공하면 스스로
+꺼지는데(`run_all.sh` 의 `AUTO_SHUTDOWN`), S3 를 읽을 권한을 가진 주체가 그 인스턴스뿐이면
+**결과를 올려놓고 아무도 못 읽는다.** 08-12 라운드에서 실제로 이 상태였다.
 
 ```bash
 BUCKET=my-bucket
@@ -67,7 +77,22 @@ aws iam put-role-policy --role-name shadowfit-measure \
 aws iam create-instance-profile --instance-profile-name shadowfit-measure
 aws iam add-role-to-instance-profile --instance-profile-name shadowfit-measure \
     --role-name shadowfit-measure
+
+# 🔴 회수용 — 운영자 CLI 사용자에게 «읽기만» 붙인다 (#199).
+#    삭제 권한은 주지 않는다 (인스턴스 역할에 안 준 것과 같은 이유).
+sed "s/__BUCKET__/$BUCKET/g" \
+    loadtest/aws/iam/policy-s3-results-read.json > /tmp/policy-read.json
+
+aws iam put-user-policy --user-name "$(aws sts get-caller-identity --query Arn \
+    --output text | sed 's#.*/##')" \
+    --policy-name shadowfit-measure-results-read \
+    --policy-document file:///tmp/policy-read.json
 ```
+
+⚠️ **프로파일 이름을 믿지 말 것.** `~/.aws/credentials` 에 `shadowfit-admin` 같은 이름이
+있어도 실제 주체는 다를 수 있다 — 08-12 에 그 프로파일이 `default` 와 **같은 임시 사용자
+키**를 담고 있어 한참 헤맸다. 붙이기 전에 `aws sts get-caller-identity` 로 **UserId 를 직접
+확인**한다(위 명령이 그 값을 그대로 쓰는 이유).
 
 인스턴스 시작 시 이 인스턴스 프로파일을 붙이거나, 이미 떠 있으면
 `aws ec2 associate-iam-instance-profile --instance-id i-xxx --iam-instance-profile Name=shadowfit-measure`.
