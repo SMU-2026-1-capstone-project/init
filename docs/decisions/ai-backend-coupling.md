@@ -13,11 +13,11 @@ ShadowFit은 Spring(Java) 백엔드와 별도 팀이 작성한 Python AI 서버�
 다음 변경들이 예고돼 있어서 결합 방식을 한 번 정리해두지 않으면 같은 결정을 매 PR마다 즉흥적으로 내리게 된다:
 
 - (가까운 미래) AI 콜백 신뢰성 더 끌어올리기 — 3회 재시도로는 부족한 상황 발생 가능
-- (가까운 미래) 새 운동 종목(런지·플랭크 등) 추가 시 `exercise_type` 일반화 ([`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md))
+- (가까운 미래) 새 운동 종목(런지·플랭크 등) 추가 시 `exercise_type` 일반화 ([[project_squat_first]])
 - (잠재) AI 서버 수평 확장 또는 GPU 인스턴스 분리
 - (잠재) proto 중복 파일 동기화 자동화
 
-**제약**: 사용자는 AI 서버 코드를 다른 사람이 작성한 영역으로 간주하여 변경을 최소화하고자 함 ([`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md), 2026-05-23 재확인). 따라서 결합 변경은 **Spring 쪽만으로 가능한 안**을 디폴트로, AI 쪽 손대는 안은 명시적 정당화 필요.
+**제약**: 사용자는 AI 서버 코드를 다른 사람이 작성한 영역으로 간주하여 변경을 최소화하고자 함 ([[feedback_minimize_python_changes]], 2026-05-23 재확인). 따라서 결합 변경은 **Spring 쪽만으로 가능한 안**을 디폴트로, AI 쪽 손대는 안은 명시적 정당화 필요.
 
 ---
 
@@ -34,8 +34,8 @@ ShadowFit은 Spring(Java) 백엔드와 별도 팀이 작성한 Python AI 서버�
 - **언어 경계**: proto 외에는 코드 재사용 불가, 공통 라이브러리 없음.
 - **인프라**: 단일 docker-compose. 메시지 큐(Kafka/Redis Streams 등) 없음. 영구 큐 도입은 운영 비용 증가.
 - **수평 확장**: AI 세션 상태가 in-memory라 현재 1 인스턴스 가정. 늘리려면 AI 코드 손대야 함 (제약과 충돌).
-- **스코프**: 지금은 스쿼트 한 종목만 ([`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md)). 추상화 비용을 미리 지불할 이유 적음.
-- **언어**: 한국어 단일 ([`project-korean-only`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_korean_only.md)). 메시지 다국어 분리는 불필요.
+- **스코프**: 지금은 스쿼트 한 종목만 ([[project_squat_first]]). 추상화 비용을 미리 지불할 이유 적음.
+- **언어**: 한국어 단일 ([[project_korean_only]]). 메시지 다국어 분리는 불필요.
 
 ---
 
@@ -108,7 +108,7 @@ ShadowFit은 Spring(Java) 백엔드와 별도 팀이 작성한 Python AI 서버�
 
 **추천**: **A6-DP-5 (Spring 측 3곳 조합)** — AI 무변경 + 가장 넓은 커버리지. 단점은 DP-1 의 정확도 한계(타임아웃이 콜백 실패 때문인지 진짜 AI 처리 지연인지 구분 X) 인데, 알람 본문에 *"AI 헬스체크 결과"* 도 같이 실으면 운영자가 즉시 판단 가능.
 
-DP-4 (AI 측 직접 알람) 는 정확도는 가장 높지만 [`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 위배라 보류.
+DP-4 (AI 측 직접 알람) 는 정확도는 가장 높지만 [[feedback_minimize_python_changes]] 위배라 보류.
 
 **미결 질문**:
 - 콜백 실패가 실제로 관찰된 적 있나? 빈도? → 현재는 알람이 없어 *"관찰됐는지 자체를 모름"*. A6 이 이 질문에 답할 도구.
@@ -139,7 +139,7 @@ B3 잠정 추천이었으나, 실제로 시도해보니 `docker-compose.yml`의 
 - 즉 양쪽 다 **빌드 설정 1줄씩** + **proto 파일 위치 이동** 만. 양쪽 동작 코드(`spring_client.py`, `exercise_servicer.py`, `ExerciseAnalysisService.java` 등) 는 무변경.
 
 **미결 질문**:
-- 사용자가 위 "빌드 설정 1줄 + proto 위치 이동" 을 *"AI 변경"* 으로 간주하는가? ([`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 의 보호 대상에 해당하는지 명시 필요)
+- 사용자가 위 "빌드 설정 1줄 + proto 위치 이동" 을 *"AI 변경"* 으로 간주하는가? ([[feedback_minimize_python_changes]] 의 보호 대상에 해당하는지 명시 필요)
 - 다음 proto 변경 PR 이 들어올 시점이 알려진 게 있나? 그때 함께 정리하면 비용 최소화.
 
 ---
@@ -173,7 +173,7 @@ B3 잠정 추천이었으나, 실제로 시도해보니 `docker-compose.yml`의 
 **추천**: **F1 (Push)** — 사용자가 직접 제안한 흐름. 변경 크기 최소(한 줄), 분산된 INSERT 로 부하 안정, rep별 유실은 격리됨(전부 사라지지 않음). F3 의 추가 안전망은 운영하면서 콜백 유실이 실제로 관찰될 때 추가.
 
 **미결 질문**:
-- F1 의 "AI 한 줄 추가" 가 [`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 의 동작 코드 변경 보호 대상에 해당하는가? 사용자가 직접 제안한 흐름이라 예외인가?
+- F1 의 "AI 한 줄 추가" 가 [[feedback_minimize_python_changes]] 의 동작 코드 변경 보호 대상에 해당하는가? 사용자가 직접 제안한 흐름이라 예외인가?
 - rep "완성" 의 정의 — squat 의 경우 down→up 한 사이클? 분석기 측 코드 흐름 확인 필요.
 - 한 rep 의 데이터 크기 — 프레임 수 × `joint_coordinates(JSON)`. DB INSERT 단위 비용 검토.
 
@@ -248,7 +248,7 @@ H1 잠정 추천이었으나 사용자 의도(PPT 아키텍처 = 프론트 → A
 
 **문제**: 현재 AI는 `exercise_type="squat"` 하드코딩(`exercise_servicer.py:70`), `_analyzers = {"squat": ...}`(`pose.py:28-30`). proto에 `exercise_type` 필드 없음. 두 번째 운동이 들어올 때 어떻게 표현할지.
 
-이 분기는 [`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) 결정에 따라 **두 번째 운동이 실제로 분석기를 갖고 오는 시점까지 미뤄둠**. 그때 다시 평가.
+이 분기는 [[project_squat_first]] 결정에 따라 **두 번째 운동이 실제로 분석기를 갖고 오는 시점까지 미뤄둠**. 그때 다시 평가.
 
 선택지만 미리 적어둠:
 
@@ -301,7 +301,7 @@ H1 잠정 추천이었으나 사용자 의도(PPT 아키텍처 = 프론트 → A
 |------|--------|------|
 | A. 콜백 신뢰성 | **A6 (운영 알람 추가)** | AI 무변경. 가장 시급한 부분은 "실패가 났는지조차 모름" 이라 알람으로 가시성 먼저 확보 |
 | B. proto 동기화 | **B3 (루트 `proto/`)** 또는 **B1 유지** | B3가 장기적 안전, 단 사용자가 "빌드 설정 1줄 변경 = AI 변경" 으로 보는지에 따라 결정 |
-| C. `exercise_type` | **보류** | [`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) |
+| C. `exercise_type` | **보류** | [[project_squat_first]] |
 | D. AI 세션 저장 | **D1 (in-memory 유지)** | AI 변경 비용 과다 |
 | F. 자세 데이터 영속화 | **F1 (Push, rep 단위)** ✅ 이미 구현됨 | `pose.py:116` 에 트리거 존재 확인 (2026-05-23 정정) |
 | E. 통신 프로토콜 | **E1 (gRPC 유지)** | 이미 안정화 |

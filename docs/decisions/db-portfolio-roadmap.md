@@ -1,7 +1,7 @@
 # 이 프로젝트를 백엔드 DB 포폴로 만들기 — 로드맵
 
-작성일: 2026-06-05
-상태: **분석/추천 (결정 전)** — 기능 선택·착수는 사용자 confirm 후 박제
+작성일: 2026-06-05 / 갱신: 2026-08-12 (§3·§4 를 §10 및 실제 코드와 동기화)
+상태: **1·2순위는 결정 완료**(1위 폐기 / 2위 완료). 3순위 이하만 «분석/추천(결정 전)» — 착수는 사용자 confirm 후 박제
 대상 진로: 백엔드(Spring) 신입. DB 역량 증명이 목표.
 연관: [`youtube-coordinate-harvest.md`](./youtube-coordinate-harvest.md), [`report-aggregation.md`](./report-aggregation.md), [`redis-introduction.md`](./redis-introduction.md), [`ai-load-budget.md`](./ai-load-budget.md), `loadtest/ghz/`
 
@@ -47,7 +47,7 @@
 ## 3. 현 자산 (이미 갖춘 것)
 
 - 낙관적 락 `exercise_sessions.version` + 충돌 3회 재시도 — 동시성
-- 멱등성: `session_feedback_logs` uniqueKey + `INSERT IGNORE`
+- ~~멱등성: `session_feedback_logs` uniqueKey + `INSERT IGNORE`~~ 🔴 **자산으로 셀 수 없다(2026-08-12)** — 장치는 실재하나 그 경로에 **호출자가 없어 한 번도 돈 적이 없다**(#193). 실제로 도는 두 콜백 중 `SavePoseDataBatch` 는 멱등 장치가 **없다**(#188, [`./pose-batch-idempotency-vs-partition.md`](./pose-batch-idempotency-vs-partition.md))
 - 복합 인덱스 `pose_data(session_id, timestamp_sec)`
 - write 감축 의도: pose_data "1초 평균" 설계 ([§7 갭](#7-정직하게-짚을-갭))
 - rep 단위 **배치 적재** (`SavePoseDataBatch`) — 단건 INSERT 회피
@@ -59,12 +59,16 @@
 
 ## 4. 기능 후보 — 우선순위
 
-각 후보는 "왜 CRUD 아님 + 측정 지표"를 가진다. **⭐ = 현재 추천 (결정 전)**.
+각 후보는 "왜 CRUD 아님 + 측정 지표"를 가진다. ⭐ 는 2026-06-05 초안 시점의 추천이었다.
+
+> 🔴 **이 표의 1·2위는 더 이상 «후보» 가 아니다 (2026-08-12 정정).** 1위는 **폐기**, 2위는 **완료**됐다.
+> 결정 경위와 실측은 **[§10](#10-미결정-항목-2026-06-12-재조정) 이 최신**이며, 이 표가 그것을
+> 따라가지 못해 문서가 자기모순이었다. 3위 이하는 초안 그대로이므로 착수 전 재검토가 필요하다.
 
 | 순위 | 기능 | DB 기법 | 임팩트 | 차별화 | 비용 |
 |---|---|---|---|---|---|
-| 1 ⭐ | **활동 피드 팬아웃** (소셜) | fan-out-on-write vs on-read, 소셜그래프 M:N, 알림 fan-out | ★★★ | ★★★ | 중 |
-| 2 ⭐ | **pose_data 파티셔닝 + 보존정책** | 시간 파티셔닝, 청크 삭제(락 회피), 아카이빙 | ★★★ | ★★ | 중 |
+| ~~1 ⭐~~ 🔴 **폐기** | ~~**활동 피드 팬아웃** (소셜)~~ | ~~fan-out-on-write vs on-read, 소셜그래프 M:N, 알림 fan-out~~ | — | — | — |
+| ~~2 ⭐~~ ✅ **완료** | **pose_data 파티셔닝 + 보존정책** | 시간 파티셔닝, DROP PARTITION 폐기, 미래 파티션 자동 생성 | ★★★ | ★★ | (완료) |
 | 3 | 주간/월간 통계 사전집계 | 배치 집계테이블(materialized 흉내), `@Scheduled` | ★★ | ★★ | 중 |
 | 4 | 리더보드 (그룹/전체) | 윈도우 함수, **Redis ZSET**, 배치 갱신 | ★★ | ★★ | 저 |
 | 5 | 시계열 피로도·추세 (코칭) | 윈도우 `LAG`/이동평균, baseline 집계, Redis hot-state | ★★ | ★★ | 저 |
@@ -73,16 +77,47 @@
 | 8 | 운동 추천 (item 동시출현) | 사전집계 배치 + 캐시, 무거운 집계 쿼리 | ★★ | ★ | 중 |
 | 9 | 전문가 연계 (리포트 전달) | RBAC/공유 권한, 상태머신, multi-tenant 집계 | ★★ | ★ | 중 |
 
-### 4-1. 1순위 활동 피드 팬아웃 — 왜 톱픽인가
+### 4-1. ~~1순위 활동 피드 팬아웃~~ — 🔴 폐기 (§10)
+
+**도메인이 받쳐주지 않아 폐기**했다 — "혼자 운동" 도메인에 소셜 피드를 얹는 것은 억지라는 판단
+([`../portfolio/portfolio-narrative.md`](../portfolio/portfolio-narrative.md) §4: 헤드라인 제외).
+신규 테이블 `friendships`·`activity_feed`·`notifications` 는 **만들지 않았다.**
+
+기술적 매력(write amplification, on-write vs on-read)이 컸던 만큼 폐기 이유가 **기술이 아니라
+도메인 적합성**이었다는 점이 남길 가치가 있다 — 되살리려면 그 전제부터 다시 세워야 한다.
+
+<details><summary>초안 시점의 근거 (보존용)</summary>
+
 - "파트너가 하체 운동을 완료했습니다" = **fan-out 문제** (트위터 타임라인). 캡스톤이 거의 못 다룸 → 차별화 최고.
 - 활동 1건 → 친구 N명 피드에 N행 = **write amplification**. 사용자가 "차별화 높다"고 한 **쓰기 축과 동일한 문제**.
 - "인플루언서(팔로워 多) 활동 시 팬아웃 폭발 → on-write vs on-read 선택" 은 면접관이 즉시 알아보는 서사.
 - 필요 신규 테이블(안): `friendships`(self M:N + 상태), `activity_feed`, `notifications`.
 
-### 4-2. 2순위 pose_data 파티셔닝 — 가장 순수한 DB 스토리
-- 대부분 캡스톤엔 천연 대용량 테이블이 없음. pose_data는 초당 수십 행 쏟아지는 시계열 → **누적 월 ~1억 행** (§5).
-- "1초 평균 감축(이미 함) → 그래도 쌓이면 → 시간 파티셔닝 → 오래된 파티션 아카이브/드롭" = 운영까지 가는 완결 서사.
-- ⚠️ **실스키마 반영 시 FK+파티션 비호환 블로커 발견** (MySQL/InnoDB 제약) + 회원 탈퇴 CASCADE 대체 설계 필요 — [`./pose-data-partition-fk-tradeoff.md`](./pose-data-partition-fk-tradeoff.md) (OPEN), [GitHub #41](https://github.com/Shadowfit/init/issues/41)
+</details>
+
+### 4-2. ~~2순위~~ pose_data 파티셔닝 — ✅ 완료, 운영까지 갔다
+
+초안이 그린 "감축 → 파티셔닝 → 아카이브/드롭" 서사가 **끝까지 구현됐다.**
+
+| 단계 | 상태 |
+|---|---|
+| 저장 감축(다운샘플 R≈5) | ✅ `PoseDataService.DOWNSAMPLE_WINDOW`, PR #53 (2026-07-25) |
+| 시간 파티셔닝 | ✅ `PARTITION BY RANGE (unix_timestamp(created_at))` 월별 (DB 실측 2026-08-12) |
+| 만료 파티션 폐기 | ✅ `PoseDataPartitionScheduler.dropExpiredPartitions` — `DROP PARTITION` |
+| 미래 파티션 자동 생성 | ✅ 같은 스케줄러 `ensureFuturePartitions` (`REORGANIZE PARTITION pfuture`) |
+| 실측 근거 | ✅ ALTER 96분 / DROP PARTITION 1.8초 / DELETE 대비 **625배** ([`../portfolio/realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §4-②d) |
+| 볼륨 | ✅ 1억 행 시드 (133,334세션 × 750행, ~11GB) |
+
+FK 비호환 블로커도 **해소됐다** — FK 를 제거하고 애플리케이션 검증으로 대체했다
+([`./pose-data-partition-fk-tradeoff.md`](./pose-data-partition-fk-tradeoff.md), [#41](https://github.com/Shadowfit/init/issues/41)).
+
+**대신 그 대가가 남았다.** FK 도 유니크 키도 없어져 **참조무결성과 멱등성을 애플리케이션이 떠맡았다**:
+
+- 고아 행 창(세션 검증 ↔ INSERT 사이) — [#87](https://github.com/Shadowfit/init/issues/87)
+- 파티션 컬럼(`created_at`) 강제 포함 때문에 **순진한 멱등 키를 걸 수 없다** —
+  [#188](https://github.com/Shadowfit/init/issues/188), [`./pose-batch-idempotency-vs-partition.md`](./pose-batch-idempotency-vs-partition.md)
+
+즉 이 칸은 «완료» 지만 **파생 부채가 열려 있고, 그 부채가 지금 쓰기 축의 다음 작업**이다.
 
 ---
 
@@ -174,6 +209,8 @@
   - ~~다음 미결정: 풀 10→20/30 재측정~~ → **2026-07-25 완료**([`pose-ingest-downsampling.md §5-1(7)(8)`](./pose-ingest-downsampling.md)). AWS EC2 임시 인스턴스 2대(DB 전용+백엔드/ghz 분리)로 실측 — **로컬 결론이 반전**: 분리 배포에서는 고부하(c≥50)에서 풀=30이 풀=10 대비 확실히 우세, c=100은 풀=10이 붕괴(47% 타임아웃). "풀 무용"은 로컬 동거 환경 종속 결론이었음. 이어서 pool=15·20을 c=100 기준 추가 실측해 cliff를 10~15 사이로 좁힘 — **15부터 20/30과 동급이라 실측 스위트스폿은 ~15**(이론 공식 ≈5보다 3배 큼). 인프라는 실측 후 삭제.
   - **다운샘플도 실제 착수 완료**(2026-07-25, PR #53): `PoseDataService.savePoseDataBatch`에 R≈5 대표추출(윈도우별 sync_rate 최저 프레임만 저장) 반영, HikariCP `maximum-pool-size`도 15로 변경. "1초 평균 집계" 위치(AI vs Spring) 자체는 위치 B(Spring)로 확정 반영된 상태 — 남은 건 pool=11~14 정밀 cliff 위치, 리포트 해상도 SLA 도메인 확인 정도.
   - 🔴 **2026-08-08 격자 재측정 — 위 두 줄의 관계가 뒤집혔다**([`pose-ingest-downsampling.md §5-1(9)`](./pose-ingest-downsampling.md), 원본 [`loadtest/results/pool-cliff-2026-08-08/`](../../loadtest/results/pool-cliff-2026-08-08/)). EC2 3대(obs 분리)로 c 10~100 × pool 5·20 을 재측정하니 **초당 ~205건 수준에서 절벽이 없다** — 풀을 4배 줄여도 ~205 RPS 고정, 실패 0. `pool=20` 은 20개 중 2~3개만 쓰고(대기 0) `pool=5` 는 포화인데(95 대기) RPS 가 같다 → **풀은 병목이 아니다.** 원인의 한 축은 **바로 위 줄의 다운샘플**이고, `DOWNSAMPLE_WINDOW` 를 1 로 되돌린 대조군이 RPS 1.7배·p99 4.9배 차이로 직접 증명한다. ⚠️ **초판이 여기에 적었던 *"병목을 백엔드 CPU 로 옮겼다(백엔드 p90 128% vs MySQL 53%)"* 는 같은 날 리뷰에서 근거 없음으로 철회**됐다(MySQL 지표 미수집, 백엔드 CPU 는 0.51~0.56). ✅ **~205 천장의 정체는 같은 날 저녁에 규명됐다 — 커밋 `fsync`** ([`loadtest/results/ceiling-fsync-2026-08-08/`](../../loadtest/results/ceiling-fsync-2026-08-08/)). 내구성 설정만 바꿔 **231.6 → 803.1 RPS (3.47배)**, binlog 동기화만 풀어도 +78%. 1순위 용의자로 적었던 «부하기 커넥션 1개» 는 반증됐다(`--connections` 1→16 에서 230→211). 🔴 **단 채택하지 않는다** — DAU 1,000 가정에서 231 RPS 는 한참 위라 안 아픈 것을 고치며 데이터 안전을 파는 셈이다.
+    > 🔴 **2026-08-09 재정정 — 이 «절벽이 없다» 도 조건부였다** ([4차](../../loadtest/results/commit-count-2026-08-09/), [#166](https://github.com/Shadowfit/init/issues/166)). 위 재측정은 **모든 요청이 한 세션으로 가는** 페이로드였고, 그 조건에서는 fsync 가 천장이라 풀이 가려져 있었다. 다세션으로 재보니 **`pool=5` 가 plateau 의 69%** 로 **절벽이 다시 나타난다.** 즉 «질문 소멸» 이 아니라 **질문이 되살아났고**, 이번엔 답까지 있다 — 10 부터 plateau. 그리고 아래 *"살아남은 레버는 다운샘플 하나"* 도 좁혀야 한다: **풀은 여전히 레버다.**
+
     **즉 §5-1(9) 는 이 로드맵의 서사를 한 단계 바꾼다.** 2026-06-12 판정(*"다운샘플은 천장 해법 아님, 1순위는 풀 사이징"*)이 07-25 에 절반 뒤집혔고(분리 배포에서는 풀이 레버), 08-08 에 **완전히 역전됐다** — 지금 코드에서 살아남은 레버는 **다운샘플 하나**이고, 그것이 풀 사이징을 무의미하게 만든 당사자다. `pool=11~14 정밀 위치`는 해소가 아니라 **질문 소멸**(좁힐 절벽이 없다).
 
 > 참고: 보강 축(outbox·관측성·회복탄력성)의 착수 순서는 별도 미결정 — [`portfolio-narrative.md §7`](../portfolio/portfolio-narrative.md), [`outbox-reliable-messaging.md`](./outbox-reliable-messaging.md).
@@ -186,17 +223,19 @@
 - JSON 컬럼(`joint_coordinates`) 방어 논리 준비: "조회가 통째 읽기 + 33관절 분해 시 행수 33배 → 합리적 반정규화". 면접 공격 대비.
 - 신입 정직 포지셔닝 유지 ([feedback-industry-level-standard]).
 
-### 11-1. MySQL vs PostgreSQL — 선택 근거 (2026-07-05 정리)
+### 11-1. MySQL vs PostgreSQL → **[`./mysql-vs-postgresql.md`](./mysql-vs-postgresql.md) 로 이관** (2026-08-11)
 
-"왜 MySQL이냐" 질문 대비 정리. **워크로드 자체가 MySQL에 특별히 유리해서가 아니라, 이미 만든 실측 자산 + 채용 시그널이 근거.** 아래 세 가지는 처음엔 "워크로드가 MySQL에 맞다"는 근거로 들었으나, 자체 실측·원리 확인 결과 전부 과장으로 판명 — 면접에서 엔진 자체의 기술적 필연성을 주장하지 말 것.
+여기 있던 «엔진 우위 주장 3개 반증» 은 그대로 유효하고, 전문은 위 문서 §2 에 있다.
 
-| 과장했던 주장 | 반증 |
-|---|---|
-| InnoDB 클러스터드 인덱스가 시계열 append에 유리 | 절반만 맞음. `pose_data.id` AUTO_INCREMENT(단조 PK)로 InnoDB 특유의 함정(비단조 PK→랜덤쓰기·페이지 스플릿)을 피한 것뿐. PostgreSQL 힙 테이블은 PK 값과 무관하게 자연 append라 애초에 이 함정이 없음 → 무승부 |
-| 파티션 `DROP` TTL 패턴이 MySQL에 맞음 | 자체 실측([`realmysql-experiments.md:116`](../portfolio/realmysql-experiments.md))이 이미 반증: `session_id=` 조회는 pruning 이득 **0**, 오히려 14개 파티션-로컬 인덱스 훑느라 미세 손해. 파티셔닝 가치는 순수 쓰기축 보존정책(`DROP PARTITION` O(1))인데, PostgreSQL 선언적 파티셔닝의 `DETACH`+`DROP`도 동일하게 O(1) — MySQL 전용 무기 아님 |
-| JSON 오프페이지 회피(projection −98.7%)가 MySQL 강점 | InnoDB off-page 저장(큰 컬럼을 오버플로우 페이지로 분리, 원 행엔 포인터만)과 PostgreSQL **TOAST**가 원리상 동일. 큰 가변길이 컬럼을 다루는 RDBMS의 일반 원리지 엔진 차별점 아님 |
+이관한 이유: 초판(2026-07-05)의 결론이 *"MySQL 을 유지하는 진짜 이유는 이미 만든 실측 자산 + 채용 시그널"* 이었는데,
+그건 **"자산이 없었으면 뭘 골랐겠나" 에 답이 없다.** 새 문서는 자산을 빼고 다시 세운다 —
+근거가 «이미 재놨으니까» 에서 **«전환 비용 + 운영 여력»** 으로 바뀐다. 결론(MySQL 유지)은 동일.
 
-**정직한 결론**: 이 워크로드(시계열 append + TTL 파티션 + 대용량 컬럼)는 파티셔닝·TOAST/off-page를 지원하는 RDBMS면 MySQL/PostgreSQL 거의 동일하게 동작한다. MySQL을 유지하는 진짜 이유는 기술 우위가 아니라 (1) 이미 625x·96분 ALTER·−98.7% 등 MySQL 기준으로 실측·문서화 완료된 자산, (2) 국내 백엔드 신입 채용 시그널([[user_career_target]]). 면접 답변은 이 두 가지로.
+세 줄 요약:
+
+- 기술적으로는 무승부. **엔진 자체의 기술적 필연성을 면접에서 주장하지 말 것.**
+- greenfield 였다면 PostgreSQL. 지금 조건(운영자 1명·마감·도는 시연)에서는 MySQL.
+- 진짜 갈림길은 «MySQL이냐 PG냐» 가 아니라 **«DB 를 박스 밖 매니지드로 뺄 거냐»** 다.
 
 ---
 

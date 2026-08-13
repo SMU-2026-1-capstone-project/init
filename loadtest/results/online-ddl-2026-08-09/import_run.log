@@ -1,0 +1,57 @@
+# 시딩 대체안 실측 — INSERT 시딩 vs 파일 복원(IMPORT TABLESPACE)
+# 2026-08-10 23:29:51
+
+## [0] 황금 원본 시딩 (채택하면 이게 «한 번만» 드는 비용)
+  기존 황금 원본 재사용 (1,000만 행·파티션 없음). 앞선 실행의 시딩 851s 를 인용한다
+
+## [1] 스냅샷 (FLUSH FOR EXPORT + 파일 복사)
+  스냅샷: 11s · 1033MB (.ibd + .cfg)
+
+## [2] 파일 복원 3회
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+  1회차: 43s  (행 10000000 · 인덱스 확인)
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+  2회차: 46s  (행 10000000 · 인덱스 확인)
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+PAGER set to stdout
+  3회차: 30s  (행 10000000 · 인덱스 확인)
+
+## 판정
+  INSERT 시딩  851s
+  파일 복원    39s (평균 3회)
+  → 판당 812s 절약 · 배수 21x
+  → 8판 기준: 113분 → 19분 (준비 시딩 1회 포함)
+
+⚠️ 채택 시 바뀌는 조건: IMPORT 직후는 버퍼풀이 차갑다. 팔 A·B 를 전부 이 방식으로
+   통일해야 팔 간 비교가 성립하고, 기존 96분·24.5분 baseline 과는 조건이 달라진다.
+
+결과 파일: /e/init/loadtest/results/online-ddl-2026-08-09/probe_import_speed.txt

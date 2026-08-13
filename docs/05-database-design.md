@@ -1,6 +1,8 @@
 # 데이터베이스 설계 가이드
 
-> 이 문서는 설계 의도와 핵심 스키마를 정리합니다. **운영 중인 실제 스키마는 `mysql/schema.sql` 이 단일 진실 원천**이며, 본 문서와 다를 수 있는 부분은 마지막 "코드 동기 메모" 절에서 명시합니다.
+> 이 문서는 설계 의도와 핵심 스키마를 정리합니다. **운영 중인 실제 스키마의 단일 진실 원천은 [`backend/src/main/resources/db/migration/`](../backend/src/main/resources/db/migration/)** — 초기 형태는 `V1__baseline.sql`, 이후 변경은 `V2`·`V3`… 순서로 누적됩니다. 어떤 DB 가 어디까지 적용됐는지는 그 DB 의 `flyway_schema_history` 가 답합니다(§「스키마는 이제 Flyway 가 적용한다」). 본 문서와 다를 수 있는 부분은 마지막 "코드 동기 메모" 절에서 명시합니다.
+>
+> 🔴 **2026-08-12 정정** — 이 줄은 `mysql/schema.sql` 을 원천으로 가리키고 있었는데, **그 파일은 2026-08-01 `f7e52d4`(#115 Flyway 도입)에서 삭제됐다.** 아래 §「스키마는 이제 Flyway 가 적용한다」의 표가 «이전 → 지금» 으로 전환을 적어두고도, **이 머리말과 `pose_data` 이력 주석·같은 절의 스크래치 DB 줄·「데이터 저장 전략」의 타입 불일치 주석** 넷은 옛 파일을 계속 가리키고 있었다 — [[project_doc_drift_pattern]] 이 말한 «기능 표는 맞고 나머지가 빠진다» 의 실례다.
 
 ## ERD 개요
 회의록에서 정의된 DB 활용 3단계 로드맵에 따른 설계입니다.
@@ -108,7 +110,7 @@ CREATE TABLE pose_data (
 ) PARTITION BY RANGE (UNIX_TIMESTAMP(created_at)) (...);
 ```
 
-> **이 표의 이력** — 실제 정의는 `mysql/schema.sql` 이 기준이다.
+> **이 표의 이력** — 실제 정의는 [`V1__baseline.sql`](../backend/src/main/resources/db/migration/V1__baseline.sql) 이 기준이다(아래 세 변경은 baseline 에 이미 반영돼 있다 — Flyway 도입 시점이 셋보다 뒤였다).
 > - **FK 없음**: 파티셔닝을 위해 제거했다(2026-07-20). 참조무결성은 `PoseDataService` 의 세션 존재 검증이 담당한다 → [`decisions/pose-data-partition-fk-tradeoff.md`](./decisions/pose-data-partition-fk-tradeoff.md)
 > - **`rep_number` 추가**(2026-07-31): 재부착 시 rep 카운트 복원 근거 → [`decisions/session-resume-and-ai-state.md`](./decisions/session-resume-and-ai-state.md) §3-3
 > - **`smoothed_knee_angle` 추가 · `is_correct` 삭제**(2026-08-01): `sync_rate` 는 rep 안에서 상수라 프레임을 구분하지 못해 대표 프레임 선택 기준이 필요했고, `is_correct` 는 읽는 곳이 없으면서 임계값 40 을 쓰기 시점에 굳혀 AI 의 persona 임계값과 모순됐다 → [`decisions/worst-section-rep-resolution.md`](./decisions/worst-section-rep-resolution.md) §4-ㄹ
@@ -175,7 +177,7 @@ CREATE TABLE exercise_feedback_templates (
     UNIQUE KEY uk_exercise_feedback (exercise_id, feedback_type)
 );
 ```
-세션 시작 시 클라이언트가 `GET /exercises/{exerciseId}/feedback-templates` 로 받아 device TTS 로 재생. 다국어 분리 컬럼 없음 ([`project-korean-only`](../../C:/Users/khjae/.claude/projects/E--init/memory/project_korean_only.md)).
+세션 시작 시 클라이언트가 `GET /exercises/{exerciseId}/feedback-templates` 로 받아 device TTS 로 재생. 다국어 분리 컬럼 없음 ([[project_korean_only]]).
 
 ### session_feedback_logs (세션별 TTS 발화 이벤트 로그) — 2026-05 추가
 ```sql
@@ -224,7 +226,7 @@ CREATE TABLE outbox_events (
 | **`correlation_id` 를 컬럼으로 둔다** | 발행기는 `@Scheduled` 스레드라 MDC 가 비어 있고, outbox 는 스레드가 아니라 **시간·프로세스 경계**를 넘는다. 런타임 캡처로는 원리상 이을 수 없어 **행에 저장**해야 원 요청과 이어진다. MDC 와 달리 이 값은 **인스턴스 재시작을 견딘다** |
 | **`locked_by` + `lock_expires_at`** | 발행기가 둘 이상일 때 같은 행을 두 번 집는 것 방지(조건부 갱신=CAS). 리뷰에서 지적받아 추가(`eebf852`) |
 
-**운영 파라미터**: 폴링 간격 `outbox.publisher.poll-interval-ms`(기본 1000), 재시도 상한 `outbox.publisher.max-retry`(기본 10). 지표 3종(`shadowfit_outbox_pending`·`dispatch`·`lag`)이 Prometheus 로 나간다 — **적체는 "지금 몇 건"이 아니라 기울기가 답**이라 시계열로 본다([`../monitoring/README.md`](../../monitoring/README.md)).
+**운영 파라미터**: 폴링 간격 `outbox.publisher.poll-interval-ms`(기본 1000), 재시도 상한 `outbox.publisher.max-retry`(기본 10). 지표 3종(`shadowfit_outbox_pending`·`dispatch`·`lag`)이 Prometheus 로 나간다 — **적체는 "지금 몇 건"이 아니라 기울기가 답**이라 시계열로 본다([`../monitoring/README.md`](../monitoring/README.md)).
 
 > 🔴 **2026-08-08 정정 — 이 문서에 이 테이블이 6주간 없었다.** 스키마 문서가 «기능 테이블» 은 다 담았는데 **«전달 보장» 테이블이 빠졌다.** 같은 결의 누락이 [`02-folder-structure.md`](./02-folder-structure.md) 에도 있었다(`model/outbox/`·`global/observability/` 없음) — **기능이 아닌 것은 문서 갱신 트리거가 안 울린다**는 패턴이다.
 
@@ -239,7 +241,12 @@ CREATE TABLE outbox_events (
 | 확인 | — | `curl http://localhost:9090/actuator/flyway` (🔴 8080 아님) |
 
 - 스키마를 바꿀 때는 **새 파일**을 추가한다(`V3__…sql`). **이미 적용된 파일은 고치지 않는다** — checksum 이 달라지면 다음 부팅이 실패한다
-- `mysql/schema.sql` 은 남아 있다 — 부하테스트 스크래치 DB 를 통째로 세울 때 쓴다
+- ~~`mysql/schema.sql` 은 남아 있다 — 부하테스트 스크래치 DB 를 통째로 세울 때 쓴다~~
+  → 🔴 **틀렸다(2026-08-12 정정).** 그 파일은 이 전환(`f7e52d4`)에서 **삭제됐다.**
+  **부하테스트 스크래치 DB 도 이미 `V1__baseline.sql` 을 쓴다** — [`loadtest/measure_admin_filter_explain.sh:91`](../loadtest/measure_admin_filter_explain.sh)
+  이 baseline 원본에 DB 지정만 얹어 통째로 적용한다. 같은 파일 `:22-23` 이 그 이유를 적어뒀다:
+  *"실 스키마를 그대로 쓴다 … 컬럼 타입·길이·인덱스가 실테이블과 어긋날 여지가 없다."*
+  **즉 결손이 아니라 대체가 이미 끝나 있었고, 이 줄만 안 따라왔다.**
 - ⚠️ `mysql/dev-seed.sql`(테스트 계정·더미 세션 801)은 **의도적으로 마이그레이션에서 제외**했다. 배포 환경에 가면 안 되는 데이터라서 — 부하테스트 전에 손으로 넣는다
 - ⚠️ Flyway 가 답하는 것은 *"내 파일이 돌았나"* 까지다. 누가 손으로 `ALTER TABLE` 을 치면 **아무것도 안 남는다** — 드리프트 탐지는 별건이고 미도입이다
 
@@ -264,7 +271,8 @@ MediaPipe의 33개 관절 포인트에 대한 1초 평균 좌표:
 ## 데이터 저장 전략
 - **실시간 분석 데이터**: 모든 프레임이 아닌 **1초당 평균값**만 저장 (회의록 결정사항)
 - **좌표 데이터**: JSON 타입으로 유연하게 저장
-  - ⚠️ **타입 불일치(2026-07-15 발견, 미해결)**: `mysql/schema.sql`은 `joint_coordinates`를 `JSON` 타입으로 선언하지만, JPA 엔티티 `PoseData.java`는 `@Lob @Column(columnDefinition = "TEXT")`로 매핑돼 있음. 동작상 즉시 문제가 되진 않으나(Hibernate가 문자열로 다룸) 스키마와 엔티티 선언이 서로 다름 — 엔티티를 JSON 타입으로 맞출지, 스키마를 TEXT로 통일할지는 결정 필요.
+  - ⚠️ **타입 불일치(2026-07-15 발견, 미해결 — 2026-08-12 재확인)**: [`V1__baseline.sql:81,194`](../backend/src/main/resources/db/migration/V1__baseline.sql) 은 `joint_coordinates` 를 `JSON NOT NULL` 로 선언하지만, JPA 엔티티 [`PoseData.java:34-35`](../backend/src/main/java/com/shadowfit/model/exercise/PoseData.java) 는 `@Lob @Column(columnDefinition = "TEXT")` 로 매핑돼 있음. 동작상 즉시 문제가 되진 않으나(Hibernate 가 문자열로 다룸) 스키마와 엔티티 선언이 서로 다름 — 엔티티를 JSON 타입으로 맞출지, 스키마를 TEXT 로 통일할지는 결정 필요. **드리프트는 실 DB 가 아니라 테스트에서 샌다**: H2 테스트는 엔티티 기반 DDL 이라 `TEXT` 로 만들어지므로, 같은 결의 사고가 이미 한 번 있었다(`@OnDelete` 누락 2건, [`tasks/27-implementation-gaps.md`](./tasks/27-implementation-gaps.md) §1).
+    - 📌 인용처만 갱신했다(`mysql/schema.sql` → `V1__baseline.sql`). **불일치 자체는 그대로 살아 있고, 결정도 그대로 미결이다.**
 - **인덱스**: 세션별 시계열 조회를 위해 `(session_id, timestamp_sec)` 복합 인덱스 적용
 - **인코딩**: 전체 charset `utf8mb4` 강제 (한국어 피드백 메시지 깨짐 방지, 커밋 0fe056e)
 

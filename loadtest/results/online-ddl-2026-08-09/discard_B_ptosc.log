@@ -1,0 +1,161 @@
+No slaves found.  See --recursion-method if host 02354c608545 has slaves.
+Not checking slave lag because no slaves were found and --check-replica-lag was not specified.
+Operation, tries, wait:
+  analyze_table, 10, 1
+  copy_rows, 10, 0.25
+  create_triggers, 10, 1
+  drop_triggers, 10, 1
+  swap_tables, 10, 1
+  update_foreign_keys, 10, 1
+Altering `shadowfit`.`pose_data_scale`...
+Creating new table...
+CREATE TABLE `shadowfit`.`_pose_data_scale_new` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `session_id` bigint NOT NULL,
+  `timestamp_sec` double NOT NULL,
+  `joint_coordinates` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sync_rate` double DEFAULT NULL,
+  `is_correct` tinyint(1) DEFAULT '1',
+  `feedback_message` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`,`created_at`),
+  KEY `idx_session_timestamp` (`session_id`,`timestamp_sec`)
+) ENGINE=InnoDB AUTO_INCREMENT=10485881 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+Created new table shadowfit._pose_data_scale_new OK.
+Altering new table...
+ALTER TABLE `shadowfit`.`_pose_data_scale_new` PARTITION BY RANGE (UNIX_TIMESTAMP(created_at)) (
+  PARTITION p2026_01 VALUES LESS THAN (UNIX_TIMESTAMP('2026-02-01 00:00:00')),
+  PARTITION p2026_02 VALUES LESS THAN (UNIX_TIMESTAMP('2026-03-01 00:00:00')),
+  PARTITION p2026_03 VALUES LESS THAN (UNIX_TIMESTAMP('2026-04-01 00:00:00')),
+  PARTITION p2026_04 VALUES LESS THAN (UNIX_TIMESTAMP('2026-05-01 00:00:00')),
+  PARTITION p2026_05 VALUES LESS THAN (UNIX_TIMESTAMP('2026-06-01 00:00:00')),
+  PARTITION p2026_06 VALUES LESS THAN (UNIX_TIMESTAMP('2026-07-01 00:00:00')),
+  PARTITION p2026_07 VALUES LESS THAN (UNIX_TIMESTAMP('2026-08-01 00:00:00')),
+  PARTITION p2026_08 VALUES LESS THAN (UNIX_TIMESTAMP('2026-09-01 00:00:00')),
+  PARTITION p2026_09 VALUES LESS THAN (UNIX_TIMESTAMP('2026-10-01 00:00:00')),
+  PARTITION p2026_10 VALUES LESS THAN (UNIX_TIMESTAMP('2026-11-01 00:00:00')),
+  PARTITION p2026_11 VALUES LESS THAN (UNIX_TIMESTAMP('2026-12-01 00:00:00')),
+  PARTITION p2026_12 VALUES LESS THAN (UNIX_TIMESTAMP('2027-01-01 00:00:00')),
+  PARTITION p2027_01 VALUES LESS THAN (UNIX_TIMESTAMP('2027-02-01 00:00:00')),
+  PARTITION pfuture  VALUES LESS THAN MAXVALUE
+)
+Altered `shadowfit`.`_pose_data_scale_new` OK.
+2026-08-10T13:32:14 Creating triggers...
+-----------------------------------------------------------
+Event : DELETE 
+Name  : pt_osc_shadowfit_pose_data_scale_del 
+SQL   : CREATE TRIGGER `pt_osc_shadowfit_pose_data_scale_del` AFTER DELETE ON `shadowfit`.`pose_data_scale` FOR EACH ROW BEGIN DECLARE CONTINUE HANDLER FOR 1146 begin end; DELETE IGNORE FROM `shadowfit`.`_pose_data_scale_new` WHERE `shadowfit`.`_pose_data_scale_new`.`id` <=> OLD.`id` AND `shadowfit`.`_pose_data_scale_new`.`created_at` <=> OLD.`created_at`; END  
+Suffix: del 
+Time  : AFTER 
+-----------------------------------------------------------
+-----------------------------------------------------------
+Event : UPDATE 
+Name  : pt_osc_shadowfit_pose_data_scale_upd 
+SQL   : CREATE TRIGGER `pt_osc_shadowfit_pose_data_scale_upd` AFTER UPDATE ON `shadowfit`.`pose_data_scale` FOR EACH ROW BEGIN DECLARE CONTINUE HANDLER FOR 1146 begin end; DELETE IGNORE FROM `shadowfit`.`_pose_data_scale_new` WHERE !(OLD.`id` <=> NEW.`id` AND OLD.`created_at` <=> NEW.`created_at`) AND `shadowfit`.`_pose_data_scale_new`.`id` <=> OLD.`id` AND `shadowfit`.`_pose_data_scale_new`.`created_at` <=> OLD.`created_at`; REPLACE INTO `shadowfit`.`_pose_data_scale_new` (`id`, `session_id`, `timestamp_sec`, `joint_coordinates`, `sync_rate`, `is_correct`, `feedback_message`, `created_at`) VALUES (NEW.`id`, NEW.`session_id`, NEW.`timestamp_sec`, NEW.`joint_coordinates`, NEW.`sync_rate`, NEW.`is_correct`, NEW.`feedback_message`, NEW.`created_at`); END  
+Suffix: upd 
+Time  : AFTER 
+-----------------------------------------------------------
+-----------------------------------------------------------
+Event : INSERT 
+Name  : pt_osc_shadowfit_pose_data_scale_ins 
+SQL   : CREATE TRIGGER `pt_osc_shadowfit_pose_data_scale_ins` AFTER INSERT ON `shadowfit`.`pose_data_scale` FOR EACH ROW BEGIN DECLARE CONTINUE HANDLER FOR 1146 begin end; REPLACE INTO `shadowfit`.`_pose_data_scale_new` (`id`, `session_id`, `timestamp_sec`, `joint_coordinates`, `sync_rate`, `is_correct`, `feedback_message`, `created_at`) VALUES (NEW.`id`, NEW.`session_id`, NEW.`timestamp_sec`, NEW.`joint_coordinates`, NEW.`sync_rate`, NEW.`is_correct`, NEW.`feedback_message`, NEW.`created_at`);END  
+Suffix: ins 
+Time  : AFTER 
+-----------------------------------------------------------
+2026-08-10T13:32:14 Created triggers OK.
+2026-08-10T13:32:14 Copying approximately 9959994 rows...
+INSERT LOW_PRIORITY IGNORE INTO `shadowfit`.`_pose_data_scale_new` (`id`, `session_id`, `timestamp_sec`, `joint_coordinates`, `sync_rate`, `is_correct`, `feedback_message`, `created_at`) SELECT `id`, `session_id`, `timestamp_sec`, `joint_coordinates`, `sync_rate`, `is_correct`, `feedback_message`, `created_at` FROM `shadowfit`.`pose_data_scale` FORCE INDEX(`PRIMARY`) WHERE ((`id` > ?) OR (`id` = ? AND `created_at` >= ?)) AND ((`id` < ?) OR (`id` = ? AND `created_at` <= ?)) LOCK IN SHARE MODE /*pt-online-schema-change 1 copy nibble*/
+SELECT /*!40001 SQL_NO_CACHE */ `id`, `id`, `created_at` FROM `shadowfit`.`pose_data_scale` FORCE INDEX(`PRIMARY`) WHERE ((`id` > ?) OR (`id` = ? AND `created_at` >= ?)) ORDER BY `id`, `created_at` LIMIT ?, 2 /*next chunk boundary*/
+Copying `shadowfit`.`pose_data_scale`:   1% 33:02 remain
+Copying `shadowfit`.`pose_data_scale`:   5% 17:16 remain
+Copying `shadowfit`.`pose_data_scale`:   9% 14:01 remain
+Copying `shadowfit`.`pose_data_scale`:  13% 13:15 remain
+Copying `shadowfit`.`pose_data_scale`:  15% 13:32 remain
+Copying `shadowfit`.`pose_data_scale`:  18% 13:01 remain
+Copying `shadowfit`.`pose_data_scale`:  19% 15:23 remain
+Copying `shadowfit`.`pose_data_scale`:  19% 16:42 remain
+Copying `shadowfit`.`pose_data_scale`:  19% 18:34 remain
+Copying `shadowfit`.`pose_data_scale`:  20% 19:44 remain
+Copying `shadowfit`.`pose_data_scale`:  21% 20:22 remain
+Copying `shadowfit`.`pose_data_scale`:  24% 18:57 remain
+Copying `shadowfit`.`pose_data_scale`:  26% 18:18 remain
+Copying `shadowfit`.`pose_data_scale`:  27% 18:42 remain
+Copying `shadowfit`.`pose_data_scale`:  32% 15:49 remain
+Copying `shadowfit`.`pose_data_scale`:  34% 15:32 remain
+Copying `shadowfit`.`pose_data_scale`:  37% 14:27 remain
+Copying `shadowfit`.`pose_data_scale`:  39% 14:03 remain
+Copying `shadowfit`.`pose_data_scale`:  39% 14:28 remain
+Copying `shadowfit`.`pose_data_scale`:  40% 14:45 remain
+Copying `shadowfit`.`pose_data_scale`:  40% 15:24 remain
+Copying `shadowfit`.`pose_data_scale`:  41% 15:59 remain
+Copying `shadowfit`.`pose_data_scale`:  41% 16:18 remain
+Copying `shadowfit`.`pose_data_scale`:  42% 16:47 remain
+Copying `shadowfit`.`pose_data_scale`:  43% 16:45 remain
+Copying `shadowfit`.`pose_data_scale`:  43% 17:08 remain
+Copying `shadowfit`.`pose_data_scale`:  44% 17:23 remain
+Copying `shadowfit`.`pose_data_scale`:  45% 17:13 remain
+Copying `shadowfit`.`pose_data_scale`:  46% 16:57 remain
+Copying `shadowfit`.`pose_data_scale`:  47% 16:40 remain
+Copying `shadowfit`.`pose_data_scale`:  48% 16:57 remain
+Copying `shadowfit`.`pose_data_scale`:  48% 16:58 remain
+Copying `shadowfit`.`pose_data_scale`:  49% 16:51 remain
+Copying `shadowfit`.`pose_data_scale`:  50% 17:08 remain
+Copying `shadowfit`.`pose_data_scale`:  50% 17:08 remain
+Copying `shadowfit`.`pose_data_scale`:  51% 17:11 remain
+Copying `shadowfit`.`pose_data_scale`:  52% 16:58 remain
+Copying `shadowfit`.`pose_data_scale`:  54% 15:56 remain
+Copying `shadowfit`.`pose_data_scale`:  59% 13:39 remain
+Copying `shadowfit`.`pose_data_scale`:  59% 13:37 remain
+Copying `shadowfit`.`pose_data_scale`:  61% 12:49 remain
+Copying `shadowfit`.`pose_data_scale`:  64% 11:40 remain
+Copying `shadowfit`.`pose_data_scale`:  67% 10:23 remain
+Copying `shadowfit`.`pose_data_scale`:  71% 08:44 remain
+Copying `shadowfit`.`pose_data_scale`:  73% 08:26 remain
+Copying `shadowfit`.`pose_data_scale`:  74% 07:51 remain
+Copying `shadowfit`.`pose_data_scale`:  76% 07:20 remain
+Copying `shadowfit`.`pose_data_scale`:  77% 07:17 remain
+Copying `shadowfit`.`pose_data_scale`:  78% 06:56 remain
+Copying `shadowfit`.`pose_data_scale`:  79% 06:36 remain
+Copying `shadowfit`.`pose_data_scale`:  80% 06:15 remain
+Copying `shadowfit`.`pose_data_scale`:  80% 06:14 remain
+Copying `shadowfit`.`pose_data_scale`:  81% 06:03 remain
+Copying `shadowfit`.`pose_data_scale`:  82% 06:00 remain
+Copying `shadowfit`.`pose_data_scale`:  82% 05:56 remain
+Copying `shadowfit`.`pose_data_scale`:  82% 05:55 remain
+Copying `shadowfit`.`pose_data_scale`:  83% 05:52 remain
+Copying `shadowfit`.`pose_data_scale`:  83% 05:41 remain
+Copying `shadowfit`.`pose_data_scale`:  84% 05:28 remain
+Copying `shadowfit`.`pose_data_scale`:  85% 05:04 remain
+Copying `shadowfit`.`pose_data_scale`:  86% 04:47 remain
+Copying `shadowfit`.`pose_data_scale`:  87% 04:25 remain
+Copying `shadowfit`.`pose_data_scale`:  88% 04:08 remain
+Copying `shadowfit`.`pose_data_scale`:  89% 03:46 remain
+Copying `shadowfit`.`pose_data_scale`:  90% 03:28 remain
+Copying `shadowfit`.`pose_data_scale`:  92% 02:46 remain
+Copying `shadowfit`.`pose_data_scale`:  92% 02:35 remain
+Copying `shadowfit`.`pose_data_scale`:  94% 02:06 remain
+Copying `shadowfit`.`pose_data_scale`:  94% 01:54 remain
+Copying `shadowfit`.`pose_data_scale`:  95% 01:34 remain
+Copying `shadowfit`.`pose_data_scale`:  96% 01:19 remain
+Copying `shadowfit`.`pose_data_scale`:  97% 01:07 remain
+Copying `shadowfit`.`pose_data_scale`:  97% 00:50 remain
+Copying `shadowfit`.`pose_data_scale`:  98% 00:42 remain
+Copying `shadowfit`.`pose_data_scale`:  99% 00:21 remain
+2026-08-10T14:11:05 Copied rows OK.
+2026-08-10T14:11:05 Analyzing new table...
+2026-08-10T14:11:07 Swapping tables...
+RENAME TABLE `shadowfit`.`pose_data_scale` TO `shadowfit`.`_pose_data_scale_old`, `shadowfit`.`_pose_data_scale_new` TO `shadowfit`.`pose_data_scale`
+2026-08-10T14:11:11 Swapped original and new tables OK.
+2026-08-10T14:11:11 Dropping old table...
+DROP TABLE IF EXISTS `shadowfit`.`_pose_data_scale_old`
+2026-08-10T14:11:13 Dropped old table `shadowfit`.`_pose_data_scale_old` OK.
+2026-08-10T14:11:13 Dropping triggers...
+DROP TRIGGER IF EXISTS `shadowfit`.`pt_osc_shadowfit_pose_data_scale_del`
+DROP TRIGGER IF EXISTS `shadowfit`.`pt_osc_shadowfit_pose_data_scale_upd`
+DROP TRIGGER IF EXISTS `shadowfit`.`pt_osc_shadowfit_pose_data_scale_ins`
+2026-08-10T14:11:13 Dropped triggers OK.
+# Event              Count
+# ================== =====
+# INSERT              3834
+# mysql_warning_1062  3651
+Successfully altered `shadowfit`.`pose_data_scale`.

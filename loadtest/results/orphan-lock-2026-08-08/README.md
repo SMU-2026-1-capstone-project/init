@@ -63,7 +63,9 @@ warmup 을 매판 넣은 이유는 [`load-test-strategy.md` §7.6](../../../docs
 | 성격 | 상한(실제로 발생하지 않는 상황) | 실운영 근사 |
 
 환경: 로컬 단일 호스트(i3-6100, 2물리코어)에 MySQL·백엔드·ghz 동거. `dockin-*` 컨테이너 3개는 측정 전 중지.
-세션 901~1900 은 이 측정을 위해 시딩했고 (`reference_source='loadtest-multi'`) **남겨뒀다** — [`seed-multi-sessions.sql`](./seed-multi-sessions.sql).
+세션 901~1900 은 이 측정을 위해 시딩했고 (`reference_source='loadtest-multi'`) **남겨뒀다** — [`seed-multi-sessions.sql`](../../seed/seed-multi-sessions.sql).
+
+> 📌 이 시드는 여기서 만들어졌지만 **`loadtest/seed/` 로 옮겼다**(2026-08-12, #166). 다세션 페이로드가 rig 의 기본값이 되면서 1회성 산출물이 아니라 **상시 전제**가 됐기 때문이다.
 
 ---
 
@@ -249,7 +251,7 @@ JVM 옵션은 **하나도 지정하지 않았고**(`Dockerfile`·compose 어디�
 | [`ramp-lock-before.json`](./ramp-lock-before.json) · [`ramp-lock-after.json`](./ramp-lock-after.json) | 단일 세션 판 ghz 원본 |
 | [`ramp-multi-before.json`](./ramp-multi-before.json) · [`ramp-multi-after.json`](./ramp-multi-after.json) · [`ramp-multi-after-scalar.json`](./ramp-multi-after-scalar.json) | 다중 세션 판 ghz 원본 |
 | [`sweep-multi.ps1`](./sweep-multi.ps1) | 다중 세션 판 재현 스크립트 |
-| [`seed-multi-sessions.sql`](./seed-multi-sessions.sql) | 세션 901~1900 시드 |
+| [`seed-multi-sessions.sql`](../../seed/seed-multi-sessions.sql) | 세션 901~1900 시드 (**`loadtest/seed/` 로 이동**, #166) |
 | [`lock-variant.patch`](./lock-variant.patch) | `after` 판에 쓴 코드 변경 |
 
 > 📌 **코드는 되돌렸다.** `lock-variant.patch` 는 **적용돼 있지 않다** — `git apply` 로 얹어야 `after` 가 재현된다.

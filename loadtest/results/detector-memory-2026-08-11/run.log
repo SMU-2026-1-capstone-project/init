@@ -1,0 +1,61 @@
+=== M2 — PoseDetector 1개의 실제 메모리 ===
+    model_complexity=1 · 인스턴스 12개 · RSS 기준
+
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+W0000 00:00:1786430167.842554   14896 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430167.888272   17288 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430167.925466   14896 landmark_projection_calculator.cc:186] Using NORM_RECT without IMAGE_DIMENSIONS is only supported for the square ROI. Provide IMAGE_DIMENSIONS or use PROJECTION_MATRIX.
+[기준] 워밍업 후 RSS = 100.5 MB  (모델 로드·라이브러리 초기화 제외한 바닥)
+
+|   개 |    생성 후 RSS |    추론 후 RSS |     생성 증가 |     추론 증가 |      누적/개 |
+|-----|-------------|-------------|-----------|-----------|-----------|
+W0000 00:00:1786430168.307092    4100 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430168.369727    5220 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|   1 |       101.5 |       200.1 |       1.0 |      98.5 |      99.5 |
+W0000 00:00:1786430168.699060   16452 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430168.743243   16452 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|   2 |       200.1 |       299.2 |       0.1 |      99.0 |      99.3 |
+W0000 00:00:1786430169.012469    1628 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430169.055339    1628 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|   3 |       299.4 |       397.8 |       0.2 |      98.4 |      99.1 |
+W0000 00:00:1786430169.489650   13084 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430169.547318   17116 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|   4 |       398.0 |       495.7 |       0.2 |      97.7 |      98.8 |
+W0000 00:00:1786430169.952870   17308 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430170.007937    9416 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|   5 |       495.7 |       594.2 |       0.1 |      98.5 |      98.7 |
+W0000 00:00:1786430170.344757   14828 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430170.384817   14828 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|   6 |       594.3 |       693.3 |       0.1 |      99.0 |      98.8 |
+W0000 00:00:1786430170.677332    8856 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430170.716890    4212 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|   7 |       693.5 |       791.4 |       0.2 |      97.8 |      98.7 |
+W0000 00:00:1786430171.024313    9076 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430171.072048   16780 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|   8 |       791.9 |       890.4 |       0.6 |      98.5 |      98.7 |
+W0000 00:00:1786430171.341885   12528 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430171.383627   12528 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|   9 |       890.5 |       989.9 |       0.1 |      99.4 |      98.8 |
+W0000 00:00:1786430171.660822   16964 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430171.700920    7072 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|  10 |       990.0 |      1087.8 |       0.1 |      97.8 |      98.7 |
+W0000 00:00:1786430172.010859   16300 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430172.050880   16300 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|  11 |      1088.0 |      1186.0 |       0.2 |      98.0 |      98.7 |
+W0000 00:00:1786430172.362530   16820 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1786430172.399955   16820 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+|  12 |      1186.1 |      1284.6 |       0.1 |      98.5 |      98.7 |
+
+[1+2] 인스턴스당 = **98.7 MB**  (총 1184.1 MB / 12개)
+[3]   close()+gc 후 RSS = 104.5 MB → 회수 1180.1 MB (100%)
+
+## 세션 상한의 메모리 쪽 근거
+   세션  12개 → 검출기 메모리 약    1184 MB
+   세션  24개 → 검출기 메모리 약    2368 MB
+   세션  48개 → 검출기 메모리 약    4736 MB
+   세션  67개 → 검출기 메모리 약    6611 MB
+
+  ⚠️ 이건 «검출기만» 이다. 프레임 버퍼·파이썬 힙·다른 컨테이너는 별도다.
+  ⚠️ 회수율이 낮으면 «정리» 만으로 부족하다 — 세션 회전이 잦을수록 누적된다.
+     단 RSS 는 할당자가 OS 에 안 돌려줘도 안 줄어든다. «누수» 와 «반환 안 함» 은 여기서 안 갈린다.

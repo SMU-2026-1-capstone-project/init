@@ -9,15 +9,15 @@
 #     · member_id ↔ start_time 종속    → **집계 e(기간 내 COUNT DISTINCT member_id) 직격**
 #     · 모든 행이 2벌 + distinct start_time 이 절반 → **집계 a 의 skip scan 카디널리티 직격**
 #
-#   그래서 §4-5 의 두 헤드라인이 재확인 대상이다:
-#     ① a 의 "rows 추정이 38배 부풀려져 있었다" (110,527 추정 vs 2,880 실제)
+#   그래서 §4-5 의 두 헤드라인이 재확인 대상이었다:
+#     ① a 의 "rows 추정이 38배 부풀려져 있었다" (110,527 추정 vs 2,880 실제)  ← 이 스크립트가 본다
 #     ② e 의 "(start_time, member_id) 를 넣으면 10배" (1,002ms → 99.5ms)
+#        ← **이 스크립트는 더 이상 안 본다.** 가설이 채택돼 스키마에 들어갔다(아래 [3] 제거 기록)
 #
 # ── 이 장치가 하는 것 ─────────────────────────────────────────────────────────
 #
 #   [1] AdminStatsExplainCaptureTest 로 **앱이 실제로 보내는** 집계 SQL 5종을 캡처
 #   [2] 각각 EXPLAIN ANALYZE — 추정 rows vs 실제 rows, 시간 최소/중앙값
-#   [3] e 인덱스 가설 재검증 — (start_time, member_id) 를 임시로 붙였다 뗀다
 #
 # ── 대답하지 못하는 것 ────────────────────────────────────────────────────────
 #
@@ -28,24 +28,30 @@
 #
 # ── 얼마나 걸리나 (2026-08-09 실측) ───────────────────────────────────────────
 #
-#   156초 (2분 36초) — 집계 SQL 캡처(gradle 테스트) + EXPLAIN ANALYZE 7회 × 5종 + [3].
+#   156초 (2분 36초) — 집계 SQL 캡처(gradle 테스트) + EXPLAIN ANALYZE 7회 × 5종 + 옛 [3].
+#   ⚠️ 이 값은 [3] 을 떼기 전의 것이다. 지금은 그만큼 짧아지지만 재측정하지 않았다.
 #   ⚠️ **스크래치 DB 가 이미 시딩돼 있을 때**의 값이다. 없으면
 #      measure_admin_filter_explain.sh 를 먼저 돌려야 하고 그쪽이 682초 더 든다.
 #   ⚠️ 전제: 2물리코어, MySQL 컨테이너 단독. 이웃을 켜둔 채면 더 걸리고 ms 도 부풀려진다.
 #
-# ── 🔴 [3]단계가 낡았다 (2026-08-09) ──────────────────────────────────────────
+# ── [3]단계를 뗐다 (2026-08-12, 이슈 #153) ────────────────────────────────────
 #
-#   [3] 은 "(start_time, member_id) 를 가설로 임시 추가해 이득을 본다" 는 장치인데,
+#   있던 것: "(start_time, member_id) 를 가설로 임시 추가해 이득을 본다".
 #   그 가설은 **2026-08-07 에 채택돼 이미 스키마에 있다**(idx_session_starttime_member,
-#   V1__baseline.sql:175). 그래서 지금 이 단계는 **같은 컬럼의 중복 인덱스**를 얹는다:
+#   V1__baseline.sql:175). 그래서 이 단계는 **같은 컬럼의 중복 인덱스**를 얹고 있었다:
 #
 #     현행(5개)    최소 13.1ms  스캔 19,019행
 #     가설(+6번째) 최소 12.8ms  스캔 19,019행     ← 스캔 행이 같다 = 같은 접근 경로
 #
-#   비교로서 의미가 없어졌고 라벨이 읽는 사람을 오도한다. 결과는 admin-page-scope.md
-#   §4-5-2 ⑤. measure_r.py 가 시그니처 변경을 못 따라와 죽어 있던 것(#145)과 같은 계열인데,
-#   그쪽은 터져서 드러났고 이쪽은 **조용히 무의미한 값을 낸다** — 후자가 더 위험하다.
-#   (정리 자체는 정상이다: 측정 후 인덱스 6종 = 보조 5 + PRIMARY 로 임시분 제거 확인)
+#   터지지 않고 **조용히 무의미한 값을 냈다.** 라벨만 보면 "6번째 인덱스는 효과가 없다" 는
+#   정반대 결론으로 읽힌다(실제로는 이미 들어가 있어서 이득이 «현행» 쪽에 포함된 것).
+#   measure_r.py 가 시그니처 드리프트로 죽어 있던 것(#145)과 같은 계열인데, 그쪽은 터져서
+#   드러났고 이쪽은 안 터진다 — 후자가 더 위험하다. 결과 원본은 admin-page-scope.md §4-5-2 ⑤.
+#
+#   🔴 **«역방향»(채택된 인덱스를 떼고 대조) 으로 고쳐 쓰지 않았다.** 그렇게 하면 이 데이터
+#      위에서 나온 ms 를 인용하게 되는데, 시딩이 균등 분포라 선택도가 가짜다. 같은 이유로
+#      measure_admin_index.sh 도 «읽기 이득은 EXPLAIN 계획 변화까지, 시간 수치는 안 낸다» 로
+#      선을 그어 두었다. 그 선을 여기서만 넘을 근거가 없다.
 #
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
@@ -60,11 +66,12 @@ REPS=7
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d)"
 
-# ⚠️ 실패해도 서버 상태를 되돌린다. 여기서 특히 중요한 것은 **임시 인덱스**다 —
-#    [3] 이 (start_time, member_id) 를 붙였다 떼는데, 그 사이에 죽으면 스크래치 DB 에
-#    6번째 인덱스가 남는다. 그러면 이후 측정이 **조용히 다른 스키마 위에서** 돌게 되고,
-#    그건 §4-2 가 정리한 "틀렸다는 신호조차 없는" 종류의 오염이다.
-#    general_log 도 켜진 채 남으면 디스크가 차고 다음 측정이 느려진다.
+# ⚠️ 실패해도 서버 상태를 되돌린다. general_log 가 켜진 채 남으면 디스크가 차고 다음 측정이
+#    느려진다.
+#    임시 인덱스 제거는 **이제 이 스크립트가 만들지 않는 것을 지운다** — 옛 [3] 이 죽으면서
+#    스크래치 DB 에 idx_tmp_start_member 를 남겼을 수 있어서 청소만 남겨 둔다. 남아 있으면
+#    이후 측정이 **조용히 다른 스키마 위에서** 돌고, 그건 §4-2 가 정리한 "틀렸다는 신호조차
+#    없는" 종류의 오염이다.
 cleanup(){
   local rc=$?
   docker exec "$CONTAINER" mysql -uroot -p$PW -e "SET GLOBAL general_log='OFF';" 2>/dev/null || true
@@ -95,7 +102,7 @@ est_rows(){ { printf '%s' "$1" | grep -o 'cost=[0-9.e+]* rows=[0-9.e+]*' || true
 
 echo "############ D 대시보드 집계 — 재측정 ############"
 echo
-echo "## [0/3] 전제"
+echo "## [0/2] 전제"
 U=$(Q -sN -e "SELECT COUNT(*) FROM users;")
 S=$(Q -sN -e "SELECT COUNT(*) FROM exercise_sessions;")
 echo "   회원 ${U} / 세션 ${S}"
@@ -113,7 +120,7 @@ fi
 echo
 
 # ── [1] 집계 SQL 캡처 ─────────────────────────────────────────────────────────
-echo "## [1/3] 캡처 — AdminStatsExplainCaptureTest"
+echo "## [1/2] 캡처 — AdminStatsExplainCaptureTest"
 DB -e "SET GLOBAL general_log='OFF'; SET GLOBAL log_output='FILE'; SET GLOBAL general_log_file='${LOGFILE}';"
 docker exec "$CONTAINER" sh -c "rm -f ${LOGFILE}"
 DB -e "SET GLOBAL general_log='ON';"
@@ -142,7 +149,7 @@ echo
 
 # ── [2] 추정 vs 실제 ──────────────────────────────────────────────────────────
 # §4-5 의 성과가 "rows 는 견적이지 측정이 아니다"였으므로, 그 격차를 표의 1급 열로 둔다.
-echo "## [2/3] EXPLAIN ANALYZE — 추정 rows vs 실제 rows, 시간 ${REPS}회"
+echo "## [2/2] EXPLAIN ANALYZE — 추정 rows vs 실제 rows, 시간 ${REPS}회"
 printf "%-26s %12s %12s %8s %10s %10s\n" "집계" "추정rows" "실제rows" "배수" "최소(ms)" "중앙값"
 while IFS=$'\t' read -r lbl sql; do
   Q -e "${sql%;}" >/dev/null 2>&1 || true
@@ -163,41 +170,6 @@ while IFS=$'\t' read -r lbl sql; do
 done < "$WORK/captured.tsv"
 echo
 
-# ── [3] e 인덱스 가설 재검증 ──────────────────────────────────────────────────
-# §4-5 는 (start_time, member_id) 로 1,002ms → 99.5ms (10배) 를 봤다. 그 측정은 start_time 이
-# member_id 와 묶여 있던 데이터 위였다 — 기간을 자르면 회원이 한 구간에 몰려 있었으므로
-# 중복 제거가 실제보다 쉬웠을 수 있다. 고친 데이터에서 다시 본다.
-echo "## [3/3] e 활성 회원 — (start_time, member_id) 인덱스 가설 재검증"
-E_SQL=$(awk -F'\t' '$1 ~ /e_active/ {print $2; exit}' "$WORK/captured.tsv")
-if [[ -z "$E_SQL" ]]; then
-  echo "   !! e 집계 SQL 을 못 찾았다 (라벨 e_active*)"
-else
-  bench(){ # $1=라벨
-    local vals="" tree
-    Q -e "${E_SQL%;}" >/dev/null 2>&1 || true
-    for _ in $(seq $REPS); do
-      tree=$(ea "$E_SQL" "e/$1")
-      [[ -n "$tree" ]] && vals="${vals}$(top_time "$tree")\n"
-    done
-    local sorted nv; sorted=$(printf "$vals" | grep -v '^$' | sort -n)
-    nv=$(printf '%s\n' "$sorted" | wc -l | tr -d ' ')
-    [[ -z "$sorted" ]] && { printf "   %-14s 실패\n" "$1"; return; }
-    printf "   %-14s 최소 %8s ms  중앙값 %8s ms  스캔 %s행\n" "$1" \
-      "$(printf '%s\n' "$sorted" | head -1)" \
-      "$(printf '%s\n' "$sorted" | awk -v m=$(( (nv+1)/2 )) 'NR==m')" \
-      "$(max_rows "$(ea "$E_SQL" "e/$1/rows")")"
-  }
-  bench "현행(5개)"
-  Q -e "ALTER TABLE exercise_sessions ADD INDEX idx_tmp_start_member (start_time, member_id);" >/dev/null
-  Q -e "ANALYZE TABLE exercise_sessions;" >/dev/null
-  bench "가설(+6번째)"
-  # 임시 인덱스는 반드시 뗀다 — 남기면 이후 측정이 조용히 다른 스키마 위에서 돈다.
-  Q -e "ALTER TABLE exercise_sessions DROP INDEX idx_tmp_start_member;" >/dev/null
-  Q -e "ANALYZE TABLE exercise_sessions;" >/dev/null
-  echo "   (임시 인덱스 제거 완료 — 현재 인덱스 $(Q -sN -e "SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema='${DB_NAME}' AND table_name='exercise_sessions';")종)"
-fi
-echo
-
 if [[ -s "$FAILLOG" ]]; then
   echo "🔴🔴 실행 실패한 쿼리가 있다:"; sort "$FAILLOG" | uniq -c | sed 's/^/     /'; echo
 fi
@@ -205,4 +177,4 @@ fi
 echo "############ 읽는 법 ############"
 echo "[2] '배수' 는 추정rows/실제rows — 1.0 에서 멀수록 옵티마이저 견적이 빗나간 것이다."
 echo "    §4-5 는 a 에서 38배(비관), §4-3 은 (b) 에서 낙관 방향으로 빗나간 사례를 이미 남겼다."
-echo "[3] 시간은 최소값을 읽을 것. 동거 노이즈는 늘리기만 한다(§4-5 ②-1)."
+echo "    시간은 최소값을 읽을 것. 동거 노이즈는 늘리기만 한다(§4-5 ②-1)."

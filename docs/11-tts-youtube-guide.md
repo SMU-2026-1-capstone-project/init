@@ -28,7 +28,7 @@
 >
 > ⚠️ **재생성 시 함정**: pb2 생성 산출물이 `ai-server/` 루트와 `app/proto/` 두 곳에 있고 **실제로 로드되는 건 루트 쪽**이다([이슈 #132](https://github.com/Shadowfit/init/issues/132)).
 
-> 모든 멘트는 한국어 단일 ([`project-korean-only`](../../C:/Users/khjae/.claude/projects/E--init/memory/project_korean_only.md)). 다국어 분리 컬럼·로직 없음.
+> 모든 멘트는 한국어 단일 ([[project_korean_only]]). 다국어 분리 컬럼·로직 없음.
 
 ---
 

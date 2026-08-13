@@ -181,7 +181,7 @@
   - `exercise_servicer.py` +126줄 (정리·통합)
   - `auth_interceptor.py` -26줄 (server.py 내부로 합침)
   - `spring_client.py` +63줄
-**결합 영향**: AI 쪽 결합 표면이 한 갈래로 수렴. ([`feedback-preview-scope-before-bulk-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_preview_scope_before_bulk_changes.md) 의 계기가 된 작업.)
+**결합 영향**: AI 쪽 결합 표면이 한 갈래로 수렴. ([[feedback_preview_scope_before_bulk_changes]] 의 계기가 된 작업.)
 
 ### 94acf6d — chore: ai-server/app/grpc 패키지 docstring 복원
 **Spring↔AI 결합 영향**: 없음 (단순 docstring 1줄).
@@ -336,7 +336,7 @@
 ## 6. 변경 트렌드 관찰
 
 - **결합 표면이 줄어드는 방향으로 진행**: REST 콜백 controller(0d89668)·GrpcConfig(48bb0fc)·mock_server(6ac0390)·session_registry(e8e1b65) 등 초기 도입 컴포넌트가 모두 나중에 제거됨 (8ac8248, 7d51cf6, 1a50c14, 4a0f456). 양쪽 모두 인터페이스 갈래를 줄여가는 추세.
-- **신뢰성 작업은 AI 쪽 코드 변경을 동반**: c7657f1에서 thread-local·재시도가 AI에 추가됐고, 그 외 AI 동작 변경은 1a50c14·4a0f456 같은 큰 통합 정리에만 몰려 있음 → [`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 와 정합.
+- **신뢰성 작업은 AI 쪽 코드 변경을 동반**: c7657f1에서 thread-local·재시도가 AI에 추가됐고, 그 외 AI 동작 변경은 1a50c14·4a0f456 같은 큰 통합 정리에만 몰려 있음 → [[feedback_minimize_python_changes]] 와 정합.
 - **proto는 결합의 무게 중심**: 거의 모든 신기능 도입(953bad6, 4eb153b, ea1c636, f172933, c52f677 일부, 8ac8248 후속) 이 proto 동기 변경을 강제. → [`decisions/ai-backend-coupling.md`](../decisions/ai-backend-coupling.md) §5 분기 B의 근거.
 - **권위 충돌 정리**: 143a2e4에서 “프론트가 운동 통계를 직접 만들지 않음” 원칙으로 결합 책임 경계 명확화.
 

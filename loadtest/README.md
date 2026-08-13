@@ -5,6 +5,11 @@
 
 확정 결정(2026-05-31): 목표 DAU 1,000 / 트랙 **② 백엔드 격리(ghz) → ⑤ 시딩→projection** 순차 / 도구 ghz + Locust.
 
+> 🔴 **EC2 를 띄운다면 먼저 [`AWS-RIDE-ALONG.md`](AWS-RIDE-ALONG.md) 를 열 것.**
+> 이 프로젝트의 EC2 는 항상 «임시 생성 → 측정 → 삭제» 라, 살아 있는 동안에만 잴 수 있는 항목이 있다.
+> 2026-08-08 에 인프라를 3대 띄우고도 «다음에 띄울 때 돌릴 것» 이라 적어둔 쿼리를 안 돌리고 삭제한 적이 있다 —
+> 목록이 문서 여기저기 흩어져 있었기 때문이다. 그 목록과 **삭제 전 체크리스트**가 그 파일에 있다.
+
 > 핵심: 시스템 병목은 AI 추론(MediaPipe)이라 **MediaPipe 를 빼고** 본인 소유 경로(Spring+MySQL)만
 > `SavePoseDataBatch` gRPC 로 격리 측정한다. (strategy §3.2·§5)
 
@@ -15,7 +20,9 @@
 | 파일 | 용도 |
 |------|------|
 | `gen_batch.py` | `PoseDataBatchRequest` 1건(= rep 1회 프레임들) JSON 생성기. `--reps` = R 값 |
-| `batch.json` | 생성된 데이터 템플릿 (session 801, R=25, ~52KB / 프레임 ~2.1KB). **실측 R 로 재생성 권장** |
+| `gen_batch_multi.py` | 위의 다세션 판 — 세션 N개를 순회하는 **메시지 배열** 생성 |
+| **`batch_multi.json`** | **기본 페이로드** (session 901~1900, R=25). ghz 가 요청마다 다음 세션으로 순회 |
+| `batch.json` | 단일 핫세션 판 (session 801, R=25, ~52KB / 프레임 ~2.1KB). **기본값 아님** — 아래 참조 |
 | `run-save-pose-batch.ps1` | Windows 실행 (smoke / baseline / ramp) |
 | `run-save-pose-batch.sh` | bash 실행 (Git Bash / Linux) |
 | `results/` | 실행 출력. **일회성 리포트는 안 남기고, 실험 결과는 커밋한다** — 아래 |
@@ -24,7 +31,23 @@
 
 1. **백엔드 gRPC 가 :6565 에 떠 있음** — reflection 켜진 상태 (`application.yml` `grpc.server.reflection-enabled: true`).
    ghz 가 reflection 으로 스키마 자동 인식 → proto 파일·import 경로 지정 불필요.
-2. **세션 row 존재** — `batch.json` 의 `sessionId`(기본 801)가 DB 에 있어야 함
+> 🔴 **기본 페이로드는 `batch_multi.json` 이다 (2026-08-12, [#166](https://github.com/Shadowfit/init/issues/166)).**
+> 전 요청이 `session_id=801` 하나로 가면 모든 INSERT 가 같은 인덱스 리프로 몰려 커밋이 직렬화되고,
+> 그때 나오는 천장은 시스템의 천장이 아니라 **그 경합의 천장**이다. 3차(2026-08-08)의
+> «천장 = 커밋 fsync» 결론이 그 위에서 나왔고, 4차가 같은 코드·같은 행수에서 페이로드만 바꿔
+> **220.4 → 649.4 RPS** 로 반증했다.
+>
+> `batch.json` 은 지우지 않았다 — 단일 핫세션은 이제 버그가 아니라 **4차가 규명한 조건**이고,
+> 그 조건을 재현할 수단이 필요하다. 쓰려면 명시적으로: `-DataFile batch.json` / `DATA_FILE=batch.json`.
+> 스크립트가 세션 범위(801 vs 901~1900)를 따라 리셋·프리플라이트 대상을 같이 바꾼다.
+
+2. **세션 row 존재** — 페이로드의 `sessionId` 들이 DB 에 있어야 함. 기본값이면 **901~1900 (1,000개)**:
+   ```bash
+   docker exec -i shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit < seed/seed-multi-sessions.sql
+   ```
+   없으면 판이 «완주» 하고 `count` 는 찬 채 `OK 0` 인 결과가 남는다 — 실패로 안 보인다.
+   그래서 스크립트가 판 시작 전에 **프리플라이트**로 막는다 (`-SkipPreflight` 로 해제).
+   단일 핫세션 판(`batch.json`)을 쓸 때만 아래 더미 801 이 필요하다:
    ([`PoseDataService.savePoseDataBatch`](../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java) 가 `findById` 로 세션 먼저 조회 → 없으면 `SESSION_NOT_FOUND`).
    더미 801 은 [`mysql/dev-seed.sql`](../mysql/dev-seed.sql) 에 있다.
    ⚠️ **자동으로 안 들어간다** — Flyway 도입(이슈 #115) 후 initdb 마운트가 없어졌고, 이 픽스처는
@@ -44,6 +67,16 @@ scoop install ghz            # Windows (scoop)
 go install github.com/bojand/ghz/cmd/ghz@latest   # go 있으면
 ```
 릴리스 바이너리: https://github.com/bojand/ghz/releases
+
+> **스크립트가 ghz 를 찾는 순서: ① 저장소 `loadtest/.bin/ghz.exe` → ② PATH** ([#194](https://github.com/Shadowfit/init/issues/194)).
+> 규칙은 `ghz/_ghz-path.ps1` 한 곳에 있고 bash 판도 같은 순서다. 둘 중 아무 쪽이나 채우면 rig 전체가 돈다.
+>
+> `.bin/` 을 먼저 보는 이유는 재현성이다 — 저장소 안에 일부러 받아둔 바이너리가 있으면 그걸로 재는 게 맞다.
+> 머신 전역 PATH 사정에 따라 판마다 다른 버전이 돌면 그 차이는 결과에 남지 않고 조용하다.
+> 그래서 판 시작 시 **어느 바이너리를 썼는지 버전과 함께 한 줄 찍는다**: `[ghz] 저장소 .bin — …\ghz.exe (v0.121.0)`
+>
+> ⚠️ `.bin/` 은 gitignore 대상(`loadtest/.gitignore:6`)이라 **clone 만으로는 생기지 않는다.**
+> 전에는 스크립트마다 찾는 방법이 세 갈래여서, 어느 쪽으로 설치하든 절반이 「미설치」라며 죽었다.
 
 ### 실행
 

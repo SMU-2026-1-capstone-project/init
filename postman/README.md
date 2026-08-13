@@ -76,5 +76,5 @@ grpcurl -plaintext `
 
 - 결정 문서: [`../docs/decisions/tts-design.md`](../docs/decisions/tts-design.md), [`../docs/decisions/session-end-trigger.md`](../docs/decisions/session-end-trigger.md), [`../docs/decisions/latency-perception.md`](../docs/decisions/latency-perception.md)
 - API 명세: [`../docs/07-api-design.md`](../docs/07-api-design.md)
-- proto: [`../backend/src/main/proto/exercise.proto`](../backend/src/main/proto/exercise.proto), [`../backend/src/main/proto/user.proto`](../backend/src/main/proto/user.proto)
+- proto: [`../backend/src/main/proto/exercise.proto`](../backend/src/main/proto/exercise.proto)
 - Swagger UI: http://localhost:8080/swagger-ui/index.html

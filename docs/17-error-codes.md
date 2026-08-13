@@ -1,7 +1,7 @@
 # 에러 코드 & 예외 처리 가이드
 
 마지막 업데이트: 2026-05-23
-범위: Spring 백엔드의 에러 코드 enum, 응답 포맷, gRPC 에러 매핑. 사용자가 받게 되는 메시지는 한국어 단일 ([`project-korean-only`](../../C:/Users/khjae/.claude/projects/E--init/memory/project_korean_only.md)).
+범위: Spring 백엔드의 에러 코드 enum, 응답 포맷, gRPC 에러 매핑. 사용자가 받게 되는 메시지는 한국어 단일 ([[project_korean_only]]).
 
 ---
 

@@ -7,7 +7,7 @@ RealMySQL 실험([`../../docs/portfolio/realmysql-experiments.md`](../../docs/po
 | **A. 실데이터** | `pose_data` | 실제 33-랜드마크 JSON(~2.3KB) | ~375만(디스크 제약) | ②b projection 등 **payload 실험** |
 | **B. 행수 스케일** | `pose_data_scale` | 더미 `{}` | **정확히 1억** | ②c 페이지네이션·②d 파티션 등 **행수 실험** |
 
-> 핵심: 1억 행을 실제 JSON으로 채우면 255GB라 로컬 불가. 행수 실험은 payload가 무관하므로 더미로 디커플링(rig B). payload 실험은 행수가 작아도 되므로 실데이터 일부(rig A).
+> 핵심: 1억 행을 실제 JSON으로 채우면 **JSON 바이트만 ~230GB**(1억 × 2.3KB)라 로컬 불가 — 테이블은 행·페이지 오버헤드로 더 크다. 행수 실험은 payload가 무관하므로 더미로 디커플링(rig B). payload 실험은 행수가 작아도 되므로 실데이터 일부(rig A).
 
 ---
 

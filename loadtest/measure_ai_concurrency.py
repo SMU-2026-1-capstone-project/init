@@ -195,10 +195,77 @@ SEP = "|" + "-" * 28 + "|" + "-" * 7 + "|" + "-" * 9 + "|" + "-" * 9 + "|" + "-"
 
 import os  # noqa: E402
 
+
+def host():
+    """이 측정이 «어느 장비에서» 났는지 검출해서 결과에 박는다.
+
+    초판은 `물리 2코어(i3-6100)+HT` 를 **문자열로 하드코딩**했다. 다른 장비에서 돌리면
+    거짓 사양이 결과에 찍히고, 그 결과가 나중에 인용된다. 그래서 검출한다.
+
+    cgroup 상한을 같이 보는 이유: `os.cpu_count()` 는 **호스트 논리 CPU 를 보지
+    컨테이너 캡을 안 본다.** `docker --cpus` 가 걸려 있으면 조용히 틀린 코어 수로 나눈다.
+    (같은 종류의 함정을 `--memory` 캡에서 이미 겪었다.)
+
+    반환: (cpu 모델, 논리 코어, 물리 코어 or None, cgroup 상한 or None)
+    """
+    model, logical, physical = "unknown", os.cpu_count() or 1, None
+    try:
+        with open("/proc/cpuinfo") as f:
+            lines = f.read().splitlines()
+        for ln in lines:
+            if ln.startswith("model name"):
+                model = ln.split(":", 1)[1].strip()
+                break
+        # (physical id, core id) 쌍의 개수 = 물리 코어. HT 는 같은 쌍을 공유한다.
+        pairs, cur = set(), {}
+        for ln in lines:
+            if ":" in ln:
+                k, v = (x.strip() for x in ln.split(":", 1))
+                if k in ("physical id", "core id"):
+                    cur[k] = v
+            elif not ln.strip():
+                if len(cur) == 2:
+                    pairs.add((cur["physical id"], cur["core id"]))
+                cur = {}
+        if len(cur) == 2:
+            pairs.add((cur["physical id"], cur["core id"]))
+        if pairs:
+            physical = len(pairs)
+    except OSError:
+        pass
+
+    quota = None
+    try:                                              # cgroup v2
+        with open("/sys/fs/cgroup/cpu.max") as f:
+            q, p = f.read().split()
+        if q != "max":
+            quota = int(q) / int(p)
+    except (OSError, ValueError):
+        try:                                          # cgroup v1
+            with open("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") as f:
+                q = int(f.read())
+            with open("/sys/fs/cgroup/cpu/cpu.cfs_period_us") as f:
+                p = int(f.read())
+            if q > 0:
+                quota = q / p
+        except (OSError, ValueError):
+            pass
+    return model, logical, physical, quota
+
+
+CPU, LOGICAL, PHYSICAL, QUOTA = host()
+EFF = int(QUOTA) if QUOTA else LOGICAL            # 실제로 쓸 수 있는 논리 CPU
+
 print("=== AI 서버 프레임당 추론 비용 · 동시성 스케일 ===")
-print(f"    model_complexity={settings.POSE_MODEL_COMPLEXITY} · "
-      f"컨테이너 CPU(논리)={os.cpu_count()} · 물리 2코어(i3-6100)+HT")
-print("    ⚠️ 절대 «동시 N세션» 은 이 장비에서 안 나온다. 프레임당 비용과 상대 곡선만 신뢰할 것.")
+print(f"    model_complexity={settings.POSE_MODEL_COMPLEXITY}")
+print(f"    CPU   : {CPU}")
+print(f"    코어  : 논리 {LOGICAL} · 물리 {PHYSICAL if PHYSICAL else '검출 실패'}"
+      + (f" · cgroup 상한 {QUOTA:g}" if QUOTA else " · cgroup 상한 없음"))
+if QUOTA:
+    print("    🔴 cgroup CPU 상한이 걸려 있다. «코어당 세션» 을 낼 거면 상한을 풀고 다시 재라.")
+if not PHYSICAL:
+    print("    🔴 물리 코어를 못 셌다(비 x86?). «코어당 세션» 은 논리 코어 기준이 되어 과대평가된다.")
+print("    ⚠️ ms 는 이 CPU 에 묶인다. 옮겨 쓸 수 있는 것은 포화 곡선 «모양» 과 «물리 코어당 세션» 이다.")
 print()
 
 # ── 사전 단언 ──────────────────────────────────────────────────────────────────
@@ -240,12 +307,19 @@ print()
 print("## [C] 동시 스레드 — 처리량 포화")
 print("     스레드마다 자기 검출기(스레드 로컬)를 갖고 같은 사람 연속 프레임을 돈다.")
 print("     = 세션이 스레드에 1:1로 붙는 «가장 유리한» 배치다. 실제 스레드풀은 이보다 나쁠 수 있다.")
-print()
-print(f"| {'스레드':<8} | {'총 처리량(fps)':>14} | {'스레드당 평균ms':>16} | {'1스레드 대비':>12} |")
-print("|" + "-" * 10 + "|" + "-" * 16 + "|" + "-" * 18 + "|" + "-" * 14 + "|")
 
-base_fps = None
-for nth in (1, 2, 4, 8):
+# 스윕을 장비에 맞춘다 — 포화점 «너머» 까지 가야 곡선이 닫힌다.
+# 초판은 (1,2,4,8) 고정이었다. 물리 8코어 박스면 포화가 8 밖이라 곡선이 안 닫힌다.
+SWEEP = sorted({1, 2, 4, 8, EFF, EFF * 2} | ({PHYSICAL} if PHYSICAL else set()))
+REPEATS = 3
+
+print(f"     스윕 {SWEEP} · {REPEATS}판 + 버림판 1 · 판마다 순서를 뒤집는다")
+print("     (오름차순 1판씩이면 «스레드 수» 와 «판 순서»(터보·써멀 드리프트)가 안 갈린다)")
+print()
+
+
+def throughput(nth):
+    """nth 스레드 동시 실행 → (총 처리량 fps, 스레드당 평균 ms)."""
     per_thread = []
     lock = threading.Lock()
     frames = squat_cycle(20)
@@ -265,25 +339,54 @@ for nth in (1, 2, 4, 8):
     for t in ths:
         t.join()
     wall = time.perf_counter() - t0
+    return nth * len(frames) * REPS / wall, statistics.mean(per_thread)
 
-    total_frames = nth * len(frames) * REPS
-    fps = total_frames / wall
-    if base_fps is None:
-        base_fps = fps
-    print(f"| {nth:<8} | {fps:>14.1f} | {statistics.mean(per_thread):>16.1f} "
-          f"| {fps / base_fps:>11.2f}x |")
+
+for _n in SWEEP:                # 버림판 — 결과에 넣지 않는다
+    throughput(_n)
+
+runs = {n: [] for n in SWEEP}
+for r in range(REPEATS):
+    for n in (SWEEP if r % 2 == 0 else list(reversed(SWEEP))):
+        runs[n].append(throughput(n))
+
+print(f"| {'스레드':<8} | {'총 처리량(fps)':>14} | {'판별 최소~최대':>17} "
+      f"| {'스레드당 평균ms':>16} | {'1스레드 대비':>12} |")
+print("|" + "-" * 10 + "|" + "-" * 16 + "|" + "-" * 19 + "|" + "-" * 18 + "|" + "-" * 14 + "|")
+
+med = {}
+for n in SWEEP:
+    fpss = sorted(x[0] for x in runs[n])
+    med[n] = fpss[len(fpss) // 2]                 # 판 간 중앙값
+    print(f"| {n:<8} | {med[n]:>14.1f} | {fpss[0]:>7.1f}~{fpss[-1]:<9.1f} "
+          f"| {statistics.mean(x[1] for x in runs[n]):>16.1f} "
+          f"| {med[n] / med[SWEEP[0]]:>11.2f}x |")
+
+peak_n = max(med, key=med.get)
+peak = med[peak_n]
 
 print()
 print("## 유도")
 print(f"  프레임당 비용(트래킹 유지) : {a['mean']:.1f} ms")
 print(f"  프레임당 비용(트래킹 깨짐) : {b['mean']:.1f} ms")
+print(f"  측정된 포화 처리량         : {peak:.1f} fps (스레드 {peak_n})")
 print()
+print("  ⓐ 측정 기반 — 이 장비에서 «실제로 나온» 처리량을 클라 fps 로 나눈다")
 for fps_c in (3, 10):
-    for cores in (2, 4, 8):
-        s_ok = cores * 1000 / (a["mean"] * fps_c)
-        s_bad = cores * 1000 / (b["mean"] * fps_c)
-        print(f"  {cores}코어 · 클라 {fps_c}fps → 동시 세션 "
-              f"{s_ok:5.1f} (트래킹 유지) ~ {s_bad:5.1f} (깨짐)")
+    ses = peak / fps_c
+    print(f"     클라 {fps_c:>2}fps → 동시 {ses:6.1f} 세션"
+          + (f"   ⇒ 물리 코어당 {ses / PHYSICAL:.2f} 세션" if PHYSICAL else ""))
+
+if PHYSICAL:
+    per_core = peak / 3 / PHYSICAL                # 실클라 3fps 기준(#143 상한)
+    print()
+    print("  ⓑ 다른 사양으로 옮길 때 — ⓐ 의 «코어당» 에 목표 물리 코어 수를 곱한다")
+    for cores in (4, 8, 16, 32):
+        print(f"     물리 {cores:>2}코어 · 클라 3fps → 동시 {per_core * cores:6.1f} 세션")
+    # 67 = DAU 1,000 가정의 피크 동시 세션 (ai-load-budget.md / load-test-strategy.md §1)
+    print(f"\n  ⇒ 가정한 피크 동시 67세션을 채우려면 물리 {67 / per_core:.1f}코어")
 print()
 print("  ⚠️ 위 유도는 «코어를 100% 추론에 쓸 수 있다» 는 상한이다. 실제로는 디코딩·HTTP·GIL,")
+print("     그리고 같은 박스에 사는 다른 컨테이너가 이 값을 깎는다. 하한이 아니라 상한으로 읽을 것.")
+print("  ⚠️ 코어 선형 가정도 상한이다 — 메모리 대역·L3 경합은 코어가 늘수록 나빠진다.")
 print("     그리고 [C] 가 보여주는 포화가 더 낮은 값을 만든다. 상한으로만 읽을 것.")

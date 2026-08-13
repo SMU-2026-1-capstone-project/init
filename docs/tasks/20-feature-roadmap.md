@@ -119,15 +119,15 @@
 | 🟢 | 카테고리 관리 CRUD | 운영자용 |
 | 🟢 | 사용자 운동 패턴 분석 API | 큰 작업 |
 | 🟢 | 데이터 기반 개인화 루틴 추천 | 가장 큰 작업, 알고리즘 설계 필요 |
-| ⚪ | 운동 세트 개념 도입 | DB 컬럼·DTO 신설, 분석기와 협의 — [`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) 와 묶어 후순위 |
+| ⚪ | 운동 세트 개념 도입 | DB 컬럼·DTO 신설, 분석기와 협의 — [[project_squat_first]] 와 묶어 후순위 |
 
 ### 2-3. AI Server (FastAPI) — 🟢 변경 최소화 (정책)
 
-[`feedback-minimize-python-changes`](../../../C:/Users/khjae/.claude/projects/E--init/memory/feedback_minimize_python_changes.md) 따라 거의 손대지 않음.
+[[feedback_minimize_python_changes]] 따라 거의 손대지 않음.
 
 | 우선 | 항목 | 비고 |
 |------|------|------|
-| 🟢 | (필요 시) `ExtractReferenceData` 실제 구현 | 새 운동 추가 시점에 함께 — 현재는 `UNIMPLEMENTED` 응답. [`project-squat-first`](../../../C:/Users/khjae/.claude/projects/E--init/memory/project_squat_first.md) 따라 보류 |
+| 🟢 | (필요 시) `ExtractReferenceData` 실제 구현 | 새 운동 추가 시점에 함께 — 현재는 `UNIMPLEMENTED` 응답. [[project_squat_first]] 따라 보류 |
 | ⚪ | 런지·플랭크 분석기 추가 | 위와 같은 시점 |
 | ⚪ | 운동 세트 자동 구분 분석 로직 | DB 스키마 결정 후 |
 

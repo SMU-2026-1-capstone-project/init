@@ -2,7 +2,8 @@
 # 1억 행 합성 시딩 — pose_data_scale (RealMySQL 실험 §3 선결, docs/portfolio/realmysql-experiments.md)
 #
 # 133,334 세션 × 750행(끝세션 250) = 정확히 1억 행, 더미 JSON {}, 2026년 12개월+ 분산.
-# 행수·payload 디커플링(§0.3): 실제 2.3KB JSON이면 255GB라 로컬 불가 → 더미로 ~11GB.
+# 행수·payload 디커플링(§0.3): 실제 2.3KB JSON이면 JSON 바이트만 ~230GB(1억 × 2.3KB)라
+#   로컬 불가 → 더미로 ~11GB. 테이블은 행·페이지 오버헤드로 그보다 크다.
 # 전제: docker shadowfit-mysql 가동, 버퍼풀 2GB·sort_buffer 64M (docker-compose.yml command).
 #   ⚠️ 기본 버퍼풀 128MB로 돌리면 롤백/풀스캔이 디스크 random I/O로 붕괴(롤백 64행/s) — 반드시 2GB.
 #

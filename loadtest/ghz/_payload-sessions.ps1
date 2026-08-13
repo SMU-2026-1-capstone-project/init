@@ -1,0 +1,109 @@
+<#
+  페이로드가 쓰는 세션 id 를 **페이로드에서 직접** 읽는다 (#166).
+
+  왜 파일 이름이나 상수가 아닌가: 리셋 대상·프리플라이트 대상·실제 요청이 가는 곳,
+  이 셋이 갈리면 rig 가 조용히 거짓말을 한다. 리셋이 엉뚱한 세션을 지우면 «동일 상태»
+  전제가 깨지고, 그때 나오는 처리량 저하는 원인을 못 찾는다. #166 이 정확히 그 사고였고,
+  #167(익스포터 자격증명이 두 곳에서 따로 정해짐)도 같은 모양이다.
+  단일 출처는 페이로드 파일 하나뿐이다 — 요청이 실제로 그 값을 쓰기 때문이다.
+
+  gen_batch_multi.py --sessions 를 다른 범위로 재생성해도 따라온다.
+
+  사용:
+    . (Join-Path $PSScriptRoot "_payload-sessions.ps1")
+    $S = Get-PayloadSessions -DataFile $DataFile
+    # $S.Ids  $S.Lo  $S.Hi  $S.Count  $S.SqlIn
+#>
+
+function Get-PayloadSessions {
+  param([Parameter(Mandatory = $true)][string]$DataFile)
+
+  $path = (Resolve-Path -LiteralPath $DataFile -ErrorAction SilentlyContinue)
+  if (-not $path) { throw "페이로드 없음: $DataFile" }
+
+  # 50MB 급 JSON 이라 ConvertFrom-Json 은 PS 5.1 에서 수십 초~분 단위다. 필요한 건 정수 하나뿐이라
+  # 정규식으로 훑는다 (51.6MB / 약 1.4초 실측, 2026-08-12).
+  $raw = [IO.File]::ReadAllText($path)
+  $ids = [regex]::Matches($raw, '"sessionId"\s*:\s*(\d+)') | ForEach-Object { [int]$_.Groups[1].Value }
+  if (-not $ids -or $ids.Count -eq 0) { throw "$DataFile 에서 sessionId 를 못 찾았다 — 페이로드 형식 확인 필요" }
+
+  $uniq = $ids | Sort-Object -Unique
+  [PSCustomObject]@{
+    Ids   = $uniq
+    Lo    = $uniq[0]
+    Hi    = $uniq[-1]
+    Count = $uniq.Count
+    # IN 목록으로 낸다. 범위(BETWEEN)가 아니라 실제 id 집합이라 페이로드가 듬성듬성해도 정확하다.
+    SqlIn = ($uniq -join ",")
+  }
+}
+
+<#
+  판 시작 전 세션 존재 확인. 없으면 ghz 는 판을 «완주» 하고 count 는 찬 채 OK 0 인 결과를
+  남긴다 — 숫자가 나오므로 실패로 안 보인다. 그 판을 아예 시작하지 않는다.
+  $true = 통과.
+#>
+function Test-SessionsSeeded {
+  param([Parameter(Mandatory = $true)]$Sessions, [string]$SeedHint = "..\seed\seed-multi-sessions.sql")
+
+  # mysql 클라이언트가 stderr 로 내는 경고(World-writable config file ...)를 PowerShell 5.1 이
+  # NativeCommandError 로 승격시켜 호출부의 ErrorActionPreference=Stop 을 밟는다. 2>$null 로도
+  # 안 막힌다(리다이렉트해도 ErrorRecord 로 감싼다). 이 호출 동안만 낮춘다.
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $have = (docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -N -e `
+    "SELECT COUNT(*) FROM exercise_sessions WHERE id IN ($($Sessions.SqlIn));" 2>$null | Select-Object -Last 1)
+  $ErrorActionPreference = $prev
+
+  # «세션이 없다» 와 «물어보지도 못했다» 는 다른 사건이다. 구분하지 않으면 docker 데몬이
+  # 내려간 상황에서 «시드를 적용하세요» 라고 안내하게 되고, 시드를 아무리 넣어도 안 고쳐진다.
+  # (2026-08-12 에 실제로 그렇게 나왔다 — Docker Desktop 이 죽어 있었다.)
+  if ("$have".Trim() -notmatch '^\d+$') {
+    Write-Host "[preflight] 세션 수를 못 물어봤습니다 — MySQL 컨테이너에 질의가 실패했습니다." -ForegroundColor Red
+    Write-Host "            docker 데몬과 shadowfit-mysql 컨테이너 상태를 먼저 확인하세요:" -ForegroundColor Red
+    Write-Host "            docker ps --filter name=shadowfit-mysql" -ForegroundColor Red
+    Write-Host "            (이건 «시드가 없다» 가 아닙니다. 시드를 넣어도 안 고쳐집니다.)" -ForegroundColor Red
+    return $false
+  }
+
+  if ("$have".Trim() -eq "$($Sessions.Count)") {
+    Write-Host "[preflight] 세션 $($Sessions.Lo)~$($Sessions.Hi) = $have/$($Sessions.Count) ✅" -ForegroundColor DarkGray
+    return $true
+  }
+  Write-Host "[preflight] 실패 — 페이로드가 쓰는 세션 $($Sessions.Count)개 중 $have 개만 존재합니다 (범위 $($Sessions.Lo)~$($Sessions.Hi))." -ForegroundColor Red
+  Write-Host "            시드를 먼저 적용하세요:" -ForegroundColor Red
+  Write-Host "            docker exec -i shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit < $SeedHint" -ForegroundColor Red
+  return $false
+}
+
+<# 페이로드가 쓰는 세션들의 누적 pose_data 삭제 (세션 row 자체는 보존). 남은 행 수(항상 "0")를 돌려준다.
+
+  리셋 실패는 **측정 실패**다. 전에는 docker exec 이 실패해도 빈 문자열을 돌려줬고, 호출부는
+  그걸 «남은 행: » 으로 찍은 뒤 측정을 계속했다(ceiling.ps1 은 반환값을 보지도 않았다). 그러면
+  이전 판의 pose_data 가 깔린 채로 잰 결과가 정상 측정값으로 저장된다 — #166 이 잡으려던
+  «리셋이 안 먹은 채로 판이 돈다» 가 형태만 바꿔 되살아난다. CodeRabbit 이 PR #172 에서 잡았다.
+  그래서 여기서 throw 한다. 조용히 0을 돌려주느니 판을 안 도는 게 낫다.
+#>
+function Reset-PayloadRows {
+  param([Parameter(Mandatory = $true)]$Sessions)
+
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -e `
+    "DELETE FROM pose_data WHERE session_id IN ($($Sessions.SqlIn));" 2>$null | Out-Null
+  $delExit = $LASTEXITCODE
+  $cnt = (docker exec shadowfit-mysql mysql -ushadowfit -pshadowfit shadowfit -N -e `
+    "SELECT COUNT(*) FROM pose_data WHERE session_id IN ($($Sessions.SqlIn));" 2>$null | Select-Object -Last 1)
+  $cntExit = $LASTEXITCODE
+  $ErrorActionPreference = $prev
+
+  if ($delExit -ne 0) { throw "리셋 실패 — DELETE 가 exit=$delExit 로 끝났습니다. MySQL 컨테이너 상태를 확인하세요 (docker ps --filter name=shadowfit-mysql)." }
+  if ($cntExit -ne 0) { throw "리셋 확인 실패 — COUNT 가 exit=$cntExit 로 끝났습니다. 지웠는지 확인하지 못했으므로 측정을 시작하지 않습니다." }
+
+  $left = "$cnt".Trim()
+  # 숫자가 아니면 «못 물어봤다» 다 — 프리플라이트와 같은 구분 (docker 데몬이 내려간 경우 등).
+  if ($left -notmatch '^\d+$') { throw "리셋 확인 실패 — COUNT 응답이 숫자가 아닙니다('$left'). 측정을 시작하지 않습니다." }
+  if ($left -ne "0") { throw "리셋 후에도 pose_data 가 $left 행 남았습니다 — 이 상태로 재면 이전 판이 결과에 섞입니다." }
+
+  return $left
+}

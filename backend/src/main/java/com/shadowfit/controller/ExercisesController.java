@@ -7,6 +7,7 @@ import com.shadowfit.model.exercise.Status;
 import com.shadowfit.service.Exercise.ExerciseAnalysisService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -49,9 +50,12 @@ public class ExercisesController {
      * App → Spring → gRPC → FastAPI 흐름 시작점
      */
     @Operation(summary="운동 세션 시작",description = "운동을 시작할 수 있음/ ai서버에서 특정 조건을 달성하면 운동 종료가됨")
+    // ⚠️ 2026-08-10: @Valid 가 없어 exerciseId=null 이 500 을 냈다 (이슈 #178).
+    // @RequestBody 12곳 중 여기 하나만 빠져 있었다. DTO 의 @NotNull 과 **둘 다** 있어야 한다 —
+    // @Valid 만 붙이면 제약이 없어 아무것도 안 걸리고, @NotNull 만 붙이면 트리거가 없어 평가되지 않는다.
     @PostMapping("/sessions")
     public ResponseEntity<ExercisesResponseDto> startAnalysis(
-            @RequestBody VideoRequestDto dto,
+            @Valid @RequestBody VideoRequestDto dto,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         Long memberId = userDetails.getMember().getId();

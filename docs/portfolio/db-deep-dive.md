@@ -52,13 +52,28 @@
 
 | 🟢 깊게 파도 됨 (희소) | 🔴 억지로 팔면 털림 |
 |---|---|
-| 대용량 시계열 (연 ~8억 행/~800GB) | 고 throughput/QPS (DAU 1,000은 작음, §4.2) |
+| 대용량 시계열 (연 ~8억 행/~800GB — ⚠️ 조건은 아래 박스) | 고 throughput/QPS (DAU 1,000은 작음, §4.2) |
 | JSON 컬럼 운영 (projection·하이드레이션) | 샤딩 (규모상 불필요) |
 | 파티셔닝 + TTL/DROP PARTITION | read replica (실수요 없음 → "확장 대비 설계"로만) |
 | gRPC 결합 정합성 (락·멱등성) | 무거운 락 경합·데드락 (append-only라 자연 hotspot 없음 → 합성) |
 | 측정 기반 읽기 최적화 (projection·캐싱) | 인덱스 튜닝 단독 (리포트 쿼리 이미 최적, §4.3) |
 
 > "안 한 것/규모상 불필요한 것을 정직하게 구분"하는 게 없는 QPS 자랑보다 강함 — median 신입보다 위인 판단 시그널(§0.5).
+
+> 🔴 **「연 ~8억 행/~800GB」의 조건 — 우리가 스스로 무효화했다** (2026-08-12 확인)
+>
+> 이 값의 산식은 [`load-test-strategy §4.3`](../decisions/load-test-strategy.md) 이 **「R≈25 추정(§4.5)」** 으로 명시한다.
+> 그런데 **R≈5 다운샘플이 PR #53(2026-07-25)로 코드에 들어가 있다** — 프레임을 저장 «전» 에 5분의 1로
+> 줄이므로([`pose-ingest-downsampling.md`](../decisions/pose-ingest-downsampling.md)), **지금 적재율은 이 추정의 약 1/5** 이다.
+>
+> | 추정 | 산식 | 나오는 곳 |
+> |---|---|---|
+> | 연 ~8억 행 / ~800GB | R≈25, ~1,500행/세션 | `load-test-strategy §4.3` · 이 문서 · `realmysql §1` |
+> | 연 ~2.7억 행 | 365,000세션 × 750행 | [`session-index-composition.md:233`](../decisions/session-index-composition.md) |
+>
+> **둘을 맞춰본 적이 없고, 다운샘플 이후로 재산정한 적도 없다.** 새 값을 여기서 임의로 만들지 않는다 —
+> 아래 §0·§2-D 의 「~800GB 오염」 서술은 **이 조건에서 읽어야 한다.** 다만 **결론(raw 를 영속시키지 말 것)은
+> 값의 크기가 아니라 «무한 누적» 이라는 성질에서 나오므로, 1/5 이 되어도 방향은 그대로다.**
 
 ---
 
@@ -106,7 +121,7 @@
 2. **Redis 캐싱** ⬜ — 세션 종료 후 리포트 불변 → cache-aside, 높은 적중률. stampede 방지.
 3. **precompute-on-write** ✅ **완료(2026-07-24)** — worst 구간을 세션 종료 시 1회 계산(`WorstSectionCalculator`)해 `reports.detailed_analysis`(JSON)에 저장, `SessionService.applyComplete`와 같은 트랜잭션. `ReportService.getSessionReport`는 이제 GET 때 `pose_data` 재스캔 없이 이 값을 읽기만 함(precompute 이전 리포트만 하위호환 fallback). 세부 설계 4가지(계산 위치·트랜잭션 경계·실패정책·백필)는 [`report-read-path.md §9`](../decisions/report-read-path.md).
 
-> ⚠️ 구 "인덱스 추가 → 850ms→12ms" 가설은 **폐기**. `schema.sql:86 idx_session_timestamp(session_id, timestamp_sec)`이 이미 쿼리에 최적이고 세션 단위라 테이블 성장에 무관(§4.3). 헤드라인은 인덱스가 아니라 **payload 축소**.
+> ⚠️ 구 "인덱스 추가 → 850ms→12ms" 가설은 **폐기**. [`V1__baseline.sql`](../../backend/src/main/resources/db/migration/V1__baseline.sql) 의 `idx_session_timestamp(session_id, timestamp_sec)`이 이미 쿼리에 최적이고 세션 단위라 테이블 성장에 무관(§4.3). 헤드라인은 인덱스가 아니라 **payload 축소**.
 
 ### C. 동시성 / 정합성 — gRPC × DB 교집합 ⭐
 
@@ -115,7 +130,7 @@
 | **낙관적 락**: 타임아웃 스케줄러 vs FastAPI 완료 콜백 경합 | ✅ | `Session.java:66 @Version`, `SessionTimeoutScheduler.java:84` 충돌 시 양보 |
 | **멱등성**: at-least-once gRPC 콜백 재전송 | ✅ | `FeedbackLogService.java:33` `INSERT IGNORE` + `uk_session_event` |
 | **일일 집계 lost-update** | ✅ 해결(2026-07-15) | `SessionService.applyComplete`에서 세션 완료 시 `DailyLogService.accumulateStats` 호출로 배선. `DailyLogRepository.upsertStats`(네이티브 `INSERT ... ON DUPLICATE KEY UPDATE` 한 문장)로 같은 날 두 세션 동시 종료돼도 lost-update 없음. **함정 발견**: 처음엔 원자 UPDATE 먼저 시도 후 실패 시(첫 기록) JPA `save()`로 INSERT, 그마저 유니크 위반이면 catch해서 재시도하는 방식으로 짰다가 동시성 테스트에서 실패(`org.hibernate.AssertionFailure: don't flush the Session after an exception occurs`) — `save()` 실패가 Hibernate 세션 자체를 손상시켜 같은 트랜잭션 내 후속 쿼리가 깨짐. 네이티브 upsert 한 문장으로 바꿔 해결 |
-| **report 생성 멱등성** | ✅ 완료 | `reports.session_id` UNIQUE(`uk_report_session`, `schema.sql`) + `SessionService.precomputeReport`(같은 날 구현된 precompute-on-write)가 실제 report 생성 경로. `applyComplete`의 기존 멱등성 체크(이미 COMPLETED면 조기 반환)와 UNIQUE 제약이 이중 방어 |
+| **report 생성 멱등성** | ✅ 완료 | `reports.session_id` UNIQUE(`uk_report_session`, [`V1__baseline.sql`](../../backend/src/main/resources/db/migration/V1__baseline.sql)) + `SessionService.precomputeReport`(같은 날 구현된 precompute-on-write)가 실제 report 생성 경로. `applyComplete`의 기존 멱등성 체크(이미 COMPLETED면 조기 반환)와 UNIQUE 제약이 이중 방어 |
 
 상세 스토리는 [`problem-solving-log.md #3·#4`](./problem-solving-log.md).
 
