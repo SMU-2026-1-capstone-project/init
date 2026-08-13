@@ -17,6 +17,7 @@ set -uo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 RIG=$ROOT/loadtest/results/online-ddl-2026-08-09
+BACKUP_RIG=$ROOT/loadtest/results/backup-restore-2026-08-13
 
 # ── 설정 ─────────────────────────────────────────────────────────────────
 S3_BASE=${S3_BASE:?S3_BASE 가 필요하다 — 예: s3://my-bucket/shadowfit}
@@ -24,6 +25,13 @@ RUN_ID=${RUN_ID:-ec2-$(date +%Y%m%d-%H%M%S)}
 OUTDIR=${OUTDIR:-$ROOT/loadtest/results/online-ddl-$RUN_ID}
 S3_DEST="${S3_BASE%/}/$RUN_ID"
 
+# 라운드마다 갈아끼운다. 기본값은 무중단 DDL(P1) 라운드이고 **그건 2026-08-12 에 끝났다.**
+#
+#   P3 백업/복구 라운드:
+#     PHASES="preflight backup_rehearsal backup ridealong collect"
+#
+# 🔴 `ddl` 과 `backup` 을 **같이 넣지 말 것.** 둘 다 디스크가 지배해서 한 라운드에 섞으면
+#    서로 오염된다(AWS-RIDE-ALONG §7 이 P1↔P2 에 건 경고와 같다). 라운드를 나눈다.
 PHASES=${PHASES:-"preflight rehearsal ddl ridealong collect"}
 SYNC_SEC=${SYNC_SEC:-300}
 AUTO_SHUTDOWN=${AUTO_SHUTDOWN:-0}
@@ -41,6 +49,12 @@ export WRITER_MAX_SEC=${WRITER_MAX_SEC:-14400}   # 4시간
 
 TIMEOUT_REHEARSAL=${TIMEOUT_REHEARSAL:-3600}     # 1시간 (예상 ~15분)
 TIMEOUT_DDL=${TIMEOUT_DDL:-43200}                # 12시간 (로컬 추정 5.9시간 × 2)
+
+# 백업/복구 — 설계 §9 는 «측정 2h» 로 잡았지만 그 값은 **1,000만 행 기준 추정**이었고
+# 무대가 1억 행으로 확정됐다. 어느 팔이 얼마나 걸리는지가 바로 Q1·Q2 라 **미리 모른다.**
+# 그래서 상한을 넉넉히 준다 — 걸려서 끊기는 것보다 낫다.
+TIMEOUT_BACKUP=${TIMEOUT_BACKUP:-43200}          # 12시간
+BACKUP_SESSIONS=${BACKUP_SESSIONS:-133334}       # 1억 행 (133,334 × 750)
 TIMEOUT_RIDEALONG=${TIMEOUT_RIDEALONG:-900}
 
 export PW DB_NAME CONTAINER
@@ -190,6 +204,38 @@ phase_ddl() {
   return 0
 }
 
+# ── 백업/복구 (主 P3) ────────────────────────────────────────────────────
+#
+# 🔴 **DDL 과 같은 라운드에 돌리더라도 반드시 순차다.** 둘 다 디스크가 지배해서 겹치면
+#    둘 다 오염된다(AWS-RIDE-ALONG §7 이 P1↔P2 에 대해 건 것과 같은 경고).
+#    `PHASES` 가 순서대로 도는 구조라 그것만 지키면 된다.
+#
+# 리허설을 따로 둔다 — **이 경로는 EC2 에서 한 번도 돈 적이 없다.** 08-12 가 부트스트랩에서
+# 죽었듯, 안 밟아본 경로를 본 규모로 바로 돌리면 몇 시간을 버린다. 축소로 먼저 밟는다.
+phase_backup_rehearsal() {
+  local out=$OUTDIR/backup_rehearsal
+  mkdir -p "$out"
+  note "SESSIONS=$REHEARSAL_SESSIONS — 경로 점검용. **이 판의 수치는 측정값이 아니다**"
+  OUT=$out SESSIONS=$REHEARSAL_SESSIONS DO_CHECKSUM=0 \
+    timeout --kill-after=60 "$TIMEOUT_REHEARSAL" bash "$BACKUP_RIG/probe.sh"        || return 1
+  OUT=$out SESSIONS=$REHEARSAL_SESSIONS DO_CHECKSUM=0 \
+    timeout --kill-after=60 "$TIMEOUT_REHEARSAL" bash "$BACKUP_RIG/backup_sweep.sh" || return 1
+  return 0
+}
+
+phase_backup() {
+  local out=$OUTDIR/backup
+  mkdir -p "$out"
+  note "정판 — SESSIONS=$BACKUP_SESSIONS (1억 행), 팔 A·B 각 버림1+본판3 + 팔 C 1판"
+  # probe.sh 가 G1~G4 를, backup_sweep.sh 가 preflight 로 G5 를 본다.
+  # G5 가 실패하면 스윕이 **팔 B 만 빼고** 계속한다 — 팔 A·C 까지 버릴 이유는 없다.
+  OUT=$out SESSIONS=$BACKUP_SESSIONS \
+    timeout --kill-after=120 "$TIMEOUT_BACKUP" bash "$BACKUP_RIG/probe.sh"        || return 1
+  OUT=$out SESSIONS=$BACKUP_SESSIONS \
+    timeout --kill-after=120 "$TIMEOUT_BACKUP" bash "$BACKUP_RIG/backup_sweep.sh" || return 1
+  return 0
+}
+
 # 從 항목 — 인프라가 살아 있을 때만 값이 생긴다. AWS-RIDE-ALONG.md §1 참고.
 phase_ridealong() {
   local out=$OUTDIR/ridealong
@@ -282,6 +328,23 @@ for p in $PHASES; do
         break
       } ;;
     ddl)       run_phase ddl       phase_ddl ;;
+    backup_rehearsal)
+      # 🔴 `break` 는 안 된다 — 뒤에 오는 從 항목·collect 까지 버릴 이유는 없다.
+      #    `continue` 도 안 된다 — 바로 다음이 `backup` 이면 그대로 본 측정에 들어간다.
+      #    플래그로 **그 단계만** 막는다.
+      if run_phase backup_rehearsal phase_backup_rehearsal; then
+        BACKUP_REHEARSAL_OK=1
+      else
+        BACKUP_REHEARSAL_OK=0
+        note "🔴 백업 리허설 실패 — 본 측정을 건너뛴다. 리허설의 존재 이유가 이것이다"
+      fi ;;
+    backup)
+      if [ "${BACKUP_REHEARSAL_OK:-1}" = "1" ]; then
+        run_phase backup phase_backup
+      else
+        note "⏭  백업 본 측정 건너뜀 — 리허설이 실패했다(환경 결함이 측정 결과로 찍히면 안 된다)"
+        printf "backup\tSKIP\t0\t%s\n" "$(date -Is)" >> "$PHASE_LOG"
+      fi ;;
     ridealong) run_phase ridealong phase_ridealong ;;
     collect)   run_phase collect   phase_collect ;;
     *)         note "알 수 없는 단계 '$p' — 건너뛴다" ;;
