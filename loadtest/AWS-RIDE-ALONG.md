@@ -108,6 +108,14 @@
 - [ ] **판정이 뒤집혔는가** — 뒤집혔으면 설계 문서 결정 로그에 «뒤집힘» 으로 남긴다. 지우고 새로 쓰지 않는다
 - [ ] **요금 태그가 붙어 있는가** (`Project=shadowfit-measure`, 인스턴스 + 볼륨). 살아 있을 때만 붙일 수 있다. 이 repo 에 EC2 요금 기록이 한 줄도 없는 이유가 이것이다 — 하루 이틀 뒤 Cost Explorer 에서 뽑아 `MANIFEST.txt` 의 `# 요금` 칸을 채운다
 - [ ] 인스턴스·볼륨 **삭제** (볼륨이 남으면 요금이 계속 나간다)
+  ```bash
+  bash scripts/aws_teardown.sh list          # 무엇이 남아 있나 + 정지 인스턴스 경고
+  bash scripts/aws_teardown.sh sweep --yes   # stopped 인스턴스 + 미연결 볼륨
+  ```
+  🔴 **`AUTO_SHUTDOWN=1` 은 stop 이지 terminate 가 아니다.** 그건 의도다(`/root/run_all.log` 가
+  사라지면 사후 진단이 막힌다 — #203 이 그 로그로 잡혔다). 그래서 **지우는 일은 사람이 따로**
+  해야 하고, 08-13 에 실제로 그 단계가 빠져 gp3 250GB 가 남아 있었다. `sweep` 은 **도는
+  인스턴스를 안 건드리고** 다른 프로젝트 태그(`Project=DOCKin`)는 거부한다
 
 ---
 
