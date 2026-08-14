@@ -29,7 +29,7 @@ AI(FastAPI) 한 인스턴스가 다음을 모두 처리한다:
 | 분석 FPS 권장값 | 10 | [`config.py:18`](../../ai-server/app/config.py) `VIDEO_PROCESS_FPS` |
 | 카메라 최대 FPS | 30 | [`config.py:17`](../../ai-server/app/config.py) `VIDEO_MAX_FPS` |
 | 프론트 → AI 직결 결정 | 분기 H2 채택 (2026-05-24) | [`ai-backend-coupling.md`](./ai-backend-coupling.md) §H |
-| AI 인스턴스 수 | 1 (수평 확장 미지원 — in-memory `session_state`) | [`session_state.py`](../../ai-server/app/grpc/session_state.py) |
+| AI 인스턴스 수 | 1 (수평 확장 미지원 — in-memory `session_state`) ✅ **2026-08-14: 지금 규모에선 제약이 아니다** — 물리 8코어 한 대가 동시 156세션으로 가정 피크 67 을 2.3배 덮는다 | [`session_state.py`](../../ai-server/app/grpc/session_state.py) |
 | MediaPipe detector | thread-local 싱글톤 | 커밋 c7657f1 |
 | sync_rate 알고리즘 | DTW per-joint (관절 4~6개) + 정규화 | [`dtw_calculator.py:10-31`](../../ai-server/app/core/dtw_calculator.py) |
 
@@ -45,7 +45,7 @@ AI(FastAPI) 한 인스턴스가 다음을 모두 처리한다:
 > | 전제 | 표의 값 | 실제 |
 > |---|---|---|
 > | 클라 전송 fps | 10fps | **~3fps** — `frontend/app/(tabs)/exercise.tsx:150` 이 `intervalMs = 330`. ai-server 도 `session_state.py:47` 에서 `MIN_FRAME_INTERVAL_SEC = 0.300` 으로 상한을 건다(#143) |
-> | MediaPipe 프레임당 | 20~50ms | **103.4ms 실측** (p50 100.5 / p95 129.1). 단 i3-6100 + Docker Desktop 기준. ✅ **2026-08-11: «서버급에서는 더 빠를 것» 이 확인됐다 — Xeon 8488C 베어메탈에서 17.6ms(5.9배).** [`../../loadtest/results/ai-recalibrate-2026-08-11/`](../../loadtest/results/ai-recalibrate-2026-08-11/) |
+> | MediaPipe 프레임당 | 20~50ms | **103.4ms 실측** (p50 100.5 / p95 129.1). 단 i3-6100 + Docker Desktop 기준. ✅ **2026-08-11: «서버급에서는 더 빠를 것» 이 확인됐다 — Xeon 8488C 베어메탈에서 17.6ms(5.9배).** [`../../loadtest/results/ai-recalibrate-2026-08-11/`](../../loadtest/results/ai-recalibrate-2026-08-11/) ✅ **2026-08-14: 물리 8코어에서 15.0ms · 동시 156세션(가정 피크 67 의 2.3배) — «수평 확장 미지원» 이 지금은 제약이 아니다.** [`../../loadtest/results/ai-concurrency-aws-2026-08-14/`](../../loadtest/results/ai-concurrency-aws-2026-08-14/README.md) |
 >
 > **두 오차가 서로 반대 방향이라 «세션당 CPU 누적» 은 우연히 비슷하다** (10fps×35ms ≈ 3fps×103ms).
 > 그래서 아래 «CPU 시간의 95%+ 를 MediaPipe 가 점유» 라는 **결론은 그대로 유효**하고,
