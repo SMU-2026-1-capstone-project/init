@@ -220,10 +220,15 @@ restore_arm_b() {  # $1 = tag → stdout: "복구초 sync_ms" (prepare + 기동�
   MSYS_NO_PATHCONV=1 docker run --rm --user 0 -v "$d:/backup" "$XB_IMAGE" \
     xtrabackup --prepare --target-dir=/backup >> "$OUT/${tag}_xb.log" 2>&1 || return 1
   # ② 준비된 datadir 를 새 볼륨에 붓는다
+  #
+  # 🔴 `--reflink=never` 가 **필수다**(#210). 이 무대의 루트는 xfs `reflink=1` 이라 기본
+  #    동작이 extent 를 공유해버린다 — 10.4GB 가 «복사» 되고도 디스크 소비가 0 이었고,
+  #    그래서 복구가 9초로 찍혔다. 재는 것은 「datadir 를 실제로 붓는 시간」이므로
+  #    **공유가 아니라 복사여야 한다.**
   docker volume create "$RESTORE_VOLUME" >/dev/null 2>&1
   MSYS_NO_PATHCONV=1 docker run --rm --user 0 -v "$d:/backup:ro" \
     -v "$RESTORE_VOLUME:/target" "$XB_IMAGE" \
-    sh -c 'cp -a /backup/. /target/ && chown -R 999:999 /target' >/dev/null 2>&1 || return 1
+    sh -c 'cp -a --reflink=never /backup/. /target/ && chown -R 999:999 /target' >/dev/null 2>&1 || return 1
   # ③ 그 위에서 서버를 올린다. **여기까지가 「다시 쓰기를 받기까지」** 다(Q1 = RTO).
   docker run -d --name "$RESTORE_CONTAINER" -e MYSQL_ROOT_PASSWORD="$PW" \
     -v "$RESTORE_VOLUME:/var/lib/mysql" "$MYSQL_IMAGE" >/dev/null 2>&1 || return 1
