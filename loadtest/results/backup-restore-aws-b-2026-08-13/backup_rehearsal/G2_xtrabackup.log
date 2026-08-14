@@ -1,0 +1,107 @@
+2026-08-13T14:42:40.856778-00:00 0 [Note] [MY-011825] [Xtrabackup] recognized server arguments: --datadir=/var/lib/mysql 
+2026-08-13T14:42:40.856829-00:00 0 [Note] [MY-011825] [Xtrabackup] recognized client arguments: --backup=1 --target-dir=/backup --databases=backup_lab --host=127.0.0.1 --user=root --password=* 
+xtrabackup version 8.0.35-36 based on MySQL server 8.0.35 Linux (x86_64) (revision id: 7233322c)
+2026-08-13T14:42:40.858162-00:00 0 [Note] [MY-011825] [Xtrabackup] perl binary not found. Skipping the version check
+2026-08-13T14:42:40.858179-00:00 0 [Note] [MY-011825] [Xtrabackup] Connecting to MySQL server host: 127.0.0.1, user: root, password: set, port: not set, socket: not set
+2026-08-13T14:42:40.871346-00:00 0 [Note] [MY-011825] [Xtrabackup] Using server version 8.0.46
+2026-08-13T14:42:40.873099-00:00 0 [Note] [MY-011825] [Xtrabackup] Executing LOCK INSTANCE FOR BACKUP ...
+2026-08-13T14:42:40.874936-00:00 0 [Note] [MY-011825] [Xtrabackup] uses posix_fadvise().
+2026-08-13T14:42:40.874957-00:00 0 [Note] [MY-011825] [Xtrabackup] cd to /var/lib/mysql
+2026-08-13T14:42:40.874964-00:00 0 [Note] [MY-011825] [Xtrabackup] open files limit requested 0, set to 32768
+2026-08-13T14:42:40.875456-00:00 0 [Note] [MY-011825] [Xtrabackup] using the following InnoDB configuration:
+2026-08-13T14:42:40.875469-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_data_home_dir = .
+2026-08-13T14:42:40.875473-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_data_file_path = ibdata1:12M:autoextend
+2026-08-13T14:42:40.875494-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_group_home_dir = ./
+2026-08-13T14:42:40.875502-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_files_in_group = 2
+2026-08-13T14:42:40.875508-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_file_size = 50331648
+2026-08-13T14:42:40.877123-00:00 0 [Note] [MY-011825] [Xtrabackup] inititialize_service_handles suceeded
+2026-08-13T14:42:40.921952-00:00 0 [Note] [MY-011825] [Xtrabackup] Connecting to MySQL server host: 127.0.0.1, user: root, password: set, port: not set, socket: not set
+2026-08-13T14:42:40.933484-00:00 0 [Note] [MY-011825] [Xtrabackup] Redo Log Archiving is not set up.
+2026-08-13T14:42:41.022868-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (91459679)
+2026-08-13T14:42:41.024595-00:00 0 [Note] [MY-012953] [InnoDB] Disabling background ibuf IO read threads.
+2026-08-13T14:42:41.226054-00:00 0 [Note] [MY-011825] [Xtrabackup] Generating a list of tablespaces
+2026-08-13T14:42:41.226092-00:00 0 [Note] [MY-012204] [InnoDB] Scanning './'
+2026-08-13T14:42:41.232932-00:00 0 [Note] [MY-012208] [InnoDB] Completed space ID check of 2 files.
+2026-08-13T14:42:41.234686-00:00 0 [Warning] [MY-012091] [InnoDB] Allocated tablespace ID 29 for backup_lab/t, old maximum was 0
+2026-08-13T14:42:41.234761-00:00 0 [Note] [MY-013252] [InnoDB] Using undo tablespace './undo_001'.
+2026-08-13T14:42:41.235514-00:00 0 [Note] [MY-013252] [InnoDB] Using undo tablespace './undo_002'.
+2026-08-13T14:42:41.236641-00:00 0 [Note] [MY-012910] [InnoDB] Opened 2 existing undo tablespaces.
+2026-08-13T14:42:41.236921-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./ibdata1 to /backup/ibdata1
+2026-08-13T14:42:41.291677-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./ibdata1 to /backup/ibdata1
+2026-08-13T14:42:41.296581-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./backup_lab/t.ibd to /backup/backup_lab/t.ibd
+2026-08-13T14:42:41.346771-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./backup_lab/t.ibd to /backup/backup_lab/t.ibd
+2026-08-13T14:42:41.350994-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./mysql.ibd to /backup/mysql.ibd
+2026-08-13T14:42:41.484524-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./mysql.ibd to /backup/mysql.ibd
+2026-08-13T14:42:41.488752-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./undo_002 to /backup/undo_002
+2026-08-13T14:42:41.559567-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./undo_002 to /backup/undo_002
+2026-08-13T14:42:41.564713-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./undo_001 to /backup/undo_001
+2026-08-13T14:42:41.634865-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./undo_001 to /backup/undo_001
+2026-08-13T14:42:42.023117-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (91459679)
+2026-08-13T14:42:42.236838-00:00 0 [Note] [MY-011825] [Xtrabackup] Starting to backup non-InnoDB tables and files
+2026-08-13T14:42:42.236979-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./auto.cnf
+2026-08-13T14:42:42.236999-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./ibdata1
+2026-08-13T14:42:42.237006-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./#ib_16384_0.dblwr
+2026-08-13T14:42:42.237010-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./#ib_16384_1.dblwr
+2026-08-13T14:42:42.237015-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./undo_001
+2026-08-13T14:42:42.237019-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./undo_002
+2026-08-13T14:42:42.237024-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./mysql.ibd
+2026-08-13T14:42:42.237029-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./ca-key.pem
+2026-08-13T14:42:42.237033-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./ca.pem
+2026-08-13T14:42:42.237038-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./server-key.pem
+2026-08-13T14:42:42.237042-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./server-cert.pem
+2026-08-13T14:42:42.237047-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./client-key.pem
+2026-08-13T14:42:42.237052-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./client-cert.pem
+2026-08-13T14:42:42.237057-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./private_key.pem
+2026-08-13T14:42:42.237062-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./public_key.pem
+2026-08-13T14:42:42.237066-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000001
+2026-08-13T14:42:42.237071-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000002
+2026-08-13T14:42:42.237077-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000003
+2026-08-13T14:42:42.237084-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000004
+2026-08-13T14:42:42.237089-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000005
+2026-08-13T14:42:42.237094-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000006
+2026-08-13T14:42:42.237098-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000007
+2026-08-13T14:42:42.237102-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000008
+2026-08-13T14:42:42.237107-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000009
+2026-08-13T14:42:42.237111-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000010
+2026-08-13T14:42:42.237116-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000011
+2026-08-13T14:42:42.237121-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000012
+2026-08-13T14:42:42.237132-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000013
+2026-08-13T14:42:42.237137-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000014
+2026-08-13T14:42:42.237146-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000015
+2026-08-13T14:42:42.237151-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000016
+2026-08-13T14:42:42.237161-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000017
+2026-08-13T14:42:42.237166-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000018
+2026-08-13T14:42:42.237174-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000019
+2026-08-13T14:42:42.237178-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000020
+2026-08-13T14:42:42.237182-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000021
+2026-08-13T14:42:42.237187-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000022
+2026-08-13T14:42:42.237192-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./ib_buffer_pool
+2026-08-13T14:42:42.237210-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./ibtmp1
+2026-08-13T14:42:42.237224-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000023
+2026-08-13T14:42:42.237232-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.000024
+2026-08-13T14:42:42.237237-00:00 3 [Note] [MY-011825] [Xtrabackup] Skipping ./binlog.index
+2026-08-13T14:42:42.337180-00:00 0 [Note] [MY-011825] [Xtrabackup] Finished backing up non-InnoDB tables and files
+2026-08-13T14:42:42.337204-00:00 0 [Note] [MY-011825] [Xtrabackup] Executing FLUSH NO_WRITE_TO_BINLOG BINARY LOGS
+2026-08-13T14:42:42.351968-00:00 0 [Note] [MY-011825] [Xtrabackup] Selecting LSN and binary log position from p_s.log_status
+2026-08-13T14:42:42.353993-00:00 0 [Note] [MY-011825] [Xtrabackup] Copying /var/lib/mysql/binlog.000025 to /backup/binlog.000025 up to position 157
+2026-08-13T14:42:42.354048-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Copying /var/lib/mysql/binlog.000025 to /backup/binlog.000025
+2026-08-13T14:42:42.356424-00:00 0 [Note] [MY-011825] [Xtrabackup] Writing /backup/binlog.index
+2026-08-13T14:42:42.356459-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Writing file /backup/binlog.index
+2026-08-13T14:42:42.360040-00:00 0 [Note] [MY-011825] [Xtrabackup] Writing /backup/xtrabackup_binlog_info
+2026-08-13T14:42:42.360074-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Writing file /backup/xtrabackup_binlog_info
+2026-08-13T14:42:42.362462-00:00 0 [Note] [MY-011825] [Xtrabackup] Executing FLUSH NO_WRITE_TO_BINLOG ENGINE LOGS...
+2026-08-13T14:42:42.363660-00:00 0 [Note] [MY-011825] [Xtrabackup] The latest check point (for incremental): '91459679'
+2026-08-13T14:42:42.363676-00:00 0 [Note] [MY-011825] [Xtrabackup] Stopping log copying thread at LSN 91459679
+2026-08-13T14:42:42.363744-00:00 1 [Note] [MY-011825] [Xtrabackup] Starting to parse redo log at lsn = 91459603
+2026-08-13T14:42:42.368360-00:00 0 [Note] [MY-011825] [Xtrabackup] Executing UNLOCK INSTANCE
+2026-08-13T14:42:42.368488-00:00 0 [Note] [MY-011825] [Xtrabackup] All tables unlocked
+2026-08-13T14:42:42.368546-00:00 0 [Note] [MY-011825] [Xtrabackup] Copying ib_buffer_pool to /backup/ib_buffer_pool
+2026-08-13T14:42:42.369409-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Copying ib_buffer_pool to /backup/ib_buffer_pool
+2026-08-13T14:42:42.371768-00:00 0 [Note] [MY-011825] [Xtrabackup] Backup created in directory '/backup/'
+2026-08-13T14:42:42.371777-00:00 0 [Note] [MY-011825] [Xtrabackup] MySQL binlog position: filename 'binlog.000025', position '157'
+2026-08-13T14:42:42.371822-00:00 0 [Note] [MY-011825] [Xtrabackup] Writing /backup/backup-my.cnf
+2026-08-13T14:42:42.371856-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Writing file /backup/backup-my.cnf
+2026-08-13T14:42:42.374262-00:00 0 [Note] [MY-011825] [Xtrabackup] Writing /backup/xtrabackup_info
+2026-08-13T14:42:42.374299-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Writing file /backup/xtrabackup_info
+2026-08-13T14:42:43.378658-00:00 0 [Note] [MY-011825] [Xtrabackup] Transaction log of lsn (91459679) to (91459679) was copied.
+2026-08-13T14:42:43.585213-00:00 0 [Note] [MY-011825] [Xtrabackup] completed OK!

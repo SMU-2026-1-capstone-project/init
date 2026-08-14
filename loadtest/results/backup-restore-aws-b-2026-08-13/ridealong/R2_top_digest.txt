@@ -1,0 +1,22 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DIGEST_TEXT	COUNT_STAR	sum_s	SUM_ROWS_EXAMINED
+CALL `ddl_writer` (...)	1	36.615678861	0
+CHECKSUM TABLE `pose_data_scale`	1	13.776187552	0
+SELECT COUNT ( * ) FROM `pose_data_scale`	2	0.208074542	0
+TRUNCATE TABLE `ddl_writer_log`	1	0.086471874	0
+SELECT ? `k` , COUNT ( * ) `v` FROM `reports` UNION ALL SELECT ? , COUNT ( * ) FROM `reports` WHERE `detailed_analysis` IS NOT NULL UNION ALL SELECT ? , COUNT ( * ) FROM `pose_data` UNION ALL SELECT ? , COUNT ( * ) FROM `exercise_sessions`	1	0.014149121	0
+SELECT COUNT ( * ) FROM `information_schema` . `tables` WHERE ENGINE = ? OR ENGINE = ?	1	0.013314866	386
+FLUSH NO_WRITE_TO_BINLOG BINARY LOGS	1	0.00947885	0
+SHOW GLOBAL VARIABLES LIKE ?	2	0.007503624	0
+SELECT @@`version_comment` LIMIT ?	17	0.00675554	17
+DELETE FROM `ddl_writer_ctl`	1	0.00665225	0
+SELECT `SPACE` FROM `INFORMATION_SCHEMA` . `INNODB_TABLESPACES`	1	0.005710982	35
+SHOW VARIABLES	4	0.005343964	2620
+UPDATE `ddl_writer_ctl` SET STOP = ? WHERE `id` = ?	1	0.004277543	1
+SELECT `PLUGIN_NAME` , `PLUGIN_LIBRARY` FROM `information_schema` . `plugins` WHERE `PLUGIN_STATUS` = ? AND `PLUGIN_TYPE` = ?	1	0.002888373	48
+SELECT `T2` . `PATH` , `T2` . `NAME` , `T1` . `SPACE_TYPE` FROM `INFORMATION_SCHEMA` . `INNODB_TABLESPACES` `T1` JOIN `INFORMATION_SCHEMA` . `INNODB_TABLESPACES_BRIEF` `T2` USING ( `SPACE` ) WHERE `T1` . `SPACE_TYPE` = ? && `T1` . `ROW_FORMAT` != ? UNION SELECT `T2` . `PATH` , `SUBSTRING_INDEX` ( `SUBSTRING_INDEX` ( `T2` . `PATH` , ?, ... ) , ?, ... ) NAME , `T1` . `SPACE_TYPE` FROM `INFORMATION_SCHEMA` . `INNODB_TABLESPACES` `T1` JOIN `INFORMATION_SCHEMA` . `INNODB_TABLESPACES_BRIEF` `T2` USING ( `SPACE` ) WHERE `T1` . `SPACE_TYPE` = ? && `T1` . `ROW_FORMAT` != ?	1	0.002678051	204
+SHOW GLOBAL STATUS	1	0.002282842	494
+SHOW ENGINE `INNODB` STATUS	1	0.002066511	0
+SELECT * FROM `performance_schema` . `replication_group_members`	2	0.001833136	0
+SELECT COUNT ( * ) FROM `performance_schema` . `processlist` WHERE `id` = ?	2	0.001757642	1
+SELECT COUNT ( * ) , `IFNULL` ( SUM ( `errno` != ? ) , ? ) , `IFNULL` ( MAX ( `elapsed_ms` ) , ? ) , `IFNULL` ( MAX ( CASE WHEN `rn` = `mid` THEN `elapsed_ms` END ) , ? ) , `IFNULL` ( MAX ( `gap_ms` ) , ? ) FROM ( SELECT `elapsed_ms` , `errno` , ROW_NUMBER ( ) OVER ( ORDER BY `elapsed_ms` ) `rn` , COUNT ( * ) OVER ( ) DIV ? `mid` , TIMESTAMPDIFF ( MICROSECOND , LAG ( `started_at` ) OVER ( ORDER BY `seq` ) , `started_at` ) / ? `gap_ms` FROM `ddl_writer_log` ) `t`	1	0.001563375	155
