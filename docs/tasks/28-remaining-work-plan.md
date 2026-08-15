@@ -1,6 +1,6 @@
 # 남은 작업 계획 — Spring 백엔드 완주까지
 
-작성: 2026-07-31 · 갱신: 2026-08-09 (C 완료로 △ 부분이 사라졌으나 낙관 % 는 안 움직인다 — §1. 이전 갱신은 08-07 §1, 08-03 §1-3)
+작성: 2026-07-31 · 갱신: 2026-08-16 (구현 % 를 08-09 이 «결정 대기» 로 남긴 값으로 확정하고, 포폴 % 를 올린다 — §1. 이전 갱신은 08-09 §1, 08-07 §1, 08-03 §1-3)
 상태: **분석/추천 — 착수 순서 미확정** (결정 ✅ 는 사용자 confirm 후)
 범위: **Spring 백엔드만.** 프론트(React Native) 전용 항목과 AI 서버(FastAPI) 고유 항목은 제외 — 단 크로스 레포 작업은 그 사실을 명시하고 포함
 　　　→ **AI 트랙 잔여는 [`30-ai-remaining-work.md`](./30-ai-remaining-work.md)** (2026-08-07 신설). 이 문서의 합계에 AI 항목은 **들어 있지 않다**
@@ -24,12 +24,69 @@
 > **2026-08-07 갱신: 구현 67~72% / 포폴 57~64%** — 관리자 3종(`/admin/members`·`/admin/sessions`·`/admin/stats/overview`)을 요구사항에 편입해 분모 28 → 31, 완료 20 → 23 (§1).
 >
 > **2026-08-09 갱신: 완료 23 → 24, △ 부분 1 → 0** (C 운동 종목 CRUD, `cebf2d5`). **낙관 % 는 77% 그대로다** — 낙관이 부분을 완료로 세기 때문에 분자 합이 안 바뀐다. 진전이 나타나는 자리는 판단 % 뿐이고, 그건 🔶 **결정 대기**(추천: 구현 70~75%, 포폴 유지)로 남겼다 (§1).
+>
+> **2026-08-16 갱신: 구현 70~75% / 포폴 70~76%** (사용자 confirm). 구현은 **위 줄의 «결정 대기» 를 그대로 확정**한 것이고 새 근거가 아니다. 움직인 쪽은 포폴이다 — DBA 결손 3개 중 **2개(무중단 DDL·백업/복구)가 실측으로 닫혔고** 종료 조건 E2 의 정본([`../portfolio/one-pager.md`](../portfolio/one-pager.md))이 섰다 (§1).
 
 > 2026-08-03 갱신: 7건이 더 머지됐으나 **% 는 그대로 둔다** — 전부 결함 수정·설계 개선이라 요구사항 완료 개수(20/28)가 안 움직인다(§1-3). 열려 있던 결함 중 [#77](https://github.com/Shadowfit/init/issues/77)·[#91](https://github.com/Shadowfit/init/issues/91)·[#93](https://github.com/Shadowfit/init/issues/93)·[#96](https://github.com/Shadowfit/init/issues/96)·[#98](https://github.com/Shadowfit/init/issues/98) 해소, [#78](https://github.com/Shadowfit/init/issues/78)·[#79](https://github.com/Shadowfit/init/issues/79) 는 여전히 열림. **압축 안 되는 결정은 이제 관리자 인덱스 3안 하나다.**
 
 ---
 
 ## 1. 현재 진척
+
+### 🔄 2026-08-16 갱신 — 구현은 제자리, 움직인 건 포폴이다
+
+| 관점 | 08-09 | **지금** | 성격 |
+|---|:--:|:--:|---|
+| 구현 (Spring 백엔드 기능) | 67~72% | **70~75%** | 08-09 이 남긴 «결정 대기» 값의 **확정**. 새 근거가 아니다 |
+| 포폴 (백엔드 신입 시그널) | 57~64% | **70~76%** | **실제 이동.** 스스로 «비어 있다» 고 적어둔 칸이 채워졌다 |
+
+**요구사항 31개는 그대로다** — ✅ 완료 24 / △ 부분 0 / ❌ 미구현 7. 낙관 % 도 77.4% 그대로다.
+
+#### 구현 — 3%p 는 새 기능이 아니라 «확정» 이다
+
+08-09 → 08-16 사이 `main` 에 들어온 것 중 **요구사항 축에 더해진 것은 하나뿐**이다:
+
+- **기준 좌표 추출 경로**([#227](https://github.com/Shadowfit/init/pull/227), 08-16) — `ExtractReferenceData` 가
+  *«`success=True` 를 돌려주는 빈 껍데기»*([`30-ai-remaining-work.md`](./30-ai-remaining-work.md) §1-1)에서
+  **실제 구현**으로 바뀌었다(`ai-server/app/grpc/exercise_servicer.py:374`).
+  ⚠️ 단 **유튜브 URL 은 거부하고 컨테이너 안 파일 경로만 받는다** — ToS 리스크 수용이 미결정이라
+  AI-01 이 «완전히» 닫힌 것은 아니다
+- 나머지 5건([#184](https://github.com/Shadowfit/init/pull/184)·[#181](https://github.com/Shadowfit/init/pull/181)·[#235](https://github.com/Shadowfit/init/pull/235)·[#240](https://github.com/Shadowfit/init/pull/240)·[#225](https://github.com/Shadowfit/init/pull/225))은 **전부 결함 수정**이라
+  §1-3 원칙대로 요구사항 완료 개수를 안 움직인다
+- E1 통주행([#241](https://github.com/Shadowfit/init/pull/241), 미머지)은 새 기능이 아니라 **검증**이다
+
+> 📌 그래서 이번 3%p 는 «일주일 동안 3%p 만큼 만들었다» 가 아니라 **«08-09 에 이미 근거가 있었는데 확정을 안 하고 있었다»** 는 뜻이다.
+
+#### 포폴 — 약 13%p, 이번 주의 실질
+
+| 들어온 것 | 날짜 | 무엇을 채웠나 |
+|---|---|---|
+| 무중단 DDL 본 측정 (pt-osc 대조 6판) | 08-12 | DBA 결손 3개 중 1개 |
+| 백업/복구 본 측정 + PITR (9판) | 08-13~15 | DBA 결손 2개째 |
+| [`../portfolio/one-pager.md`](../portfolio/one-pager.md) 정본 | 08-10 | 종료 조건 **E2** 의 대상 문서 |
+| 동거 용량 rig P6 | 08-14~16 | 「156세션은 혼자 살 때의 값이다」 정정 |
+
+**올리는 근거**: [`one-pager.md`](../portfolio/one-pager.md) 의 «아직 비어 있는 것» 표가 스스로 적어둔 **3칸 중 2칸이 실측으로 닫혔다.**
+이건 기능 개수가 아니라 **«비었다고 자기가 적어둔 자리가 채워진 것»** 이고, 판단 % 가 재는 게 정확히 그것이다.
+[[결정은 사용자가, Claude 는 추천만]] 에 따라 이 값은 2026-08-16 사용자 confirm 으로 박제한다.
+
+#### 그럼에도 76% 를 넘기지 않는 이유 (3개)
+
+| # | 남은 것 | 왜 깎나 |
+|:--:|---|---|
+| 1 | [#193](https://github.com/Shadowfit/init/issues/193) **자세 문제 유형 감지기가 통째로 없다** | proto·테이블·Spring 수신부는 다 있는데 AI 가 안 부른다. 「개인화 TTS 피드백」이 아직 **시연 더미**다 |
+| 2 | **복제 축** | [`../decisions/replication-lag-and-semisync.md`](../decisions/replication-lag-and-semisync.md) 가 «설계(착수 전)». one-pager 는 «의도적 미적용» 으로 적었으나 [종료 조건 §7](../decisions/project-destination-and-exit-criteria.md) 에서는 **«유지 vs 측정» 이 미결정**이다 — 두 문서가 아직 같은 말을 안 한다 |
+| 3 | **아웃박스 «exactly-once» 를 지키는 장치** | 테스트가 `OutboxEventRepositoryTest` **하나뿐**이다 (§2-7 가). 서사는 보장을 말하는데 그걸 고정한 건 주석과 수동 확인 1회다 |
+
+> ⚠️ **정직 단서 — 이 % 는 여전히 Spring 백엔드 분모다.** 프로젝트 전체로 세면 더 낮다:
+> 프론트 TTS 발화 코드 **0건**(`expo-speech` 는 `node_modules` 에만 있다) · `reattach` 호출 **0건** ·
+> 관리자 프론트 **미착수(추정 없음)**. 이건 §0 의 ⚠️ 와 같은 경고이고, 갱신할 때마다 다시 적는다.
+
+> 📌 **«얼마나 남았나» 를 이 % 로만 읽지 말 것.** 프로젝트의 «끝» 을 정의한 것은 이 문서가 아니라
+> [`../decisions/project-destination-and-exit-criteria.md`](../decisions/project-destination-and-exit-criteria.md) 의 **종료 조건 E1~E4** 다.
+> 그쪽 기준으로는 E1 이 08-16 통주행으로 사실상 닫혔고(머지 전), E3 가 2/3, E2·E4 가 부분이다.
+
+---
 
 ### 🔄 2026-08-09 갱신 — 개수는 늘었는데 낙관 % 는 안 움직인다
 
