@@ -70,6 +70,31 @@ class MemberControllerIntegrationTest {
                 .andExpect(content().string("newuser"));
     }
 
+    /**
+     * 이슈 #195 재현 — 이슈에 적힌 curl 2회(같은 username, 다른 email)를 그대로 HTTP 로 옮긴 것.
+     *
+     * <p>고치기 전 여기서 나가던 것은 <b>500</b> 이었다. {@code users.username} 이 UNIQUE 인데
+     * ({@code V1__baseline.sql:28}) 사전검사가 email 에만 있어, DB 가 거부한 것을
+     * {@code GlobalExceptionHandler} 의 {@code Exception} 핸들러가 받아 서버 결함으로 보고했다.
+     *
+     * <p><b>status 뿐 아니라 문구도 단언한다.</b> {@code ErrorResponseDto} 는 code 를 싣지 않아
+     * 프론트가 message 로만 구분하므로({@code login.tsx:229-231}), U003 의 "이미 가입된
+     * 사용자입니다"로 되돌아가면 status 는 400 그대로여도 사용자에게는 틀린 안내가 된다 —
+     * 그 회귀를 잡는 자리가 여기다.
+     */
+    @Test
+    @DisplayName("#195 이미 쓰는 username 으로 가입하면 500 이 아니라 400 + 닉네임 문구")
+    void signup_duplicateUsername_returns400() throws Exception {
+        // setUp 이 username="httpuser" 를 이미 저장해뒀다. email 은 새 값이라 email 검사는 통과한다.
+        MemberRequestDto dto = new MemberRequestDto("httpuser", "another@test.com", "pw1234", Sex.MALE);
+
+        mockMvc.perform(post("/member/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("이미 사용 중인 닉네임입니다."));
+    }
+
     @Test
     @DisplayName("회원가입 — sex 가 실제로 저장된다 (받기만 하고 버리던 것 수정)")
     void signup_persistsSex() throws Exception {

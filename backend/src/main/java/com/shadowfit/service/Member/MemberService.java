@@ -14,7 +14,10 @@ import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.member.RefreshTokenRepository;
 import com.shadowfit.service.Exercise.PoseDataCleanupService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +26,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -188,11 +193,35 @@ public class MemberService{
         refreshTokenRepository.deleteByMemberId(requester.getId());
     }
 
-    //회원가입 로직
+    /**
+     * 회원가입.
+     *
+     * <p><b>두 층으로 막는다</b>(이슈 #195). {@code users} 에는 UNIQUE 가 <b>둘</b> 있는데
+     * ({@code V1__baseline.sql:26}·{@code :28}) 사전검사가 email 에만 있어, 겹친 username 으로
+     * 가입하면 {@code DataIntegrityViolationException} 이 {@code GlobalExceptionHandler} 의
+     * {@code Exception} 핸들러로 떨어져 <b>400 이 아니라 500</b> 이 나갔다.
+     *
+     * <p>① <b>사전검사</b> — 순차 재현(같은 닉네임으로 두 번 가입)을 닫는다. 사람이 실제로 만나는
+     * 경로가 이쪽이다. 이슈의 발견 경로도 E1 드라이버가 username 을 재사용한 것이었다.
+     *
+     * <p>② <b>제약 위반 수신</b> — ①과 INSERT 사이에 같은 값이 들어오는 레이스가 남으므로,
+     * 막는 대신 <b>받아서 같은 4xx 로 바꾼다</b>. {@code AdminExerciseService.deleteExercise}
+     * (:259)가 FK 제약에 대해 이미 같은 모양을 쓴다 — 잠금으로 직렬화하려면 가입 경로 전체를
+     * 묶어야 하는데, 사용자당 한 번 일어나는 동작이 살 비용이 아니다.
+     *
+     * <p>🔴 <b>어느 제약이 걸렸는지는 재조회로 가르지 않는다.</b> email·username 둘 다 UNIQUE 라
+     * 예외만으로는 구분이 안 되는데, 제약 위반 직후의 영속성 컨텍스트는 JPA 명세상 <b>상태가
+     * 정의되지 않는다</b>(트랜잭션은 이미 rollback-only). 거기서 {@code existsByEmail} 을 한 번 더
+     * 도는 것은 동작하더라도 보장이 없는 자리다. 그래서 예외가 <b>구조적으로</b> 들고 오는
+     * 제약명({@code ConstraintViolationException#getConstraintName()})으로 가른다 — 조회 0회다.
+     */
     @Transactional
     public String signup(MemberRequestDto dto) {
         if(memberRepository.existsByEmail((dto.getEmail()))) {
             throw new BusinessException(ErrorCode.USERID_DUPLICATION);
+        }
+        if (memberRepository.existsByUsername(dto.getUsername())) {
+            throw new BusinessException(ErrorCode.USERNAME_DUPLICATION);
         }
         String encodedPassword = passwordEncoder.encode(dto.getPassword());
         // sex 는 지금까지 DTO 로 받기만 하고 엔티티에 옮기지 않아 조용히 버려졌다 —
@@ -207,8 +236,48 @@ public class MemberService{
                 // 곧 "서버가 권한을 고정한다"이다 (이슈 #138, decisions/admin-role-provisioning.md).
                 .sex(dto.getSex())
                 .build();
-        memberRepository.save(member);
+        try {
+            memberRepository.save(member);
+            // Member 는 IDENTITY 라 save() 가 곧 INSERT 지만, 그 사실에 기대지 않는다 —
+            // 전략이 바뀌면(#211 이 batch insert 를 이유로 건드리는 자리다) 제약 위반이 커밋
+            // 시점으로 밀려 이 try 를 빠져나간 뒤 터진다. deleteExercise(:273)와 같은 이유다.
+            memberRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw duplicationOf(e);
+        }
         return member.getUsername();
+    }
+
+    /**
+     * 사전검사와 INSERT 사이에 낀 UNIQUE 위반을 해당 필드의 4xx 로 옮긴다(이슈 #195 ②층).
+     *
+     * <p>제약명은 MySQL 이 {@code Duplicate entry 'e1runner' for key 'users.username'} 으로 주고
+     * Hibernate 의 dialect 가 그중 {@code users.username} 을 뽑아 온다. 테이블 접두사가 붙는지는
+     * 버전에 따라 다르므로 <b>포함 관계로</b> 본다.
+     *
+     * <p><b>모르는 제약은 그대로 500 으로 보낸다.</b> {@code DataIntegrityViolationException} 은
+     * UNIQUE 전용이 아니라 FK·NOT NULL·JSON 형식 위반({@code AdminExerciseService:292})에서도
+     * 나오고, 그쪽은 대개 <b>클라 잘못이 아니라 서버 결함</b>이다. 싸잡아 4xx 로 바꾸면 진짜 결함이
+     * "사용자가 중복을 냈다"로 위장되고 {@code log.error} 도 사라져 조용해진다. 여기서 4xx 로
+     * 바꾸는 것은 <b>이름을 확인한 두 제약뿐</b>이다.
+     */
+    private RuntimeException duplicationOf(DataIntegrityViolationException e) {
+        String constraint = (e.getCause() instanceof ConstraintViolationException cve)
+                ? cve.getConstraintName()
+                : null;
+        if (constraint == null) {
+            return e;
+        }
+        String name = constraint.toLowerCase(Locale.ROOT);
+        if (name.contains("username")) {
+            log.warn("가입 경합 — 사전검사 후 username 이 선점됨 (constraint={})", constraint);
+            return new BusinessException(ErrorCode.USERNAME_DUPLICATION);
+        }
+        if (name.contains("email")) {
+            log.warn("가입 경합 — 사전검사 후 email 이 선점됨 (constraint={})", constraint);
+            return new BusinessException(ErrorCode.USERID_DUPLICATION);
+        }
+        return e;
     }
 
     //회원탈퇴 로직
