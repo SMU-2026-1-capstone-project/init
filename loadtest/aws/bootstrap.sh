@@ -72,6 +72,17 @@ if command -v dnf >/dev/null 2>&1; then
       -o /usr/libexec/docker/cli-plugins/docker-compose || die "compose 플러그인 내려받기 실패"
     chmod +x /usr/libexec/docker/cli-plugins/docker-compose
   fi
+  # 🔴 compose v2 의 `build` 는 **buildx 를 따로 요구**한다("requires buildx 0.17.0 or later").
+  #    AL2023 의 docker 패키지엔 없어서, 이미지를 빌드하는 역할(p6-target)이 여기서 죽는다.
+  #    MySQL 만 띄우던 기존 라운드는 build 를 안 해서 이 구멍이 안 보였다 (2026-08-16 실측).
+  if ! docker buildx version >/dev/null 2>&1; then
+    mkdir -p /usr/libexec/docker/cli-plugins
+    case "$(uname -m)" in x86_64) BX_ARCH=amd64 ;; aarch64) BX_ARCH=arm64 ;; *) BX_ARCH="" ;; esac
+    [ -n "$BX_ARCH" ] && curl -fsSL \
+      "https://github.com/docker/buildx/releases/download/v0.19.3/buildx-v0.19.3.linux-${BX_ARCH}" \
+      -o /usr/libexec/docker/cli-plugins/docker-buildx \
+      && chmod +x /usr/libexec/docker/cli-plugins/docker-buildx
+  fi
 elif command -v apt-get >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq || die "apt update 실패"
