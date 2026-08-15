@@ -222,7 +222,14 @@ public class PoseDataService {
                         .build())
                 .collect(Collectors.toList());
 
+        // 🔴 재추출은 «추가» 가 아니라 «교체» 다 (#220). 기존 행을 두고 saveAll 하면 rep 두 벌이
+        //    이어붙어 **한 벌처럼** 읽힌다 — AI 가 이 표를 순서대로 훑어 각도 시퀀스 하나로 만들고
+        //    (`_parse_reference_poses`), 그때 timestamp_sec 은 아예 안 본다. 2026-08-16 실측에서
+        //    37행이 74행이 됐고 표에는 «등록 완료» 로그만 남았다.
+        //    같은 트랜잭션이라 삭제·삽입이 원자적이다 — 중간에 실패해도 정답지가 비지 않는다.
+        long removed = referenceRepository.deleteByExerciseId(exerciseId);
         referenceRepository.saveAll(referenceEntities);
-        log.info("운동 ID {} : 기준 좌표 {}개 등록 완료", exerciseId, referenceEntities.size());
+        log.info("운동 ID {} : 기준 좌표 {}개 등록 완료 (기존 {}개 교체)",
+                exerciseId, referenceEntities.size(), removed);
     }
 }
