@@ -18,6 +18,7 @@ set -uo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 RIG=$ROOT/loadtest/results/online-ddl-2026-08-09
 BACKUP_RIG=$ROOT/loadtest/results/backup-restore-2026-08-13
+CORES_RIG=$ROOT/loadtest/results/coresidency-2026-08-15
 
 # ── 설정 ─────────────────────────────────────────────────────────────────
 S3_BASE=${S3_BASE:?S3_BASE 가 필요하다 — 예: s3://my-bucket/shadowfit}
@@ -34,6 +35,32 @@ S3_DEST="${S3_BASE%/}/$RUN_ID"
 #     PHASES="preflight backup_rehearsal backup backup_real ridealong collect"
 #     🔴 `backup_real` 은 반드시 `backup` **뒤**다 — 무대(`pose_data_scale`)를 real 로 다시
 #        세우므로 순서가 뒤집히면 1억 행 본 측정이 다른 무대 위에서 돈다.
+#
+#   P6 동거 용량 라운드 (主-P6):
+#     TARGET_HOST=10.0.0.5 AI_PUBLIC_TOKEN=... \
+#     PHASES="coresidency_preflight coresidency_rehearsal coresidency collect"
+#
+#     🔴 **#223 이 닫히기 전에는 이 라운드가 안 돈다.**
+#        - #222 (팔 A 가 성립 안 함) 은 **(a)안으로 닫았다**(2026-08-16) — 팔 A 를
+#          «B 와 같은 구성 + ghz 부하 없음» 으로 재정의. 실행 검증은 아직 없다
+#        - 그 대가로 A 와 B 는 **구성이 같아졌다.** 갈리는 것은 ghz 부하 하나다.
+#        - #223 은 **배선됐다**(2026-08-16, 요청/초 고정). 그래서 아래 GHZ_* 가 필수다:
+#            GHZ_RPS=<정한 값> GHZ_DATA=<gen_batch_multi.py 산출물> GHZ_TOKEN=<INTERNAL_API_TOKEN>
+#          비어 있으면 preflight 가 막는다. ghz 없이 도는 라운드는 CORES_ARMS="A" 뿐이고
+#          (B·C·D 는 전부 從 부하를 쓴다), 그건 «유휴 동거 기준선» 하나만 얻는 라운드다
+#
+#     🔴 **이 라운드만 러너의 자리가 다르다.** 다른 단계는 «러너 = 측정 대상 박스» 인데
+#        (`docker exec $CONTAINER` 로 로컬 MySQL 을 친다), P6 의 rig 은
+#        «부하기에서 돌며 대상 박스를 SSH 로 몬다» 를 전제한다(`coresidency_sweep.sh:16`).
+#        그래서 P6 라운드에서 이 스크립트는 **부하기 박스**에서 돈다.
+#        - 대상 박스의 조건(타입·vCPU·RAM·캡)은 `collect` 가 `TARGET_SSH` 로 따로 걷는다.
+#          안 그러면 매니페스트가 **부하기의 스펙**을 측정 조건으로 박제한다
+#        - 부하기를 따로 두지 않고 같은 박스에서 돌리려면(설계 §10 미결정)
+#          `TARGET_SSH="bash -c"` 로 두면 코드 변경 없이 선다. 단 그때 재는 것은
+#          «부하기까지 동거하는 박스» 라 조건이 다르다 — 결과에 그대로 적을 것
+#
+#   🔴 `coresidency` 를 `ddl`·`backup` 과 같은 PHASES 에 넣지 말 것. 러너의 자리 자체가
+#      다르고(위), 저 둘은 디스크가 지배해서 섞이면 셋 다 오염된다.
 #
 # 🔴 `ddl` 과 `backup` 을 **같이 넣지 말 것.** 둘 다 디스크가 지배해서 한 라운드에 섞으면
 #    서로 오염된다(AWS-RIDE-ALONG §7 이 P1↔P2 에 건 경고와 같다). 라운드를 나눈다.
@@ -63,6 +90,38 @@ BACKUP_SESSIONS=${BACKUP_SESSIONS:-133334}       # 1억 행 (133,334 × 750)
 TIMEOUT_BACKUP_REAL=${TIMEOUT_BACKUP_REAL:-7200} # 2시간 (무대 ~1.5GB, 판 4개)
 BACKUP_REAL_SESSIONS=${BACKUP_REAL_SESSIONS:-1000}  # 1,000 × 750행 ≈ 75만 행 ≈ 1.5GB
 TIMEOUT_RIDEALONG=${TIMEOUT_RIDEALONG:-900}
+
+# ── 동거 용량 (主 P6) ────────────────────────────────────────────────────
+#
+# 러너는 **부하기**에서 돈다(위 헤더). 아래 값은 전부 rig 의 기본값과 같게 두되, 러너에서
+# 조건을 한 곳에 모아 매니페스트에 남기려고 다시 적는다.
+TARGET_HOST=${TARGET_HOST:-}
+AI_CONTAINER=${AI_CONTAINER:-shadowfit-ai}
+TARGET_REPO_DIR=${TARGET_REPO_DIR:-/root/init}
+# 대상 호스트가 없으면 **빈 값**이다 — `root@` 만 남은 명령이 도는 것을 막는다.
+TARGET_SSH=${TARGET_SSH:-${TARGET_HOST:+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@$TARGET_HOST}}
+AI_PUBLIC_TOKEN=${AI_PUBLIC_TOKEN:-}
+
+CORES_ARMS=${CORES_ARMS:-"A B C"}            # D(관측 스택)를 넣으면 판이 33% 는다
+CORES_LEVELS=${CORES_LEVELS:-"20 40 80 160"}
+CORES_DUR=${CORES_DUR:-90}
+CORES_REPEATS=${CORES_REPEATS:-3}
+CORES_REH_LEVELS=${CORES_REH_LEVELS:-"5 10"} # 축소 리허설 — README 「무인 실행 전 필수」
+CORES_REH_DUR=${CORES_REH_DUR:-20}
+
+# 從 부하(#223) — 팔 B·C·D 를 «옆이 일하는» 상태로 만드는 ghz. **요청/초 고정**이다.
+# 🔴 `GHZ_RPS` 에 기본값을 두지 않는다. 정한 값이므로 근거가 조건 칸에 같이 가야 한다.
+GHZ_RPS=${GHZ_RPS:-}
+GHZ_DATA=${GHZ_DATA:-}                       # gen_batch_multi.py 산출물 (부하기 로컬)
+GHZ_TOKEN=${GHZ_TOKEN:-}                     # INTERNAL_API_TOKEN
+GHZ_BIN=${GHZ_BIN:-/home/ec2-user/go/bin/ghz}
+GHZ_CONC=${GHZ_CONC:-50}
+
+# 소요 환산(rig 파라미터 기준): 팔당 버림1+본판12 = 13판 × (DUR 90s + AI 재기동 ~18s +
+# 세션 개설·종료) ≈ 30분. 3팔이면 1.5h 안팎, 팔 D 까지면 2h 안팎이다.
+# 상한은 그 2~3배로 준다 — 걸려서 끊기는 것보다 낫다(설계 원칙 ③).
+TIMEOUT_CORES=${TIMEOUT_CORES:-21600}                    # 6시간
+TIMEOUT_CORES_REHEARSAL=${TIMEOUT_CORES_REHEARSAL:-1800} # 30분 (예상 몇 분)
 
 export PW DB_NAME CONTAINER
 
@@ -148,17 +207,36 @@ run_phase() {  # $1=이름 $2...=명령
 
 # ── 단계 정의 ────────────────────────────────────────────────────────────
 
-phase_preflight() {
-  local ok=0
-
-  # 🔴 S3 쓰기를 **제일 먼저** 확인한다. 8시간 돌고 업로드에서 막히는 것이 최악이다.
+# 라운드가 무엇이든 똑같이 물어야 하는 것 둘. 단계별 preflight 가 이것을 나눠 갖는다.
+preflight_s3() {  # 🔴 S3 쓰기를 **제일 먼저** 확인한다. 8시간 돌고 업로드에서 막히는 것이 최악이다.
   echo "preflight $(date -Is)" > "$OUTDIR/_write_test.txt"
   if aws s3 cp "$OUTDIR/_write_test.txt" "$S3_DEST/_write_test.txt" --only-show-errors; then
     note "✅ S3 쓰기 가능 — $S3_DEST"
-  else
-    note "🔴 S3 에 못 쓴다 — 인스턴스 프로파일 권한을 볼 것. 여기서 멈춘다"
-    ok=1
+    return 0
   fi
+  note "🔴 S3 에 못 쓴다 — 인스턴스 프로파일 권한을 볼 것. 여기서 멈춘다"
+  return 1
+}
+
+# 🔴 요금 태그는 **살아 있을 때만** 붙일 수 있다. 지금 경고하면 고칠 수 있고,
+#    끄고 나서 알면 이 라운드의 실제 청구액은 영영 못 가른다. 이 repo 에 지금까지
+#    EC2 요금 기록이 한 줄도 없는 이유가 그것이다.
+preflight_tags() {  # 경고만 한다 — 태그가 없다고 측정을 막지는 않는다
+  local tags; tags=$(imds "tags/instance" | tr '\n' ' ')
+  if echo "$tags" | grep -qi "Project"; then
+    note "✅ 요금 태그 있음 — Cost Explorer 에서 이 측정만 뽑을 수 있다"
+  elif [ -z "$tags" ]; then
+    note "⚠️ 인스턴스 태그를 못 읽었다 — 태그가 없거나 «메타데이터의 태그 허용» 이 꺼져 있다."
+    note "   지금 붙일 것: aws ec2 create-tags --resources \$(imds instance-id) --tags Key=Project,Value=shadowfit-measure"
+  else
+    note "⚠️ Project 태그가 없다 (현재: $tags) — 요금을 이 측정에 귀속시킬 수 없다"
+  fi
+}
+
+phase_preflight() {
+  local ok=0
+
+  preflight_s3 || ok=1
 
   docker exec "$CONTAINER" mysqladmin ping -h localhost --silent >/dev/null 2>&1 \
     && note "✅ MySQL 응답" || { note "🔴 MySQL 무응답"; ok=1; }
@@ -172,18 +250,7 @@ phase_preflight() {
 
   note "WRITER_MAX_SEC=$WRITER_MAX_SEC (기본 5400 에서 상향됨)"
 
-  # 🔴 요금 태그는 **살아 있을 때만** 붙일 수 있다. 지금 경고하면 고칠 수 있고,
-  #    끄고 나서 알면 이 라운드의 실제 청구액은 영영 못 가른다. 이 repo 에 지금까지
-  #    EC2 요금 기록이 한 줄도 없는 이유가 그것이다.
-  local tags; tags=$(imds "tags/instance" | tr '\n' ' ')
-  if echo "$tags" | grep -qi "Project"; then
-    note "✅ 요금 태그 있음 — Cost Explorer 에서 이 측정만 뽑을 수 있다"
-  elif [ -z "$tags" ]; then
-    note "⚠️ 인스턴스 태그를 못 읽었다 — 태그가 없거나 «메타데이터의 태그 허용» 이 꺼져 있다."
-    note "   지금 붙일 것: aws ec2 create-tags --resources \$(imds instance-id) --tags Key=Project,Value=shadowfit-measure"
-  else
-    note "⚠️ Project 태그가 없다 (현재: $tags) — 요금을 이 측정에 귀속시킬 수 없다"
-  fi
+  preflight_tags
 
   return $ok
 }
@@ -269,6 +336,192 @@ phase_backup_real() {
   return 0
 }
 
+# ── 동거 용량 (主 P6) ────────────────────────────────────────────────────
+#
+# 이 세 단계는 다른 단계와 «어디를 보는가» 가 다르다 — 러너는 부하기에 있고 측정 대상은
+# 원격이다. 그래서 preflight 도 따로 둔다: `preflight` 는 로컬 MySQL·percona 이미지·
+# 디스크 20GB 를 묻는데 부하기 박스엔 셋 다 없다. 그걸 그대로 쓰면 **환경이 맞는데
+# 실패로 찍힌다** — 08-12 에 «부트스트랩이 스키마를 안 만들어서» 從 항목을 놓친 것과
+# 같은 계열의, 「환경 결함이 측정 결과처럼 보이는」 자리다.
+
+phase_coresidency_preflight() {
+  local ok=0
+  preflight_s3 || ok=1
+
+  [ -n "$TARGET_HOST" ] \
+    && note "✅ 대상 호스트: $TARGET_HOST" \
+    || { note "🔴 TARGET_HOST 가 없다 — 무엇을 재는지가 안 정해졌다"; ok=1; }
+  [ -n "$AI_PUBLIC_TOKEN" ] \
+    && note "✅ AI_PUBLIC_TOKEN 있음" \
+    || { note "🔴 AI_PUBLIC_TOKEN 이 비었다 — 프레임 경로가 전부 401 이다"; ok=1; }
+
+  # 🔴 rig 은 «python» 을 부른다(probe.sh G0·G1·G2 · coresidency_sweep.sh:94).
+  #    AL2023 은 python3 만 있는 경우가 흔한데, 그러면 게이트가 통째로 죽는다.
+  if command -v python >/dev/null 2>&1; then
+    note "✅ python: $(command -v python)"
+  else
+    note "🔴 «python» 이 PATH 에 없다 — rig 이 python3 가 아니라 python 을 부른다 (alias 를 걸 것)"
+    ok=1
+  fi
+
+  # 프레임 자산은 커밋돼 있다(408KB). 여기서 만들 수는 없다 — gen_frames.py 는 mediapipe 가
+  # 필요해서 ai-server 이미지 안에서 도는 물건이다.
+  if [ -f "$CORES_RIG/frames.json" ]; then
+    note "✅ 프레임 자산 $(wc -c < "$CORES_RIG/frames.json") B"
+  else
+    note "🔴 frames.json 이 없다 — 여기서는 못 만든다(mediapipe 필요). 미리 만들어 올릴 것"
+    ok=1
+  fi
+
+  # 160세션 × (부하 스레드 1 + 커넥션) — 기본 1024 면 상단 레벨에서 «조용히» 실패한다.
+  local nofile; nofile=$(ulimit -n 2>/dev/null)
+  note "부하기 ulimit -n = ${nofile:-?} (최고 레벨 ${CORES_LEVELS##* }세션)"
+
+  if [ -n "$TARGET_SSH" ]; then
+    if $TARGET_SSH "test -d $TARGET_REPO_DIR && docker ps >/dev/null 2>&1" 2>/dev/null; then
+      note "✅ 대상 박스 도달 — $TARGET_REPO_DIR · docker 사용 가능"
+    else
+      note "🔴 대상 박스에 못 붙거나 $TARGET_REPO_DIR / docker 가 없다 — 팔 전환이 통째로 죽는다"
+      ok=1
+    fi
+
+    # 🔴 #214 — 메모리 캡이 없으면 **첫 세션에서** RuntimeError 다. 팔 B 도 메모리 캡은 건다
+    #    (팔 B 가 흔드는 것은 CPU 캡 하나다). percona-toolkit 이미지가 없어 팔 B 4판이 전부
+    #    죽었던 것과 같은 부류 — 도구의 성질이 아니라 환경 결함인데 표에는 똑같이 보인다.
+    local aimem
+    aimem=$($TARGET_SSH "docker inspect -f '{{.HostConfig.Memory}}' $AI_CONTAINER 2>/dev/null" 2>/dev/null | tr -d '\r')
+    if [ -z "$aimem" ]; then
+      note "⚠️ 대상에서 $AI_CONTAINER 를 못 찾았다 — 아직 안 떠 있으면 정상. 게이트 G3 가 다시 본다"
+    elif [ "$aimem" = "0" ]; then
+      note "🔴 AI 메모리 캡이 없다 (#214) — 첫 세션에서 죽는다. AI_MEM_LIMIT 를 걸 것"
+      ok=1
+    else
+      note "✅ AI 메모리 캡 $((aimem/1024/1024))MB"
+    fi
+
+    # 팔 C·D 는 대상 박스의 compose 가 AI_CPUS·MYSQL_CPUS·BACKEND_CPUS 를 **필수**로 읽는다
+    # (`${AI_CPUS:?}`). 없으면 그 팔의 13판이 전부 죽는데, 표에는 팔 하나가 빈 것으로만 보인다.
+    if echo "$CORES_ARMS" | grep -qE '(^| )(C|D)( |$)'; then
+      local missing=""
+      local v
+      for v in AI_CPUS MYSQL_CPUS BACKEND_CPUS; do
+        $TARGET_SSH "grep -q '^$v=' $TARGET_REPO_DIR/.env" 2>/dev/null || missing="$missing $v"
+      done
+      [ -z "$missing" ] \
+        && note "✅ 팔 C 용 캡 변수 3개 확인 (.env)" \
+        || { note "🔴 대상 .env 에 없다:$missing — 팔 C 가 통째로 죽는다"; ok=1; }
+    fi
+  fi
+
+  # 從 부하(#223). 팔 B·C·D 가 하나라도 있으면 **여기서** 막는다 — 리허설까지 가서 알면
+  # 리허설 시간을 버리고, 본판까지 가면 라운드를 버린다.
+  if echo " $CORES_ARMS " | grep -qE ' (B|C|D) '; then
+    local miss=""
+    [ -n "$GHZ_RPS" ]   || miss="$miss GHZ_RPS"
+    [ -n "$GHZ_TOKEN" ] || miss="$miss GHZ_TOKEN"
+    [ -f "${GHZ_DATA:-/nonexistent}" ] || miss="$miss GHZ_DATA(파일)"
+    [ -x "$GHZ_BIN" ]   || miss="$miss GHZ_BIN(실행권한)"
+    if [ -z "$miss" ]; then
+      note "✅ 從 부하 ${GHZ_RPS} req/s 고정 · c=$GHZ_CONC · $(basename "$GHZ_DATA")"
+    else
+      note "🔴 從 부하 설정이 비었다:$miss — 팔 B/C/D 는 «유휴 동거» 를 잰다 (#223)"
+      ok=1
+    fi
+  else
+    note "從 부하 없음 — CORES_ARMS='$CORES_ARMS' 에 B·C·D 가 없다(유휴 동거 기준선만 얻는 라운드)"
+  fi
+
+  preflight_tags
+  return $ok
+}
+
+# 「스크립트가 0 으로 끝났다」와 「판이 성립했다」는 다르다.
+#
+# 🔴 이 rig 의 급소가 정확히 여기다 — 세션이 안 열리면 프레임이 전부 거절되는데 요청 수·지연은
+#    정상으로 찍힌다(README 게이트 G2). 그래서 리허설의 통과 여부를 **종료 코드가 아니라
+#    결과 표**로 판정한다. #202(「설계에 있던 판이 rig 에 없었는데 표는 정상」)와 같은 방어다.
+cores_assert_usable() {  # $1 = coresidency.tsv
+  local tsv=$1
+  [ -f "$tsv" ] || { note "🔴 결과 표가 없다: $tsv"; return 1; }
+  awk -F'\t' '
+    NR>1 {
+      rows++
+      printf "     %s %s %s세션 → req=%s setup_fail=%s nolease=%s nopose=%s\n", $1,$2,$3,$4,$12,$10,$11
+      if ($4 == "FAIL")   { bad++; next }
+      if ($12+0 > 0)      { bad++; next }
+      if ($4+0 == 0)      { bad++; next }
+    }
+    END {
+      if (rows == 0) { print "  🔴 본판이 한 줄도 없다 — 스윕이 판을 못 돌았다"; exit 1 }
+      if (bad > 0) {
+        printf "  🔴 %d/%d 판이 성립하지 않았다 (FAIL · setup_fail>0 · 요청 0건).\n", bad, rows
+        print  "     이 상태의 수치는 «측정» 이 아니라 «세션이 안 열린 것» 이다 — 본 측정으로 넘어가지 않는다"
+        exit 1
+      }
+      printf "  ✅ %d판 전부 성립 (setup_fail 0)\n", rows
+    }' "$tsv"
+}
+
+# 축소 리허설. **여기서 실패하면 본 측정으로 넘어가지 않는다** — 리허설의 존재 이유다.
+# README 「축소 리허설(무인 실행 전 필수)」와 같은 규모로 돈다.
+phase_coresidency_rehearsal() {
+  local out=$OUTDIR/coresidency_rehearsal
+  mkdir -p "$out"
+  note "게이트 G0~G3 → 축소 스윕 (LEVELS='$CORES_REH_LEVELS' DUR=$CORES_REH_DUR REPEATS=1)"
+  note "**이 판의 수치는 측정값이 아니다** — 경로만 본다"
+
+  env OUT="$out" BASE="http://$TARGET_HOST:8080" AI="http://$TARGET_HOST:8000" \
+      TOKEN="$AI_PUBLIC_TOKEN" AI_CONTAINER="$AI_CONTAINER" DOCKER="$TARGET_SSH docker" \
+      timeout --kill-after=60 "$TIMEOUT_CORES_REHEARSAL" bash "$CORES_RIG/probe.sh" \
+    > "$out/probe.log" 2>&1 || { cat "$out/probe.log"; return 1; }
+  cat "$out/probe.log"
+
+  env OUT="$out" HOST="$TARGET_HOST" TOKEN="$AI_PUBLIC_TOKEN" SSH="$TARGET_SSH" \
+      REPO_DIR="$TARGET_REPO_DIR" ARMS="$CORES_ARMS" LEVELS="$CORES_REH_LEVELS" \
+      DUR="$CORES_REH_DUR" REPEATS=1 \
+      GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
+      GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
+      timeout --kill-after=60 "$TIMEOUT_CORES_REHEARSAL" bash "$CORES_RIG/coresidency_sweep.sh" \
+    || return 1
+
+  # 🔴 전 팔을 리허설에서 밟는다. 팔 하나가 «구성은 되는데 세션이 안 열리는» 상태면
+  #    본판에서 그 팔 13판이 통째로 빈다 — 그걸 아침에 알면 라운드를 다시 사야 한다.
+  #    #222 의 팔 A 가 그 상태였고 (a)안으로 고쳤다 — 이 판정은 그 수정이 실제로 섰는지를
+  #    EC2 에서 처음으로 확인하는 자리이기도 하다(코드 판독만 돼 있다).
+  cores_assert_usable "$out/coresidency.tsv" || return 1
+  return 0
+}
+
+phase_coresidency() {
+  local out=$OUTDIR/coresidency
+  mkdir -p "$out"
+  note "정판 — 팔 '$CORES_ARMS' × 레벨 '$CORES_LEVELS' × ${CORES_REPEATS}반복 (+팔당 버림 1)"
+  # 🔴 #223 — 스윕에 ghz 부하가 없다. (a)안 이후 A 와 B 가 그것 하나로만 갈리므로,
+  #    두 팔을 같이 넣으면 스윕이 스스로 거부한다(assert_arms_distinguishable).
+  #    한 팔만 도는 라운드라면 «대조를 포기했다» 를 결과에 적어야 한다.
+  note "⚠️ #223 — ghz 부하 미배선. A·B 대조는 그때까지 성립하지 않는다"
+
+  env OUT="$out" BASE="http://$TARGET_HOST:8080" AI="http://$TARGET_HOST:8000" \
+      TOKEN="$AI_PUBLIC_TOKEN" AI_CONTAINER="$AI_CONTAINER" DOCKER="$TARGET_SSH docker" \
+      timeout --kill-after=60 "$TIMEOUT_CORES" bash "$CORES_RIG/probe.sh" \
+    > "$out/probe.log" 2>&1 || { cat "$out/probe.log"; return 1; }
+  cat "$out/probe.log"
+
+  env OUT="$out" HOST="$TARGET_HOST" TOKEN="$AI_PUBLIC_TOKEN" SSH="$TARGET_SSH" \
+      REPO_DIR="$TARGET_REPO_DIR" ARMS="$CORES_ARMS" LEVELS="$CORES_LEVELS" \
+      DUR="$CORES_DUR" REPEATS="$CORES_REPEATS" STATS_SEC="${STATS_SEC:-5}" \
+      GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
+      GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
+      timeout --kill-after=120 "$TIMEOUT_CORES" bash "$CORES_RIG/coresidency_sweep.sh" \
+    || return 1
+
+  # 본판은 **막지 않는다** — 이미 다 돌았고, 성립 여부는 표에 남겨 사람이 읽는다.
+  # (판정은 사람이 한다: sweep 말미의 「특히 볼 것」 세 줄)
+  cores_assert_usable "$out/coresidency.tsv" \
+    || note "⚠️ 위 판들은 그대로 남긴다 — 지우지 말고 «성립 안 함» 으로 읽을 것"
+  return 0
+}
+
 # 從 항목 — 인프라가 살아 있을 때만 값이 생긴다. AWS-RIDE-ALONG.md §1 참고.
 phase_ridealong() {
   local out=$OUTDIR/ridealong
@@ -329,13 +582,38 @@ phase_collect() {
     echo "vCPU / RAM    : $(nproc) / $(awk '/MemTotal/ {printf "%.0fGB", $2/1048576}' /proc/meminfo 2>/dev/null)"
     echo "커널          : $(uname -r)"
     echo "디스크        : $(df -h "$ROOT" | awk 'NR==2 {print $2, "여유", $4}')"
-    echo "MySQL         : $(docker exec -e MYSQL_PWD="$PW" "$CONTAINER" mysql -uroot -N -e 'SELECT VERSION();' 2>/dev/null | tr -d '\r')"
-    echo "버퍼풀        : $(docker exec -e MYSQL_PWD="$PW" "$CONTAINER" mysql -uroot -N -e "SELECT @@innodb_buffer_pool_size;" 2>/dev/null | tr -d '\r')"
+    # 🔴 로컬에 MySQL 이 없는 라운드(P6 — 러너가 부하기다)에서는 빈칸이 남는다. 빈칸은
+    #    «0» 이나 «못 걷었다» 로 읽히므로 **왜 없는지**를 적는다 (_rig.sh 의 FAIL≠0 규약).
+    if docker inspect "$CONTAINER" >/dev/null 2>&1; then
+      echo "MySQL         : $(docker exec -e MYSQL_PWD="$PW" "$CONTAINER" mysql -uroot -N -e 'SELECT VERSION();' 2>/dev/null | tr -d '\r')"
+      echo "버퍼풀        : $(docker exec -e MYSQL_PWD="$PW" "$CONTAINER" mysql -uroot -N -e "SELECT @@innodb_buffer_pool_size;" 2>/dev/null | tr -d '\r')"
+    else
+      echo "MySQL         : 해당 없음 — 이 박스에 $CONTAINER 가 없다(러너가 측정 대상이 아닌 라운드)"
+    fi
     echo "WRITER_MAX_SEC: $WRITER_MAX_SEC"
     # 🔴 #198 — 이 한 줄이 없어서 08-12 라운드를 회수할 때 버킷 이름을 사람에게 물어야 했다.
     #    러너 로그(`/root/run_all.log`)에도 찍히지만 그건 $OUTDIR 밖이라 S3 로 안 올라가고
     #    인스턴스와 함께 죽는다. **살아남는 파일에 적어야 한다.**
     echo "S3 결과       : $S3_DEST"
+
+    # 🔴 P6 라운드에서는 **위 블록이 부하기의 스펙**이다. 동거 용량은 「이 박스에 몇 세션이
+    #    사는가」라서, 대상 박스를 안 적으면 매니페스트가 조용히 다른 기계를 조건으로 박제한다.
+    #    조건 없는 수치는 이 프로젝트에서 인용 불가이고, 틀린 조건은 그보다 나쁘다.
+    if [ -n "$TARGET_SSH" ]; then
+      echo
+      echo "# 대상 박스 (측정 대상 — 위 블록은 «부하기» 다)"
+      echo "호스트        : $TARGET_HOST"
+      echo "인스턴스 타입 : $($TARGET_SSH "TOK=\$(curl -sf --max-time 3 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60'); curl -sf --max-time 3 -H \"X-aws-ec2-metadata-token: \$TOK\" http://169.254.169.254/latest/meta-data/instance-type" 2>/dev/null | tr -d '\r')"
+      echo "vCPU / RAM    : $($TARGET_SSH "nproc; awk '/MemTotal/ {printf \"%.0fGB\", \$2/1048576}' /proc/meminfo" 2>/dev/null | tr '\n' ' ' | tr -d '\r')"
+      echo "컨테이너 캡   :"
+      $TARGET_SSH "docker ps --format '{{.Names}}' | while read -r c; do
+          printf '  %-22s mem=%s cpus=%s\n' \"\$c\" \
+            \"\$(docker inspect -f '{{.HostConfig.Memory}}' \$c)\" \
+            \"\$(docker inspect -f '{{.HostConfig.NanoCpus}}' \$c)\"; done" 2>/dev/null | tr -d '\r'
+      echo "동거 팔       : ARMS='$CORES_ARMS' LEVELS='$CORES_LEVELS' DUR=${CORES_DUR}s REPEATS=$CORES_REPEATS"
+      echo "⚠️ 위 «캡» 은 라운드 **종료 시점** 값이다 — 스윕이 팔마다 갈아끼우므로 마지막 팔의 상태다"
+    fi
+
     echo
     echo "# 단계"
     cat "$PHASE_LOG"
@@ -393,6 +671,26 @@ for p in $PHASES; do
       else
         note "⏭  real 대조 건너뜀 — 리허설이 실패했다"
         printf "backup_real\tSKIP\t0\t%s\n" "$(date -Is)" >> "$PHASE_LOG"
+      fi ;;
+    coresidency_preflight)
+      run_phase coresidency_preflight phase_coresidency_preflight || {
+        note "🔴 사전 확인 실패 — 여기서 멈춘다. 이 상태로 돌리면 «환경 결함» 이 «측정 결과» 로 찍힌다"
+        break
+      } ;;
+    coresidency_rehearsal)
+      # backup 과 같은 형태: `break` 도 `continue` 도 안 된다. 플래그로 **그 단계만** 막는다.
+      if run_phase coresidency_rehearsal phase_coresidency_rehearsal; then
+        CORES_REHEARSAL_OK=1
+      else
+        CORES_REHEARSAL_OK=0
+        note "🔴 동거 리허설 실패 — 본 측정을 건너뛴다. 세션이 안 열리는 채로 도는 것이 이 rig 의 최악이다"
+      fi ;;
+    coresidency)
+      if [ "${CORES_REHEARSAL_OK:-1}" = "1" ]; then
+        run_phase coresidency phase_coresidency
+      else
+        note "⏭  동거 본 측정 건너뜀 — 리허설이 실패했다"
+        printf "coresidency\tSKIP\t0\t%s\n" "$(date -Is)" >> "$PHASE_LOG"
       fi ;;
     ridealong) run_phase ridealong phase_ridealong ;;
     collect)   run_phase collect   phase_collect ;;

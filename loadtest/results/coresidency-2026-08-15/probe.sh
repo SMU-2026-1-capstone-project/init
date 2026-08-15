@@ -16,6 +16,11 @@ BASE=${BASE:-http://localhost:8080}
 AI=${AI:-http://localhost:8000}
 TOKEN=${TOKEN:-}
 AI_CONTAINER=${AI_CONTAINER:-shadowfit-ai}
+# 🔴 G3 는 **대상 박스의** 컨테이너를 봐야 한다. 게이트를 부하기에서 돌리면 로컬 docker 에는
+#    그 컨테이너가 없어서 «못 찾겠다» 로 떨어지는데, 그건 캡이 없는 것이 아니라 **보는 곳이
+#    틀린 것**이다. 환경 결함이 게이트 실패로 위장하는 자리라 통로를 열어둔다.
+#      예) DOCKER="ssh root@10.0.0.5 docker" bash probe.sh
+DOCKER=${DOCKER:-docker}
 ORIG=${ORIG:-$HERE/../../measure_ai_concurrency.py}
 FRAMES=${FRAMES:-$HERE/frames.json}
 
@@ -135,10 +140,10 @@ fi
 
 # ── G3. 캡이 실제로 걸려 있는가 (팔 C·D 전제) ────────────────────────────
 g "G3. 컨테이너 자원 한도 — 팔이 실제로 갈리는가"
-lim=$(docker inspect -f '{{.HostConfig.Memory}}' "$AI_CONTAINER" 2>/dev/null)
-cpu=$(docker inspect -f '{{.HostConfig.NanoCpus}}' "$AI_CONTAINER" 2>/dev/null)
+lim=$($DOCKER inspect -f '{{.HostConfig.Memory}}' "$AI_CONTAINER" 2>/dev/null | tr -d '\r')
+cpu=$($DOCKER inspect -f '{{.HostConfig.NanoCpus}}' "$AI_CONTAINER" 2>/dev/null | tr -d '\r')
 if [ -z "$lim" ]; then
-  no "$AI_CONTAINER 를 못 찾겠다"
+  no "$AI_CONTAINER 를 못 찾겠다 (DOCKER='$DOCKER' — 보는 곳이 맞는지부터 볼 것)"
 else
   if [ "$lim" = "0" ]; then
     no "메모리 한도가 없다 — 첫 세션에서 RuntimeError 다 (#214). 팔 B 도 메모리 캡은 걸어야 한다"
