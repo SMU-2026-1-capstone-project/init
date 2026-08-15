@@ -40,10 +40,15 @@ sys.path.insert(0, "/tmp")          # docker cp 로 올린 경우
 import cv2                                                          # noqa: E402
 from synthetic_body import squat_cycle                              # noqa: E402
 
-# rep 상태기계의 문턱 — `ai-server/app/core/squat_analyzer.py:95-98` 에서 가져온 값이다.
-# 🔴 **여기에 임의로 정한 숫자는 없다.** 코드가 쓰는 값을 그대로 읽어 대조한다.
-STAND_DEG = 155.0     # 이상이면 «서있음»
-BOTTOM_DEG = 95.0     # 이하면 «앉음»
+# rep 상태기계의 문턱. 🔴 **여기에 임의로 정한 숫자는 없다** — 코드가 쓰는 값을 그대로 쓴다.
+#
+# ⚠️ **`squat_analyzer` 안에 문턱이 두 벌이다** (2026-08-15 확인):
+#   · `analyze_squat_frames(bottom_threshold=100.0, standing_threshold=150.0)` — **rep 을 세는 것은 이쪽**
+#   · `_phase_from_angles()` 의 95 / 155 — 국면 «이름표» 를 붙이는 쪽
+# 초판이 뒤엣것을 골랐다. rep 이 생기는지를 보는 게이트이므로 **앞엣것이 맞다.**
+# (판정은 안 바뀐다 — 최대 124.30° 라 150 에도 못 닿는다. 그래도 잰 자를 틀리게 적으면 안 된다.)
+STAND_DEG = 150.0     # 이상이면 «서있음» (standing_threshold)
+BOTTOM_DEG = 100.0    # 이하면 «앉음»   (bottom_threshold)
 
 
 def knee_angles(frames):
