@@ -94,6 +94,7 @@ class MemberDeletionCascadeIntegrationTest {
 
         feedbackLogRepository.saveAndFlush(SessionFeedbackLog.builder()
                 .session(session).feedbackType(FeedbackType.KNEE_OUT)
+                .repNumber(1)                     // 멱등키의 두 번째 컬럼 (#193 ②)
                 .occurredAt(LocalDateTime.now())
                 .build());
 
