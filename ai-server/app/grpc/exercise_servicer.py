@@ -66,6 +66,17 @@ def _extract_reference_poses_from_video(path: str) -> list:
        평균하는데 이 표(`exercise_references`)는 «랜드마크» 를 저장하고 AI 가 읽어서 각도로
        바꾼다. 각도 평균은 랜드마크로 되돌릴 수 없다. 그래서 한 rep 을 그대로 쓴다 —
        `V4__seed_squat_reference.sql` 이 같은 규칙으로 만들어졌으므로 두 경로가 같은 것을 낸다.
+
+    🔴 **이 함수는 결정적이지 않다** ([#224](https://github.com/Shadowfit/init/issues/224)).
+       같은 영상·같은 코드인데 실행마다 결과가 갈린다 — 2026-08-16 실측에서 **37↔36프레임,
+       score 105.53↔102.87, 최저무릎 95.4°↔96.7°**. 원인 미규명(트래킹 상태·CPU 부하·rep
+       경계 판정 — 셋 다 안 갈랐다).
+
+       **그래서 재추출은 «같은 정답지를 다시 만드는 일» 이 아니다.** `saveReferencePoses` 가
+       기존 행을 교체하므로(#220) 달라진 값이 즉시 전면 적용된다. 관리자가 «영상은 그대로인데
+       한 번 더 눌렀다» 로 채점 기준이 미묘하게 바뀐다는 뜻이다. 크기는 작지만(±1.3 score)
+       **«같은 입력에 같은 출력» 이 성립하지 않는다는 사실 자체**가, 나중에 「정답지를
+       바꿨나?」를 되짚을 때 근거를 없앤다.
     """
     from app.api.endpoints.pose import _landmarks_to_json
     from app.core.reference_builder import _segment_reps
