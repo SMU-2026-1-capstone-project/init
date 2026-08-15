@@ -75,7 +75,13 @@ if command -v dnf >/dev/null 2>&1; then
   # 🔴 compose v2 의 `build` 는 **buildx 를 따로 요구**한다("requires buildx 0.17.0 or later").
   #    AL2023 의 docker 패키지엔 없어서, 이미지를 빌드하는 역할(p6-target)이 여기서 죽는다.
   #    MySQL 만 띄우던 기존 라운드는 build 를 안 해서 이 구멍이 안 보였다 (2026-08-16 실측).
-  if ! docker buildx version >/dev/null 2>&1; then
+  #    ⚠️ «있는가» 가 아니라 «버전이 되는가» 로 물어야 한다. AL2023 은 buildx **0.12.1** 을
+  #       이미 깔아 두므로 존재 검사만 하면 그대로 통과하고 build 에서 다시 죽는다
+  #       (2026-08-16 에 실제로 두 번 죽었다 — 없어서 한 번, 낡아서 한 번).
+  BX_VER=$(docker buildx version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | tr -d v)
+  BX_OK=$(awk -v v="${BX_VER:-0.0.0}" 'BEGIN{split(v,a,"."); print (a[1]>0 || a[2]>=17) ? 1 : 0}')
+  if [ "$BX_OK" != "1" ]; then
+    echo "  buildx ${BX_VER:-없음} → 0.19.3 으로 올린다 (compose build 는 0.17+ 를 요구한다)"
     mkdir -p /usr/libexec/docker/cli-plugins
     case "$(uname -m)" in x86_64) BX_ARCH=amd64 ;; aarch64) BX_ARCH=arm64 ;; *) BX_ARCH="" ;; esac
     [ -n "$BX_ARCH" ] && curl -fsSL \
