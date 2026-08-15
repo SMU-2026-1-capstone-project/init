@@ -63,6 +63,12 @@ GHZ_CONC=${GHZ_CONC:-50}                     # ghz 기본값. rate 를 못 따�
 GHZ_TARGET=${GHZ_TARGET:-$HOST:6565}
 GHZ_PAD=${GHZ_PAD:-5}                        # AI 측정 창을 ghz 창 «안쪽» 에 두기 위한 앞뒤 여유(초)
 MYSQL_CONTAINER=${MYSQL_CONTAINER:-shadowfit-mysql}
+# 🔴 자격증명을 박아두지 않는다. 로컬 dev 는 shadowfit/shadowfit 이지만 **측정 박스는 다르다** —
+#    `bootstrap.sh` 가 rig 기본 PW(1234)로 세운다. 박아두면 시드 확인이 «세션이 없다» 가
+#    아니라 «못 물었다» 로 떨어지고, 그건 라운드를 멈추게 한다(2026-08-16 EC2 에서 실제로 멈췄다).
+#    비밀번호는 `MYSQL_PWD` 로 넘긴다 — argv 에 안 실리고 mysql 의 경고도 안 난다.
+MYSQL_USER=${MYSQL_USER:-shadowfit}
+MYSQL_PW=${MYSQL_PW:-shadowfit}
 
 LOG="$OUT/coresidency.tsv"
 [ -f "$LOG" ] || printf "arm\tround\tsessions\treq\trps\tdetect_pct\tp50\tp95\tp99\tnolease\tnopose\tsetup_fail\n" > "$LOG"
@@ -130,7 +136,7 @@ PY
   ) || { echo "  🔴 페이로드에서 세션 id 를 못 뽑았다: $GHZ_DATA" >&2; return 1; }
   [ -n "$ids" ] || { echo "  🔴 페이로드에 세션 id 가 없다: $GHZ_DATA" >&2; return 1; }
   want=$(echo "$ids" | tr ',' '\n' | grep -c .)
-  got=$($SSH "docker exec -i $MYSQL_CONTAINER mysql -ushadowfit -pshadowfit shadowfit -N \
+  got=$($SSH "docker exec -i -e MYSQL_PWD=$MYSQL_PW $MYSQL_CONTAINER mysql -u$MYSQL_USER shadowfit -N \
         -e \"SELECT COUNT(*) FROM exercise_sessions WHERE id IN ($ids);\"" 2>/dev/null \
         | tr -d '[:space:]')
   case "$got" in
@@ -150,7 +156,7 @@ PY
 reset_ghz_rows() {
   ghz_configured || return 0
   [ -n "${GHZ_SESS_LO:-}" ] || return 0
-  $SSH "docker exec -i $MYSQL_CONTAINER mysql -ushadowfit -pshadowfit shadowfit \
+  $SSH "docker exec -i -e MYSQL_PWD=$MYSQL_PW $MYSQL_CONTAINER mysql -u$MYSQL_USER shadowfit \
         -e \"DELETE FROM pose_data WHERE session_id BETWEEN $GHZ_SESS_LO AND $GHZ_SESS_HI;\"" \
     >/dev/null 2>&1 \
     || echo "  ⚠️ 從 부하 행 정리 실패 — 다음 판이 «커진 테이블» 을 잰다. 결과에 적을 것" >&2

@@ -481,6 +481,7 @@ phase_coresidency_rehearsal() {
       DUR="$CORES_REH_DUR" REPEATS=1 \
       GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
       GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
+      MYSQL_USER=root MYSQL_PW="$PW" \
       timeout --kill-after=60 "$TIMEOUT_CORES_REHEARSAL" bash "$CORES_RIG/coresidency_sweep.sh" \
     || return 1
 
@@ -512,6 +513,7 @@ phase_coresidency() {
       DUR="$CORES_DUR" REPEATS="$CORES_REPEATS" STATS_SEC="${STATS_SEC:-5}" \
       GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
       GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
+      MYSQL_USER=root MYSQL_PW="$PW" \
       timeout --kill-after=120 "$TIMEOUT_CORES" bash "$CORES_RIG/coresidency_sweep.sh" \
     || return 1
 
