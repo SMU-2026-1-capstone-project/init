@@ -351,7 +351,7 @@ ShadowFit은 카메라 한 대로 운동 자세를 정량 분석·교정하는 �
 | 도메인 | 주요 엔드포인트 |
 |---|---|
 | 회원/인증 | `POST /member/signup`·`/login`·`/logout`, `DELETE /member/{email}`, `GET·PATCH /member/onboarding/{email}` |
-| 운동 세션 | `POST /exercises/{id}/reference`, `POST /exercises/sessions`, `PUT /exercises/sessions/{id}/complete` |
+| 운동 세션 | `POST /exercises/{id}/reference`, `POST /exercises/sessions`, `PATCH /sessions/{id}/end`, `GET /sessions/active`, `POST /sessions/{id}/reattach` |
 | 내부 API | `POST /internal/exercises/pose-data`(REST), gRPC `ExerciseService.ReportFeedbackBatch` |
 | 피드백 템플릿 | `GET /exercises/{id}/feedback-templates` |
 | 리포트 | `GET /reports/weekly-summary`·`/calendar`·`/session/{id}`, `POST /reports/daily-logs` |

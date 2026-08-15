@@ -60,7 +60,7 @@
 | [#77](https://github.com/Shadowfit/init/issues/77) | 재부착 검증과 gRPC 사이 잠금 없음 (TOCTOU) | 열림 — **결과 확인이 먼저** |
 | [#78](https://github.com/Shadowfit/init/issues/78) | worst 구간이 프레임 해상도를 가정하는데 `sync_rate` 는 rep 단위 상수 | 열림 — 2026-08-01 코멘트로 **원인 보강** (§2-3) |
 | [#79](https://github.com/Shadowfit/init/issues/79) | 다운샘플의 "worst 프레임 대표추출"이 실행되지 않는다 — 항상 첫 프레임만 남는다 | **수정 완료** (`2abf49b`, 미푸시) — §2-4 |
-| — | `ExerciseAnalysisService.applyCompleteFromApp` 을 **부르는 프로덕션 코드가 없다** (테스트만 호출) | 미등록 — §2-5 |
+| [#179](https://github.com/Shadowfit/init/issues/179) | `ExerciseAnalysisService.applyCompleteFromApp` 을 **부르는 프로덕션 코드가 없다** (테스트만 호출) | **해소 (2026-08-16)** — 삭제. §2-5 |
 | [#80](https://github.com/Shadowfit/init/issues/80) | worst `reason` 이 싱크로율의 동어반복 / `pickDominantFeedback` 죽은 코드 / `is_correct` 읽는 곳 없음 | 열림 — 처리 방향은 [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md) §8-3 에 확정 |
 | — | `Exercise` 캐시 TTL 1시간 vs "플래그만 TRUE 로 바꾸면 열린다" 주석 | 미등록 (영향 낮음) |
 
@@ -120,9 +120,9 @@ grep "\.completeSession(" backend/src/main
 
 `ExerciseAnalysisService.completeSession(Long, SessionUpdateRequestDto)` 와 `applyCompleteFromApp` 은 **컨트롤러에서도 호출되지 않는다.** 유일한 호출자가 테스트다(`ExerciseAnalysisServiceTest`·`SessionMetricsRecordingTest`).
 
-즉 미결 항목의 **질문 자체가 잘못 세워져 있었다** — "적용할지"가 아니라 "이 코드가 살아 있는 게 맞는지"다. 삭제 / 유지+미사용 명시 / 되살리기 중 미결이며, 삭제하면 테스트 6~7개가 함께 없어진다.
+즉 미결 항목의 **질문 자체가 잘못 세워져 있었다** — "적용할지"가 아니라 "이 코드가 살아 있는 게 맞는지"다.
 
-⚠️ **이슈로 등록하지 않았다.** 결함이라기보다 사용되지 않는 코드라 판단했으나, [[feedback_troubleshooting_to_issues]] 기준으로는 등록하는 게 맞을 수 있다 — 결정과 함께 처리한다.
+✅ **해소 (2026-08-16).** [#179](https://github.com/Shadowfit/init/issues/179) 로 등록한 뒤 **삭제**로 결정했다. 판단 근거는 코드 밖에 있었다 — 프런트가 호출하는 종료 지점은 `PATCH /sessions/{id}/end` 하나뿐이고(`exercisesService.ts:21`), 앱이 결과를 직접 보고하는 갈래는 분기 2.A.ET 에서 **ET-H 채택(2026-05-26)으로 이미 폐기**된 설계다. 되살리는 쪽이 오히려 결정을 뒤집는 일이었다. 함께 없어진 테스트 7개 중 낙관락 재시도·exhausted 검증은 살아 있는 gRPC 경로(`ai-callback`)에 같은 시나리오가 남아 있어 메커니즘 커버리지 손실은 없다.
 
 ---
 
@@ -213,7 +213,7 @@ main
 - [ ] [#78](https://github.com/Shadowfit/init/issues/78) — 고치는 방법 3안 결정. **비교 문서 완료** → [`../decisions/worst-section-rep-resolution.md`](../decisions/worst-section-rep-resolution.md)(ㄱ안 추천, ㄴ 배제 권고, ㄷ 별도 트랙). 조사 중 확인한 것: `dtaidistance` 가 워핑 경로 API(`dtw.warping_path`)를 제공하는데 지금은 `dtw.distance()` 로 **거리만 받고 경로를 버린다.** ㄷ안(프레임별 점수)이 새 알고리즘이 아니라 **버리는 중간 산출물을 살리는 일**일 수 있다 — ⚠️ 코드를 읽고 판단한 것이며 돌려보지 않았다
 - [x] ~~[#79](https://github.com/Shadowfit/init/issues/79)~~ → **수정 완료**(`2abf49b`, 미푸시). 죽은 비교를 걷어내고 균등 샘플링임을 코드·주석·문서(§4)에 맞췄다. **동작은 안 바뀐다** — 원래 하던 일을 그대로 쓴 것이다. 🔶 남은 것: "가장 나빴던 순간의 좌표"를 남기려면 프레임마다 실제로 다른 값(무릎각 등)이 기준이어야 하는데 종목별 정의가 필요해 열어뒀다
 - [ ] **`feat/rep-cleanup` 푸시 + PR** — 로컬에만 있다(§6-1)
-- [ ] `applyCompleteFromApp` — **질문이 바뀌었다**(§2-5). "적용할지"가 아니라 **부르는 코드가 없는데 어떻게 할지**다. 삭제 / 유지+미사용 명시 / 되살리기
+- [x] ~~`applyCompleteFromApp` — 부르는 코드가 없는데 어떻게 할지~~ → **✅ 삭제** ([#179](https://github.com/Shadowfit/init/issues/179), 2026-08-16). §2-5
 - [ ] `is_correct` — 읽는 곳이 없고 임계값이 AI persona 기준과 어긋난다. ⚠️ `pose_data` 는 월별 `PARTITION BY RANGE` 라 컬럼 DROP 이 전체 재구성이다. **지금은 0행이라 제일 싼 시점**
 - [ ] §4 의 부정확한 주석 5건 정정
 - [ ] **같은 뿌리를 오해한 곳이 더 없는지** — `sync_rate` 를 읽는 소비자를 전수로 훑은 적이 없다(§2-3 교훈)

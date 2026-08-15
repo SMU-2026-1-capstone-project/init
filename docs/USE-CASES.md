@@ -86,8 +86,8 @@
   3. Spring이 `Session`(status=`IN_PROGRESS`)을 생성하고, gRPC로 AI 서버에 분석 시작을 알린 뒤 **즉시 `sessionId`를 반환**한다 (AI 분석 완료를 기다리지 않음).
   4. 사용자가 카메라 앞에서 운동을 수행하는 동안 AI 서버가 rep 단위로 관절 좌표·싱크로율·자세 오류를 계산한다.
   5. AI 서버가 rep 완성 시마다 포즈 데이터를 배치로 `POST /internal/exercises/pose-data`(`X-Internal-Token` 인증)로 Spring에 저장한다.
-  6. 사용자가 종료 버튼을 누르면 앱 → Spring `PUT /exercises/sessions/{sessionId}/complete` 호출, `totalReps` 등 결과 전달.
-  7. Spring이 `Session.status = COMPLETED`로 갱신한다.
+  6. 사용자가 종료 버튼을 누르면 앱 → Spring `PATCH /sessions/{sessionId}/end` 호출. 앱은 결과값을 보내지 않는다 — 종료 신호만 보낸다(ET-H, 분기 2.A.ET).
+  7. Spring이 `endTime`을 기록하고 아웃박스를 통해 AI에 gRPC `StopAnalysis`를 보낸다. AI가 분석을 마치고 gRPC `CompleteSession`으로 보고하면 Spring이 `pose_data`에서 싱크 통계를 직접 집계해 `Session.status = COMPLETED`로 갱신한다.
 - **대안/예외 흐름**
   - 3a. AI 서버가 gRPC 응답 불가(다운) → Resilience4j 서킷브레이커/재시도 동작 (Spring→AI 방향만 보호됨)
   - 4a→7 사이 사용자가 앱을 종료/네트워크 단절 등으로 종료 요청을 못 보냄 → **UC-05E(세션 타임아웃)**로 이어짐

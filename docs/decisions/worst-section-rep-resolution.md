@@ -405,7 +405,7 @@ precompute-on-write 로 **이미 `reports.detailed_analysis` 에 저장된 worst
 - [x] ~~**착수 브랜치**~~ → **✅ [#75](https://github.com/Shadowfit/init/issues/75) 먼저.** `fix/session-stats-and-tx-boundary` 푸시 + [PR #81](https://github.com/Shadowfit/init/pull/81) 생성 완료(2026-08-01). 머지 후 그 위에서 ㄱ안 착수
 - [ ] `is_correct` 처리 — 삭제 / 임계값 정합 / 유지 ([#80](https://github.com/Shadowfit/init/issues/80)). ⚠️ `pose_data` 가 월별 `PARTITION BY RANGE` 라 컬럼 DROP 은 전체 재구성이다 — **지금은 0행이라 제일 싼 시점**
 - [ ] `reason` **최종 문구** — 구현은 잠정값(`"2회차 · 싱크로율 75%"`)으로 나갔다. 테스트도 전체 문자열을 고정하지 않았으니 바꿀 여지는 열려 있다
-- [ ] `applyCompleteFromApp` — ⚠️ **질문이 바뀌었다.** 조사해 보니 **부르는 프로덕션 코드가 없다**(테스트만 호출, [`../tasks/29-ai-code-verification.md`](../tasks/29-ai-code-verification.md) §2-5). "rep 단위 집계를 적용할지"가 아니라 **삭제 / 유지+미사용 명시 / 되살리기**다
+- [x] ~~`applyCompleteFromApp` 에 rep 단위 집계를 적용할지~~ → **✅ 해소.** 부르는 프로덕션 코드가 없어 질문이 "삭제/유지/되살리기" 로 바뀌었고([`../tasks/29-ai-code-verification.md`](../tasks/29-ai-code-verification.md) §2-5), [#179](https://github.com/Shadowfit/init/issues/179) 에서 **삭제**로 닫혔다(2026-08-16). 적용할 대상이 사라졌다
 - [ ] **프론트 화면** — 추이 그래프·표. 타입만 맞춰뒀고 표시가 없어 지금은 사용자 눈에 안 보인다(범위·추정 미정)
 - [ ] **ㄷ안을 별도 트랙으로 남길지**, 아예 배제할지
 - [ ] **ㄹ안(§4-ㄹ) 착수 여부** — 2026-08-01 신설. ㄱ안 위에 얹는 후속이라 ㄷ안과 택일이 아니다. 하면 `worstSection.timeStamp` 와 리포트에 남는 좌표가 근거를 갖게 되고 [#79](https://github.com/Shadowfit/init/issues/79) 의 "비교 기준 교체"도 같이 닫힌다. 추정 5~9h(신뢰도 낮음). ⚠️ **파티션 테이블 컬럼 추가가 붙으므로 `is_correct` 결정과 묶어서 한 번에 하는 게 싸다** — 지금 `pose_data` 0행

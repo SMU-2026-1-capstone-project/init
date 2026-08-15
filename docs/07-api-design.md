@@ -140,21 +140,8 @@ PATCH /sessions/42/end
 
 AI = 운동 통계의 단일 진실 원천 원칙. (커밋 143a2e4)
 
-### [Deprecated] PUT /exercises/sessions/{sessionId}/complete
-프론트가 자체 카운트한 통계로 DB를 직접 갱신하던 옛 경로. AI 분석 결과와 권위가 충돌해 디프리케이트. `/stop` 으로 마이그레이션 후 제거 예정.
-```json
-// Request
-{
-  "totalReps": 15,
-  "avgSyncRate": 78.5,
-  "maxSyncRate": 92.0,
-  "minSyncRate": 55.3,
-  "caloriesBurned": 120.5,
-  "difficultyLevel": 2
-}
-// Response 200
-{ "sessionId": 42, "status": "COMPLETED", "endTime": "2026-03-30T14:30:00" }
-```
+### ~~PUT /exercises/sessions/{sessionId}/complete~~ — 제거됨
+프론트가 자체 카운트한 통계로 DB를 직접 갱신하던 옛 경로. AI 분석 결과와 권위가 충돌해 디프리케이트됐고, 엔드포인트는 `23c8953`(2026-07-11, 인증 없이 임의 세션을 강제 완료할 수 있던 결함)에서, 뒤에 남아 있던 서비스 계층·DTO 는 이슈 #179 에서 제거했다. 종료는 `PATCH /sessions/{sessionId}/end` 하나이고 완료 값의 출처는 AI gRPC 콜백이다.
 
 ### GET /exercises/{exerciseId}/feedback-templates - 운동별 TTS 멘트 목록
 ```json
