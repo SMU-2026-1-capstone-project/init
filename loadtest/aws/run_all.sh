@@ -274,7 +274,15 @@ phase_ridealong() {
   local out=$OUTDIR/ridealong
   mkdir -p "$out"
   # 워치독을 명령에 직접 건다 (run_phase 주석 참고). 從 항목이 매달려서 라운드를 잡아먹지 않게.
-  local q="timeout $TIMEOUT_RIDEALONG docker exec -i $CONTAINER mysql -uroot -p$PW $DB_NAME"
+  #
+  # 🔴 **`-p$PW` 를 쓰지 않는다.** ① 비밀번호가 프로세스 인자로 노출되고 ② mysql 이
+  #    `[Warning] Using a password on the command line interface can be insecure.` 를
+  #    **stderr 로** 뱉는데, 아래 수집이 그걸 데이터 파일에 합쳐 담고 있었다 —
+  #    `R2_global_status.txt` 1행이 경고라 **TSV 로서 깨져 있다**(PR #200 리뷰).
+  #    `MYSQL_PWD` 는 argv 에 안 실리고 경고도 안 난다.
+  local q="timeout $TIMEOUT_RIDEALONG docker exec -i -e MYSQL_PWD=$PW $CONTAINER mysql -uroot $DB_NAME"
+  # stderr 는 **데이터 파일이 아니라 여기로** 모은다. 섞으면 파서가 조용히 틀린다.
+  local err="$out/_stderr.log"
 
   # R1 — worst-section. 2026-08-08 에 정확히 이걸 안 돌리고 인프라를 삭제했다.
   #      ⚠️ 백엔드(Flyway)가 안 돌았으면 테이블 자체가 없다. 그때는 «해당 없음» 이 정답이고,
@@ -286,19 +294,19 @@ phase_ridealong() {
       $q -e "SELECT 'reports 전체' k, COUNT(*) v FROM reports
              UNION ALL SELECT 'detailed_analysis 채워진 행', COUNT(*) FROM reports WHERE detailed_analysis IS NOT NULL
              UNION ALL SELECT 'pose_data 전체', COUNT(*) FROM pose_data
-             UNION ALL SELECT 'exercise_sessions', COUNT(*) FROM exercise_sessions;" 2>&1
+             UNION ALL SELECT 'exercise_sessions', COUNT(*) FROM exercise_sessions;" 2>>"$err"
     else
       echo "해당 없음 — reports 테이블이 없다(백엔드/Flyway 미실행). 0 이 아니라 «측정 대상 부재» 다."
     fi
-  } > "$out/R1_worst_section.txt" 2>&1
+  } > "$out/R1_worst_section.txt" 2>>"$err"
 
   # R2 — MySQL 지표. pool-cliff 초판이 «병목이 백엔드 CPU 로 이동» 을 철회한 사유가
   #      바로 이 지표의 부재였다. 이번엔 처음부터 걷는다.
-  $q -e "SHOW GLOBAL STATUS;"    > "$out/R2_global_status.txt"    2>&1
-  $q -e "SHOW GLOBAL VARIABLES;" > "$out/R2_global_variables.txt" 2>&1
+  $q -e "SHOW GLOBAL STATUS;"    > "$out/R2_global_status.txt"    2>>"$err"
+  $q -e "SHOW GLOBAL VARIABLES;" > "$out/R2_global_variables.txt" 2>>"$err"
   $q -e "SELECT DIGEST_TEXT, COUNT_STAR, SUM_TIMER_WAIT/1e12 sum_s, SUM_ROWS_EXAMINED
          FROM performance_schema.events_statements_summary_by_digest
-         ORDER BY SUM_TIMER_WAIT DESC LIMIT 20;" > "$out/R2_top_digest.txt" 2>&1
+         ORDER BY SUM_TIMER_WAIT DESC LIMIT 20;" > "$out/R2_top_digest.txt" 2>>"$err"
 
   # R3 — 3-way 조인. reports/sessions/users 시딩이 선행이라 이번 라운드 범위 밖이다.
   echo "미실행 — reports·exercise_sessions·users 시딩이 선행 조건. AWS-RIDE-ALONG.md §1 從-R3" \
@@ -321,8 +329,8 @@ phase_collect() {
     echo "vCPU / RAM    : $(nproc) / $(awk '/MemTotal/ {printf "%.0fGB", $2/1048576}' /proc/meminfo 2>/dev/null)"
     echo "커널          : $(uname -r)"
     echo "디스크        : $(df -h "$ROOT" | awk 'NR==2 {print $2, "여유", $4}')"
-    echo "MySQL         : $(docker exec "$CONTAINER" mysql -uroot -p"$PW" -N -e 'SELECT VERSION();' 2>/dev/null | tr -d '\r')"
-    echo "버퍼풀        : $(docker exec "$CONTAINER" mysql -uroot -p"$PW" -N -e "SELECT @@innodb_buffer_pool_size;" 2>/dev/null | tr -d '\r')"
+    echo "MySQL         : $(docker exec -e MYSQL_PWD="$PW" "$CONTAINER" mysql -uroot -N -e 'SELECT VERSION();' 2>/dev/null | tr -d '\r')"
+    echo "버퍼풀        : $(docker exec -e MYSQL_PWD="$PW" "$CONTAINER" mysql -uroot -N -e "SELECT @@innodb_buffer_pool_size;" 2>/dev/null | tr -d '\r')"
     echo "WRITER_MAX_SEC: $WRITER_MAX_SEC"
     # 🔴 #198 — 이 한 줄이 없어서 08-12 라운드를 회수할 때 버킷 이름을 사람에게 물어야 했다.
     #    러너 로그(`/root/run_all.log`)에도 찍히지만 그건 $OUTDIR 밖이라 S3 로 안 올라가고

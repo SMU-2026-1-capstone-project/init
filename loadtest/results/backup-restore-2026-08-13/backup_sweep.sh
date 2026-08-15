@@ -514,11 +514,19 @@ phase_g5() {
   dst=$(verify_restored) || { echo "  🔴 G5 복구본을 못 읽었다"; fresh_restore_target; return 1; }
   fresh_restore_target
   echo "  복구: $dst"
+  # 🔴 **«무엇을 비교했는가» 를 판정과 같은 줄에 적는다.** `DO_CHECKSUM=0`(리허설 기본)이면
+  #    체크섬이 양쪽 다 `-` 라 실제 비교는 **행 수뿐**인데, 파일에는 「판정: 일치」만 남아
+  #    나중에 읽는 사람이 «내용까지 같다» 로 읽는다. 같은 행 수로도 내용은 다를 수 있다.
+  local basis
+  if [ "$DO_CHECKSUM" = "1" ]; then basis="행수+체크섬"
+  else basis="행수만 (DO_CHECKSUM=0 — 체크섬 미산출. «내용 일치» 를 뜻하지 않는다)"; fi
   { echo "# G5 — XtraBackup 복구 유효성 ($(date -Is))"
+    echo "비교 기준: $basis"
     echo "원본 (행수 체크섬): $src"
     echo "복구 (행수 체크섬): $dst"
-    echo "판정: $([ "$src" = "$dst" ] && echo 일치 || echo 불일치)"
+    echo "판정: $([ "$src" = "$dst" ] && echo 일치 || echo 불일치) — $basis"
   } > "$OUT/G5_xtrabackup_restore.txt"
+  [ "$DO_CHECKSUM" = "1" ] || echo "  ⚠️ G5 는 행수만 비교했다(DO_CHECKSUM=0). 본 측정에서는 켤 것"
   [ "$src" = "$dst" ] || { echo "  🔴 G5 불일치 — **팔 B 를 빼고 돌린다**"; return 1; }
   echo "  ✅ G5 통과 — 팔 B 가 유효하다"
 }
