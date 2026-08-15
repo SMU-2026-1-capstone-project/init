@@ -20,7 +20,11 @@
 set -uo pipefail
 
 REPO=${REPO:-https://github.com/Shadowfit/init.git}
-REF=${REF:-work/2026-08-13}
+# 🔴 **기본값은 작업 브랜치가 아니라 `main` 이다.** 초판은 `work/2026-08-13` 을 박아뒀는데,
+#    그 브랜치가 머지 후 삭제되자 이 스크립트가 «clone 은 되는데 checkout 에서 죽는» 상태가
+#    됐다. 무인 부트스트랩에서 이런 실패는 인스턴스 값을 통째로 날린다.
+#    특정 판을 재현할 때만 `REF=<브랜치|태그|커밋>` 로 덮는다.
+REF=${REF:-main}
 WORKDIR=${WORKDIR:-/root/init}
 
 step() { echo; echo "──── $* ────"; }
