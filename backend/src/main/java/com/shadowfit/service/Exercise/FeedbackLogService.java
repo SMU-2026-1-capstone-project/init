@@ -89,6 +89,24 @@ public class FeedbackLogService {
             }
         });
 
+        // 🔴 이 계산은 운영 설정에서 성립하지 않는다 (이슈 #219, 2026-08-16 실측).
+        //
+        // 운영 URL 에 rewriteBatchedStatements=true 가 있어(application.yml:17) 드라이버가 batch 를
+        // multi-row SQL 로 재작성하고 행별 결과를 SUCCESS_NO_INFO(-2) 로 답한다. r > 0 은 -2 에
+        // 대해 언제나 거짓이므로 inserted 는 항상 0, skipped 는 항상 전체가 된다:
+        //
+        //   rewrite=false + INSERT IGNORE : [0, 0, 1]   → inserted=1 (맞음)
+        //   rewrite=true  + INSERT IGNORE : [-2, -2, -2] → inserted=0 (틀림, 실제로는 3행 들어감)
+        //
+        // 그리고 이 값은 로그로만 가지 않는다 — ExerciseGrpcService:126 이 gRPC 응답 savedCount
+        // 로 싣는다. 즉 이 경로가 켜지면 AI 는 매번 "0건 저장됨" 을 받는다.
+        //
+        // 아직 사고가 아닌 이유는 이 경로의 호출이 0건이기 때문이다(#193 — AI 쪽에
+        // ReportFeedbackBatch 호출자가 없다). 고칠 시점도 거기다. 확정된 방향은 배치 전후
+        // COUNT(*) 차이로 세는 것(#193 착수 전 결정 ③). 반환값으로 세는 길은 없다 —
+        // ON DUPLICATE KEY UPDATE 로 바꿔도 -2 는 그대로이고, rewrite=false 에서도 그 문법은
+        // 중복에 1 을 돌려준다(Connector/J 가 affected 가 아니라 found rows 를 보고).
+        // 재현: BatchUpdateReturnValueProbe.
         int inserted = 0;
         for (int r : results) if (r > 0) inserted++;
         int skipped = events.size() - inserted;
