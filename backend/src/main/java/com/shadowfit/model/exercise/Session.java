@@ -7,14 +7,13 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import jakarta.persistence.Version;
-import lombok.AccessLevel;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "exercise_sessions")
-@Getter @Setter
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -65,11 +64,12 @@ public class Session {
     @Builder.Default
     private Status status = Status.IN_PROGRESS;
 
-    // 낙관적 락: FastAPI 완료 콜백과 스케줄러 타임아웃이 동시에 같은 세션을 갱신할 때 충돌 감지용
+    // 낙관적 락: FastAPI 완료 콜백과 스케줄러 타임아웃이 동시에 같은 세션을 갱신할 때 충돌 감지용.
+    // Hibernate 가 관리하는 필드라 외부에서 쓰면 안 된다 — 이전에는 @Setter(AccessLevel.NONE) 으로
+    // 이 필드만 막았지만, 지금은 클래스 전체에 setter 가 없어 그 방어가 기본값이 됐다.
     @Version
     @Column(nullable = false)
     @Builder.Default
-    @Setter(AccessLevel.NONE)  // Hibernate가 관리하는 필드 — 외부에서 setVersion() 호출 차단
     private Long version = 0L;
 
     @CreationTimestamp // INSERT 시 현재 시간 자동 입력
@@ -128,5 +128,69 @@ public class Session {
     /** {@code now} 기준으로 이미 타임아웃 기준을 지났는지. 스케줄러가 아직 안 돌았어도 true 일 수 있다. */
     public boolean isTimedOutAt(LocalDateTime now, int idleMinutes, int bufferMinutes) {
         return now.isAfter(timeoutThreshold(idleMinutes, bufferMinutes));
+    }
+
+    /**
+     * 이 세션을 완료로 확정한다 — <b>"완료란 무엇인가" 의 정의는 여기 하나뿐이어야 한다.</b>
+     *
+     * <p>이전에는 이 전이가 호출자 쪽 setter 네 번으로 표현됐고, 그래서 두 번째 사본이 생겼을 때
+     * 아무도 못 막았다(이슈 #174·#179 — 그 사본은 한 달간 낡은 채로 남아 있었다). 전이에 이름이
+     * 있으면 사본을 만들려는 사람이 최소한 이 메서드를 지나가게 된다.
+     *
+     * <p><b>멱등</b>: 이미 COMPLETED 면 아무것도 바꾸지 않고 {@code false} 를 돌려준다. AI 가 응답
+     * 유실로 같은 결과를 재전송해도 첫 완료 시각·기록이 보존된다.
+     *
+     * <p><b>왜 {@code void} 가 아닌가</b> — 호출자는 "내가 실제로 전이시켰는가" 를 알아야 한다.
+     * 완료 지표·일일 통계 누적·리포트 선계산이 그 판정에 달려 있어서, 재전송에도 그것들이 또
+     * 돌면 통계가 두 번 더해진다.
+     *
+     * @return 이번 호출이 실제로 전이시켰으면 {@code true}, 이미 완료였으면 {@code false}
+     */
+    public boolean complete(int totalReps, SyncStats sync, BigDecimal caloriesBurned, LocalDateTime at) {
+        if (this.status == Status.COMPLETED) {
+            return false;
+        }
+        this.status = Status.COMPLETED;
+        this.endTime = at;
+        this.totalReps = totalReps;
+        this.avgSyncRate = sync.avg();
+        this.maxSyncRate = sync.max();
+        this.minSyncRate = sync.min();
+        this.caloriesBurned = caloriesBurned;
+        return true;
+    }
+
+    /**
+     * 사용자가 종료를 눌렀다 — <b>종료 시각만 찍고 {@code status} 는 건드리지 않는다.</b>
+     *
+     * <p>상태를 안 바꾸는 것이 계약이다. {@code COMPLETED} 로의 전이는 AI 완료 콜백 몫이라, 여기서
+     * 같이 바꾸면 "사용자는 끝냈지만 분석은 진행 중" 인 구간이 표현 불가능해진다. 타임아웃
+     * 스케줄러가 그 구간을 safety net 으로 걷어갈 수 있는 것도 status 가 IN_PROGRESS 로 남기
+     * 때문이다. 메서드 이름에 status 가 안 들어가는 이유이기도 하다.
+     *
+     * @return 이번 호출이 실제로 종료 시각을 남겼으면 {@code true}, 이미 종료된 세션이면 {@code false}
+     */
+    public boolean markEnded(LocalDateTime at) {
+        if (this.endTime != null) {
+            return false;
+        }
+        this.endTime = at;
+        return true;
+    }
+
+    /**
+     * 타임아웃·전송 실패로 세션을 걷어낸다. <b>{@code IN_PROGRESS} 일 때만 성립한다</b> — 이미
+     * 완료된 세션을 FAILED 로 덮으면 사용자가 실제로 운동한 기록이 사라진다. 이 가드가 낙관적
+     * 락과 함께 "콜백 결과 우선" 정책을 이룬다.
+     *
+     * @return 이번 호출이 실제로 걷어냈으면 {@code true}, 이미 끝난 세션이면 {@code false}
+     */
+    public boolean fail(LocalDateTime at) {
+        if (this.status != Status.IN_PROGRESS) {
+            return false;
+        }
+        this.status = Status.FAILED;
+        this.endTime = at;
+        return true;
     }
 }
