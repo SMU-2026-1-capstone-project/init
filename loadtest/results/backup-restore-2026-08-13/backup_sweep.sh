@@ -108,10 +108,17 @@ reset_between_rounds() {
 }
 
 # 캐시를 비운다 — `reset_between_rounds` 안의 그 동작을 단독으로도 쓴다(#201).
-drop_caches_now() {  # $1 = 실패했을 때 찍을 맥락
+#
+# 🔴 **실패를 경고로 넘기지 않는다.** 못 비운 채로 복구를 재면 warm-cache 시간이 `backup.tsv`
+#    에 «정상 값» 으로 앉는다 — 그게 정확히 #201 이 만든 사고다(「9초」가 표에선 멀쩡해 보였다).
+#    비우기가 불가능한 환경(Docker Desktop·비 root)에서 돌릴 거면
+#    `DROP_CACHES_BEFORE_RESTORE=0` 으로 **끄고 그 사실을 조건에 남긴다.** 끄지 않은 채
+#    실패하는 것은 «조건을 모르고 잰» 것이라 판을 버리는 게 맞다.
+drop_caches_now() {  # $1 = 실패했을 때 찍을 맥락 → 실패 시 non-zero
   sync 2>/dev/null
-  echo 3 > /proc/sys/vm/drop_caches 2>/dev/null \
-    || echo "  ⚠️ drop_caches 실패(권한) — ${1:-} 캐시가 안 비워졌다. **조건에 남길 것**" >&2
+  echo 3 > /proc/sys/vm/drop_caches 2>/dev/null && return 0
+  echo "  🔴 drop_caches 실패(권한) — ${1:-} 캐시를 못 비웠다. 이 판은 무효다" >&2
+  return 1
 }
 
 # 🔴 **이 함수가 #201 의 답이다.** 복구가 끝난 «직후» 아직 안 내려간 분량을 시간으로 잰다.
@@ -333,6 +340,11 @@ seed_real() {
 
   # 시딩 한정 완화 — 끝에서 되돌린다(seed_scale 과 같은 규약. 안 되돌리면 다음 판이 다른
   # 내구성으로 측정된다).
+  #
+  # 🔴 **되돌리기를 «성공 경로» 에만 두면 안 된다.** 아래 시딩·인덱스 빌드가 실패하면
+  #    `flush=2` 인 채로 함수가 빠져나가고, 그 뒤 판들이 **완화된 내구성에서 측정된다.**
+  #    표에는 아무 흔적도 안 남는다. 그래서 나가는 경로마다 `restore_flush` 를 부른다.
+  restore_flush() { DB -e "SET GLOBAL innodb_flush_log_at_trx_commit=1;" >/dev/null 2>&1; }
   DB -e "SET GLOBAL innodb_flush_log_at_trx_commit=2;" || return 1
 
   local s e chunk=100
@@ -346,7 +358,7 @@ seed_real() {
                     + INTERVAL FLOOR(t.timestamp_sec) SECOND
            FROM _seq_real s CROSS JOIN _pose_template t
            WHERE s.n >= $s AND s.n < $e;" \
-      || { DB -e "SET GLOBAL innodb_flush_log_at_trx_commit=1;"; echo "🔴 real 시딩 실패 (세션 $s~$e)" >&2; return 1; }
+      || { restore_flush; echo "🔴 real 시딩 실패 (세션 $s~$e)" >&2; return 1; }
   done
 
   DB -e "CREATE INDEX idx_session_timestamp ON pose_data_scale (session_id, timestamp_sec);
@@ -354,7 +366,7 @@ seed_real() {
          ANALYZE TABLE pose_data_scale;
          DROP TABLE IF EXISTS _seq_real;
          DROP TABLE IF EXISTS _pose_template;" \
-    || { echo "🔴 인덱스 빌드/정리 실패" >&2; return 1; }
+    || { restore_flush; echo "🔴 인덱스 빌드/정리 실패" >&2; return 1; }
   rm -f "$sql"
   t1=$(date +%s)
 
@@ -423,7 +435,13 @@ run_one() {  # $1 = round, $2 = 팔(A|B|C)
   else
     # 🔴 복구 «직전» 에 캐시를 비운다(#201). 방금 백업해서 따뜻해진 캐시 위에서 복구를 재면
     #    「빠른 복구」가 아니라 「캐시에서 꺼낸 시간」이 나온다. 양 팔에 똑같이 건다.
-    [ "$DROP_CACHES_BEFORE_RESTORE" = "1" ] && drop_caches_now "복구 직전"
+    #    비우기에 실패하면 **재지 않는다.** 「빠른 복구」로 보이는 값이 표에 남는 쪽이
+    #    비어 있는 칸보다 훨씬 위험하다 — 「재봤더니 X」와 「재지 못했다」의 구분(rig 규약).
+    if [ "$DROP_CACHES_BEFORE_RESTORE" = "1" ] && ! drop_caches_now "복구 직전"; then
+      printf "%s\t%s\t%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t캐시비움실패\n" \
+        "$round" "$arm" "$STAGE" "$backup_s" "$artifact_mb" >> "$LOG"
+      FAILED+=("$tag:캐시비움실패"); fresh_restore_target; return 1
+    fi
 
     echo "  [복구] 별도 컨테이너로"
     local rout
@@ -506,6 +524,21 @@ phase_g5() {
 }
 
 # ── 실행 ─────────────────────────────────────────────────────────────────
+
+# 🔴 **러너가 이 스크립트를 중간에 끊을 수 있다** — `loadtest/aws/run_all.sh` 가
+#    `timeout --kill-after` 로 감싼다. 그 순간 팔 C 의 `SELECT SLEEP(86400)` 세션이 살아
+#    있으면 `pose_data_scale` 이 **최대 24시간 잠긴 채 남고**, 같은 라운드의 뒤 단계(從
+#    항목 등)가 **그 잠금 위에서 측정된다.** 표에는 정상으로 보인다 — 또 「조용히 다른 것을
+#    잰」 판이 되는 경로다. 복구 컨테이너·볼륨도 같이 정리한다(둘 다 삭제는 멱등이다).
+cleanup_all() {
+  local kid
+  kid=$(DBQ "SELECT id FROM information_schema.processlist
+             WHERE info LIKE 'SELECT SLEEP(86400)%' LIMIT 1;" 2>/dev/null)
+  [ -n "${kid:-}" ] && DBQ "KILL $kid;" >/dev/null 2>&1
+  fresh_restore_target
+}
+trap cleanup_all EXIT INT TERM
+
 require_container
 install_writer
 [ -f "$LOG" ] || printf "round\tarm\tstage\tbackup_s\tartifact_mb\trestore_s\tsync_ms\trestore_durable_s\tattempts\terrors\tmax_stall_ms\tp50_ms\tdisk_peak_mb\tverify\n" > "$LOG"
@@ -543,6 +576,15 @@ for item in "${SEQ[@]}"; do
   i=$((i+1))
   echo; echo "[$i/$TOTAL]"
   run_one "${item%%:*}" "${item##*:}" || true
+  # 🔴 **판이 끝나면 그 판의 산출물을 지운다.** 크기는 `artifact_mb` 로 표에 이미 남았고,
+  #    원본을 들고 있을 이유가 없다. 태그가 판마다 다르므로 각 팔의 `rm -rf` 는 «자기 판»
+  #    만 지운다 — 1억 행 기본 목록(A 4판·B 4판)이면 덤프 ~5.7GB × 4 + 데이터디렉터리
+  #    사본 ~10.4GB × 4 가 동시에 남아 **뒤쪽 판이 «백업실패» 로 찍힌다.** 그건 측정값이
+  #    아니라 환경 결함인데 표에서는 구분되지 않는다. 진단이 필요하면 `KEEP_ARTIFACTS=1`.
+  if [ "${KEEP_ARTIFACTS:-0}" != "1" ]; then
+    _tag="${item%%:*}_${item##*:}"
+    rm -rf "$WORK/${_tag}.sql" "$WORK/xb_$_tag" "$WORK/snap_$_tag"
+  fi
   [ $i -lt "$TOTAL" ] && reset_between_rounds
 done
 
