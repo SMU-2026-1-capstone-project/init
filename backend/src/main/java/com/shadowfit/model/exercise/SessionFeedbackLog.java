@@ -15,7 +15,13 @@ import java.time.LocalDateTime;
  *
  * 멱등성 (BE-13-G):
  *   uniqueKey (session_id, occurred_at, feedback_type) 로 중복 row 방지.
- *   FeedbackLogService 가 per-row try/catch 로 DataIntegrityViolationException 흡수.
+ *   FeedbackLogService 가 INSERT IGNORE 로 흡수 (FeedbackLogService:40, INSERT_IGNORE_SQL).
+ *
+ *   ⚠️ 이 줄은 원래 "per-row try/catch 로 DataIntegrityViolationException 흡수" 라고 적혀 있었다.
+ *   실제 코드는 그때도 INSERT IGNORE 였다(이슈 #215 ④). 결과는 같지만 근거가 다르고, 하필
+ *   그 문구가 가리키는 방식은 이 코드베이스가 실측으로 밟았다가 물러난 쪽이다
+ *   (DailyLogRepository:16-20 — "Hibernate 세션이 flush 실패로 손상돼 후속 쿼리가 깨짐").
+ *   주석을 보고 따라 하면 손해를 보는 자리라 근거까지 남긴다.
  */
 @Entity
 @Table(name = "session_feedback_logs",
