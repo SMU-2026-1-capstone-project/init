@@ -104,7 +104,7 @@
   - **왜 ALTER인가 (CREATE vs ALTER)**: 시딩은 **일부러 비파티션 일반 테이블**로 채움(파티션 걸면 INSERT마다 라우팅 계산으로 시딩 느려짐). 이미 1억 행 든 테이블에 파티션을 거니 `CREATE` 불가 → `ALTER TABLE ... PARTITION BY`만 가능. 그런데 이건 메타데이터만 바꾸는 게 아니라 **임시 테이블(`#sql-…`) 생성 → 1억 행 전부 읽어 파티션별 재배치 → 인덱스 재빌드 → 원본 교체**(=`copy to tmp table`).
   - **같은 `ALTER`라도 비용 정반대** ⭐: `PARTITION BY`(전환)=1억 행 풀 리빌드 71분 vs `DROP PARTITION`(만료)=O(1) 메타데이터. 이 대비가 카드 핵심 — "파티션 전환은 비싸니 운영이면 처음부터 파티션 테이블로 만들거나 pt-osc 무중단, 일단 걸어두면 만료는 DROP으로 거의 공짜".
   - **운영 캐비엇**: 이 in-place `ALTER ... PARTITION BY`는 1억 행 **copy-to-tmp 풀 리빌드**(로컬 실측 ~85분, ~24,700행/초, 그동안 테이블 락) → 현업 운영 DB라면 `pt-online-schema-change`/`ALGORITHM=INPLACE`로 무중단 전환할 이유. 회고 포인트.
-  - **✅ 결과 — 그 「무중단 전환할 이유」를 실측으로 바꿈 (2026-08-12, EC2 m6i.xlarge, `pose_data_scale` 996만 행)**: 위 캐비엇은 **권고**였다. 팔 A(차단 `ALTER`) ↔ 팔 B(`pt-osc`) 를 같은 rig 에서 버림 2판 + 본판 6판(`A B B A A B` 위치 상쇄)으로 대조했다. 상세 [`online-ddl-aws-2026-08-12`](../../loadtest/results/online-ddl-aws-2026-08-12/README.md).
+  - **✅ 결과 — 그 「무중단 전환할 이유」를 실측으로 바꿈 (2026-08-12, EC2 m6i.xlarge, `pose_data_scale` 1,000만 행)**: 위 캐비엇은 **권고**였다. 팔 A(차단 `ALTER`) ↔ 팔 B(`pt-osc`) 를 같은 rig 에서 버림 2판 + 본판 6판(`A B B A A B` 위치 상쇄)으로 대조했다. 상세 [`online-ddl-aws-2026-08-12`](../../loadtest/results/online-ddl-aws-2026-08-12/README.md).
 
     | | 팔 A (차단 ALTER) | 팔 B (pt-osc) |
     |---|---|---|
