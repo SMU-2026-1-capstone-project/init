@@ -2,7 +2,7 @@
 
 작성일: 2026-08-12
 상태: **3회 탑승 완료 (P1 2026-08-12 · P3 2026-08-13 · P3-b 2026-08-13~14) + 팔 B 교정 1판 (2026-08-14)**
-      — 남은 主 는 P2·P4·P5, 착수·채택은 사용자 confirm 후 박제
+      — 남은 主 는 P2·P4·P5·P6, 착수·채택은 사용자 confirm 후 박제
 연관: [`../docs/decisions/online-ddl-vs-blocking-alter.md`](../docs/decisions/online-ddl-vs-blocking-alter.md), [`../docs/portfolio/one-pager.md`](../docs/portfolio/one-pager.md), [`results/`](results/)
 
 ---
@@ -39,6 +39,7 @@
 | ~~**P3-b**~~ | ~~**백업 재측정 — 내구성·행 크기**~~ | 🔴 08-13 라운드가 두 곳에서 다른 것을 쟀다. ① 팔 B 복구가 **페이지 캐시**를 쟀고([#201](https://github.com/Shadowfit/init/issues/201)), ② 설계에서 확정됐던 **real-JSON 대조**가 rig 에 없었다([#202](https://github.com/Shadowfit/init/issues/202)). 둘 다 **디스크가 지배**해서 로컬로는 못 닫는다 | ✅ **완료 (2026-08-13~14)** — [b 라운드](results/backup-restore-aws-b-2026-08-13/README.md) · [팔 B 교정](results/restore-reflink-2026-08-14/README.md). #201 은 원인이 캐시가 **아니라 xfs reflink** 였고([#210](https://github.com/Shadowfit/init/issues/210)), #202 는 돌았는데 **예상과 방향이 반대**였다 | **실측 3.32시간**(러너 3.06h) + 교정 1판 |
 | **P4** | **복제 지연 · 반동기 대가** | 인스턴스 2대가 전제. ⭐ **반동기 대가는 AZ 간 RTT 에 지배**되므로 로컬에선 구조적으로 과소평가된다 | 🟡 **설계 완료 (2026-08-13)** · rig 없음 — [`../docs/decisions/replication-lag-and-semisync.md`](../docs/decisions/replication-lag-and-semisync.md) | 게이트 2~3h + 측정 2~3h |
 | **P5** | **세션 분산도 스윕** (1·2·5·20·100) | 🔴 정본 baseline **649.4 RPS 가 «100세션» 에서 나온 값**인데 그 100 은 잰 값이 아니다. 이 앱은 회원당 활성 세션이 1개라 **동시 세션 수 = 동시에 운동 중인 사람 수**다 — baseline 이 가정한 부하보다 분산된 조건일 수 있다. 4대 구성이라 로컬 불가 | 🟢 **설계·rig 완료 (2026-08-14)** — [`../docs/decisions/session-spread-sweep.md`](../docs/decisions/session-spread-sweep.md) · [rig](results/session-spread-2026-08-13/README.md) | 主 25판 + 從 6판 · **지켜보는 1~2h**(무인 아님) |
+| **P6** | **동거 용량** — 「156세션」은 혼자 살 때의 값 | 🔴 08-14 의 **156세션은 AI 컨테이너만 있는 박스** 값이다. 실제 배포는 MySQL·Spring 이 한 호스트에 산다. **동거하면 얼마로 내려가는지가 미측정**이고, 그 숫자가 「한 대로 되나 = 수평확장이 필요한가」를 가른다. 단독 대조군이 필요해 로컬 불가 | 🟢 **설계·rig 완료 (2026-08-15)** — [설계](../docs/decisions/ai-coresidency-capacity.md) · [rig](results/coresidency-2026-08-15/README.md). 기존 `measure_ai_concurrency.py` 는 검출기를 in-process 로 불러 못 쓴다(§2). 🔴 rig 작성 중 **«합성 인체로는 rep 이 안 생긴다»** 가 실측돼 부하를 두 갈래로 나눴다 | 12판 + 버림 4판 · 부하기 별도 1대 |
 
 > P2 가 눈에 띈다 — **이미 한 번 헤드라인을 무효화한 것과 같은 계열의 조건**이 아직 정본에
 > 열린 채로 남아 있다. P1 과 같은 라운드에 태울 수 있으면 가장 싸다(단 §7 오염 주의).
