@@ -85,7 +85,7 @@ if [ -z "$TOKEN" ]; then
   no "TOKEN(AI_PUBLIC_TOKEN)이 비었다 — AI HTTP 는 401 이다"
 else
   python - "$BASE" "$AI" "$TOKEN" "$FRAMES" <<'PY'
-import json, sys, urllib.request, urllib.error, time
+import json, os, sys, time, urllib.request, urllib.error
 base, ai, token, framespath = sys.argv[1:5]
 def http(url, method="GET", body=None, headers=None):
     data = json.dumps(body).encode() if body is not None else None
@@ -119,20 +119,33 @@ except Exception:
 print(f"  ✅ 세션 생성 — sessionId={sid}")
 
 frames = json.load(open(framespath))["frames"]
-st, body = http(ai + "/api/v1/pose", "POST",
-                {"image": frames[0], "exercise_type": "squat", "session_id": sid,
-                 "timestamp_sec": 0.0}, {"Authorization": "Bearer " + token})
-if st != 200:
-    print(f"  🔴 프레임 {st}: {body[:150]}"); sys.exit(1)
-j = json.loads(body)
-if j.get("success"):
-    print("  ✅ 프레임 수락 + 검출 성공")
-else:
+
+# 🔴 세션 생성 응답은 즉시 오지만 `StartAnalysis` 는 afterCommit + @Async 로 **그 뒤에** 나간다
+#    (ExerciseAnalysisService:210-217). 그래서 생성 직후의 첫 프레임은 정상 시스템에서도
+#    «분석기가 없습니다» 로 거절된다 — 2026-08-16 EC2 실측: 0s 거절 / 2s 성공.
+#    붙을 때까지 기다리되, **안 붙는 것과 늦게 붙는 것은 구분해서** 적는다.
+ATTACH_SEC = float(os.environ.get("ATTACH_SEC", "20"))
+t0 = time.monotonic()
+waited = None
+while True:
+    st, body = http(ai + "/api/v1/pose", "POST",
+                    {"image": frames[0], "exercise_type": "squat", "session_id": sid,
+                     "timestamp_sec": 0.0}, {"Authorization": "Bearer " + token})
+    if st != 200:
+        print(f"  🔴 프레임 {st}: {body[:150]}"); sys.exit(1)
+    j = json.loads(body)
+    if j.get("success"):
+        waited = time.monotonic() - t0
+        break
     msg = j.get("message", "")
-    print(f"  🔴 프레임이 거절됐다: {msg[:120]}")
-    if "분석기가 없습니다" in msg:
-        print("     → StartAnalysis 가 안 붙었다. Spring→AI gRPC 또는 검출기 풀을 본다")
-    sys.exit(1)
+    if "분석기가 없습니다" not in msg:
+        print(f"  🔴 프레임이 거절됐다: {msg[:120]}"); sys.exit(1)
+    if time.monotonic() - t0 >= ATTACH_SEC:
+        print(f"  🔴 {ATTACH_SEC:.0f}s 안에 분석기가 안 붙었다: {msg[:120]}")
+        print("     → Spring→AI gRPC 또는 검출기 풀을 본다 (경합이 아니라 «안 붙는» 것이다)")
+        sys.exit(1)
+    time.sleep(0.5)   # AI 유입 간격 상한(300ms)보다 넉넉히
+print(f"  ✅ 프레임 수락 + 검출 성공 (분석기 부착까지 {waited:.1f}s 대기)")
 http(base + f"/sessions/{sid}/end", "PATCH", None, auth)
 PY
   [ $? -eq 0 ] || FAIL=$((FAIL+1))
