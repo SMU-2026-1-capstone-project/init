@@ -70,6 +70,10 @@ MYSQL_CONTAINER=${MYSQL_CONTAINER:-shadowfit-mysql}
 MYSQL_USER=${MYSQL_USER:-shadowfit}
 MYSQL_PW=${MYSQL_PW:-shadowfit}
 
+# 🔴 결과 디렉터리를 스윕이 만든다. 부르는 쪽이 만들어 줄 거라 믿으면, 안 만들어졌을 때
+#    «표가 안 써지는데 판은 도는» 상태가 된다 — #203 이 정확히 그 사고였다(백업 rig).
+mkdir -p "$OUT" || { echo "🔴 결과 디렉터리를 못 만든다: $OUT" >&2; exit 1; }
+
 LOG="$OUT/coresidency.tsv"
 [ -f "$LOG" ] || printf "arm\tround\tsessions\treq\trps\tdetect_pct\tp50\tp95\tp99\tnolease\tnopose\tsetup_fail\n" > "$LOG"
 
@@ -268,7 +272,13 @@ stop_stats() { [ -f "/tmp/stats_$1.pid" ] && kill "$(cat "/tmp/stats_$1.pid")" 2
 
 # ── 한 판 ────────────────────────────────────────────────────────────────
 run_one() {  # $1=팔 $2=라운드 $3=세션수
-  local arm=$1 round=$2 n=$3 tag="${arm}_${round}_${n}"
+  # 🔴 `local a=$1 b=$2 t="${a}_${b}"` 로 한 줄에 쓰면 안 된다. bash 는 `local` 의 인자
+  #    **단어를 전부 먼저 전개**한 뒤 대입하므로, `${round}` 는 아직 없는 상태에서 전개된다.
+  #    `set -u` 아래에선 그게 «round: unbound variable» 로 즉사한다.
+  #    (2026-08-16 EC2 첫 실행에서 판을 하나도 못 돌고 죽은 원인이 이것이다. 전역에 `arm` 이
+  #     있어서 «arm» 이 아니라 «round» 만 이름에 찍혀 더 헷갈렸다.)
+  local arm=$1 round=$2 n=$3
+  local tag="${arm}_${round}_${n}"
   CUR_ARM=$arm; CUR_N=$n          # start_ghz·stop_ghz 가 읽는다
   echo; echo "──────── $tag ────────"
   start_stats "$tag"
