@@ -122,6 +122,36 @@ B 와 156 을 비교하게 되고, 그러면 **「동거 때문에 내려간 몫
 | 귀속 | 컨테이너별 CPU·메모리 (cgroup) | `docker stats` 샘플러 |
 | 귀속 | MySQL `threads_running`·`innodb_os_log_fsyncs` | mysqld_exporter |
 | 귀속 | Spring gRPC 처리량·p99, HikariCP `pending` | `/actuator/prometheus` |
+| **從** | **AI 컨테이너 RSS 실사용 ↔ 유도식 차이** ([#229](https://github.com/Shadowfit/init/issues/229)) | 같은 `docker stats` 샘플러 |
+
+### 4-1. 從 — 메모리 유도식의 «공식 밖 몫» ([#229](https://github.com/Shadowfit/init/issues/229))
+
+**이 라운드에 얹으면 추가 비용이 거의 0 이다.** 이미 동시 세션을 ramp 하며 `docker stats` 로
+컨테이너별 메모리를 걷는다 — 필요한 것은 **걷은 값을 유도식과 대조하는 것뿐**이다.
+
+검출기 풀 상한 공식이 **검출기만** 센다(`memory_ceiling()`):
+
+```
+상한 = (컨테이너 한도 − 기본 RSS 100.5MB) ÷ 검출기 98.7MB
+```
+
+그리고 코드 자신이 *"프레임 버퍼·base64 임시·파이썬 힙·gRPC 는 **미측정**이라 안 뺐다"* 고
+경고한다. 그래서 공식에 **딱 맞추면 풀이 세션을 거절하기 전에 컨테이너가 OOM 으로 죽고**,
+이 프로젝트가 전제로 삼는 비대칭 실패(«덜 받아짐»=안전)가 **«죽음»=위험으로 뒤집힌다.**
+
+| 세션 수 N 에서 볼 것 | 무엇을 답하나 |
+|---|---|
+| N=0(기동 직후) RSS | 기본 RSS **100.5MB** 가 지금도 맞는가 (M2 실측값, x86 미검증) |
+| `RSS − (100.5 + 98.7×N)` | **공식 밖 몫.** 이게 «여유분» 의 근거가 된다 |
+| 그 몫이 N 에 비례하는가 | 비례하면 «세션당 상수», 아니면 «고정 오버헤드» 로 공식에 넣는다 |
+
+🔴 **지금은 숫자를 못 적는다.** 여유를 «몇 %» 로 할지 근거가 없어 `docker-compose.prod.yml`·
+`.env.example`·`19-deployment.md` 는 **경고만** 달아뒀다([[feedback_no_arbitrary_threshold_values]]).
+이 從 이 그 빈칸을 채운다.
+
+⚠️ **팔 A~D 전부에서 걷는다.** 캡이 걸린 팔(C·D)에서는 «한도에 얼마나 붙었나» 가 같이 보이고,
+그게 [#212](https://github.com/Shadowfit/init/issues/212) 의 CPU 캡 값과 **같은 라운드에서**
+답해지는 자리다.
 
 🔴 **검출률을 처리량과 같은 급으로 둔다.** [#164](https://github.com/Shadowfit/init/issues/164) 가
 검출률 30% → 95.6% 로 고친 전례가 있고([`pool-verify-2026-08-11`](../../loadtest/results/pool-verify-2026-08-11/README.md)),
