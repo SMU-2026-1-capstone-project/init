@@ -497,10 +497,10 @@ phase_coresidency() {
   local out=$OUTDIR/coresidency
   mkdir -p "$out"
   note "정판 — 팔 '$CORES_ARMS' × 레벨 '$CORES_LEVELS' × ${CORES_REPEATS}반복 (+팔당 버림 1)"
-  # 🔴 #223 — 스윕에 ghz 부하가 없다. (a)안 이후 A 와 B 가 그것 하나로만 갈리므로,
-  #    두 팔을 같이 넣으면 스윕이 스스로 거부한다(assert_arms_distinguishable).
-  #    한 팔만 도는 라운드라면 «대조를 포기했다» 를 결과에 적어야 한다.
-  note "⚠️ #223 — ghz 부하 미배선. A·B 대조는 그때까지 성립하지 않는다"
+  # #223 은 배선됐다(요청/초 고정). A 와 B 를 가르는 것은 그 부하 하나뿐이므로,
+  # 설정이 비면 스윕이 스스로 라운드를 거부한다(assert_arms_distinguishable).
+  # 🔴 읽을 때 볼 것은 «걸렸나» 가 아니라 «얼마가 걸렸나» 다 — ghz.tsv 의 achieved_rps.
+  note "從 부하 ${GHZ_RPS:-?} req/s 고정 — 실측치는 ghz.tsv 의 achieved_rps 로 확인할 것"
 
   env OUT="$out" BASE="http://$TARGET_HOST:8080" AI="http://$TARGET_HOST:8000" \
       TOKEN="$AI_PUBLIC_TOKEN" AI_CONTAINER="$AI_CONTAINER" DOCKER="$TARGET_SSH docker" \
