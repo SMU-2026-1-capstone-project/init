@@ -34,7 +34,12 @@ MYSQL_IMAGE=${MYSQL_IMAGE:-mysql:8.0}
 #    로 죽었다. 기본값을 repo 옆(호스트 디스크)으로 둔다.
 WORK=${WORK:-$HERE/_work}
 
-OUT=$HERE
+# 🔴 `OUT=$HERE` 였다 — **덮을 수 없는 자리**라 러너가 `OUT=$out bash probe.sh` 로 불러도
+#    조용히 무시됐다. 그 결과 08-13 EC2 판에서 G1~G4 가 **커밋된 로컬 판정 위에 덮여 썼고**,
+#    정작 S3 로 올라가는 결과 디렉터리에는 게이트가 한 장도 없었다.
+#    `backup_sweep.sh` 의 `$HERE` 결함(d6453bf)과 같은 계열이고, 이쪽만 안 고쳐져 있었다.
+OUT=${OUT:-$HERE}
+mkdir -p "$OUT" || { echo "🔴 OUT 을 못 만든다: $OUT" >&2; exit 1; }
 FAILED=()
 PASSED=()
 

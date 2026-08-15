@@ -1,0 +1,44 @@
+# 측정 조건 — backupb-ec2-20260813-144233
+생성          : 2026-08-13T17:46:20+00:00
+커밋          : a958af2f8f0a7ed78a0301916a423035c9fd7404 (work/2026-08-13)
+인스턴스 타입 : m6i.xlarge
+인스턴스 ID   : i-05674d0227d3c07d3
+AZ / 리전     : ap-northeast-2c / ap-northeast-2
+vCPU / RAM    : 4 / 15GB
+커널          : 6.12.95-124.187.amzn2023.x86_64
+디스크        : 200G 여유 135G
+MySQL         : 8.0.46
+버퍼풀        : 2147483648
+WRITER_MAX_SEC: 14400
+S3 결과       : s3://shadowfit-measure-055447613012/shadowfit/backupb-ec2-20260813-144233
+
+# 단계
+phase	status	seconds	started_at
+preflight	OK	2	2026-08-13T14:42:33+00:00
+backup_rehearsal	OK	369	2026-08-13T14:42:35+00:00
+backup	OK	10113	2026-08-13T14:48:46+00:00
+backup_real	OK	537	2026-08-13T17:37:20+00:00
+ridealong	OK	0	2026-08-13T17:46:19+00:00
+
+⚠️ 절대 소요 시간을 «운영에서 N분» 으로 인용 금지 — 하드웨어 종속(설계 §5)
+⚠️ rehearsal/ 의 수치는 측정값이 아니다 — 경로 점검용 축소 판
+
+# 단계 (최종)
+phase	status	seconds	started_at
+preflight	OK	2	2026-08-13T14:42:33+00:00
+backup_rehearsal	OK	369	2026-08-13T14:42:35+00:00
+backup	OK	10113	2026-08-13T14:48:46+00:00
+backup_real	OK	537	2026-08-13T17:37:20+00:00
+ridealong	OK	0	2026-08-13T17:46:19+00:00
+collect	OK	0	2026-08-13T17:46:20+00:00
+
+# 요금 (청구액은 나중에 채운다)
+인스턴스 타입   : m6i.xlarge
+리전            : ap-northeast-2
+태그            : Name Project Purpose
+인스턴스 가동   : 3.32시간 (부팅부터 지금까지 — 요금 대상은 이쪽)
+러너 소요       : 3.06시간
+루트 볼륨       :  200G disk
+실제 청구액     : (미기입) — Cost Explorer 에서 태그 Project=shadowfit-measure 로 필터해 채울 것
+
+⚠️ 인스턴스를 끈 뒤에도 **볼륨이 남으면 요금이 계속 나간다.** 삭제까지 확인할 것

@@ -1,7 +1,9 @@
 # DB 말고 나머지 네 축을 파는 법 — 「내가 만든 게 정말 그렇게 동작하나」
 
 작성일: 2026-08-10
-상태: **설계 (착수 전)** — 실행·채택은 사용자 confirm 후 박제
+상태: **설계 · 본 실행 0** — 실행·채택은 사용자 confirm 후 박제. 다만 두 축이 움직였다:
+      **네트워크**(§3-2)는 rig `conn_ridealong.sh` 가 서서 P5 라운드에 얹기로 결정됐고(2026-08-14, [`session-spread-sweep.md`](./session-spread-sweep.md) 결정 로그),
+      **시스템**(§3-4)은 파생 실험 [`async-pool-backpressure-experiment.md`](./async-pool-backpressure-experiment.md) 의 0단계가 돌았다. **OS·보안은 그대로 0.** ⚠️ §1 자산 표는 2026-08-10 기준
 대상: OS · 네트워크 · 보안 · 시스템. **DB 축은 이미 깊으므로 이 문서의 대상이 아니다**
 연관: [`./project-destination-and-exit-criteria.md`](./project-destination-and-exit-criteria.md), [`../portfolio/realmysql-experiments.md`](../portfolio/realmysql-experiments.md), [`./pose-ingest-downsampling.md`](./pose-ingest-downsampling.md), [[feedback_measure_design_needs_repeats]]
 

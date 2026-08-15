@@ -1,0 +1,576 @@
+2026-08-13T16:26:02.214110-00:00 0 [Note] [MY-011825] [Xtrabackup] recognized server arguments: --datadir=/var/lib/mysql 
+2026-08-13T16:26:02.215320-00:00 0 [Note] [MY-011825] [Xtrabackup] recognized client arguments: --backup=1 --target-dir=/backup --host=127.0.0.1 --user=root --password=* 
+xtrabackup version 8.0.35-36 based on MySQL server 8.0.35 Linux (x86_64) (revision id: 7233322c)
+2026-08-13T16:26:02.217441-00:00 0 [Note] [MY-011825] [Xtrabackup] perl binary not found. Skipping the version check
+2026-08-13T16:26:02.217463-00:00 0 [Note] [MY-011825] [Xtrabackup] Connecting to MySQL server host: 127.0.0.1, user: root, password: set, port: not set, socket: not set
+2026-08-13T16:26:02.256440-00:00 0 [Note] [MY-011825] [Xtrabackup] Using server version 8.0.46
+2026-08-13T16:26:02.279008-00:00 0 [Note] [MY-011825] [Xtrabackup] Executing LOCK INSTANCE FOR BACKUP ...
+2026-08-13T16:26:02.287041-00:00 0 [Note] [MY-011825] [Xtrabackup] uses posix_fadvise().
+2026-08-13T16:26:02.287066-00:00 0 [Note] [MY-011825] [Xtrabackup] cd to /var/lib/mysql
+2026-08-13T16:26:02.287077-00:00 0 [Note] [MY-011825] [Xtrabackup] open files limit requested 0, set to 32768
+2026-08-13T16:26:02.312797-00:00 0 [Note] [MY-011825] [Xtrabackup] using the following InnoDB configuration:
+2026-08-13T16:26:02.312814-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_data_home_dir = .
+2026-08-13T16:26:02.312819-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_data_file_path = ibdata1:12M:autoextend
+2026-08-13T16:26:02.314723-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_group_home_dir = ./
+2026-08-13T16:26:02.314734-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_files_in_group = 2
+2026-08-13T16:26:02.314741-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_file_size = 50331648
+2026-08-13T16:26:02.322598-00:00 0 [Note] [MY-011825] [Xtrabackup] inititialize_service_handles suceeded
+2026-08-13T16:26:02.372944-00:00 0 [Note] [MY-011825] [Xtrabackup] Connecting to MySQL server host: 127.0.0.1, user: root, password: set, port: not set, socket: not set
+2026-08-13T16:26:02.385789-00:00 0 [Note] [MY-011825] [Xtrabackup] Redo Log Archiving is not set up.
+2026-08-13T16:26:02.477980-00:00 0 [Note] [MY-011825] [Xtrabackup] Starting to parse redo log at lsn = 12502805037
+2026-08-13T16:26:02.489057-00:00 0 [Note] [MY-012953] [InnoDB] Disabling background ibuf IO read threads.
+2026-08-13T16:26:02.494545-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12502979159)
+2026-08-13T16:26:02.690298-00:00 0 [Note] [MY-011825] [Xtrabackup] Generating a list of tablespaces
+2026-08-13T16:26:02.690339-00:00 0 [Note] [MY-012204] [InnoDB] Scanning './'
+2026-08-13T16:26:02.698003-00:00 0 [Note] [MY-012208] [InnoDB] Completed space ID check of 2 files.
+2026-08-13T16:26:02.699784-00:00 0 [Warning] [MY-012091] [InnoDB] Allocated tablespace ID 77 for backup_lab/t, old maximum was 0
+2026-08-13T16:26:02.722828-00:00 0 [Note] [MY-013252] [InnoDB] Using undo tablespace './undo_001'.
+2026-08-13T16:26:02.723609-00:00 0 [Note] [MY-013252] [InnoDB] Using undo tablespace './undo_002'.
+2026-08-13T16:26:02.724752-00:00 0 [Note] [MY-012910] [InnoDB] Opened 2 existing undo tablespaces.
+2026-08-13T16:26:02.725053-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./ibdata1 to /backup/ibdata1
+2026-08-13T16:26:02.776890-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./ibdata1 to /backup/ibdata1
+2026-08-13T16:26:02.782412-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./sys/sys_config.ibd to /backup/sys/sys_config.ibd
+2026-08-13T16:26:02.785269-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./sys/sys_config.ibd to /backup/sys/sys_config.ibd
+2026-08-13T16:26:02.790424-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/flyway_schema_history.ibd to /backup/shadowfit/flyway_schema_history.ibd
+2026-08-13T16:26:02.793566-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/flyway_schema_history.ibd to /backup/shadowfit/flyway_schema_history.ibd
+2026-08-13T16:26:02.796495-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/users.ibd to /backup/shadowfit/users.ibd
+2026-08-13T16:26:02.796629-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/users.ibd to /backup/shadowfit/users.ibd
+2026-08-13T16:26:02.800411-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/exercises.ibd to /backup/shadowfit/exercises.ibd
+2026-08-13T16:26:02.800518-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/exercises.ibd to /backup/shadowfit/exercises.ibd
+2026-08-13T16:26:02.803336-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/exercise_references.ibd to /backup/shadowfit/exercise_references.ibd
+2026-08-13T16:26:02.803442-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/exercise_references.ibd to /backup/shadowfit/exercise_references.ibd
+2026-08-13T16:26:02.806450-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/exercise_sessions.ibd to /backup/shadowfit/exercise_sessions.ibd
+2026-08-13T16:26:02.806587-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/exercise_sessions.ibd to /backup/shadowfit/exercise_sessions.ibd
+2026-08-13T16:26:02.810155-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_01.ibd to /backup/shadowfit/pose_data#p#p2026_01.ibd
+2026-08-13T16:26:02.810260-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_01.ibd to /backup/shadowfit/pose_data#p#p2026_01.ibd
+2026-08-13T16:26:02.813061-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_02.ibd to /backup/shadowfit/pose_data#p#p2026_02.ibd
+2026-08-13T16:26:02.813178-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_02.ibd to /backup/shadowfit/pose_data#p#p2026_02.ibd
+2026-08-13T16:26:02.816058-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_03.ibd to /backup/shadowfit/pose_data#p#p2026_03.ibd
+2026-08-13T16:26:02.816159-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_03.ibd to /backup/shadowfit/pose_data#p#p2026_03.ibd
+2026-08-13T16:26:02.818987-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_04.ibd to /backup/shadowfit/pose_data#p#p2026_04.ibd
+2026-08-13T16:26:02.819097-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_04.ibd to /backup/shadowfit/pose_data#p#p2026_04.ibd
+2026-08-13T16:26:02.821902-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_05.ibd to /backup/shadowfit/pose_data#p#p2026_05.ibd
+2026-08-13T16:26:02.822107-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_05.ibd to /backup/shadowfit/pose_data#p#p2026_05.ibd
+2026-08-13T16:26:02.825015-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_06.ibd to /backup/shadowfit/pose_data#p#p2026_06.ibd
+2026-08-13T16:26:02.825122-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_06.ibd to /backup/shadowfit/pose_data#p#p2026_06.ibd
+2026-08-13T16:26:02.830756-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./backup_lab/t.ibd to /backup/backup_lab/t.ibd
+2026-08-13T16:26:02.875348-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./backup_lab/t.ibd to /backup/backup_lab/t.ibd
+2026-08-13T16:26:02.881661-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_07.ibd to /backup/shadowfit/pose_data#p#p2026_07.ibd
+2026-08-13T16:26:02.881788-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_07.ibd to /backup/shadowfit/pose_data#p#p2026_07.ibd
+2026-08-13T16:26:02.883433-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/ddl_writer_ctl.ibd to /backup/shadowfit/ddl_writer_ctl.ibd
+2026-08-13T16:26:02.883547-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/ddl_writer_ctl.ibd to /backup/shadowfit/ddl_writer_ctl.ibd
+2026-08-13T16:26:02.885153-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_08.ibd to /backup/shadowfit/pose_data#p#p2026_08.ibd
+2026-08-13T16:26:02.885257-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_08.ibd to /backup/shadowfit/pose_data#p#p2026_08.ibd
+2026-08-13T16:26:02.886963-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data_scale.ibd to /backup/shadowfit/pose_data_scale.ibd
+2026-08-13T16:26:03.499004-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12502982761)
+2026-08-13T16:26:04.499211-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12502985643)
+2026-08-13T16:26:05.499427-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12502988541)
+2026-08-13T16:26:06.499898-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12502993795)
+2026-08-13T16:26:07.508972-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12502996681)
+2026-08-13T16:26:08.512011-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12502999589)
+2026-08-13T16:26:09.512242-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503002481)
+2026-08-13T16:26:10.512474-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503006327)
+2026-08-13T16:26:11.521834-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503009219)
+2026-08-13T16:26:12.522392-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503011328)
+2026-08-13T16:26:13.522677-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503015709)
+2026-08-13T16:26:14.522948-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503018597)
+2026-08-13T16:26:15.528868-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503022191)
+2026-08-13T16:26:16.535932-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503025091)
+2026-08-13T16:26:17.536168-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503027989)
+2026-08-13T16:26:18.536397-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503030895)
+2026-08-13T16:26:19.541005-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503034479)
+2026-08-13T16:26:20.550155-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503037369)
+2026-08-13T16:26:21.553876-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503042636)
+2026-08-13T16:26:22.554101-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503046238)
+2026-08-13T16:26:23.554308-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503049120)
+2026-08-13T16:26:24.557792-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503052018)
+2026-08-13T16:26:25.565903-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503055618)
+2026-08-13T16:26:26.566114-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503058526)
+2026-08-13T16:26:27.566340-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503061399)
+2026-08-13T16:26:28.569267-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503064991)
+2026-08-13T16:26:29.575587-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503067907)
+2026-08-13T16:26:30.579675-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503070805)
+2026-08-13T16:26:31.579894-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503074407)
+2026-08-13T16:26:32.580124-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503077299)
+2026-08-13T16:26:33.586163-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503081068)
+2026-08-13T16:26:34.590227-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503083960)
+2026-08-13T16:26:35.590462-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503086985)
+2026-08-13T16:26:36.590688-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503090587)
+2026-08-13T16:26:37.601724-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503095155)
+2026-08-13T16:26:38.607420-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503098445)
+2026-08-13T16:26:39.607641-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503101655)
+2026-08-13T16:26:40.607863-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503104715)
+2026-08-13T16:26:41.616057-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503107603)
+2026-08-13T16:26:42.625012-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503111207)
+2026-08-13T16:26:43.625231-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503114099)
+2026-08-13T16:26:44.625453-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503117007)
+2026-08-13T16:26:45.632398-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503120609)
+2026-08-13T16:26:46.639909-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503123517)
+2026-08-13T16:26:47.640113-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503127121)
+2026-08-13T16:26:48.640329-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503130001)
+2026-08-13T16:26:49.646693-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503132899)
+2026-08-13T16:26:50.654504-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503136511)
+2026-08-13T16:26:51.661512-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503139399)
+2026-08-13T16:26:52.661744-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503143001)
+2026-08-13T16:26:53.661997-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503145873)
+2026-08-13T16:26:54.668591-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503148761)
+2026-08-13T16:26:55.677362-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503154023)
+2026-08-13T16:26:56.677587-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503156931)
+2026-08-13T16:26:57.680070-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503179054)
+2026-08-13T16:26:58.686589-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503182264)
+2026-08-13T16:26:59.693159-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503185162)
+2026-08-13T16:27:00.693386-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503188060)
+2026-08-13T16:27:01.693628-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503191672)
+2026-08-13T16:27:02.699015-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503194544)
+2026-08-13T16:27:03.706526-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503198146)
+2026-08-13T16:27:04.706752-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503201044)
+2026-08-13T16:27:05.706974-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503203942)
+2026-08-13T16:27:06.710355-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503206824)
+2026-08-13T16:27:07.716603-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503210426)
+2026-08-13T16:27:08.725745-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503213334)
+2026-08-13T16:27:09.725975-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503216918)
+2026-08-13T16:27:10.726207-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503219834)
+2026-08-13T16:27:11.726438-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503222726)
+2026-08-13T16:27:12.733400-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503226318)
+2026-08-13T16:27:13.736907-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503229226)
+2026-08-13T16:27:14.737160-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503234026)
+2026-08-13T16:27:15.737386-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503237644)
+2026-08-13T16:27:16.740750-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503240536)
+2026-08-13T16:27:17.750647-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503244120)
+2026-08-13T16:27:18.750885-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503247046)
+2026-08-13T16:27:19.751127-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503249934)
+2026-08-13T16:27:20.753939-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503253536)
+2026-08-13T16:27:21.758495-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503256408)
+2026-08-13T16:27:22.767098-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503259296)
+2026-08-13T16:27:23.767345-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503262898)
+2026-08-13T16:27:24.767561-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503265806)
+2026-08-13T16:27:25.772222-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503268688)
+2026-08-13T16:27:26.780203-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503271969)
+2026-08-13T16:27:27.780444-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503277532)
+2026-08-13T16:27:28.780678-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503280577)
+2026-08-13T16:27:29.791583-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503284161)
+2026-08-13T16:27:30.798009-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503287059)
+2026-08-13T16:27:31.798230-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503289955)
+2026-08-13T16:27:32.805114-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503292847)
+2026-08-13T16:27:33.813046-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503295745)
+2026-08-13T16:27:34.813268-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503298643)
+2026-08-13T16:27:35.813493-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503301535)
+2026-08-13T16:27:36.820331-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503304815)
+2026-08-13T16:27:37.827971-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503308025)
+2026-08-13T16:27:38.828200-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503310923)
+2026-08-13T16:27:39.828400-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503314527)
+2026-08-13T16:27:40.834446-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503319093)
+2026-08-13T16:27:41.837942-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503322130)
+2026-08-13T16:27:42.838153-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503325396)
+2026-08-13T16:27:43.838427-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503328616)
+2026-08-13T16:27:44.838679-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503331514)
+2026-08-13T16:27:45.841573-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503333844)
+2026-08-13T16:27:46.853369-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503335308)
+2026-08-13T16:27:47.863228-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503337154)
+2026-08-13T16:27:48.874012-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503338218)
+2026-08-13T16:27:49.882464-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503338950)
+2026-08-13T16:27:50.884377-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503340414)
+2026-08-13T16:27:51.890832-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503341880)
+2026-08-13T16:27:52.895584-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503343004)
+2026-08-13T16:27:53.907141-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503344076)
+2026-08-13T16:27:54.909954-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503345532)
+2026-08-13T16:27:55.920493-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503346280)
+2026-08-13T16:27:56.925810-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503348448)
+2026-08-13T16:27:57.946230-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503351356)
+2026-08-13T16:27:58.962447-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503354238)
+2026-08-13T16:27:59.970627-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503356798)
+2026-08-13T16:28:00.975848-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503360026)
+2026-08-13T16:28:01.979841-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503362604)
+2026-08-13T16:28:02.986974-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503365094)
+2026-08-13T16:28:03.992861-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503369430)
+2026-08-13T16:28:05.004356-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503371198)
+2026-08-13T16:28:06.011582-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503372348)
+2026-08-13T16:28:07.012623-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503373412)
+2026-08-13T16:28:08.015024-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503374144)
+2026-08-13T16:28:09.017290-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503375260)
+2026-08-13T16:28:10.020239-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503376324)
+2026-08-13T16:28:11.027067-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503377464)
+2026-08-13T16:28:12.027280-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503379954)
+2026-08-13T16:28:13.027499-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503382862)
+2026-08-13T16:28:14.034909-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503386142)
+2026-08-13T16:28:15.035117-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503388642)
+2026-08-13T16:28:16.035329-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503392244)
+2026-08-13T16:28:17.044708-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503395152)
+2026-08-13T16:28:18.044930-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503398050)
+2026-08-13T16:28:19.045177-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503400942)
+2026-08-13T16:28:20.053585-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503404560)
+2026-08-13T16:28:20.471038-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data_scale.ibd to /backup/shadowfit/pose_data_scale.ibd
+2026-08-13T16:28:20.476794-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_09.ibd to /backup/shadowfit/pose_data#p#p2026_09.ibd
+2026-08-13T16:28:20.476930-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_09.ibd to /backup/shadowfit/pose_data#p#p2026_09.ibd
+2026-08-13T16:28:20.480078-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_10.ibd to /backup/shadowfit/pose_data#p#p2026_10.ibd
+2026-08-13T16:28:20.480185-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_10.ibd to /backup/shadowfit/pose_data#p#p2026_10.ibd
+2026-08-13T16:28:20.483352-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_11.ibd to /backup/shadowfit/pose_data#p#p2026_11.ibd
+2026-08-13T16:28:20.483459-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_11.ibd to /backup/shadowfit/pose_data#p#p2026_11.ibd
+2026-08-13T16:28:20.486854-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2026_12.ibd to /backup/shadowfit/pose_data#p#p2026_12.ibd
+2026-08-13T16:28:20.486957-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2026_12.ibd to /backup/shadowfit/pose_data#p#p2026_12.ibd
+2026-08-13T16:28:20.490120-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#p2027_01.ibd to /backup/shadowfit/pose_data#p#p2027_01.ibd
+2026-08-13T16:28:20.490226-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#p2027_01.ibd to /backup/shadowfit/pose_data#p#p2027_01.ibd
+2026-08-13T16:28:20.493447-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/pose_data#p#pfuture.ibd to /backup/shadowfit/pose_data#p#pfuture.ibd
+2026-08-13T16:28:20.493543-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/pose_data#p#pfuture.ibd to /backup/shadowfit/pose_data#p#pfuture.ibd
+2026-08-13T16:28:20.496736-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/ddl_writer_log.ibd to /backup/shadowfit/ddl_writer_log.ibd
+2026-08-13T16:28:20.496841-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/ddl_writer_log.ibd to /backup/shadowfit/ddl_writer_log.ibd
+2026-08-13T16:28:20.500146-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/daily_logs.ibd to /backup/shadowfit/daily_logs.ibd
+2026-08-13T16:28:20.500257-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/daily_logs.ibd to /backup/shadowfit/daily_logs.ibd
+2026-08-13T16:28:20.503744-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/reports.ibd to /backup/shadowfit/reports.ibd
+2026-08-13T16:28:20.503853-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/reports.ibd to /backup/shadowfit/reports.ibd
+2026-08-13T16:28:20.507447-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/exercise_feedback_templates.ibd to /backup/shadowfit/exercise_feedback_templates.ibd
+2026-08-13T16:28:20.507553-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/exercise_feedback_templates.ibd to /backup/shadowfit/exercise_feedback_templates.ibd
+2026-08-13T16:28:20.510896-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/session_feedback_logs.ibd to /backup/shadowfit/session_feedback_logs.ibd
+2026-08-13T16:28:20.511002-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/session_feedback_logs.ibd to /backup/shadowfit/session_feedback_logs.ibd
+2026-08-13T16:28:20.513966-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/body_records.ibd to /backup/shadowfit/body_records.ibd
+2026-08-13T16:28:20.514070-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/body_records.ibd to /backup/shadowfit/body_records.ibd
+2026-08-13T16:28:20.517062-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/outbox_events.ibd to /backup/shadowfit/outbox_events.ibd
+2026-08-13T16:28:20.517153-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/outbox_events.ibd to /backup/shadowfit/outbox_events.ibd
+2026-08-13T16:28:20.520053-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./shadowfit/refresh_token.ibd to /backup/shadowfit/refresh_token.ibd
+2026-08-13T16:28:20.520148-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./shadowfit/refresh_token.ibd to /backup/shadowfit/refresh_token.ibd
+2026-08-13T16:28:20.522994-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./mysql.ibd to /backup/mysql.ibd
+2026-08-13T16:28:20.960048-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./mysql.ibd to /backup/mysql.ibd
+2026-08-13T16:28:20.968654-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./undo_002 to /backup/undo_002
+2026-08-13T16:28:21.060775-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503407452)
+2026-08-13T16:28:21.439087-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./undo_002 to /backup/undo_002
+2026-08-13T16:28:21.448110-00:00 2 [Note] [MY-011825] [Xtrabackup] Copying ./undo_001 to /backup/undo_001
+2026-08-13T16:28:21.922687-00:00 2 [Note] [MY-011825] [Xtrabackup] Done: Copying ./undo_001 to /backup/undo_001
+2026-08-13T16:28:22.061010-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503410340)
+2026-08-13T16:28:22.733831-00:00 0 [Note] [MY-011825] [Xtrabackup] Starting to backup non-InnoDB tables and files
+2026-08-13T16:28:22.736077-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying mysql/general_log_213.sdi to /backup/mysql/general_log_213.sdi
+2026-08-13T16:28:22.738410-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying mysql/general_log_213.sdi to /backup/mysql/general_log_213.sdi
+2026-08-13T16:28:22.740367-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying mysql/general_log.CSM to /backup/mysql/general_log.CSM
+2026-08-13T16:28:22.740850-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying mysql/general_log.CSM to /backup/mysql/general_log.CSM
+2026-08-13T16:28:22.742779-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying mysql/general_log.CSV to /backup/mysql/general_log.CSV
+2026-08-13T16:28:22.742789-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying mysql/general_log.CSV to /backup/mysql/general_log.CSV
+2026-08-13T16:28:22.743884-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying mysql/slow_log_214.sdi to /backup/mysql/slow_log_214.sdi
+2026-08-13T16:28:22.744338-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying mysql/slow_log_214.sdi to /backup/mysql/slow_log_214.sdi
+2026-08-13T16:28:22.746974-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying mysql/slow_log.CSM to /backup/mysql/slow_log.CSM
+2026-08-13T16:28:22.747426-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying mysql/slow_log.CSM to /backup/mysql/slow_log.CSM
+2026-08-13T16:28:22.749735-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying mysql/slow_log.CSV to /backup/mysql/slow_log.CSV
+2026-08-13T16:28:22.749744-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying mysql/slow_log.CSV to /backup/mysql/slow_log.CSV
+2026-08-13T16:28:22.751295-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/cond_instances_82.sdi to /backup/performance_schema/cond_instances_82.sdi
+2026-08-13T16:28:22.751753-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/cond_instances_82.sdi to /backup/performance_schema/cond_instances_82.sdi
+2026-08-13T16:28:22.753799-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/error_log_83.sdi to /backup/performance_schema/error_log_83.sdi
+2026-08-13T16:28:22.754269-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/error_log_83.sdi to /backup/performance_schema/error_log_83.sdi
+2026-08-13T16:28:22.756640-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_waits_cur_84.sdi to /backup/performance_schema/events_waits_cur_84.sdi
+2026-08-13T16:28:22.757036-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_waits_cur_84.sdi to /backup/performance_schema/events_waits_cur_84.sdi
+2026-08-13T16:28:22.759150-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_waits_his_85.sdi to /backup/performance_schema/events_waits_his_85.sdi
+2026-08-13T16:28:22.759656-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_waits_his_85.sdi to /backup/performance_schema/events_waits_his_85.sdi
+2026-08-13T16:28:22.761575-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_waits_his_86.sdi to /backup/performance_schema/events_waits_his_86.sdi
+2026-08-13T16:28:22.762066-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_waits_his_86.sdi to /backup/performance_schema/events_waits_his_86.sdi
+2026-08-13T16:28:22.764172-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_waits_sum_87.sdi to /backup/performance_schema/events_waits_sum_87.sdi
+2026-08-13T16:28:22.764656-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_waits_sum_87.sdi to /backup/performance_schema/events_waits_sum_87.sdi
+2026-08-13T16:28:22.766547-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_waits_sum_88.sdi to /backup/performance_schema/events_waits_sum_88.sdi
+2026-08-13T16:28:22.767024-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_waits_sum_88.sdi to /backup/performance_schema/events_waits_sum_88.sdi
+2026-08-13T16:28:22.768963-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_waits_sum_89.sdi to /backup/performance_schema/events_waits_sum_89.sdi
+2026-08-13T16:28:22.769462-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_waits_sum_89.sdi to /backup/performance_schema/events_waits_sum_89.sdi
+2026-08-13T16:28:22.771490-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_waits_sum_90.sdi to /backup/performance_schema/events_waits_sum_90.sdi
+2026-08-13T16:28:22.771907-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_waits_sum_90.sdi to /backup/performance_schema/events_waits_sum_90.sdi
+2026-08-13T16:28:22.773937-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_waits_sum_91.sdi to /backup/performance_schema/events_waits_sum_91.sdi
+2026-08-13T16:28:22.774492-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_waits_sum_91.sdi to /backup/performance_schema/events_waits_sum_91.sdi
+2026-08-13T16:28:22.776467-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_waits_sum_92.sdi to /backup/performance_schema/events_waits_sum_92.sdi
+2026-08-13T16:28:22.777037-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_waits_sum_92.sdi to /backup/performance_schema/events_waits_sum_92.sdi
+2026-08-13T16:28:22.778989-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/file_instances_93.sdi to /backup/performance_schema/file_instances_93.sdi
+2026-08-13T16:28:22.779453-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/file_instances_93.sdi to /backup/performance_schema/file_instances_93.sdi
+2026-08-13T16:28:22.781309-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/file_summary_by__94.sdi to /backup/performance_schema/file_summary_by__94.sdi
+2026-08-13T16:28:22.781793-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/file_summary_by__94.sdi to /backup/performance_schema/file_summary_by__94.sdi
+2026-08-13T16:28:22.783847-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/file_summary_by__95.sdi to /backup/performance_schema/file_summary_by__95.sdi
+2026-08-13T16:28:22.784212-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/file_summary_by__95.sdi to /backup/performance_schema/file_summary_by__95.sdi
+2026-08-13T16:28:22.786253-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/host_cache_96.sdi to /backup/performance_schema/host_cache_96.sdi
+2026-08-13T16:28:22.786759-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/host_cache_96.sdi to /backup/performance_schema/host_cache_96.sdi
+2026-08-13T16:28:22.788952-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/mutex_instances_97.sdi to /backup/performance_schema/mutex_instances_97.sdi
+2026-08-13T16:28:22.789408-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/mutex_instances_97.sdi to /backup/performance_schema/mutex_instances_97.sdi
+2026-08-13T16:28:22.791269-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/objects_summary__98.sdi to /backup/performance_schema/objects_summary__98.sdi
+2026-08-13T16:28:22.791744-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/objects_summary__98.sdi to /backup/performance_schema/objects_summary__98.sdi
+2026-08-13T16:28:22.793597-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/performance_time_99.sdi to /backup/performance_schema/performance_time_99.sdi
+2026-08-13T16:28:22.794076-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/performance_time_99.sdi to /backup/performance_schema/performance_time_99.sdi
+2026-08-13T16:28:22.796037-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/processlist_100.sdi to /backup/performance_schema/processlist_100.sdi
+2026-08-13T16:28:22.796503-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/processlist_100.sdi to /backup/performance_schema/processlist_100.sdi
+2026-08-13T16:28:22.798380-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/rwlock_instances_101.sdi to /backup/performance_schema/rwlock_instances_101.sdi
+2026-08-13T16:28:22.798857-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/rwlock_instances_101.sdi to /backup/performance_schema/rwlock_instances_101.sdi
+2026-08-13T16:28:22.800848-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/setup_actors_102.sdi to /backup/performance_schema/setup_actors_102.sdi
+2026-08-13T16:28:22.801306-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/setup_actors_102.sdi to /backup/performance_schema/setup_actors_102.sdi
+2026-08-13T16:28:22.803317-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/setup_consumers_103.sdi to /backup/performance_schema/setup_consumers_103.sdi
+2026-08-13T16:28:22.803762-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/setup_consumers_103.sdi to /backup/performance_schema/setup_consumers_103.sdi
+2026-08-13T16:28:22.805792-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/setup_instrument_104.sdi to /backup/performance_schema/setup_instrument_104.sdi
+2026-08-13T16:28:22.806250-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/setup_instrument_104.sdi to /backup/performance_schema/setup_instrument_104.sdi
+2026-08-13T16:28:22.808150-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/setup_objects_105.sdi to /backup/performance_schema/setup_objects_105.sdi
+2026-08-13T16:28:22.808590-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/setup_objects_105.sdi to /backup/performance_schema/setup_objects_105.sdi
+2026-08-13T16:28:22.810560-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/setup_threads_106.sdi to /backup/performance_schema/setup_threads_106.sdi
+2026-08-13T16:28:22.811035-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/setup_threads_106.sdi to /backup/performance_schema/setup_threads_106.sdi
+2026-08-13T16:28:22.813055-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/table_io_waits_s_107.sdi to /backup/performance_schema/table_io_waits_s_107.sdi
+2026-08-13T16:28:22.813460-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/table_io_waits_s_107.sdi to /backup/performance_schema/table_io_waits_s_107.sdi
+2026-08-13T16:28:22.815613-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/table_io_waits_s_108.sdi to /backup/performance_schema/table_io_waits_s_108.sdi
+2026-08-13T16:28:22.816003-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/table_io_waits_s_108.sdi to /backup/performance_schema/table_io_waits_s_108.sdi
+2026-08-13T16:28:22.818049-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/table_lock_waits_109.sdi to /backup/performance_schema/table_lock_waits_109.sdi
+2026-08-13T16:28:22.818548-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/table_lock_waits_109.sdi to /backup/performance_schema/table_lock_waits_109.sdi
+2026-08-13T16:28:22.820718-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/threads_110.sdi to /backup/performance_schema/threads_110.sdi
+2026-08-13T16:28:22.821218-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/threads_110.sdi to /backup/performance_schema/threads_110.sdi
+2026-08-13T16:28:22.823289-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_stages_cu_111.sdi to /backup/performance_schema/events_stages_cu_111.sdi
+2026-08-13T16:28:22.823754-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_stages_cu_111.sdi to /backup/performance_schema/events_stages_cu_111.sdi
+2026-08-13T16:28:22.825773-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_stages_hi_112.sdi to /backup/performance_schema/events_stages_hi_112.sdi
+2026-08-13T16:28:22.826235-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_stages_hi_112.sdi to /backup/performance_schema/events_stages_hi_112.sdi
+2026-08-13T16:28:22.828255-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_stages_hi_113.sdi to /backup/performance_schema/events_stages_hi_113.sdi
+2026-08-13T16:28:22.828722-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_stages_hi_113.sdi to /backup/performance_schema/events_stages_hi_113.sdi
+2026-08-13T16:28:22.830798-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_stages_su_114.sdi to /backup/performance_schema/events_stages_su_114.sdi
+2026-08-13T16:28:22.831231-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_stages_su_114.sdi to /backup/performance_schema/events_stages_su_114.sdi
+2026-08-13T16:28:22.833241-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_stages_su_115.sdi to /backup/performance_schema/events_stages_su_115.sdi
+2026-08-13T16:28:22.833734-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_stages_su_115.sdi to /backup/performance_schema/events_stages_su_115.sdi
+2026-08-13T16:28:22.835685-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_stages_su_116.sdi to /backup/performance_schema/events_stages_su_116.sdi
+2026-08-13T16:28:22.836161-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_stages_su_116.sdi to /backup/performance_schema/events_stages_su_116.sdi
+2026-08-13T16:28:22.838119-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_stages_su_117.sdi to /backup/performance_schema/events_stages_su_117.sdi
+2026-08-13T16:28:22.838596-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_stages_su_117.sdi to /backup/performance_schema/events_stages_su_117.sdi
+2026-08-13T16:28:22.840564-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_stages_su_118.sdi to /backup/performance_schema/events_stages_su_118.sdi
+2026-08-13T16:28:22.841026-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_stages_su_118.sdi to /backup/performance_schema/events_stages_su_118.sdi
+2026-08-13T16:28:22.843093-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_119.sdi to /backup/performance_schema/events_statement_119.sdi
+2026-08-13T16:28:22.843622-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_119.sdi to /backup/performance_schema/events_statement_119.sdi
+2026-08-13T16:28:22.845914-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_120.sdi to /backup/performance_schema/events_statement_120.sdi
+2026-08-13T16:28:22.846484-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_120.sdi to /backup/performance_schema/events_statement_120.sdi
+2026-08-13T16:28:22.848602-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_121.sdi to /backup/performance_schema/events_statement_121.sdi
+2026-08-13T16:28:22.849137-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_121.sdi to /backup/performance_schema/events_statement_121.sdi
+2026-08-13T16:28:22.851298-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_122.sdi to /backup/performance_schema/events_statement_122.sdi
+2026-08-13T16:28:22.851794-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_122.sdi to /backup/performance_schema/events_statement_122.sdi
+2026-08-13T16:28:22.853916-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_123.sdi to /backup/performance_schema/events_statement_123.sdi
+2026-08-13T16:28:22.854413-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_123.sdi to /backup/performance_schema/events_statement_123.sdi
+2026-08-13T16:28:22.856548-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_124.sdi to /backup/performance_schema/events_statement_124.sdi
+2026-08-13T16:28:22.857027-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_124.sdi to /backup/performance_schema/events_statement_124.sdi
+2026-08-13T16:28:22.859185-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_125.sdi to /backup/performance_schema/events_statement_125.sdi
+2026-08-13T16:28:22.859521-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_125.sdi to /backup/performance_schema/events_statement_125.sdi
+2026-08-13T16:28:22.861616-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_126.sdi to /backup/performance_schema/events_statement_126.sdi
+2026-08-13T16:28:22.862133-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_126.sdi to /backup/performance_schema/events_statement_126.sdi
+2026-08-13T16:28:22.864126-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_127.sdi to /backup/performance_schema/events_statement_127.sdi
+2026-08-13T16:28:22.864636-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_127.sdi to /backup/performance_schema/events_statement_127.sdi
+2026-08-13T16:28:22.866720-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_128.sdi to /backup/performance_schema/events_statement_128.sdi
+2026-08-13T16:28:22.867232-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_128.sdi to /backup/performance_schema/events_statement_128.sdi
+2026-08-13T16:28:22.869260-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_129.sdi to /backup/performance_schema/events_statement_129.sdi
+2026-08-13T16:28:22.869719-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_129.sdi to /backup/performance_schema/events_statement_129.sdi
+2026-08-13T16:28:22.871794-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_statement_130.sdi to /backup/performance_schema/events_statement_130.sdi
+2026-08-13T16:28:22.872259-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_statement_130.sdi to /backup/performance_schema/events_statement_130.sdi
+2026-08-13T16:28:22.874268-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_transacti_131.sdi to /backup/performance_schema/events_transacti_131.sdi
+2026-08-13T16:28:22.874795-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_transacti_131.sdi to /backup/performance_schema/events_transacti_131.sdi
+2026-08-13T16:28:22.876910-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_transacti_132.sdi to /backup/performance_schema/events_transacti_132.sdi
+2026-08-13T16:28:22.877410-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_transacti_132.sdi to /backup/performance_schema/events_transacti_132.sdi
+2026-08-13T16:28:22.879555-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_transacti_133.sdi to /backup/performance_schema/events_transacti_133.sdi
+2026-08-13T16:28:22.879842-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_transacti_133.sdi to /backup/performance_schema/events_transacti_133.sdi
+2026-08-13T16:28:22.881934-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_transacti_134.sdi to /backup/performance_schema/events_transacti_134.sdi
+2026-08-13T16:28:22.882190-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_transacti_134.sdi to /backup/performance_schema/events_transacti_134.sdi
+2026-08-13T16:28:22.884187-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_transacti_135.sdi to /backup/performance_schema/events_transacti_135.sdi
+2026-08-13T16:28:22.884458-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_transacti_135.sdi to /backup/performance_schema/events_transacti_135.sdi
+2026-08-13T16:28:22.886530-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_transacti_136.sdi to /backup/performance_schema/events_transacti_136.sdi
+2026-08-13T16:28:22.886795-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_transacti_136.sdi to /backup/performance_schema/events_transacti_136.sdi
+2026-08-13T16:28:22.888800-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_transacti_137.sdi to /backup/performance_schema/events_transacti_137.sdi
+2026-08-13T16:28:22.889066-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_transacti_137.sdi to /backup/performance_schema/events_transacti_137.sdi
+2026-08-13T16:28:22.891046-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_transacti_138.sdi to /backup/performance_schema/events_transacti_138.sdi
+2026-08-13T16:28:22.891331-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_transacti_138.sdi to /backup/performance_schema/events_transacti_138.sdi
+2026-08-13T16:28:22.893312-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_errors_su_139.sdi to /backup/performance_schema/events_errors_su_139.sdi
+2026-08-13T16:28:22.893562-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_errors_su_139.sdi to /backup/performance_schema/events_errors_su_139.sdi
+2026-08-13T16:28:22.895445-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_errors_su_140.sdi to /backup/performance_schema/events_errors_su_140.sdi
+2026-08-13T16:28:22.895670-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_errors_su_140.sdi to /backup/performance_schema/events_errors_su_140.sdi
+2026-08-13T16:28:22.897566-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_errors_su_141.sdi to /backup/performance_schema/events_errors_su_141.sdi
+2026-08-13T16:28:22.897801-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_errors_su_141.sdi to /backup/performance_schema/events_errors_su_141.sdi
+2026-08-13T16:28:22.899761-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_errors_su_142.sdi to /backup/performance_schema/events_errors_su_142.sdi
+2026-08-13T16:28:22.899985-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_errors_su_142.sdi to /backup/performance_schema/events_errors_su_142.sdi
+2026-08-13T16:28:22.901873-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/events_errors_su_143.sdi to /backup/performance_schema/events_errors_su_143.sdi
+2026-08-13T16:28:22.902101-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/events_errors_su_143.sdi to /backup/performance_schema/events_errors_su_143.sdi
+2026-08-13T16:28:22.904048-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/users_144.sdi to /backup/performance_schema/users_144.sdi
+2026-08-13T16:28:22.904290-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/users_144.sdi to /backup/performance_schema/users_144.sdi
+2026-08-13T16:28:22.906291-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/accounts_145.sdi to /backup/performance_schema/accounts_145.sdi
+2026-08-13T16:28:22.906542-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/accounts_145.sdi to /backup/performance_schema/accounts_145.sdi
+2026-08-13T16:28:22.908493-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/hosts_146.sdi to /backup/performance_schema/hosts_146.sdi
+2026-08-13T16:28:22.908758-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/hosts_146.sdi to /backup/performance_schema/hosts_146.sdi
+2026-08-13T16:28:22.910767-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/socket_instances_147.sdi to /backup/performance_schema/socket_instances_147.sdi
+2026-08-13T16:28:22.911022-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/socket_instances_147.sdi to /backup/performance_schema/socket_instances_147.sdi
+2026-08-13T16:28:22.913002-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/socket_summary_b_148.sdi to /backup/performance_schema/socket_summary_b_148.sdi
+2026-08-13T16:28:22.913283-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/socket_summary_b_148.sdi to /backup/performance_schema/socket_summary_b_148.sdi
+2026-08-13T16:28:22.915390-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/socket_summary_b_149.sdi to /backup/performance_schema/socket_summary_b_149.sdi
+2026-08-13T16:28:22.915901-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/socket_summary_b_149.sdi to /backup/performance_schema/socket_summary_b_149.sdi
+2026-08-13T16:28:22.917986-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/session_connect__150.sdi to /backup/performance_schema/session_connect__150.sdi
+2026-08-13T16:28:22.918342-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/session_connect__150.sdi to /backup/performance_schema/session_connect__150.sdi
+2026-08-13T16:28:22.920210-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/session_account__151.sdi to /backup/performance_schema/session_account__151.sdi
+2026-08-13T16:28:22.920679-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/session_account__151.sdi to /backup/performance_schema/session_account__151.sdi
+2026-08-13T16:28:22.922720-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/keyring_keys_152.sdi to /backup/performance_schema/keyring_keys_152.sdi
+2026-08-13T16:28:22.923003-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/keyring_keys_152.sdi to /backup/performance_schema/keyring_keys_152.sdi
+2026-08-13T16:28:22.924965-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/memory_summary_g_153.sdi to /backup/performance_schema/memory_summary_g_153.sdi
+2026-08-13T16:28:22.925246-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/memory_summary_g_153.sdi to /backup/performance_schema/memory_summary_g_153.sdi
+2026-08-13T16:28:22.927272-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/memory_summary_b_154.sdi to /backup/performance_schema/memory_summary_b_154.sdi
+2026-08-13T16:28:22.927524-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/memory_summary_b_154.sdi to /backup/performance_schema/memory_summary_b_154.sdi
+2026-08-13T16:28:22.929528-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/memory_summary_b_155.sdi to /backup/performance_schema/memory_summary_b_155.sdi
+2026-08-13T16:28:22.929782-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/memory_summary_b_155.sdi to /backup/performance_schema/memory_summary_b_155.sdi
+2026-08-13T16:28:22.931825-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/memory_summary_b_156.sdi to /backup/performance_schema/memory_summary_b_156.sdi
+2026-08-13T16:28:22.932125-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/memory_summary_b_156.sdi to /backup/performance_schema/memory_summary_b_156.sdi
+2026-08-13T16:28:22.934159-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/memory_summary_b_157.sdi to /backup/performance_schema/memory_summary_b_157.sdi
+2026-08-13T16:28:22.934464-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/memory_summary_b_157.sdi to /backup/performance_schema/memory_summary_b_157.sdi
+2026-08-13T16:28:22.936525-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/table_handles_158.sdi to /backup/performance_schema/table_handles_158.sdi
+2026-08-13T16:28:22.936773-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/table_handles_158.sdi to /backup/performance_schema/table_handles_158.sdi
+2026-08-13T16:28:22.938709-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/metadata_locks_159.sdi to /backup/performance_schema/metadata_locks_159.sdi
+2026-08-13T16:28:22.939001-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/metadata_locks_159.sdi to /backup/performance_schema/metadata_locks_159.sdi
+2026-08-13T16:28:22.941001-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/data_locks_160.sdi to /backup/performance_schema/data_locks_160.sdi
+2026-08-13T16:28:22.941307-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/data_locks_160.sdi to /backup/performance_schema/data_locks_160.sdi
+2026-08-13T16:28:22.943372-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/data_lock_waits_161.sdi to /backup/performance_schema/data_lock_waits_161.sdi
+2026-08-13T16:28:22.943651-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/data_lock_waits_161.sdi to /backup/performance_schema/data_lock_waits_161.sdi
+2026-08-13T16:28:22.945634-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_conn_162.sdi to /backup/performance_schema/replication_conn_162.sdi
+2026-08-13T16:28:22.945980-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_conn_162.sdi to /backup/performance_schema/replication_conn_162.sdi
+2026-08-13T16:28:22.948105-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_grou_163.sdi to /backup/performance_schema/replication_grou_163.sdi
+2026-08-13T16:28:22.948373-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_grou_163.sdi to /backup/performance_schema/replication_grou_163.sdi
+2026-08-13T16:28:22.950455-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_conn_164.sdi to /backup/performance_schema/replication_conn_164.sdi
+2026-08-13T16:28:22.950747-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_conn_164.sdi to /backup/performance_schema/replication_conn_164.sdi
+2026-08-13T16:28:22.953222-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_appl_165.sdi to /backup/performance_schema/replication_appl_165.sdi
+2026-08-13T16:28:22.953518-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_appl_165.sdi to /backup/performance_schema/replication_appl_165.sdi
+2026-08-13T16:28:22.955440-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_appl_166.sdi to /backup/performance_schema/replication_appl_166.sdi
+2026-08-13T16:28:22.955682-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_appl_166.sdi to /backup/performance_schema/replication_appl_166.sdi
+2026-08-13T16:28:22.957622-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_appl_167.sdi to /backup/performance_schema/replication_appl_167.sdi
+2026-08-13T16:28:22.958128-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_appl_167.sdi to /backup/performance_schema/replication_appl_167.sdi
+2026-08-13T16:28:22.960232-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_appl_168.sdi to /backup/performance_schema/replication_appl_168.sdi
+2026-08-13T16:28:22.960655-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_appl_168.sdi to /backup/performance_schema/replication_appl_168.sdi
+2026-08-13T16:28:22.962823-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_grou_169.sdi to /backup/performance_schema/replication_grou_169.sdi
+2026-08-13T16:28:22.963182-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_grou_169.sdi to /backup/performance_schema/replication_grou_169.sdi
+2026-08-13T16:28:22.965152-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_appl_170.sdi to /backup/performance_schema/replication_appl_170.sdi
+2026-08-13T16:28:22.965819-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_appl_170.sdi to /backup/performance_schema/replication_appl_170.sdi
+2026-08-13T16:28:22.967856-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_appl_171.sdi to /backup/performance_schema/replication_appl_171.sdi
+2026-08-13T16:28:22.968332-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_appl_171.sdi to /backup/performance_schema/replication_appl_171.sdi
+2026-08-13T16:28:22.970185-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_asyn_172.sdi to /backup/performance_schema/replication_asyn_172.sdi
+2026-08-13T16:28:22.970679-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_asyn_172.sdi to /backup/performance_schema/replication_asyn_172.sdi
+2026-08-13T16:28:22.972665-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/replication_asyn_173.sdi to /backup/performance_schema/replication_asyn_173.sdi
+2026-08-13T16:28:22.973139-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/replication_asyn_173.sdi to /backup/performance_schema/replication_asyn_173.sdi
+2026-08-13T16:28:22.975102-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/log_status_174.sdi to /backup/performance_schema/log_status_174.sdi
+2026-08-13T16:28:22.975441-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/log_status_174.sdi to /backup/performance_schema/log_status_174.sdi
+2026-08-13T16:28:22.977441-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/prepared_stateme_175.sdi to /backup/performance_schema/prepared_stateme_175.sdi
+2026-08-13T16:28:22.977825-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/prepared_stateme_175.sdi to /backup/performance_schema/prepared_stateme_175.sdi
+2026-08-13T16:28:22.979864-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/user_variables_b_176.sdi to /backup/performance_schema/user_variables_b_176.sdi
+2026-08-13T16:28:22.980101-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/user_variables_b_176.sdi to /backup/performance_schema/user_variables_b_176.sdi
+2026-08-13T16:28:22.982164-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/status_by_accoun_177.sdi to /backup/performance_schema/status_by_accoun_177.sdi
+2026-08-13T16:28:22.982410-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/status_by_accoun_177.sdi to /backup/performance_schema/status_by_accoun_177.sdi
+2026-08-13T16:28:22.984363-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/status_by_host_178.sdi to /backup/performance_schema/status_by_host_178.sdi
+2026-08-13T16:28:22.984598-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/status_by_host_178.sdi to /backup/performance_schema/status_by_host_178.sdi
+2026-08-13T16:28:22.986632-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/status_by_thread_179.sdi to /backup/performance_schema/status_by_thread_179.sdi
+2026-08-13T16:28:22.986870-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/status_by_thread_179.sdi to /backup/performance_schema/status_by_thread_179.sdi
+2026-08-13T16:28:22.988825-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/status_by_user_180.sdi to /backup/performance_schema/status_by_user_180.sdi
+2026-08-13T16:28:22.989046-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/status_by_user_180.sdi to /backup/performance_schema/status_by_user_180.sdi
+2026-08-13T16:28:22.991120-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/global_status_181.sdi to /backup/performance_schema/global_status_181.sdi
+2026-08-13T16:28:22.991336-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/global_status_181.sdi to /backup/performance_schema/global_status_181.sdi
+2026-08-13T16:28:22.993199-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/session_status_182.sdi to /backup/performance_schema/session_status_182.sdi
+2026-08-13T16:28:22.993439-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/session_status_182.sdi to /backup/performance_schema/session_status_182.sdi
+2026-08-13T16:28:22.995369-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/variables_by_thr_183.sdi to /backup/performance_schema/variables_by_thr_183.sdi
+2026-08-13T16:28:22.995600-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/variables_by_thr_183.sdi to /backup/performance_schema/variables_by_thr_183.sdi
+2026-08-13T16:28:22.997469-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/global_variables_184.sdi to /backup/performance_schema/global_variables_184.sdi
+2026-08-13T16:28:22.997678-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/global_variables_184.sdi to /backup/performance_schema/global_variables_184.sdi
+2026-08-13T16:28:22.999704-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/session_variable_185.sdi to /backup/performance_schema/session_variable_185.sdi
+2026-08-13T16:28:22.999957-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/session_variable_185.sdi to /backup/performance_schema/session_variable_185.sdi
+2026-08-13T16:28:23.001793-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/variables_info_186.sdi to /backup/performance_schema/variables_info_186.sdi
+2026-08-13T16:28:23.002034-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/variables_info_186.sdi to /backup/performance_schema/variables_info_186.sdi
+2026-08-13T16:28:23.003974-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/persisted_variab_187.sdi to /backup/performance_schema/persisted_variab_187.sdi
+2026-08-13T16:28:23.004198-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/persisted_variab_187.sdi to /backup/performance_schema/persisted_variab_187.sdi
+2026-08-13T16:28:23.006044-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/user_defined_fun_188.sdi to /backup/performance_schema/user_defined_fun_188.sdi
+2026-08-13T16:28:23.006260-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/user_defined_fun_188.sdi to /backup/performance_schema/user_defined_fun_188.sdi
+2026-08-13T16:28:23.008189-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/binary_log_trans_189.sdi to /backup/performance_schema/binary_log_trans_189.sdi
+2026-08-13T16:28:23.008453-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/binary_log_trans_189.sdi to /backup/performance_schema/binary_log_trans_189.sdi
+2026-08-13T16:28:23.010506-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/tls_channel_stat_190.sdi to /backup/performance_schema/tls_channel_stat_190.sdi
+2026-08-13T16:28:23.010805-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/tls_channel_stat_190.sdi to /backup/performance_schema/tls_channel_stat_190.sdi
+2026-08-13T16:28:23.012717-00:00 3 [Note] [MY-011825] [Xtrabackup] Copying performance_schema/keyring_componen_191.sdi to /backup/performance_schema/keyring_componen_191.sdi
+2026-08-13T16:28:23.012956-00:00 3 [Note] [MY-011825] [Xtrabackup] Done: Copying performance_schema/keyring_componen_191.sdi to /backup/performance_schema/keyring_componen_191.sdi
+2026-08-13T16:28:23.034716-00:00 0 [Note] [MY-011825] [Xtrabackup] Finished backing up non-InnoDB tables and files
+2026-08-13T16:28:23.034734-00:00 0 [Note] [MY-011825] [Xtrabackup] Executing FLUSH NO_WRITE_TO_BINLOG BINARY LOGS
+2026-08-13T16:28:23.044468-00:00 0 [Note] [MY-011825] [Xtrabackup] Selecting LSN and binary log position from p_s.log_status
+2026-08-13T16:28:23.046895-00:00 0 [Note] [MY-011825] [Xtrabackup] Copying /var/lib/mysql/binlog.000059 to /backup/binlog.000059 up to position 157
+2026-08-13T16:28:23.046941-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Copying /var/lib/mysql/binlog.000059 to /backup/binlog.000059
+2026-08-13T16:28:23.048871-00:00 0 [Note] [MY-011825] [Xtrabackup] Writing /backup/binlog.index
+2026-08-13T16:28:23.048903-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Writing file /backup/binlog.index
+2026-08-13T16:28:23.052081-00:00 0 [Note] [MY-011825] [Xtrabackup] Writing /backup/xtrabackup_binlog_info
+2026-08-13T16:28:23.052115-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Writing file /backup/xtrabackup_binlog_info
+2026-08-13T16:28:23.053954-00:00 0 [Note] [MY-011825] [Xtrabackup] Executing FLUSH NO_WRITE_TO_BINLOG ENGINE LOGS...
+2026-08-13T16:28:23.055119-00:00 0 [Note] [MY-011825] [Xtrabackup] The latest check point (for incremental): '12502805384'
+2026-08-13T16:28:23.055130-00:00 0 [Note] [MY-011825] [Xtrabackup] Stopping log copying thread at LSN 12503413942
+2026-08-13T16:28:23.055280-00:00 1 [Note] [MY-011825] [Xtrabackup] >> log scanned up to (12503413942)
+2026-08-13T16:28:24.059461-00:00 0 [Note] [MY-011825] [Xtrabackup] Executing UNLOCK INSTANCE
+2026-08-13T16:28:24.059725-00:00 0 [Note] [MY-011825] [Xtrabackup] All tables unlocked
+2026-08-13T16:28:24.059796-00:00 0 [Note] [MY-011825] [Xtrabackup] Copying ib_buffer_pool to /backup/ib_buffer_pool
+2026-08-13T16:28:24.061252-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Copying ib_buffer_pool to /backup/ib_buffer_pool
+2026-08-13T16:28:24.064535-00:00 0 [Note] [MY-011825] [Xtrabackup] Backup created in directory '/backup/'
+2026-08-13T16:28:24.064546-00:00 0 [Note] [MY-011825] [Xtrabackup] MySQL binlog position: filename 'binlog.000059', position '157'
+2026-08-13T16:28:24.064600-00:00 0 [Note] [MY-011825] [Xtrabackup] Writing /backup/backup-my.cnf
+2026-08-13T16:28:24.064637-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Writing file /backup/backup-my.cnf
+2026-08-13T16:28:24.067052-00:00 0 [Note] [MY-011825] [Xtrabackup] Writing /backup/xtrabackup_info
+2026-08-13T16:28:24.067084-00:00 0 [Note] [MY-011825] [Xtrabackup] Done: Writing file /backup/xtrabackup_info
+2026-08-13T16:28:25.070920-00:00 0 [Note] [MY-011825] [Xtrabackup] Transaction log of lsn (12502805384) to (12503417552) was copied.
+2026-08-13T16:28:25.277291-00:00 0 [Note] [MY-011825] [Xtrabackup] completed OK!
+2026-08-13T16:30:36.740561-00:00 0 [Note] [MY-011825] [Xtrabackup] recognized server arguments: --innodb_checksum_algorithm=crc32 --innodb_log_checksums=1 --innodb_data_file_path=ibdata1:12M:autoextend --innodb_log_file_size=50331648 --innodb_page_size=16384 --innodb_undo_directory=./ --innodb_undo_tablespaces=2 --server-id=0 --innodb_log_checksums=ON --innodb_redo_log_encrypt=0 --innodb_undo_log_encrypt=0 
+2026-08-13T16:30:36.741661-00:00 0 [Note] [MY-011825] [Xtrabackup] recognized client arguments: --prepare=1 --target-dir=/backup 
+xtrabackup version 8.0.35-36 based on MySQL server 8.0.35 Linux (x86_64) (revision id: 7233322c)
+2026-08-13T16:30:36.741682-00:00 0 [Note] [MY-011825] [Xtrabackup] cd to /backup/
+2026-08-13T16:30:36.742905-00:00 0 [Note] [MY-011825] [Xtrabackup] This target seems to be not prepared yet.
+2026-08-13T16:30:36.773385-00:00 0 [Note] [MY-011825] [Xtrabackup] xtrabackup_logfile detected: size=8388608, start_lsn=(12502805384)
+2026-08-13T16:30:36.779933-00:00 0 [Note] [MY-011825] [Xtrabackup] using the following InnoDB configuration for recovery:
+2026-08-13T16:30:36.779949-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_data_home_dir = .
+2026-08-13T16:30:36.779954-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_data_file_path = ibdata1:12M:autoextend
+2026-08-13T16:30:36.781933-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_group_home_dir = .
+2026-08-13T16:30:36.781944-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_files_in_group = 1
+2026-08-13T16:30:36.781951-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_file_size = 8388608
+2026-08-13T16:30:36.782807-00:00 0 [Note] [MY-011825] [Xtrabackup] inititialize_service_handles suceeded
+2026-08-13T16:30:36.784579-00:00 0 [Note] [MY-011825] [Xtrabackup] using the following InnoDB configuration for recovery:
+2026-08-13T16:30:36.784592-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_data_home_dir = .
+2026-08-13T16:30:36.784596-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_data_file_path = ibdata1:12M:autoextend
+2026-08-13T16:30:36.784605-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_group_home_dir = .
+2026-08-13T16:30:36.784610-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_files_in_group = 1
+2026-08-13T16:30:36.784615-00:00 0 [Note] [MY-011825] [Xtrabackup] innodb_log_file_size = 8388608
+2026-08-13T16:30:36.784622-00:00 0 [Note] [MY-011825] [Xtrabackup] Starting InnoDB instance for recovery.
+2026-08-13T16:30:36.784632-00:00 0 [Note] [MY-011825] [Xtrabackup] Using 104857600 bytes for buffer pool (set by --use-memory parameter)
+2026-08-13T16:30:36.784662-00:00 0 [Note] [MY-012932] [InnoDB] PUNCH HOLE support available
+2026-08-13T16:30:36.784695-00:00 0 [Note] [MY-012944] [InnoDB] Uses event mutexes
+2026-08-13T16:30:36.784701-00:00 0 [Note] [MY-012945] [InnoDB] GCC builtin __atomic_thread_fence() is used for memory barrier
+2026-08-13T16:30:36.785319-00:00 0 [Note] [MY-012948] [InnoDB] Compressed tables use zlib 1.2.13
+2026-08-13T16:30:36.788199-00:00 0 [Note] [MY-012951] [InnoDB] Using hardware accelerated crc32 and polynomial multiplication.
+2026-08-13T16:30:36.788448-00:00 0 [Note] [MY-012203] [InnoDB] Directories to scan './'
+2026-08-13T16:30:36.788476-00:00 0 [Note] [MY-012204] [InnoDB] Scanning './'
+2026-08-13T16:30:36.821190-00:00 0 [Note] [MY-012208] [InnoDB] Completed space ID check of 34 files.
+2026-08-13T16:30:36.825490-00:00 0 [Note] [MY-012955] [InnoDB] Initializing buffer pool, total size = 128.000000M, instances = 1, chunk size =128.000000M 
+2026-08-13T16:30:36.832209-00:00 0 [Note] [MY-012957] [InnoDB] Completed initialization of buffer pool
+2026-08-13T16:30:36.836071-00:00 0 [Note] [MY-011952] [InnoDB] If the mysqld execution user is authorized, page cleaner thread priority can be changed. See the man page of setpriority().
+2026-08-13T16:30:36.871676-00:00 0 [Note] [MY-013883] [InnoDB] The latest found checkpoint is at lsn = 12502805384 in redo log file ./#innodb_redo/#ib_redo0.
+2026-08-13T16:30:36.872619-00:00 0 [Note] [MY-013086] [InnoDB] Starting to parse redo log at lsn = 12502805037, whereas checkpoint_lsn = 12502805384 and start_lsn = 12502804992
+2026-08-13T16:30:36.872632-00:00 0 [Note] [MY-012547] [InnoDB] Log scan progressed past the checkpoint LSN 12502805037.
+2026-08-13T16:30:36.872638-00:00 0 [Note] [MY-012551] [InnoDB] Database was not shutdown normally!
+2026-08-13T16:30:36.872643-00:00 0 [Note] [MY-012552] [InnoDB] Starting crash recovery.
+2026-08-13T16:30:36.878746-00:00 0 [Note] [MY-012550] [InnoDB] Doing recovery: scanned up to log sequence number 12503413942
+2026-08-13T16:30:36.891490-00:00 0 [Note] [MY-013083] [InnoDB] Log background threads are being started...
+2026-08-13T16:30:36.891888-00:00 0 [Note] [MY-012532] [InnoDB] Applying a batch of 381 redo log records ...
+2026-08-13T16:30:36.897850-00:00 0 [Note] [MY-012533] [InnoDB] 10%
+2026-08-13T16:30:36.907973-00:00 0 [Note] [MY-012533] [InnoDB] 20%
+2026-08-13T16:30:36.907991-00:00 0 [Note] [MY-012533] [InnoDB] 30%
+2026-08-13T16:30:36.907997-00:00 0 [Note] [MY-012533] [InnoDB] 40%
+2026-08-13T16:30:36.909144-00:00 0 [Note] [MY-012533] [InnoDB] 50%
+2026-08-13T16:30:36.920311-00:00 0 [Note] [MY-012533] [InnoDB] 60%
+2026-08-13T16:30:36.930510-00:00 0 [Note] [MY-012533] [InnoDB] 70%
+2026-08-13T16:30:36.930532-00:00 0 [Note] [MY-012533] [InnoDB] 80%
+2026-08-13T16:30:36.930540-00:00 0 [Note] [MY-012533] [InnoDB] 90%
+2026-08-13T16:30:36.930548-00:00 0 [Note] [MY-012533] [InnoDB] 100%
+2026-08-13T16:30:37.430726-00:00 0 [Note] [MY-012535] [InnoDB] Apply batch completed!
+2026-08-13T16:30:37.545109-00:00 0 [Note] [MY-013084] [InnoDB] Log background threads are being closed...
+2026-08-13T16:30:37.546536-00:00 0 [Note] [MY-013888] [InnoDB] Upgrading redo log: 1032M, LSN=12503414288.
+2026-08-13T16:30:37.546549-00:00 0 [Note] [MY-012968] [InnoDB] Starting to delete and rewrite redo log files.
+2026-08-13T16:30:37.546590-00:00 0 [Note] [MY-011825] [InnoDB] Removing redo log file: ./#innodb_redo/#ib_redo0
+2026-08-13T16:30:37.581107-00:00 0 [Note] [MY-011825] [InnoDB] Creating redo log file at ./#innodb_redo/#ib_redo0_tmp with file_id 0 with size 33554432 bytes
+2026-08-13T16:30:37.586564-00:00 0 [Note] [MY-011825] [InnoDB] Renaming redo log file from ./#innodb_redo/#ib_redo0_tmp to ./#innodb_redo/#ib_redo0
+2026-08-13T16:30:37.588568-00:00 0 [Note] [MY-012893] [InnoDB] New redo log files created, LSN=12503414796
+2026-08-13T16:30:37.588607-00:00 0 [Note] [MY-013083] [InnoDB] Log background threads are being started...
+2026-08-13T16:30:37.588935-00:00 0 [Note] [MY-013252] [InnoDB] Using undo tablespace './undo_001'.
+2026-08-13T16:30:37.588996-00:00 0 [Note] [MY-013252] [InnoDB] Using undo tablespace './undo_002'.
+2026-08-13T16:30:37.589331-00:00 0 [Note] [MY-012910] [InnoDB] Opened 2 existing undo tablespaces.
+2026-08-13T16:30:37.589396-00:00 0 [Note] [MY-011980] [InnoDB] GTID recovery trx_no: 24777
+2026-08-13T16:30:37.642317-00:00 0 [Note] [MY-013776] [InnoDB] Parallel initialization of rseg complete
+2026-08-13T16:30:37.642339-00:00 0 [Note] [MY-013777] [InnoDB] Time taken to initialize rseg using 4 thread: 52946 ms.
+2026-08-13T16:30:37.642416-00:00 0 [Note] [MY-012923] [InnoDB] Creating shared tablespace for temporary tables
+2026-08-13T16:30:37.642486-00:00 0 [Note] [MY-012265] [InnoDB] Setting file './ibtmp1' size to 12 MB. Physically writing the file full; Please wait ...
+2026-08-13T16:30:37.653327-00:00 0 [Note] [MY-012266] [InnoDB] File './ibtmp1' size is now 12 MB.
+2026-08-13T16:30:37.656994-00:00 0 [Note] [MY-013627] [InnoDB] Scanning temp tablespace dir:'./#innodb_temp/'
+2026-08-13T16:30:37.667092-00:00 0 [Note] [MY-013018] [InnoDB] Created 128 and tracked 128 new rollback segment(s) in the temporary tablespace. 128 are now active.
+2026-08-13T16:30:37.667235-00:00 0 [Note] [MY-012976] [InnoDB] 8.0.35 started; log sequence number 12503414806
+2026-08-13T16:30:37.668102-00:00 0 [Warning] [MY-012091] [InnoDB] Allocated tablespace ID 1 for sys/sys_config, old maximum was 0
+2026-08-13T16:30:37.692541-00:00 0 [Note] [MY-011825] [Xtrabackup] Completed loading of 32 tablespaces into cache in 0.0252684 seconds
+2026-08-13T16:30:37.716696-00:00 0 [Note] [MY-011825] [Xtrabackup] Time taken to build dictionary: 0.0241309 seconds
+2026-08-13T16:30:38.717057-00:00 0 [Note] [MY-011825] [Xtrabackup] starting shutdown with innodb_fast_shutdown = 1
+2026-08-13T16:30:38.717138-00:00 0 [Note] [MY-012330] [InnoDB] FTS optimize thread exiting.
+2026-08-13T16:30:39.717114-00:00 0 [Note] [MY-013072] [InnoDB] Starting shutdown...
+2026-08-13T16:30:39.818023-00:00 0 [Note] [MY-013084] [InnoDB] Log background threads are being closed...
+2026-08-13T16:30:39.827784-00:00 0 [Note] [MY-012980] [InnoDB] Shutdown completed; log sequence number 12503414806
+2026-08-13T16:30:39.830055-00:00 0 [Note] [MY-011825] [Xtrabackup] completed OK!

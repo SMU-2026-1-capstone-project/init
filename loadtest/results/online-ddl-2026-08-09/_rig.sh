@@ -35,9 +35,21 @@ EXPECTED_ROWS=$(( (SESSIONS - 1) * ROWS_PER_SESSION + TAIL_ROWS ))
 # 세션 0 ~ SESSIONS-2 를 SEED_CHUNK 씩 끊는다. 마지막 청크는 seed_scale 이 잘라 쓴다.
 SEED_CHUNKS=$(( (SESSIONS - 2) / SEED_CHUNK ))
 
-# _seq 가 0~99,999 라 그 위는 시딩이 조용히 모자란다. 가드에서 죽기 전에 여기서 끊는다.
-[ "$SESSIONS" -ge 2 ] && [ "$SESSIONS" -le 100000 ] \
-  || { echo "🔴 SESSIONS 는 2~100000 이어야 한다 (받은 값 '$SESSIONS') — _seq 범위 제약" >&2; exit 1; }
+# _seq 범위는 세션 번호를 다 담아야 한다. 그 위는 시딩이 **조용히 모자라고**, 가드에서야
+# 죽는다. 그래서 필요한 자릿수를 여기서 정하고, 담을 수 없는 값은 먼저 끊는다.
+#
+# 🔴 무조건 6자리로 만들지 않는 이유: `_seq` 는 시딩에서 **자기 자신과 CROSS JOIN** 된다.
+#    기존 판(1,000만 행 = 13,334 세션)의 플랜을 건드리지 않으려면 넓힐 때만 넓힌다.
+if [ "$SESSIONS" -le 100000 ]; then SEQ_DIGITS=5; else SEQ_DIGITS=6; fi
+[ "$SESSIONS" -ge 2 ] && [ "$SESSIONS" -le 1000000 ] \
+  || { echo "🔴 SESSIONS 는 2~1000000 이어야 한다 (받은 값 '$SESSIONS') — _seq 범위 제약" >&2; exit 1; }
+
+SEQ_EXPR="d0.n+d1.n*10+d2.n*100+d3.n*1000+d4.n*10000"
+SEQ_FROM="d d0,d d1,d d2,d d3,d d4"
+if [ "$SEQ_DIGITS" -eq 6 ]; then
+  SEQ_EXPR="$SEQ_EXPR+d5.n*100000"
+  SEQ_FROM="$SEQ_FROM,d d5"
+fi
 
 # ── pt-osc 전용 계정 ─────────────────────────────────────────────────────
 #
@@ -136,8 +148,8 @@ seed_scale() {
     INSERT INTO _seq
     WITH d AS (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
                UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9)
-    SELECT d0.n+d1.n*10+d2.n*100+d3.n*1000+d4.n*10000
-    FROM d d0,d d1,d d2,d d3,d d4;
+    SELECT $SEQ_EXPR
+    FROM $SEQ_FROM;
   " || die "시딩 준비 실패"
 
   # 시딩 한정 완화 — 끝에서 되돌린다. 되돌리기가 빠지면 **다음 판이 다른 내구성으로 측정된다.**

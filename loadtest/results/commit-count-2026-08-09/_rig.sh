@@ -195,6 +195,12 @@ restart_backend() {  # $1 = pool
 GHZ=/home/ec2-user/go/bin/ghz
 WARM_C=3; WARM_SEC=30
 
+# 스윕이 ghz 에 인자를 더 얹는 통로. 기본은 빈 값이라 기존 스윕은 그대로다.
+#   예) GHZ_EXTRA="--connections 16"
+# 🔴 **워밍업에도 같이 건다.** 커넥션 수처럼 «연결을 만드는 방식» 을 흔드는 인자를 본판에만
+#    걸면, 워밍업이 만들어 둔 연결 상태 위에서 본판이 돌아 조작 변수가 반쯤만 적용된다.
+GHZ_EXTRA=${GHZ_EXTRA:-}
+
 run_ghz() {  # $1=태그 $2=data-file $3=c $4=n  → TSV 행을 $LOG 에 남기고 "rps fail" 출력
   local tag=$1 data=$2 c=$3 n=$4
   local f="$tag.json" rc
@@ -202,7 +208,7 @@ run_ghz() {  # $1=태그 $2=data-file $3=c $4=n  → TSV 행을 $LOG 에 남기�
   echo "  워밍업 ${WARM_SEC}s (c=$WARM_C)"
   if ! ssh "${SSH_OPTS[@]}" "ec2-user@$LOADER_PUB" "
       $GHZ --insecure --call ExerciseService.SavePoseDataBatch --metadata-file /tmp/meta.json \
-           --data-file $data -c $WARM_C -z ${WARM_SEC}s $APP_PRIV:6565 >/dev/null 2>&1"; then
+           --data-file $data -c $WARM_C $GHZ_EXTRA -z ${WARM_SEC}s $APP_PRIV:6565 >/dev/null 2>&1"; then
     # 상태를 바꾸지 않은 실패다 — 이 판만 버리고 다음으로 간다.
     echo "  ✗ 워밍업 ghz 실패 — $tag 판을 버린다 (백엔드 미기동 / 포트 차단?)" >&2
     fail_row "$tag"; FAILED+=("$tag:워밍업"); return 1
@@ -211,11 +217,18 @@ run_ghz() {  # $1=태그 $2=data-file $3=c $4=n  → TSV 행을 $LOG 에 남기�
 
   local c0 c1 t0 t1
   c0=$(counters); t0=$(date +%s)
+  # 스윕별 추가 관측 훅. 정의돼 있을 때만 불린다 — 기존 스윕은 영향이 없다.
+  #   round_begin_hook <태그>
+  #   round_end_hook   <태그> <t0_epoch> <t1_epoch>
+  # 🔴 훅의 실패가 판을 죽이지 않게 한다(`|| true`). 추가 관측이 본 지표를 버리게 하면
+  #    주객이 뒤집힌다 — 훅이 못 걷은 값은 그 스윕의 표에서 비어 있으면 된다.
+  declare -F round_begin_hook >/dev/null && { round_begin_hook "$tag" || true; }
   ssh "${SSH_OPTS[@]}" "ec2-user@$LOADER_PUB" "
       $GHZ --insecure --call ExerciseService.SavePoseDataBatch --metadata-file /tmp/meta.json \
-           --data-file $data -c $c -n $n -O json -o /tmp/$f $APP_PRIV:6565 >/dev/null 2>&1" \
+           --data-file $data -c $c $GHZ_EXTRA -n $n -O json -o /tmp/$f $APP_PRIV:6565 >/dev/null 2>&1" \
     || echo "  ⚠️ ghz 가 non-zero 로 끝났다 — 리포트 내용으로 판정한다" >&2
   t1=$(date +%s); c1=$(counters)
+  declare -F round_end_hook >/dev/null && { round_end_hook "$tag" "$t0" "$t1" || true; }
 
   if ! scp "${SCP_OPTS[@]}" -q "ec2-user@$LOADER_PUB:/tmp/$f" "$OUT/$f"; then
     echo "  ✗ 결과 회수(scp) 실패 ($tag) — 원격 /tmp/$f 는 남아 있다" >&2
