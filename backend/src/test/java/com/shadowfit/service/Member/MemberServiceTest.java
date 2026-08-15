@@ -16,6 +16,7 @@ import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.member.RefreshTokenRepository;
 import com.shadowfit.service.Exercise.PoseDataCleanupService;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,10 +24,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,6 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -138,6 +142,100 @@ class MemberServiceTest {
                     .isEqualTo(ErrorCode.USERID_DUPLICATION);
 
             verify(memberRepository, never()).save(any());
+        }
+
+        /**
+         * 이슈 #195 ①층 — 순차 재현(같은 닉네임으로 두 번 가입)을 닫는 자리.
+         *
+         * <p>이 검사가 없을 때 나가던 것은 4xx 가 아니라 <b>500</b> 이었다. UNIQUE 는 DDL 에
+         * 있었으므로({@code V1__baseline.sql:28}) 데이터가 더럽혀진 적은 없고, 정상적으로 쓰는
+         * 사용자가 서버 결함처럼 보이는 응답을 받는 것이 결함이었다.
+         */
+        @Test
+        @DisplayName("#195 이미 쓰는 닉네임이면 USERNAME_DUPLICATION, 저장 안 함")
+        void signup_duplicateUsername_throws() {
+            MemberRequestDto dto = new MemberRequestDto("user1", EMAIL, "raw-pw", Sex.MALE);
+            when(memberRepository.existsByEmail(EMAIL)).thenReturn(false);
+            when(memberRepository.existsByUsername("user1")).thenReturn(true);
+
+            assertThatThrownBy(() -> memberService.signup(dto))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.USERNAME_DUPLICATION);
+
+            verify(memberRepository, never()).save(any());
+        }
+
+        /**
+         * 이슈 #195 ②층 — 사전검사를 통과한 뒤 INSERT 가 제약에 걸리는 경우(동시 가입).
+         *
+         * <p>여기서 고정하는 것은 <b>제약명으로 필드를 가른다</b>는 판단이다. email·username 이
+         * 둘 다 UNIQUE 라 예외 타입만으로는 구분되지 않고, 제약 위반 직후에 재조회로 확인하는
+         * 길은 영속성 컨텍스트 상태가 정의되지 않아 못 쓴다({@code MemberService.signup} 주석).
+         *
+         * <p>제약명 문자열은 MySQL 이 {@code for key 'users.username'} 으로 주는 것을 Hibernate
+         * dialect 가 뽑아온 값이다 — 실제 값은 {@code SignupUsernameRaceTest} 가 진짜 MySQL 로
+         * 확인한다. 이 단위 테스트는 그 값을 <b>가정</b>하므로, 둘이 짝이다.
+         */
+        @Test
+        @DisplayName("#195 경합 — username 제약에 걸리면 USERNAME_DUPLICATION 으로 옮긴다")
+        void signup_usernameConstraintRace_mapsTo4xx() {
+            MemberRequestDto dto = new MemberRequestDto("user1", EMAIL, "raw-pw", Sex.MALE);
+            when(memberRepository.existsByEmail(EMAIL)).thenReturn(false);
+            when(memberRepository.existsByUsername("user1")).thenReturn(false);
+            when(passwordEncoder.encode("raw-pw")).thenReturn("encoded-pw");
+            doThrow(constraintViolation("users.username")).when(memberRepository).save(any());
+
+            assertThatThrownBy(() -> memberService.signup(dto))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.USERNAME_DUPLICATION);
+        }
+
+        @Test
+        @DisplayName("#195 경합 — email 제약에 걸리면 USERID_DUPLICATION 으로 옮긴다")
+        void signup_emailConstraintRace_mapsTo4xx() {
+            MemberRequestDto dto = new MemberRequestDto("user1", EMAIL, "raw-pw", Sex.MALE);
+            when(memberRepository.existsByEmail(EMAIL)).thenReturn(false);
+            when(memberRepository.existsByUsername("user1")).thenReturn(false);
+            when(passwordEncoder.encode("raw-pw")).thenReturn("encoded-pw");
+            doThrow(constraintViolation("users.email")).when(memberRepository).save(any());
+
+            assertThatThrownBy(() -> memberService.signup(dto))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.USERID_DUPLICATION);
+        }
+
+        /**
+         * 🔴 이 테스트가 지키는 것은 «고치는 범위» 다.
+         *
+         * <p>{@code DataIntegrityViolationException} 은 UNIQUE 전용이 아니라 FK·NOT NULL 위반에서도
+         * 나오고 그쪽은 대개 서버 결함이다. 싸잡아 4xx 로 바꾸면 진짜 버그가 "사용자가 중복을 냈다"로
+         * 위장되고 {@code log.error} 도 사라진다. 그래서 <b>이름을 확인한 두 제약만</b> 옮기고
+         * 나머지는 원래 예외 그대로 500 으로 내보낸다. 누가 나중에 이 처리를 전역으로 넓히면
+         * 여기서 깨진다.
+         */
+        @Test
+        @DisplayName("#195 모르는 제약 위반은 4xx 로 감추지 않고 그대로 올려보낸다")
+        void signup_unknownConstraint_isNotSwallowed() {
+            MemberRequestDto dto = new MemberRequestDto("user1", EMAIL, "raw-pw", Sex.MALE);
+            when(memberRepository.existsByEmail(EMAIL)).thenReturn(false);
+            when(memberRepository.existsByUsername("user1")).thenReturn(false);
+            when(passwordEncoder.encode("raw-pw")).thenReturn("encoded-pw");
+            doThrow(constraintViolation("fk_something_else")).when(memberRepository).save(any());
+
+            assertThatThrownBy(() -> memberService.signup(dto))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+        }
+
+        private DataIntegrityViolationException constraintViolation(String constraintName) {
+            return new DataIntegrityViolationException(
+                    "could not execute statement",
+                    new ConstraintViolationException(
+                            "Duplicate entry for key '" + constraintName + "'",
+                            new SQLException("duplicate", "23000", 1062),
+                            constraintName));
         }
     }
 
