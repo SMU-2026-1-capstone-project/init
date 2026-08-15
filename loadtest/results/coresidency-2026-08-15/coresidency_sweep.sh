@@ -253,7 +253,23 @@ MSG
 # ── 판 사이 초기화 ───────────────────────────────────────────────────────
 # 🔴 세션 상태는 AI **프로세스 메모리**에 있다(`session_state.py:243`). 재기동 없이 다음 판을
 #    돌리면 앞 판의 세션이 검출기 풀 자리를 물고 있어 «nolease» 가 앞 판 탓으로 난다.
+# 🔴 이 앱은 **회원당 활성 세션을 1개로 강제**한다 — 이미 진행 중이면 생성이 409 다
+#    (`SESSION_ALREADY_IN_PROGRESS`). 판이 끝날 때 부하기가 세션을 닫지만, 닫지 못한 세션이
+#    하나라도 남으면 **그 계정은 다음 판부터 영영 막힌다.** 그러면 «동시 세션 수» 가 목표값보다
+#    조용히 작아지고, 표에는 setup_fail 로만 남는다.
+#    2026-08-16 EC2 첫 실행에서 실제로 5세션 중 2개가 이렇게 빠졌다.
+#    부하기 계정(cores%)만 건드린다 — 從 부하의 시드 세션(901~1900)은 이미 COMPLETED 다.
+reset_sessions() {
+  $SSH "docker exec -i -e MYSQL_PWD=$MYSQL_PW $MYSQL_CONTAINER mysql -u$MYSQL_USER shadowfit \
+        -e \"UPDATE exercise_sessions s JOIN users u ON u.id = s.member_id \
+             SET s.status='COMPLETED', s.end_time=NOW() \
+             WHERE s.status='IN_PROGRESS' AND u.email LIKE 'cores%@shadowfit.local';\"" \
+    >/dev/null 2>&1 \
+    || echo "  ⚠️ 남은 IN_PROGRESS 세션을 못 걷었다 — 다음 판의 세션 수가 목표보다 작아진다" >&2
+}
+
 reset_between() {
+  reset_sessions          # 계정을 막고 있는 앞 판의 세션부터 푼다
   reset_ghz_rows          # 從 부하가 쌓은 행을 먼저 지운다 (재기동 대기와 겹쳐도 되는 일이다)
   $SSH "cd $REPO_DIR && docker compose restart shadowfit-ai >/dev/null 2>&1"
   sleep 15
@@ -319,6 +335,8 @@ for arm in $ARMS; do
   step "팔 $arm"
   apply_arm "$arm" || exit 1
   sleep 20
+  # 팔을 바꾸면 컨테이너가 재기동되므로 앞 팔의 세션이 IN_PROGRESS 로 남는다. 먼저 푼다.
+  reset_sessions
   # 버림판 — 첫 판은 컨테이너 워밍업·JIT·버퍼풀을 가장 크게 탄다. **표에 안 넣는다.**
   note "버림판 (표에 안 들어간다)"
   run_one "$arm" "discard" "$(echo "$LEVELS" | awk '{print $1}')" >/dev/null 2>&1
