@@ -51,6 +51,7 @@
 | **R1** | **worst-section 쿼리 1회** | `reports` 중 `detailed_analysis` 가 채워진 행이 있는지, `pose_data` 가 비어 있는지. **로컬에선 이미 확인했고 EC2 배포분만 미확인**이다. 쿼리 한 번이면 끝난다 | [`worst-section-rep-resolution.md:261`](../docs/decisions/worst-section-rep-resolution.md) — §0 의 그 항목 |
 | **R2** | **MySQL 지표 수집** | pool-cliff 초판이 «병목이 백엔드 CPU 로 이동» 을 적었다 **철회**한 사유가 정확히 **MySQL 지표 미수집**이었다. 이번엔 처음부터 걷는다 (OS 샘플러와 같은 결) | [`pose-ingest-downsampling.md:387`](../docs/decisions/pose-ingest-downsampling.md) |
 | **R3** | **3-way 조인 hash join** | `reports ⋈ sessions ⋈ users`. ⑤ 옵티마이저 카드가 «AWS엔 그 테이블들이 비어 있어 범위 밖» 으로 닫아둔 미완부 | [`realmysql-experiments.md:225`](../docs/portfolio/realmysql-experiments.md) |
+| **R5** | **AI 메모리 유도식의 «공식 밖 몫»** | 검출기 풀 공식이 **검출기만** 센다 — 프레임 버퍼·파이썬 힙은 미측정이라 안 들어갔고, 딱 맞추면 **풀이 거절하기 전에 OOM** 이 온다. 동시 세션을 ramp 하며 RSS 를 재야 «여유분» 에 근거가 생긴다. ⚠️ **P6 라운드 전용** — 그 스윕이 이미 `docker stats` 를 걷으므로 추가 비용 거의 0 | [#229](https://github.com/Shadowfit/init/issues/229) · [`ai-coresidency-capacity.md` §4-1](../docs/decisions/ai-coresidency-capacity.md) |
 | **R4** | **커넥션 수 스윕 (네트워크 축)** | 「`--connections` 1→16 이 230→211」이 **HTTP/2 멀티플렉싱 때문인지 fsync 에 가려진 것인지** 안 갈렸다. 완화 조건에서 다시 돌리면 갈린다. ⚠️ **P5 라운드 전용** — 부하기·페이로드가 그 rig 것이라 다른 라운드엔 못 얹는다 | [`four-axes-depth-experiments.md` §3-2](../docs/decisions/four-axes-depth-experiments.md) · rig `conn_ridealong.sh` |
 
 ⚠️ **R1 과 R3 은 값 분포 한계에 걸린다.** 시딩이 단일 템플릿 복제라 카디널리티가 균일하다.
