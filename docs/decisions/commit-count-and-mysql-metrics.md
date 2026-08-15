@@ -2,7 +2,7 @@
 
 선행: [`./pool-cliff-vs-concurrency.md`](./pool-cliff-vs-concurrency.md) §8 · [`../../loadtest/results/ceiling-fsync-2026-08-08/`](../../loadtest/results/ceiling-fsync-2026-08-08/) · [`./pose-ingest-downsampling.md`](./pose-ingest-downsampling.md) §5-1
 
-작성: 2026-08-09 · 상태: **🔶 착수 전, 사용자 confirm 대기**
+작성: 2026-08-09 · 상태: **✅ 실행 완료 (2026-08-09)** — 판정은 §0-1, 원본은 [`../../loadtest/results/commit-count-2026-08-09/`](../../loadtest/results/commit-count-2026-08-09/README.md). §8 에 **후속 미결정 5건**이 열려 있다(그중 「세션 분산도」는 [`session-spread-sweep.md`](./session-spread-sweep.md) 로 문서·rig 가 섰다)
 
 ---
 

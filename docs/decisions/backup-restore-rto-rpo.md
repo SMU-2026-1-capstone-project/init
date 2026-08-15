@@ -1,7 +1,9 @@
 # 백업·복구 — 「되돌릴 수 있다」를 시간으로 바꾼다
 
 작성일: 2026-08-13
-상태: **설계 (착수 전)** — 실행·채택은 사용자 confirm 후 박제
+상태: **✅ 본 측정 완료 (2026-08-13, EC2) · 재측정 b + 팔 B 교정 완료 (2026-08-13~14)** — RTO 약 21분(팔 A) · 논리↔물리 **약 7배** · PITR 확인.
+      본 측정이 남긴 결함 2건([#201](https://github.com/Shadowfit/init/issues/201) · [#202](https://github.com/Shadowfit/init/issues/202))은 [#210](https://github.com/Shadowfit/init/issues/210) 교정까지 **닫혔다**. 경위는 결정 로그.
+      원시 결과: [본 측정](../../loadtest/results/backup-restore-aws-2026-08-13/README.md) · [b 라운드](../../loadtest/results/backup-restore-aws-b-2026-08-13/README.md) · [팔 B 교정](../../loadtest/results/restore-reflink-2026-08-14/README.md)
 대상: DBA 축 결손 3개 중 2번([[user_career_target]]). 백엔드 축에서도 «운영 의식» 시그널로 남는다.
 연관: [`./online-ddl-vs-blocking-alter.md`](./online-ddl-vs-blocking-alter.md), [`../19-deployment.md`](../19-deployment.md), [`../../loadtest/AWS-RIDE-ALONG.md`](../../loadtest/AWS-RIDE-ALONG.md) 主-P3, `loadtest/results/online-ddl-2026-08-09/_rig.sh`
 

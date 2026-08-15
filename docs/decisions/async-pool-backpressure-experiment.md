@@ -1,7 +1,8 @@
 # `@Async` 풀과 서킷브레이커 — 「AI 가 멈추면 Spring 은 무엇을 쌓는가」
 
 작성일: 2026-08-11
-상태: **설계 (착수 전)** — 실행·채택은 사용자 confirm 후 박제 ([[feedback_user_decides_not_claude]])
+상태: **0단계 완료 (0-a 2026-08-11 · 0-b 2026-08-13) · 본 실험은 미착수** — 실행·채택은 사용자 confirm 후 박제 ([[feedback_user_decides_not_claude]]).
+      0-a 가 H1(Boot 기본값)을 바이트코드로 확정했고, 0-b 는 §2 의 «Micrometer 자동 계측» 한 줄을 **반증**했다(`@Lazy` 라 첫 `@Async` 호출 전에는 빈도 지표도 없다). 경위는 결정 로그
 대상: Spring 축의 미측정 1순위. **FastAPI 실험이 아니다** — AI 정지는 자극이고 관측 대상은 Spring 의 큐다
 연관: [`./four-axes-depth-experiments.md`](./four-axes-depth-experiments.md) §3-4·§4,
 [`./architecture-review-2026-08-11.md`](./architecture-review-2026-08-11.md) 결함 ⑥,

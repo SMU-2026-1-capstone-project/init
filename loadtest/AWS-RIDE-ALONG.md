@@ -1,7 +1,7 @@
 # EC2 탑승 목록 — 인프라를 띄울 때 같이 돌릴 것
 
 작성일: 2026-08-12
-상태: **2회 탑승 완료 (P1 2026-08-12 · P3 2026-08-13) · 3회차 진행 중 (P3-b, 2026-08-14 새벽)**
+상태: **3회 탑승 완료 (P1 2026-08-12 · P3 2026-08-13 · P3-b 2026-08-13~14) + 팔 B 교정 1판 (2026-08-14)**
       — 남은 主 는 P2·P4·P5, 착수·채택은 사용자 confirm 후 박제
 연관: [`../docs/decisions/online-ddl-vs-blocking-alter.md`](../docs/decisions/online-ddl-vs-blocking-alter.md), [`../docs/portfolio/one-pager.md`](../docs/portfolio/one-pager.md), [`results/`](results/)
 
@@ -36,7 +36,7 @@
 | ~~**P1**~~ | ~~**무중단 DDL 본 측정**~~ | 로컬은 MySQL·writer·도구가 2코어를 공유해 팔 간 차이가 잡음에 묻힐 수 있다. 설계 §9 «AWS 로 올릴지» 미결정 항목 | ✅ **완료 (2026-08-12)** — [결과](results/online-ddl-aws-2026-08-12/README.md) | **실측 29분** (예상 ~5.9시간은 `WRITER_MAX_SEC` 상한 기준이었고, 996만 행에선 판당 1~2분) |
 | **P2** | **다운샘플 «1.7배» 다세션 재측정** | 🔴 [`one-pager.md:43`](../docs/portfolio/one-pager.md) 의 정본 수치인데 조건이 **단일 핫세션**(`batch.json`, session 801)이다. **fsync 3.47배를 1.03배로 무너뜨린 바로 그 조건**이고, 문서에 «다세션에서 재측정한 적 없다» 가 그대로 붙어 있다 | 🟡 rig 있음 · 페이로드는 재생성 필요(§4) | 2~3시간 |
 | ~~**P3**~~ | ~~**백업/복구 RTO·RPO**~~ | 「몇 분인가」는 디스크 성능이 지배한다. 단 「PITR 이 되는가」는 이진 사실이라 **로컬에서 먼저** 확인하고 올린다 | ✅ **완료 (2026-08-13)** — [결과](results/backup-restore-aws-2026-08-13/README.md). 미검증 2건은 §6 결정 로그 | **실측 3.11시간**(러너 2.97h — 본 측정만 2h54m) |
-| **P3-b** | **백업 재측정 — 내구성·행 크기** | 🔴 08-13 라운드가 두 곳에서 다른 것을 쟀다. ① 팔 B 복구가 **페이지 캐시**를 쟀고([#201](https://github.com/Shadowfit/init/issues/201)), ② 설계에서 확정됐던 **real-JSON 대조**가 rig 에 없었다([#202](https://github.com/Shadowfit/init/issues/202)). 둘 다 **디스크가 지배**해서 로컬로는 못 닫는다 | 🟢 **rig 수정 완료** — `sync_ms`·`restore_durable_s` 칸 추가, 복구 직전 캐시 비움, `STAGE=real` 무대 | 러너 3.5~4h |
+| ~~**P3-b**~~ | ~~**백업 재측정 — 내구성·행 크기**~~ | 🔴 08-13 라운드가 두 곳에서 다른 것을 쟀다. ① 팔 B 복구가 **페이지 캐시**를 쟀고([#201](https://github.com/Shadowfit/init/issues/201)), ② 설계에서 확정됐던 **real-JSON 대조**가 rig 에 없었다([#202](https://github.com/Shadowfit/init/issues/202)). 둘 다 **디스크가 지배**해서 로컬로는 못 닫는다 | ✅ **완료 (2026-08-13~14)** — [b 라운드](results/backup-restore-aws-b-2026-08-13/README.md) · [팔 B 교정](results/restore-reflink-2026-08-14/README.md). #201 은 원인이 캐시가 **아니라 xfs reflink** 였고([#210](https://github.com/Shadowfit/init/issues/210)), #202 는 돌았는데 **예상과 방향이 반대**였다 | **실측 3.32시간**(러너 3.06h) + 교정 1판 |
 | **P4** | **복제 지연 · 반동기 대가** | 인스턴스 2대가 전제. ⭐ **반동기 대가는 AZ 간 RTT 에 지배**되므로 로컬에선 구조적으로 과소평가된다 | 🟡 **설계 완료 (2026-08-13)** · rig 없음 — [`../docs/decisions/replication-lag-and-semisync.md`](../docs/decisions/replication-lag-and-semisync.md) | 게이트 2~3h + 측정 2~3h |
 | **P5** | **세션 분산도 스윕** (1·2·5·20·100) | 🔴 정본 baseline **649.4 RPS 가 «100세션» 에서 나온 값**인데 그 100 은 잰 값이 아니다. 이 앱은 회원당 활성 세션이 1개라 **동시 세션 수 = 동시에 운동 중인 사람 수**다 — baseline 이 가정한 부하보다 분산된 조건일 수 있다. 4대 구성이라 로컬 불가 | 🟢 **설계·rig 완료 (2026-08-14)** — [`../docs/decisions/session-spread-sweep.md`](../docs/decisions/session-spread-sweep.md) · [rig](results/session-spread-2026-08-13/README.md) | 主 25판 + 從 6판 · **지켜보는 1~2h**(무인 아님) |
 

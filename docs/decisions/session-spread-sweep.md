@@ -1,7 +1,7 @@
 # 세션 분산도 스윕 — 「100세션」은 잰 값이 아니다
 
 작성일: 2026-08-13
-상태: **설계 (착수 전)** — 착수·채택은 사용자 confirm 후 박제
+상태: **설계·rig 완료 (2026-08-14) · 측정 라운드 미실시** — 착수·채택은 사용자 confirm 후 박제. 측정값은 관례대로 `loadtest/results/session-spread-aws-<측정일>/` 에 따로 남는다
 rig: [`../../loadtest/results/session-spread-2026-08-13/`](../../loadtest/results/session-spread-2026-08-13/README.md)
 선행: [`commit-count-and-mysql-metrics.md`](./commit-count-and-mysql-metrics.md) · [4차 실측](../../loadtest/results/commit-count-2026-08-09/README.md) · [#166](https://github.com/Shadowfit/init/issues/166)
 
