@@ -115,6 +115,34 @@ services:
       - "8000:8000"
     expose:
       - "8585"
+    # 🔴 **왜 필수인가** (#214). 검출기 풀이 크기를 이 한도에서 유도하고
+    #    (`mediapipe_detector.py:285-293`), 한도도 `POSE_DETECTOR_POOL_SIZE` 도 없으면
+    #    RuntimeError 다. 그런데 그 호출은 기동이 아니라 **StartAnalysis 에서 처음**
+    #    일어난다(`exercise_servicer.py:110`) — 즉 **한도 없이 뜬 컨테이너는 `up` 도
+    #    헬스체크도 통과한 뒤 첫 사용자에게 실패를 준다.**
+    #
+    #    ⚠️ **그 실패는 이 파일에서는 더 이상 안 일어난다.** 아래 `${AI_MEM_LIMIT:?…}` 가
+    #    값이 없으면 **컨테이너를 만들기 전에 `up` 을 멈춘다.** 위 「첫 세션에서 죽는다」는
+    #    **compose 를 안 거치는 배포 경로**(직접 `docker run`, k8s 매니페스트 등 한도를
+    #    안 거는 경우)에 남아 있는 위험이고, 여기서는 그 경로를 막는 것이 목적이다.
+    #
+    #    그래서 **기본값을 두지 않고 명시를 요구한다**(위 토큰들과 같은 규약). 운영 대상
+    #    호스트가 아직 0대라 «몇 MB가 맞나» 는 배포 형태에 달려 있고(`docs/19-deployment.md:289`),
+    #    여기에 로컬 기본값(1536m)을 흘리면 그게 출처 없는 운영 기준값이 된다.
+    #
+    #    값 유도(dev compose 주석과 같은 실측): 검출기 1개 **98.7MB** · 기본 RSS **100.5MB**
+    #      한도 = 100.5MB + 98.7MB × 동시 세션 수
+    #
+    #    🔴 **이 공식대로 «딱 맞추면» 안 된다 — 여유를 둘 것.** 공식은 **검출기만** 센다.
+    #    `memory_ceiling()` 이 스스로 경고한다: *"프레임 버퍼·base64 임시·파이썬 힙·gRPC 는
+    #    미측정이라 안 뺐다. 그러니 컨테이너 한도 자체에 여유를 두라."* 딱 맞추면 풀이 세션을
+    #    거절하기 **전에** 컨테이너가 OOM 으로 죽는다 — 그러면 실패 방향이 «세션이 덜
+    #    받아짐»(안전)이 아니라 «죽음»(위험)으로 뒤집힌다.
+    #    ⚠️ **여유를 «몇 %» 로 할지는 여기 안 적는다** — 그 값이 미측정이라 숫자를 박으면
+    #    그게 출처 없는 기준값이다. 재려면 #229.
+    #
+    #    실패 방향: 작게 주면 «세션이 덜 받아짐»(돌긴 한다), 크게 주면 «안 뜸».
+    mem_limit: ${AI_MEM_LIMIT:?운영 배포에는 필수 — 검출기 풀이 이 값에서 유도된다. docs/19-deployment.md §2.1}
     environment:
       DEBUG: "false"
       TZ: Asia/Seoul
@@ -123,6 +151,10 @@ services:
       # 한다 (이슈 #134, decisions/ai-auth-token-flow.md ㄱ). 같은 값을 넣으면 분리가 무의미하다.
       AI_PUBLIC_TOKEN: ${AI_PUBLIC_TOKEN:?운영 배포에는 필수. INTERNAL_API_TOKEN 과 달라야 함}
       POSE_MODEL_COMPLEXITY: ${POSE_MODEL_COMPLEXITY:-1}
+      # 0 = 위 `mem_limit` 에서 유도(권장). 값을 주면 그 값을 쓰되 메모리 상한을 넘으면
+      # 낮춰진다(`mediapipe_detector.py:297-300`). **두 레버 중 하나는 반드시 있어야 한다** —
+      # 여기 통로를 열어두는 것은 «한도를 못 거는 배포 형태» 를 위한 탈출구다.
+      POSE_DETECTOR_POOL_SIZE: ${POSE_DETECTOR_POOL_SIZE:-0}
       BACKEND_URL: http://shadowfit-backend:8080/api/v1
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
