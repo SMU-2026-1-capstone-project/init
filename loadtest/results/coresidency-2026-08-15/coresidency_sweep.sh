@@ -66,6 +66,40 @@ REPEATS=${REPEATS:-3}               # 본판. 버림판 1은 팔마다 별도로
 #    계산해야 한다. 그리고 **3판으로는 8자리를 완전 균형 못 잡는다** — 이 치환은 상관을
 #    «없애는» 것이 아니라 «1.000 → 0.361 로 줄이는» 것이다. 결과에 그대로 적는다.
 LEVEL_SHIFT=${LEVEL_SHIFT:-2}
+
+# ── 부하기 코어 제한 (taskset 팔) — 2026-08-17 ───────────────────────────
+#
+# 🔴 **무엇을 가르려는 것인가.** 1라운드(부하기 2 vCPU)와 2라운드(4 vCPU)의 차이가 +17.7%
+#    인데, 두 라운드 사이에 **대상 박스 정지→시작**이 끼어 물리 호스트가 바뀌었을 수 있다.
+#    그래서 「부하기 구성 탓」과 「호스트 개체차 탓」이 **같이 바뀌어 안 갈린다.**
+#
+# 이 블록은 **같은 박스·같은 호스트·같은 세션 안에서** 부하기 코어 수만 흔든다:
+#    `taskset -c 0-1` (2코어)  ↔  제한 없음
+# 처리량 차이가 재현되면 원인은 **부하기 쪽**, 안 나면 그 +17.7% 는 **호스트 개체차**였다.
+#
+# 🔴 **기아 가설은 이미 기각됐다** — 두 라운드 모두 AI 가 869% 로 물리 8코어 천장에 붙어
+#    있었다(굶었다면 739% 여야 했다). 그래서 이 블록이 보는 것은 «프레임을 덜 보냈나» 가
+#    아니라 **«도착 리듬이 프레임당 비용을 올리나»** 다 — 볼 열은 `rps` 와 **AI CPU ÷ rps** 다.
+#
+# ⚠️ **완전한 재현이 아니다.** `taskset` 은 코어 수만 흉내 낸다 — 실제 c7i.large 는 네트워크
+#    대역·EBS 대역도 다르다. 「c7i.large 라운드를 재현했다」고 쓰면 안 된다.
+# ⚠️ 샘플러(ssh·docker stats)는 제한 밖에서 돈다. 실제 2 vCPU 박스에서는 그것들도 같은
+#    2코어를 나눠 썼다 — 이 블록은 그만큼 **너그러운 2코어**다.
+TASKSET_BLOCK=${TASKSET_BLOCK:-1}          # 0 이면 이 블록을 통째로 건너뛴다
+TASKSET_CPUS=${TASKSET_CPUS:-2}            # 제한할 코어 수 (0-N-1 을 준다)
+TASKSET_ARM=${TASKSET_ARM:-B}              # 옆이 «일하는» 조건에서 본다
+TASKSET_LEVELS=${TASKSET_LEVELS:-"120 160"}  # plateau — 차이가 나타나는 자리
+TASKSET_REPS=${TASKSET_REPS:-3}
+
+LOADER_CPUS=""                             # 비면 제한 없음. run_one·start_ghz 가 읽는다
+CUR_LC="full"                              # 표에 남는 이름표
+
+# 🔴 부하기에서 도는 **두 프로세스 다** 묶는다. `load_ai.py` 만 묶으면 ghz 가 남은 코어로
+#    도망가서 «2코어 박스» 가 아니라 «2코어 + 별도 코어» 가 된다.
+taskset_prefix() {
+  [ -n "$LOADER_CPUS" ] || return 0
+  echo "taskset -c 0-$((LOADER_CPUS - 1))"
+}
 STATS_SEC=${STATS_SEC:-5}           # docker stats 폴링 간격 — 관측이 대상을 흔드는 비용
 
 # ── 從 부하: Spring·MySQL (ghz SavePoseDataBatch) — #223 ─────────────────
@@ -101,7 +135,10 @@ LOG="$OUT/coresidency.tsv"
 # 🔴 `warm_lo`·`warm_hi` 는 그 판의 **정상 상태 구간을 epoch 로** 적은 것이다. 이게 없으면
 #    `stats_*.tsv`(epoch)를 요청 표(t0 기준 상대초)와 같은 축에 못 올려, 포화 구간의
 #    컨테이너별 CPU 를 사후에 못 자른다 — Q2 의 답이 거기에 있다(2026-08-16 설계 대조).
-[ -f "$LOG" ] || printf "arm\tround\tsessions\treq\trps\tdetect_pct\tp50\tp95\tp99\tnolease\tnopose\tsetup_fail\twarm_lo\twarm_hi\n" > "$LOG"
+# `loader_cpus` 는 **부하기 쪽 조건**이다(2026-08-17, taskset 팔). 본 격자는 전부 `full` 이고,
+# §T 블록만 `2` 가 섞인다 — 라운드 이름표(`lc2_*`)에도 같이 박히지만, 열로도 남겨 사후에
+# 조건으로 거를 수 있게 한다.
+[ -f "$LOG" ] || printf "arm\tround\tsessions\treq\trps\tdetect_pct\tp50\tp95\tp99\tnolease\tnopose\tsetup_fail\twarm_lo\twarm_hi\tloader_cpus\n" > "$LOG"
 
 # 🔴 ghz 결과를 본 표에 섞지 않는다. 「AI 가 몇 세션을 먹었나」와 「옆에 얼마가 걸렸나」는
 #    다른 축이고, 뭉치면 둘 다 나빠진다(README 「세 결과를 뭉치지 않는다」와 같은 규약).
@@ -276,7 +313,8 @@ start_ghz() {  # $1 = 태그.  ghz 창이 AI 측정 창을 **감싸도록** 먼�
   arm_uses_ghz "$CUR_ARM" || return 0
   local span=$(( DUR + 2 * GHZ_PAD ))
   printf '{"authorization":"Bearer %s"}' "$GHZ_TOKEN" > "$OUT/_ghz_meta.json"
-  "$GHZ_BIN" --insecure --call ExerciseService.SavePoseDataBatch \
+  # shellcheck disable=SC2046  — 제한이 없으면 빈 문자열이라 그대로 사라져야 한다
+  $(taskset_prefix) "$GHZ_BIN" --insecure --call ExerciseService.SavePoseDataBatch \
       --metadata-file "$OUT/_ghz_meta.json" --data-file "$GHZ_DATA" \
       --rps "$GHZ_RPS" -c "$GHZ_CONC" -z "${span}s" \
       -O json -o "$OUT/ghz_$1.json" "$GHZ_TARGET" > "$OUT/ghz_$1.log" 2>&1 &
@@ -708,7 +746,8 @@ run_one() {  # $1=팔 $2=라운드 $3=세션수
   # 있다 — pre·post 두 점은 둘 다 유휴 순간이라 「포화 때 옆이 어땠나」가 안 남는다.
   ( sleep $(( DUR / 2 )); snap_side "$tag" mid ) &
   local side_pid=$!
-  python "$HERE/load_ai.py" --base "$BASE" --ai "$AI" --token "$TOKEN" \
+  # shellcheck disable=SC2046  — LOADER_CPUS 가 비면 접두사가 통째로 사라진다
+  $(taskset_prefix) python "$HERE/load_ai.py" --base "$BASE" --ai "$AI" --token "$TOKEN" \
       --frames "$HERE/frames.json" --sessions "$n" --dur "$DUR" \
       --out "$OUT/req_$tag.tsv" --label "$tag"
   local rc=$?
@@ -727,13 +766,13 @@ run_one() {  # $1=팔 $2=라운드 $3=세션수
   stop_loader_stats "$tag"
   stop_stats "$tag"
   if [ $rc -ne 0 ] || [ ! -f "$OUT/req_${tag}_summary.tsv" ]; then
-    printf "%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n" "$arm" "$round" "$n" >> "$LOG"
+    printf "%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t%s\n" "$arm" "$round" "$n" "$CUR_LC" >> "$LOG"
     return 1
   fi
   # $14·$15 = warm_lo_epoch·warm_hi_epoch (load_ai.py 가 **끝에** 붙인다 — 위치로 읽으므로)
   tail -1 "$OUT/req_${tag}_summary.tsv" \
-    | awk -v a="$arm" -v r="$round" -v n="$n" -F'\t' \
-      '{printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", a,r,n,$5,$6,$7,$8,$9,$10,$11,$12,$13,$15,$16}' >> "$LOG"
+    | awk -v a="$arm" -v r="$round" -v n="$n" -v lc="$CUR_LC" -F'\t' \
+      '{printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", a,r,n,$5,$6,$7,$8,$9,$10,$11,$12,$13,$15,$16,lc}' >> "$LOG"
 }
 
 # ── 실행 ─────────────────────────────────────────────────────────────────
@@ -832,6 +871,49 @@ run_anchor() {
   reset_between
 }
 
+# ── 부하기 코어 팔 (§T) ──────────────────────────────────────────────────
+#
+# 본 격자가 다 돈 **뒤에** 붙인다. 대상 박스를 재기동하지 않으므로 이 블록 안에서는
+# 물리 호스트가 상수이고, 흔드는 것은 **부하기 코어 수 하나**다.
+# 쌍은 **붙여서** 돈다(2코어 → 전체, 같은 레벨 연속) — 그래야 시간 추세가 쌍 안에서 상쇄된다.
+# 그리고 쌍의 순서를 반복마다 뒤집는다(홀수 2→전체, 짝수 전체→2).
+run_taskset_block() {
+  [ "$TASKSET_BLOCK" = "1" ] || return 0
+  command -v taskset >/dev/null 2>&1 \
+    || { note "⚠️ 부하기에 taskset 이 없다(util-linux) — 코어 팔을 건너뛴다. 「부하기 탓 ↔ 호스트 탓」은 또 미결이다"; return 0; }
+  case " $ARMS " in
+    *" $TASKSET_ARM "*) ;;
+    *) note "⚠️ 코어 팔의 팔($TASKSET_ARM)이 ARMS 에 없다 — 건너뛴다"; return 0 ;;
+  esac
+  local ncpu; ncpu=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+  if [ "$ncpu" -le "$TASKSET_CPUS" ]; then
+    note "⚠️ 부하기가 ${ncpu}코어라 «제한 $TASKSET_CPUS» 와 «전체» 가 같은 조건이다 — 건너뛴다"
+    note "   이 블록은 **부하기가 더 큰 박스**여야 뜻이 있다(2라운드 무대는 c7i.xlarge = 4)"
+    return 0
+  fi
+
+  step "§T 부하기 코어 팔 — 팔 $TASKSET_ARM · 레벨 '$TASKSET_LEVELS' · ${TASKSET_REPS}쌍 (${TASKSET_CPUS}코어 ↔ 전체 ${ncpu}코어)"
+  apply_arm "$TASKSET_ARM" || return 1
+  sleep 20
+  reset_sessions
+  local rep n which first second
+  for rep in $(seq 1 "$TASKSET_REPS"); do
+    if [ $((rep % 2)) -eq 1 ]; then first=lc2; second=lcF; else first=lcF; second=lc2; fi
+    for n in $TASKSET_LEVELS; do
+      for which in $first $second; do
+        if [ "$which" = "lc2" ]; then
+          LOADER_CPUS=$TASKSET_CPUS; CUR_LC=$TASKSET_CPUS
+        else
+          LOADER_CPUS=""; CUR_LC=full
+        fi
+        run_one "$TASKSET_ARM" "${which}_t$rep" "$n" || true
+        reset_between
+      done
+    done
+  done
+  LOADER_CPUS=""; CUR_LC="full"
+}
+
 for r in $(seq 1 "$REPEATS"); do
   run_anchor                        # 라운드 시작마다 하나 — 마지막 하나는 루프 뒤에
   step "라운드 r$r — 팔 순서 $(rotate_arms "$((r - 1))") · 레벨 순서 $(rotate_levels "$r")"
@@ -860,6 +942,7 @@ for r in $(seq 1 "$REPEATS"); do
 done
 
 run_anchor                          # 끝 — 이것이 있어야 라운드 «전 구간» 을 감싼다
+run_taskset_block                   # §T — 같은 호스트에서 부하기 코어만 흔든다
 
 echo; echo "════ 요약 ════"; cat "$LOG"
 echo
@@ -878,3 +961,6 @@ echo "   · probe_rtt.tsv 의 p50 ↔ coresidency.tsv 의 p50 → **두 시계**
 echo "     부하기 413ms 인데 로컬 50ms 면 큐는 «부하기 쪽», 둘 다 413ms 면 «서버» 다."
 echo "     window 칸이 warm 이 아니면 두 값을 같은 창에서 읽은 것이 아니다 — 비교 금지"
 echo "   · caps.tsv → 팔 C 의 캡이 실제로 물렸는지(#253). verdict 가 OK 가 아닌 판은 조건이 다르다"
+echo "   · round=lc2_t*/lcF_t* → **부하기 코어 팔**(§T). 같은 레벨의 두 판을 짝으로 읽는다:"
+echo "     차이가 나면 «부하기 구성», 없으면 라운드 간 +17.7% 는 «호스트 개체차» 였다는 뜻이다"
+echo "     🔴 볼 것은 rps 만이 아니라 **AI CPU ÷ rps**(프레임당 비용)다 — 기아는 이미 기각됐다"

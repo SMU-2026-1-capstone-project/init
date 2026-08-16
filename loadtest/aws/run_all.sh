@@ -118,6 +118,14 @@ CORES_REH_ANCHOR_LEVEL=${CORES_REH_ANCHOR_LEVEL:-10}  # 리허설 격자(5·10)�
 # 이게 없으면 「천장이 서버인가 부하기인가」가 CPU 지표만으로는 안 갈린다(2라운드가 실증).
 CORES_PROBE=${CORES_PROBE:-1}
 CORES_PROBE_PREFIX=${CORES_PROBE_PREFIX:-probe}   # 부하기 계정(cores*)과 갈라야 한다
+# §T 부하기 코어 팔 — 「부하기 구성 탓」과 「대상 박스 물리 호스트 개체차 탓」을 가른다.
+# 같은 세션·같은 호스트에서 부하기 코어 수만 흔든다(taskset). 상세는 sweep 의 §T 주석.
+CORES_TASKSET=${CORES_TASKSET:-1}
+CORES_TASKSET_CPUS=${CORES_TASKSET_CPUS:-2}       # 1라운드 무대(c7i.large)와 같은 코어 수
+CORES_TASKSET_ARM=${CORES_TASKSET_ARM:-B}
+CORES_TASKSET_LEVELS=${CORES_TASKSET_LEVELS:-"120 160"}
+CORES_TASKSET_REPS=${CORES_TASKSET_REPS:-3}
+CORES_REH_TASKSET_LEVELS=${CORES_REH_TASKSET_LEVELS:-"10"}  # 리허설 격자에 맞춘 값
 CORES_REH_LEVELS=${CORES_REH_LEVELS:-"5 10"} # 축소 리허설 — README 「무인 실행 전 필수」
 CORES_REH_DUR=${CORES_REH_DUR:-20}
 
@@ -389,6 +397,21 @@ phase_coresidency_preflight() {
   local nofile; nofile=$(ulimit -n 2>/dev/null)
   note "부하기 ulimit -n = ${nofile:-?} (최고 레벨 ${CORES_LEVELS##* }세션)"
 
+  # §T — 부하기 코어 팔은 **부하기가 제한값보다 커야** 뜻이 있다. 2 vCPU 박스에서 «2코어 제한»
+  #      과 «전체» 는 같은 조건이고, 그러면 「부하기 탓 ↔ 호스트 탓」이 또 안 갈린다.
+  if [ "$CORES_TASKSET" = "1" ]; then
+    local lcpu; lcpu=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+    if ! command -v taskset >/dev/null 2>&1; then
+      note "🔴 부하기에 taskset 이 없다(util-linux) — §T 코어 팔이 통째로 안 돈다"; ok=1
+    elif [ "$lcpu" -le "$CORES_TASKSET_CPUS" ]; then
+      note "🔴 부하기가 ${lcpu}코어 — «제한 $CORES_TASKSET_CPUS» 와 «전체» 가 같은 조건이다."
+      note "   더 큰 부하기(c7i.xlarge 이상)로 띄우거나 CORES_TASKSET=0 으로 «안 가른다» 를 명시할 것"
+      ok=1
+    else
+      note "✅ §T 코어 팔 — 부하기 ${lcpu}코어 · 제한 ${CORES_TASKSET_CPUS}코어로 대조"
+    fi
+  fi
+
   if [ -n "$TARGET_SSH" ]; then
     if $TARGET_SSH "test -d $TARGET_REPO_DIR && docker ps >/dev/null 2>&1" 2>/dev/null; then
       note "✅ 대상 박스 도달 — $TARGET_REPO_DIR · docker 사용 가능"
@@ -565,6 +588,39 @@ cores_assert_probe() {  # $1 = probe_rtt.tsv
     }' "$tsv"
 }
 
+# §T — 부하기 코어 팔. 「돌았나」와 「쌍이 성립했나」는 다르다: 한쪽 조건만 남으면 대조가
+#      없는 것이고, 그러면 「부하기 탓 ↔ 호스트 탓」이 이번에도 안 갈린다.
+#      🔴 기아 가설은 이미 기각됐으므로(AI CPU 등가) 여기서 볼 것은 **처리량 차이**다 —
+#         차이가 나면 부하기 구성이 결과를 움직인다는 뜻이고, 안 나면 라운드 간 +17.7% 는
+#         호스트 개체차 쪽으로 기운다.
+cores_assert_taskset() {  # $1 = coresidency.tsv
+  local tsv=$1
+  [ "$CORES_TASKSET" = "1" ] || { note "§T 코어 팔 꺼짐(CORES_TASKSET=0)"; return 0; }
+  [ -f "$tsv" ] || { note "🔴 결과 표가 없다: $tsv"; return 1; }
+  awk -F'\t' '
+    NR>1 && $2 ~ /^lc(2|F)_t/ {
+      rows++
+      key = ($2 ~ /^lc2_/) ? "lc2" : "lcF"
+      if ($4 == "FAIL" || $4+0 == 0) { bad++; next }
+      cnt[key]++; sum[key] += $5+0
+      lv[$3] = 1
+    }
+    END {
+      if (rows == 0) {
+        print "     §T 판이 없다 — 부하기가 작거나 taskset 이 없어 스윕이 건너뛴 것이다(그 사유는 스윕 로그에)"
+        exit 0
+      }
+      printf "     §T %d판 (제한 %d · 전체 %d · 성립 안 함 %d)\n", rows, cnt["lc2"]+0, cnt["lcF"]+0, bad+0
+      if (cnt["lc2"]+0 == 0 || cnt["lcF"]+0 == 0) {
+        print "  🔴 한쪽 조건만 남았다 — 대조가 성립하지 않는다"
+        exit 1
+      }
+      a = sum["lc2"]/cnt["lc2"]; b = sum["lcF"]/cnt["lcF"]
+      printf "  ✅ §T 성립 — 제한 %.1f fps ↔ 전체 %.1f fps (차 %+.1f%%)\n", a, b, 100*(a-b)/b
+      print  "     차이가 크면 «부하기 구성 탓», 없으면 라운드 간 +17.7% 는 «호스트 개체차» 쪽이다"
+    }' "$tsv"
+}
+
 cores_assert_loader() {  # $1 = 결과 디렉터리
   local dir=$1 n
   n=$(ls "$dir"/loader_*.tsv 2>/dev/null | wc -l)
@@ -645,6 +701,8 @@ phase_coresidency_rehearsal() {
       LEVEL_SHIFT="$CORES_LEVEL_SHIFT" ANCHOR="$CORES_ANCHOR" \
       ANCHOR_ARM="$CORES_ANCHOR_ARM" ANCHOR_LEVEL="$CORES_REH_ANCHOR_LEVEL" \
       PROBE="$CORES_PROBE" PROBE_PREFIX="$CORES_PROBE_PREFIX" \
+      TASKSET_BLOCK="$CORES_TASKSET" TASKSET_CPUS="$CORES_TASKSET_CPUS" \
+      TASKSET_ARM="$CORES_TASKSET_ARM" TASKSET_LEVELS="$CORES_REH_TASKSET_LEVELS" TASKSET_REPS=1 \
       GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
       GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
       MYSQL_USER=root MYSQL_PW="$PW" \
@@ -664,6 +722,8 @@ phase_coresidency_rehearsal() {
   cores_assert_loader "$out" || return 1
   # 두 시계가 같은 창에서 읽혔는지 (설계 §4-2). 이게 없으면 「서버인가 부하기인가」가 또 미결이다.
   cores_assert_probe "$out/probe_rtt.tsv" || return 1
+  # §T 코어 팔의 쌍이 성립하는지. 리허설에서 경로를 밟아둬야 본판에서 한쪽만 남는 일이 없다.
+  cores_assert_taskset "$out/coresidency.tsv" || return 1
   return 0
 }
 
@@ -688,6 +748,9 @@ phase_coresidency() {
       LEVEL_SHIFT="$CORES_LEVEL_SHIFT" ANCHOR="$CORES_ANCHOR" \
       ANCHOR_ARM="$CORES_ANCHOR_ARM" ANCHOR_LEVEL="$CORES_ANCHOR_LEVEL" \
       PROBE="$CORES_PROBE" PROBE_PREFIX="$CORES_PROBE_PREFIX" \
+      TASKSET_BLOCK="$CORES_TASKSET" TASKSET_CPUS="$CORES_TASKSET_CPUS" \
+      TASKSET_ARM="$CORES_TASKSET_ARM" TASKSET_LEVELS="$CORES_TASKSET_LEVELS" \
+      TASKSET_REPS="$CORES_TASKSET_REPS" \
       GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
       GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
       MYSQL_USER=root MYSQL_PW="$PW" \
@@ -706,6 +769,8 @@ phase_coresidency() {
     || note "⚠️ 부하기 지표가 빈다 — 「천장이 서버인가 부하기인가」가 세 번째로 미결이다 (#250)"
   cores_assert_probe "$out/probe_rtt.tsv" \
     || note "⚠️ 서버 쪽 시계가 없다 — 이 라운드도 «서버가 느린 것»과 «부하기가 느린 것»을 못 가른다"
+  cores_assert_taskset "$out/coresidency.tsv" \
+    || note "⚠️ §T 코어 팔의 대조가 안 섰다 — 「부하기 탓 ↔ 호스트 개체차」는 이번에도 미결이다"
   return 0
 }
 
@@ -800,6 +865,7 @@ phase_collect() {
       echo "동거 팔       : ARMS='$CORES_ARMS' LEVELS='$CORES_LEVELS' DUR=${CORES_DUR}s REPEATS=$CORES_REPEATS"
       echo "동거 배열     : LEVEL_SHIFT=$CORES_LEVEL_SHIFT (레벨 순서 치환 #252) · ANCHOR=$CORES_ANCHOR ${CORES_ANCHOR_ARM}@${CORES_ANCHOR_LEVEL}세션"
       echo "자기 프로브   : PROBE=$CORES_PROBE (대상 박스 1세션 · 계정 prefix '$CORES_PROBE_PREFIX') — 설계 §4-2"
+      echo "코어 팔(§T)   : TASKSET=$CORES_TASKSET · ${CORES_TASKSET_CPUS}코어↔전체 · 팔 $CORES_TASKSET_ARM · 레벨 '$CORES_TASKSET_LEVELS' × ${CORES_TASKSET_REPS}쌍"
       echo "⚠️ 위 «캡» 은 라운드 **종료 시점** 값이다 — 스윕이 팔마다 갈아끼우므로 마지막 팔의 상태다"
     fi
 
