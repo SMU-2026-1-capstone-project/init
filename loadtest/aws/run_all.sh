@@ -520,6 +520,36 @@ cores_assert_ghz() {  # $1 = ghz.tsv
     }' "$tsv"
 }
 
+# 🔴 부하기 지표(#250)도 같은 이유로 게이트가 필요하다. 08-15·08-16 두 라운드가 **부하기를
+#    안 걷은 채** 끝났고, 그래서 「천장이 서버인가 부하기인가」가 두 번 미결로 남았다.
+#    샘플러가 들어간 뒤에도 위험은 남는다 — `pgrep -f 'load_ai\.py'` 가 안 맞으면
+#    `load_ai_pct` 가 **전부 0** 인 표가 조용히 생기고, 파일은 있으니 «걷었다» 로 보인다.
+#    그래서 «행이 있는가» 가 아니라 **«부하기 프로세스가 실제로 보였는가»** 를 판정한다.
+cores_assert_loader() {  # $1 = 결과 디렉터리
+  local dir=$1 n
+  n=$(ls "$dir"/loader_*.tsv 2>/dev/null | wc -l)
+  [ "$n" -gt 0 ] || { note "🔴 loader_*.tsv 가 하나도 없다 — 부하기를 또 안 걷었다 (#250)"; return 1; }
+  awk -F'\t' '
+    FNR>1 {
+      rows++
+      if ($3 == "-1") neg++              # #255 — 프로세스가 창 안에서 끝난 구간
+      else if ($3+0 > 0) seen++
+      if ($2+0 > max) max = $2+0
+      if ($9 != "-1" && $9+0 > tx) tx = $9+0
+    }
+    END {
+      printf "     표본 %d행 · load_ai 가 보인 표본 %d · 못 잰 구간(-1) %d\n", rows, seen+0, neg+0
+      printf "     부하기 최대 CPU %.1f%% (100%% = 1 vCPU) · 최대 송신 %.2f Mbps\n", max+0, tx+0
+      if (rows == 0)  { print "  🔴 표본이 한 줄도 없다 — 샘플러가 안 돌았다"; exit 1 }
+      if (seen+0 == 0) {
+        print "  🔴 load_ai 프로세스가 **한 표본도** 안 보였다 — pgrep 패턴이 안 맞는 것이다"
+        print "     이대로면 부하기 CPU 가 전부 0 인 표가 생기고, 「부하기는 안 붙었다」로 잘못 읽힌다"
+        exit 1
+      }
+      printf "  ✅ 부하기 계측 성립\n"
+    }' "$dir"/loader_*.tsv
+}
+
 # 🔴 「지표를 걷는 코드가 있다」와 「지표가 걷혔다」는 다르다 (#254 · #250 이 같은 자리에서
 #    두 번 막혔다). 옆(Spring·MySQL) 스냅샷은 **판정 열을 만드는 것이 존재 이유**인데,
 #    스크레이프가 조용히 실패하면 `side.tsv` 는 FAIL 행만 남고 라운드는 정상 종료한다.
@@ -589,6 +619,8 @@ phase_coresidency_rehearsal() {
   cores_assert_ghz "$out/ghz.tsv" || return 1
   # 그리고 옆 지표가 실제로 걷혔는지 (#254). 없으면 본판을 돌아도 H3 는 또 미답이다.
   cores_assert_side "$out/side.tsv" || return 1
+  # 부하기 자신도 (#250). 「파일은 있는데 전부 0」이 이 축의 실패 모드다.
+  cores_assert_loader "$out" || return 1
   return 0
 }
 
@@ -626,6 +658,8 @@ phase_coresidency() {
     || note "⚠️ 從 부하가 안 걸린 판이 있다 — 그 판의 «동거» 는 «유휴 동거» 다. 표에 그대로 적을 것"
   cores_assert_side "$out/side.tsv" \
     || note "⚠️ 옆 지표가 빈다 — H3(«캡이 옆을 지키는가»)는 이 라운드로도 못 닫는다 (#254). 결과에 그대로 적을 것"
+  cores_assert_loader "$out" \
+    || note "⚠️ 부하기 지표가 빈다 — 「천장이 서버인가 부하기인가」가 세 번째로 미결이다 (#250)"
   return 0
 }
 
