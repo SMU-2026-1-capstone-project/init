@@ -183,6 +183,7 @@ start_ghz() {  # $1 = 태그.  ghz 창이 AI 측정 창을 **감싸도록** 먼�
       --rps "$GHZ_RPS" -c "$GHZ_CONC" -z "${span}s" \
       -O json -o "$OUT/ghz_$1.json" "$GHZ_TARGET" > "$OUT/ghz_$1.log" 2>&1 &
   GHZ_PID=$!
+  echo "$GHZ_PID" > "/tmp/ghz_$1.pid"   # #250 — 부하기 샘플러가 이 PID 의 CPU 를 따로 센다
   note "從 부하 시작 — ${GHZ_RPS} req/s 고정 · c=$GHZ_CONC · ${span}s (AI 창 ${DUR}s 를 앞뒤 ${GHZ_PAD}s 로 감싼다)"
   sleep "$GHZ_PAD"
 }
@@ -293,6 +294,70 @@ start_stats() {  # $1 = 태그
 }
 stop_stats() { [ -f "/tmp/stats_$1.pid" ] && kill "$(cat "/tmp/stats_$1.pid")" 2>/dev/null; rm -f "/tmp/stats_$1.pid"; }
 
+# ── 부하기(러너 자신) 샘플러 — #250 ──────────────────────────────────────
+#
+# 🔴 **08-15·08-16 두 라운드가 대상 박스만 걷었다.** 그래서 「천장이 서버인가 부하기인가」가
+#    안 갈렸고, 팔 A↔B 대조(= 동거 비용)가 통째로 판정 불가로 끝났다 — ghz 프로세스가
+#    **부하기에서** 돌기 때문에 두 팔의 차이에 부하기 쪽 경합이 섞여 있다.
+#
+# 여기는 컨테이너가 아니므로 `docker stats` 가 아니라 `/proc` 를 직접 읽는다.
+# **`mpstat`(sysstat) 을 안 쓴다** — 부트스트랩이 깔아주지 않아서, 없으면 이 샘플러가
+# 조용히 빈 파일을 남긴다. 「걷은 줄 알았는데 안 걷혔다」가 정확히 이 이슈의 실패 모드다.
+#
+# 스케일은 **대상 쪽 `docker stats` 와 같다** — 100% = 1 vCPU. 부하기가 c7i.large(2 vCPU)
+# 이므로 **200% 가 포화**다. 판정선이 그것이다.
+LOADER_NCPU=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+LOADER_HZ=$(getconf CLK_TCK 2>/dev/null || echo 100)
+
+_cpu_busy_total() {   # 전체 busy·total jiffies 를 한 줄로
+  awk '/^cpu /{idle=$5+$6; tot=0; for(i=2;i<=NF;i++) tot+=$i; print tot-idle, tot; exit}' /proc/stat
+}
+_pid_jiffies() {      # $1.. = PID 들 → utime+stime 합 (jiffies)
+  local sum=0 p uv sv
+  for p in "$@"; do
+    [ -d "/proc/$p" ] || continue
+    # utime·stime 은 14·15번째 필드인데 comm 에 공백·괄호가 들어갈 수 있어 **')' 뒤부터** 센다.
+    # `-F') '` 로 자르고 마지막 조각을 쓰면 comm 이 무엇이든 안전하다.
+    read -r uv sv <<<"$(awk -F') ' '{split($NF,f," "); print f[12], f[13]}' "/proc/$p/stat" 2>/dev/null)"
+    [ -n "${uv:-}" ] && [ -n "${sv:-}" ] && sum=$((sum + uv + sv))
+  done
+  echo "$sum"
+}
+_proc_jiffies() {     # $1 = pgrep -f 패턴 → 매칭 프로세스들의 합
+  # shellcheck disable=SC2046
+  _pid_jiffies $(pgrep -f "$1" 2>/dev/null)
+}
+_ghz_jiffies() {      # $1 = 태그 → start_ghz 가 남긴 PID 하나. 팔 A 는 파일이 없어 0
+  local f="/tmp/ghz_$1.pid"
+  [ -f "$f" ] || { echo 0; return; }
+  _pid_jiffies "$(cat "$f")"
+}
+
+start_loader_stats() {  # $1 = 태그
+  local f="$OUT/loader_$1.tsv"
+  printf 'epoch\tcpu_pct\tload_ai_pct\tghz_pct\tload1\tmem_used_mib\tmem_total_mib\n' > "$f"
+  ( b0=""; t0=""; a0=0; g0=0
+    read -r b0 t0 <<<"$(_cpu_busy_total)"
+    a0=$(_proc_jiffies 'load_ai\.py'); g0=$(_ghz_jiffies "$1")
+    while :; do
+      sleep "$STATS_SEC"
+      read -r b1 t1 <<<"$(_cpu_busy_total)"
+      a1=$(_proc_jiffies 'load_ai\.py'); g1=$(_ghz_jiffies "$1")
+      dt=$((t1 - t0)); db=$((b1 - b0))
+      if [ "$dt" -gt 0 ]; then
+        awk -v e="$(date +%s)" -v db="$db" -v dt="$dt" -v da="$((a1 - a0))" -v dg="$((g1 - g0))" \
+            -v n="$LOADER_NCPU" -v hz="$LOADER_HZ" -v s="$STATS_SEC" \
+            -v l1="$(awk '{print $1}' /proc/loadavg)" \
+            -v mem="$(awk '/^MemTotal/{t=$2}/^MemAvailable/{a=$2}
+                           END{ if (t=="" || a=="") printf "-1\t-1";      # 🔴 MemAvailable 이 없으면
+                                else printf "%.1f\t%.1f",(t-a)/1024,t/1024 }' /proc/meminfo)" \
+            'BEGIN{printf "%s\t%.1f\t%.1f\t%.1f\t%s\t%s\n", e, 100*db/dt*n, 100*da/(hz*s), 100*dg/(hz*s), l1, mem}' >> "$f"
+      fi
+      b0=$b1; t0=$t1; a0=$a1; g0=$g1
+    done ) & echo $! > "/tmp/loader_$1.pid"
+}
+stop_loader_stats() { [ -f "/tmp/loader_$1.pid" ] && kill "$(cat "/tmp/loader_$1.pid")" 2>/dev/null; rm -f "/tmp/loader_$1.pid"; }
+
 # ── 한 판 ────────────────────────────────────────────────────────────────
 run_one() {  # $1=팔 $2=라운드 $3=세션수
   # 🔴 `local a=$1 b=$2 t="${a}_${b}"` 로 한 줄에 쓰면 안 된다. bash 는 `local` 의 인자
@@ -305,12 +370,14 @@ run_one() {  # $1=팔 $2=라운드 $3=세션수
   CUR_ARM=$arm; CUR_N=$n          # start_ghz·stop_ghz 가 읽는다
   echo; echo "──────── $tag ────────"
   start_stats "$tag"
+  start_loader_stats "$tag"       # #250 — 부하기 자신도 걷는다. 200% 면 부하기가 천장이다
   start_ghz "$tag"                # 팔 A 는 그냥 지나간다(정의상 유휴)
   python "$HERE/load_ai.py" --base "$BASE" --ai "$AI" --token "$TOKEN" \
       --frames "$HERE/frames.json" --sessions "$n" --dur "$DUR" \
       --out "$OUT/req_$tag.tsv" --label "$tag"
   local rc=$?
   stop_ghz "$tag"
+  stop_loader_stats "$tag"
   stop_stats "$tag"
   if [ $rc -ne 0 ] || [ ! -f "$OUT/req_${tag}_summary.tsv" ]; then
     printf "%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n" "$arm" "$round" "$n" >> "$LOG"
