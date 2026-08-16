@@ -199,6 +199,13 @@ def main():
 
     print(f"측정 — 동시 세션 {a.sessions} · {a.fps}fps · {a.dur}초")
     t0 = time.monotonic()
+    # 🔴 **벽시계 시각을 같이 잡는다** (2026-08-16, 설계 §4 대조에서 잡혔다).
+    #    요청 표는 t0 기준 상대초인데 `docker stats` 샘플러는 epoch 로 찍는다
+    #    (`coresidency_sweep.sh` start_stats). 둘을 잇는 축이 없으면 **포화 구간의
+    #    컨테이너별 CPU 를 사후에 못 자른다** — 그게 바로 Q2(무엇이 먼저 뺏는가)의 답이고,
+    #    從 R5(#229)의 «N=0 기동 직후 RSS» 구간도 같은 이유로 못 집는다.
+    #    판 전체 평균으로 뭉개면 워밍업·램프 구간이 섞인다.
+    epoch0 = time.time()
     ths = [threading.Thread(target=session_worker,
                             args=(i, a.base, a.ai, toks[i], a.exercise_id, frames, a.fps, t0, a.token,
                                   a.attach_sec),
@@ -228,7 +235,13 @@ def main():
     span = max(r[0] for r in warm) - min(r[0] for r in warm) or 1.0
     ok = kinds.get("ok", 0)
 
+    # 정상 상태 구간의 **절대** 경계. `docker stats` 를 이 구간으로 잘라야 귀속이 성립한다.
+    warm_lo = epoch0 + min(r[0] for r in warm)
+    warm_hi = epoch0 + max(r[0] for r in warm)
+
     print()
+    print(f"  측정창(epoch) 시작 {epoch0:.1f} · 정상구간 {warm_lo:.1f} ~ {warm_hi:.1f}"
+          f"  ← stats_*.tsv 를 이 구간으로 자를 것")
     print(f"  요청 {len(warm)} (정상구간 {span:.0f}s) · 처리 {len(warm)/span:.1f}/s · 검출성공 {ok/len(warm)*100:.1f}%")
     print(f"  지연 p50 {pct(ms,50):.0f}ms · p95 {pct(ms,95):.0f}ms · p99 {pct(ms,99):.0f}ms · 평균 {statistics.mean(ms):.0f}ms")
     print(f"  분류 {kinds}")
@@ -239,15 +252,20 @@ def main():
 
     if a.out:
         with open(a.out, "w") as fp:
-            fp.write("t_rel\tsession\tms\toutcome\n")
+            # t_abs 는 **뒤에** 붙인다 — 앞에 끼우면 이 표를 읽는 눈·도구가 열을 하나씩 밀려 읽는다.
+            fp.write("t_rel\tsession\tms\toutcome\tt_abs\n")
             for r in ROWS:
-                fp.write(f"{r[0]}\t{r[1]}\t{r[2]}\t{r[3]}\n")
+                fp.write(f"{r[0]}\t{r[1]}\t{r[2]}\t{r[3]}\t{epoch0 + r[0]:.3f}\n")
         summ = a.out.replace(".tsv", "") + "_summary.tsv"
         with open(summ, "w") as fp:
-            fp.write("label\tsessions\tfps\tdur\treq\trps\tdetect_pct\tp50\tp95\tp99\tnolease\tnopose\tsetup_fail\n")
+            # 🔴 새 열은 **끝에만** 붙인다. `coresidency_sweep.sh` 가 이 표의 $5~$13 을 위치로
+            #    읽어 본 표에 옮기므로(run_one), 중간에 끼우면 표가 조용히 어긋난다.
+            fp.write("label\tsessions\tfps\tdur\treq\trps\tdetect_pct\tp50\tp95\tp99\tnolease\tnopose\tsetup_fail\t"
+                     "t0_epoch\twarm_lo_epoch\twarm_hi_epoch\n")
             fp.write(f"{a.label}\t{a.sessions}\t{a.fps}\t{a.dur}\t{len(warm)}\t{len(warm)/span:.2f}\t"
                      f"{ok/len(warm)*100:.2f}\t{pct(ms,50):.1f}\t{pct(ms,95):.1f}\t{pct(ms,99):.1f}\t"
-                     f"{kinds.get('nolease',0)}\t{kinds.get('nopose',0)}\t{len(SETUP_FAIL)}\n")
+                     f"{kinds.get('nolease',0)}\t{kinds.get('nopose',0)}\t{len(SETUP_FAIL)}\t"
+                     f"{epoch0:.3f}\t{warm_lo:.3f}\t{warm_hi:.3f}\n")
         print(f"  → {a.out} · {summ}")
 
 
