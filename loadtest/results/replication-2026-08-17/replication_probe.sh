@@ -39,6 +39,12 @@ head_() { printf '\n===== %s =====\n' "$*"; }
 sql()  { docker exec -i "$1" mysql $MP -N -s -e "$2"; }
 sqlv() { docker exec -i "$1" mysql $MP -e "$2"; }
 
+# SHOW REPLICA STATUS 의 한 필드를 꺼낸다.
+# 주의: `\G` 는 `-N -s`(=sql) 와 같이 쓰면 파싱이 어긋난다 — 값이 빈 문자열로 나오고,
+#       그게 「복제가 안 붙었다」 같은 엉뚱한 판정으로 뒤늦게 드러난다(이 rig 이 실제로 그랬다).
+#       반드시 정렬 출력(sqlv)에서 뽑는다.
+rstat() { sqlv "$REP" "SHOW REPLICA STATUS\G" 2>/dev/null | awk -F': *' -v k="$1" '$0 ~ "^[ ]*"k":" {print $2; exit}'; }
+
 wait_healthy() {
   local c=$1 i
   for i in $(seq 1 60); do
@@ -68,9 +74,9 @@ d0_preflight() {
     done
     echo
     echo "# 반동기 플러그인 파일 (D1 — 08-13 에 확인된 것을 이 이미지에서 재확인)"
-    docker exec $SRC ls -1 /usr/lib64/mysql/plugin/ 2>/dev/null | grep -i semisync || \
-      docker exec $SRC ls -1 /usr/lib/mysql/plugin/ 2>/dev/null | grep -i semisync || \
-      echo "  (semisync .so 를 못 찾았다)"
+    echo "# plugin_dir 를 서버에 물어본다 — 경로를 하드코딩하면 이미지가 바뀔 때 조용히 빈 목록이 된다."
+    docker exec "$SRC" sh -c 'ls -1 "$(mysql -uroot -prepl -N -s -e "SELECT @@plugin_dir;" 2>/dev/null)" 2>/dev/null | grep -i semi' \
+      || echo "  (semisync .so 를 못 찾았다)"
   } | tee "$OUT/D0_preflight.txt"
 }
 
@@ -84,29 +90,25 @@ setup_replication() {
     CREATE USER IF NOT EXISTS 'repl'@'%' IDENTIFIED WITH mysql_native_password BY 'replpw';
     GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%';
     FLUSH PRIVILEGES;
-    CREATE DATABASE IF NOT EXISTS replprobe;
   " >/dev/null
 
-  # 측정 대상 표 — 「세션 종료 직후 리포트」의 대역이다.
-  sqlv $SRC "
-    USE replprobe;
-    CREATE TABLE IF NOT EXISTS report_probe (
-      id BIGINT PRIMARY KEY,
-      committed_at_us BIGINT NOT NULL
-    ) ENGINE=InnoDB;
-    CREATE TABLE IF NOT EXISTS heartbeat (
-      id INT PRIMARY KEY,
-      beat_us BIGINT NOT NULL
-    ) ENGINE=InnoDB;
-    INSERT INTO heartbeat (id, beat_us) VALUES (1, 0)
-      ON DUPLICATE KEY UPDATE beat_us = VALUES(beat_us);
-  " >/dev/null
+  # 🔴 스키마는 좌표를 잡은 «뒤» 에 만든다.
+  #    먼저 만들면 그 DDL 이 복제 시작 지점보다 앞서서 리플리카에 영영 안 간다. 그러면
+  #    리플리카는 DB 자체가 없고, 적용 스레드가 errno 1049(Unknown database)로 죽는다.
+  #    — 이 rig 이 실제로 그랬고, 증상은 «하트비트가 전부 NA» 라는 엉뚱한 얼굴로 나타났다.
+  #    좌표 뒤에 만들면 DDL 이 복제를 타고 넘어가므로 스키마 전파까지 같이 검증된다.
 
-  # 소스의 현재 좌표를 잡는다. 8.0 은 SHOW MASTER STATUS / SHOW BINARY LOG STATUS 둘 다 쓰인다.
-  local pos file
-  file=$(sql $SRC "SHOW MASTER STATUS\G" | awk '/File:/{print $2}')
-  pos=$(sql $SRC  "SHOW MASTER STATUS\G" | awk '/Position:/{print $2}')
+  # 소스의 현재 좌표를 잡는다.
+  # ⚠️ `\G` 는 `-N -s` 와 같이 쓰면 파싱이 어긋난다 — 빈 값이 나오고, 그 빈 값이 한참 뒤
+  #    CHANGE REPLICATION SOURCE TO 의 문법 오류로 드러난다. 탭 구분 한 줄로 받는다.
+  local pos file coord
+  coord=$(sql $SRC "SHOW MASTER STATUS;")
+  file=$(printf '%s' "$coord" | awk '{print $1}')
+  pos=$(printf  '%s' "$coord" | awk '{print $2}')
   log "소스 좌표 file=$file pos=$pos"
+  if [ -z "$file" ] || [ -z "$pos" ]; then
+    echo "!! 소스 좌표를 못 읽었다 — 복제를 붙일 수 없다" >&2; return 1
+  fi
 
   sqlv $REP "
     STOP REPLICA;
@@ -121,13 +123,46 @@ setup_replication() {
 
   sleep 3
   local io sqlt
-  io=$(sql $REP   "SHOW REPLICA STATUS\G" | awk -F': *' '/Replica_IO_Running:/{print $2}')
-  sqlt=$(sql $REP "SHOW REPLICA STATUS\G" | awk -F': *' '/Replica_SQL_Running:/{print $2}')
+  io=$(rstat Replica_IO_Running)
+  sqlt=$(rstat Replica_SQL_Running)
   log "IO=$io SQL=$sqlt"
   if [ "$io" != "Yes" ] || [ "$sqlt" != "Yes" ]; then
     sqlv $REP "SHOW REPLICA STATUS\G" | sed -n '1,60p' | tee "$OUT/_replica_status_fail.txt"
     echo "!! 복제가 안 붙었다" >&2; return 1
   fi
+
+  # 이제 스키마를 만든다 — 복제를 타고 리플리카로 간다.
+  # 측정 대상 표 «report_probe» 는 「세션 종료 직후 리포트」의 대역이다.
+  sqlv $SRC "
+    CREATE DATABASE IF NOT EXISTS replprobe;
+    USE replprobe;
+    CREATE TABLE IF NOT EXISTS report_probe (
+      id BIGINT PRIMARY KEY,
+      committed_at_us BIGINT NOT NULL
+    ) ENGINE=InnoDB;
+    CREATE TABLE IF NOT EXISTS heartbeat (
+      id INT PRIMARY KEY,
+      beat_us BIGINT NOT NULL
+    ) ENGINE=InnoDB;
+    INSERT INTO heartbeat (id, beat_us) VALUES (1, 0)
+      ON DUPLICATE KEY UPDATE beat_us = VALUES(beat_us);
+  " >/dev/null
+
+  # 스키마가 실제로 건너갔는지 확인한다. 이걸 안 보면 아래 측정이 전부 «NA» 로 나오고,
+  # 그 NA 를 지연으로 오독하게 된다.
+  local i ok=0
+  for i in $(seq 1 20); do
+    if [ "$(sql $REP "SELECT COUNT(*) FROM information_schema.tables
+                      WHERE table_schema='replprobe' AND table_name IN ('report_probe','heartbeat');" 2>/dev/null || echo 0)" = "2" ]; then
+      ok=1; break
+    fi
+    sleep 1
+  done
+  if [ "$ok" != "1" ]; then
+    sqlv $REP "SHOW REPLICA STATUS\G" | sed -n '1,60p' | tee "$OUT/_replica_status_fail.txt"
+    echo "!! 스키마가 리플리카로 안 갔다" >&2; return 1
+  fi
+  log "스키마 전파 확인 — 리플리카에 report_probe·heartbeat 있음"
 }
 
 now_us() { date +%s%6N; }
@@ -156,7 +191,7 @@ arm_c_positive_control() {
       rep_beat=$(sql $REP "SELECT beat_us FROM replprobe.heartbeat WHERE id=1;" 2>/dev/null || echo 0)
       # 리플리카가 들고 있는 beat 가 «지금» 보다 얼마나 과거인가 = 실제 지연
       lag=$(awk -v n="$(now_us)" -v b="${rep_beat:-0}" 'BEGIN{ if(b==0){print "NA"} else {printf "%.2f", (n-b)/1000000} }')
-      sbs=$(sql $REP "SHOW REPLICA STATUS\G" | awk -F': *' '/Seconds_Behind_Source:/{print $2}')
+      sbs=$(rstat Seconds_Behind_Source)
       printf '%-10s %-16s %-22s\n' "$i" "$lag" "${sbs:-NA}"
     done
   } | tee "$OUT/C_positive_control.txt"
@@ -221,7 +256,9 @@ q4_semisync_degrade() {
   # §7 함정: 8.0.26+ 신 이름(semisync_source.so)과 구 이름(semisync_master.so)이 둘 다 있다.
   # 혼용하면 «켰다고 생각했는데 안 켜진» 상태가 된다 → 켠 뒤 status 로 반드시 확인한다.
   local plug_src plug_rep
-  if docker exec $SRC ls /usr/lib64/mysql/plugin/semisync_source.so >/dev/null 2>&1; then
+  # 🔴 이 이미지에는 신 이름과 구 이름이 **둘 다** 들어 있다(D0 확인). 아무거나 INSTALL 하면
+  #    「켰다고 생각했는데 안 켜진」 상태가 만들어진다 — 그래서 켠 뒤 status 로 반드시 확인한다.
+  if docker exec "$SRC" sh -c 'test -f "$(mysql -uroot -prepl -N -s -e "SELECT @@plugin_dir;" 2>/dev/null)/semisync_source.so"' >/dev/null 2>&1; then
     plug_src="rpl_semi_sync_source SONAME 'semisync_source.so'"
     plug_rep="rpl_semi_sync_replica SONAME 'semisync_replica.so'"
     SRC_PREFIX="rpl_semi_sync_source"; REP_PREFIX="rpl_semi_sync_replica"
@@ -307,8 +344,8 @@ q5_sbs_lies() {
       sqlv $SRC "UPDATE replprobe.heartbeat SET beat_us=$beat WHERE id=1;" >/dev/null
       rep_beat=$(sql $REP "SELECT beat_us FROM replprobe.heartbeat WHERE id=1;" 2>/dev/null || echo 0)
       lag=$(awk -v n="$(now_us)" -v b="${rep_beat:-0}" 'BEGIN{ if(b==0){print "NA"} else {printf "%.2f", (n-b)/1000000} }')
-      sbs=$(sql $REP "SHOW REPLICA STATUS\G" | awk -F': *' '/Seconds_Behind_Source:/{print $2}')
-      io=$(sql $REP  "SHOW REPLICA STATUS\G" | awk -F': *' '/Replica_IO_Running:/{print $2}')
+      sbs=$(rstat Seconds_Behind_Source)
+      io=$(rstat Replica_IO_Running)
       printf '%-8s %-12s %-22s %-10s\n' \
         "$(awk -v a="$t0" -v b="$(now_us)" 'BEGIN{printf "%.1f", (b-a)/1000000}')" \
         "$lag" "${sbs:-NA}" "${io:-NA}"
@@ -317,7 +354,7 @@ q5_sbs_lies() {
     echo
     sqlv $REP "START REPLICA IO_THREAD;" >/dev/null
     sleep 3
-    echo "IO 복구 후 SBS=$(sql $REP "SHOW REPLICA STATUS\G" | awk -F': *' '/Seconds_Behind_Source:/{print $2}')"
+    echo "IO 복구 후 SBS=$(rstat Seconds_Behind_Source)"
   } | tee "$OUT/Q5_sbs.txt"
 }
 
