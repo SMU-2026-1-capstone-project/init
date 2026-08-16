@@ -215,15 +215,28 @@ assert_caps() {  # $1 = 팔
     return 1
   fi
 
+  # 🔴 기대값은 **루프 앞에서 한 번에** 읽는다. `while read ... <<EOF` 안에서 `$SSH` 를 부르면
+  #    그 ssh 가 **heredoc 을 먹어서** 루프가 첫 줄만 돌고 끝난다(-n 없는 ssh 의 기본 동작).
+  #    2026-08-17 리허설 준비 중에 잡았다 — 팔 C 에서만 터지는 자리라 사후엔 «캡이 한 컨테이너만
+  #    확인됐다» 로 보였을 것이다.
+  local env_ai="" env_be="" env_my=""
+  if [ "$want" = 1 ]; then
+    local envline
+    envline=$($SSH "grep -hE '^(AI_CPUS|BACKEND_CPUS|MYSQL_CPUS)=' $REPO_DIR/.env | tr '\n' ' '" 2>/dev/null | tr -d "\r\"'")
+    env_ai=$(printf '%s\n' "$envline"  | tr ' ' '\n' | sed -n 's/^AI_CPUS=//p'      | head -1)
+    env_be=$(printf '%s\n' "$envline"  | tr ' ' '\n' | sed -n 's/^BACKEND_CPUS=//p' | head -1)
+    env_my=$(printf '%s\n' "$envline"  | tr ' ' '\n' | sed -n 's/^MYSQL_CPUS=//p'   | head -1)
+  fi
+
   while read -r name nano; do
     [ -n "$name" ] || continue
     name=${name#/}
     expv="-"; expn=""
     if [ "$want" = 1 ]; then
       case $name in
-        shadowfit-ai)      expv=$($SSH "grep -E '^AI_CPUS=' $REPO_DIR/.env      | cut -d= -f2" 2>/dev/null | tr -d '\r"'"'"' ') ;;
-        shadowfit-backend) expv=$($SSH "grep -E '^BACKEND_CPUS=' $REPO_DIR/.env | cut -d= -f2" 2>/dev/null | tr -d '\r"'"'"' ') ;;
-        *)                 expv=$($SSH "grep -E '^MYSQL_CPUS=' $REPO_DIR/.env   | cut -d= -f2" 2>/dev/null | tr -d '\r"'"'"' ') ;;
+        shadowfit-ai)      expv=$env_ai ;;
+        shadowfit-backend) expv=$env_be ;;
+        *)                 expv=$env_my ;;
       esac
       [ -n "$expv" ] && expn=$(awk -v v="$expv" 'BEGIN{ printf "%.0f", v * 1000000000 }')
     fi
@@ -426,6 +439,8 @@ setup_probe() {
   got=$($SSH "wc -c < $PROBE_DIR/frames.json" 2>/dev/null | tr -d '[:space:]')
   if [ "$want" != "$got" ]; then
     echo "🔴 프레임 자산이 대상에 온전히 안 갔다 ($got/$want B) — 자기 프로브를 끈다" >&2
+    echo "   🔴 **\$SSH 에 \`-n\` 이 있으면 stdin 이 막혀 이 push 가 통째로 빈다**(0 B 면 십중팔구 그것이다)." >&2
+    echo "      TARGET_SSH 에서 -n 을 빼고 다시 돌릴 것 — 2026-08-17 리허설에서 실제로 이걸로 막혔다." >&2
     PROBE=0; return 0
   fi
   note "자기 프로브 준비 — $PROBE_PY · $PROBE_DIR · 프레임 $got B · 계정 prefix '$PROBE_PREFIX'"
