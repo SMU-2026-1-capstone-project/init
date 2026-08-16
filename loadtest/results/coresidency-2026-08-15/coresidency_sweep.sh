@@ -345,6 +345,134 @@ if rps and float(target) and rps < float(target):
 PY
 }
 
+# ── 자기 프로브 — 대상 박스의 시계로 같은 경로를 잰다 (설계 §4-2) ────────
+#
+# 🔴 **왜 필요한가.** 이 rig 의 plateau 는 «세션수 ÷ p50» 으로 오차 2% 안에 재현된다 —
+#    부하기가 3fps 를 페이싱하므로 왕복지연이 간격 333ms 를 넘는 순간부터 처리량이 그
+#    나눗셈으로 자동 결정된다. 즉 **「천장」은 RTT 가 333ms 를 넘는 지점**이고, 그 RTT 가
+#    서버에서 났는지 부하기에서 났는지는 **클라이언트 시계 하나로 원리적으로 안 갈린다.**
+#    2라운드가 그것을 실증했다: 부하기 CPU 는 4 vCPU 중 0.68 만 쓰는데 부하기를 키우자
+#    결과가 +17.7% 움직였다. **CPU 샘플러로는 이 축이 안 닫힌다.**
+#
+# 그래서 **대상 박스 안에서** 1세션짜리 같은 부하기를 돌린다(루프백). 판마다 두 시계가 남는다:
+#    부하기 p50 413ms  vs  로컬 p50 50ms   → 큐는 **부하기 쪽**
+#    부하기 p50 413ms  vs  로컬 p50 410ms  → **서버**
+#
+# 🔴 **계정 네임스페이스를 가른다**(`--user-prefix probe`). 안 그러면 프로브가 부하기의
+#    0번 세션과 같은 계정을 쓰고, 회원당 활성 세션 1개 제약에 걸려 **둘 중 하나가 조용히 빠진다.**
+# ⚠️ 대가: 검출기 슬롯 1개 + RSS ~107MiB + 3 req/s 를 프로브가 먹는다. **팔 A~C 전부에서
+#    같이 돌므로** 팔 간 대조에서는 상쇄된다. 조건 칸에 적는다.
+PROBE=${PROBE:-1}
+PROBE_DIR=${PROBE_DIR:-/tmp/p6probe}
+PROBE_PREFIX=${PROBE_PREFIX:-probe}
+PROBE_PY=""                          # setup_probe 가 정한다
+
+PROBE_LOG="$OUT/probe_rtt.tsv"
+[ -f "$PROBE_LOG" ] || printf "tag\tarm\tsessions\treq\trps\tdetect_pct\tp50\tp95\tp99\twindow\n" > "$PROBE_LOG"
+
+setup_probe() {
+  [ "$PROBE" = "1" ] || return 0
+  PROBE_PY=$($SSH "command -v python3 || command -v python" 2>/dev/null | head -1 | tr -d '\r')
+  if [ -z "$PROBE_PY" ]; then
+    echo "🔴 대상 박스에 python 이 없다 — 자기 프로브를 끈다. **서버 시계 없이 도는 라운드다**" >&2
+    PROBE=0; return 0
+  fi
+  # 자산은 $SSH 로 밀어 넣는다 — scp 를 따로 안 만든다(SSH 문자열에서 scp 를 유도하면 깨진다)
+  $SSH "mkdir -p $PROBE_DIR" >/dev/null 2>&1
+  $SSH "cat > $PROBE_DIR/load_ai.py" < "$HERE/load_ai.py" 2>/dev/null
+  $SSH "cat > $PROBE_DIR/frames.json" < "$HERE/frames.json" 2>/dev/null
+  # 🔴 «갔다» 를 크기로 확인한다. 반쯤 간 파일은 `ls` 에는 «있다» 로 보이고, 그러면 프로브가
+  #    판마다 죽으면서 «서버가 느리다» 가 아니라 «자료가 없다» 로 끝난다.
+  local want got
+  want=$(wc -c < "$HERE/frames.json" | tr -d '[:space:]')
+  got=$($SSH "wc -c < $PROBE_DIR/frames.json" 2>/dev/null | tr -d '[:space:]')
+  if [ "$want" != "$got" ]; then
+    echo "🔴 프레임 자산이 대상에 온전히 안 갔다 ($got/$want B) — 자기 프로브를 끈다" >&2
+    PROBE=0; return 0
+  fi
+  note "자기 프로브 준비 — $PROBE_PY · $PROBE_DIR · 프레임 $got B · 계정 prefix '$PROBE_PREFIX'"
+}
+
+start_probe() {  # $1 = 태그
+  PROBE_PID=""
+  [ "$PROBE" = "1" ] || return 0
+  # `--dur 0` = SIGTERM 까지. 판이 끝나는 시각을 미리 못 정하기 때문이다(load_ai.py 주석).
+  # 원격 PID 를 파일로 남긴다 — 로컬 ssh 를 죽여도 원격 파이썬은 안 죽는다.
+  ( $SSH "cd $PROBE_DIR && echo \$\$ > pid_$1 && exec $PROBE_PY load_ai.py \
+        --base http://127.0.0.1:8080 --ai http://127.0.0.1:8000 --token '$TOKEN' \
+        --frames frames.json --sessions 1 --dur 0 --user-prefix $PROBE_PREFIX \
+        --out $PROBE_DIR/req_$1.tsv --label probe_$1" ) > "$OUT/probe_$1.log" 2>&1 &
+  PROBE_PID=$!
+}
+
+stop_probe() {  # $1 = 태그 $2 = warm_lo(epoch) $3 = warm_hi(epoch)
+  [ "$PROBE" = "1" ] || return 0
+  [ -n "${PROBE_PID:-}" ] || return 0
+  $SSH "kill -TERM \$(cat $PROBE_DIR/pid_$1 2>/dev/null) 2>/dev/null" >/dev/null 2>&1
+  local i
+  for i in $(seq 1 30); do kill -0 "$PROBE_PID" 2>/dev/null || break; sleep 1; done
+  if kill -0 "$PROBE_PID" 2>/dev/null; then
+    echo "  ⚠️ 자기 프로브가 안 끝난다 — KILL 한다(그 판의 서버 시계는 잃는다)" >&2
+    kill "$PROBE_PID" 2>/dev/null
+  fi
+  wait "$PROBE_PID" 2>/dev/null
+
+  $SSH "cat $PROBE_DIR/req_$1.tsv" 2>/dev/null > "$OUT/probe_req_$1.tsv"
+  if [ ! -s "$OUT/probe_req_$1.tsv" ]; then
+    printf "%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\n" "$1" "$CUR_ARM" "$CUR_N" >> "$PROBE_LOG"
+    echo "  ⚠️ 자기 프로브 원본을 못 받았다 — 이 판은 «서버 시계» 가 없다 (probe_$1.log 를 볼 것)" >&2
+    return 0
+  fi
+  # 🔴 **부하기의 정상 구간으로 잘라서** 요약한다. 프로브는 판보다 먼저 시작해 계정 준비
+  #    구간(부하 없음)을 같이 담기 때문에, 안 자르면 «서버가 빠르다» 쪽으로 치우친다.
+  python - "$OUT/probe_req_$1.tsv" "$1" "$CUR_ARM" "$CUR_N" "${2:--}" "${3:--}" "$PROBE_LOG" <<'PY'
+import sys
+f, tag, arm, n, lo, hi, log = sys.argv[1:8]
+rows = []
+with open(f, encoding='utf-8') as fp:
+    next(fp, None)
+    for line in fp:
+        c = line.rstrip("\n").split("\t")
+        if len(c) < 5:
+            continue
+        try:
+            rows.append((float(c[4]), float(c[2]), c[3]))   # t_abs, ms, outcome
+        except ValueError:
+            pass
+def pct(v, p):
+    if not v: return 0.0
+    s = sorted(v); k = max(0, min(len(s) - 1, int(round((p / 100.0) * (len(s) - 1)))))
+    return s[k]
+
+# 🔴 세 상태를 **갈라서** 적는다. 뭉치면 «서버가 빨랐다» 와 «못 읽었다» 가 같은 칸에 들어간다.
+if not rows:
+    open(log, "a", encoding='utf-8').write(f"{tag}\t{arm}\t{n}\t0\t-\t-\t-\t-\t-\tempty\n")
+    print("  ⚠️ 자기 프로브 원본이 비었다 — 이 판의 서버 시계는 없다")
+    raise SystemExit(0)
+win = "full"
+if lo not in ("-", "") and hi not in ("-", ""):
+    lo_f, hi_f = float(lo), float(hi)
+    sl = [r for r in rows if lo_f <= r[0] <= hi_f]
+    if sl:
+        rows, win = sl, "warm"
+    else:
+        # 겹치는 구간이 없다. 🔴 **전 구간 값을 그 자리에 적지 않는다** — 부하 없는 구간이
+        #    섞인 p50 은 «서버가 빠르다» 로 읽히고, 그게 이 프로브를 넣은 이유를 무너뜨린다.
+        open(log, "a", encoding='utf-8').write(
+            f"{tag}\t{arm}\t{n}\t{len(rows)}\t-\t-\t-\t-\t-\tno_overlap\n")
+        print("  ⚠️ 프로브 구간이 부하기 정상 구간과 안 겹친다 — 두 시계를 같은 창에서 못 읽는다")
+        raise SystemExit(0)
+ms = [r[1] for r in rows]
+span = (max(r[0] for r in rows) - min(r[0] for r in rows)) or 1.0
+ok = sum(1 for r in rows if r[2] == "ok")
+open(log, "a", encoding='utf-8').write(
+    f"{tag}\t{arm}\t{n}\t{len(rows)}\t{len(rows)/span:.2f}\t{100.0*ok/len(rows):.2f}\t"
+    f"{pct(ms,50):.1f}\t{pct(ms,95):.1f}\t{pct(ms,99):.1f}\t{win}\n")
+if win == "no_overlap":
+    print("  ⚠️ 프로브 구간이 부하기 정상 구간과 안 겹친다 — 두 시계를 같은 창에서 못 읽는다")
+PY
+}
+
 # ── 팔이 실제로 갈리는가 ─────────────────────────────────────────────────
 #
 # 🔴 (a)안 이후 A 와 B 를 가르는 것은 **ghz 부하 하나**인데, 그 부하가 아직 이 스윕에 없다
@@ -382,11 +510,15 @@ MSG
 #    조용히 작아지고, 표에는 setup_fail 로만 남는다.
 #    2026-08-16 EC2 첫 실행에서 실제로 5세션 중 2개가 이렇게 빠졌다.
 #    부하기 계정(cores%)만 건드린다 — 從 부하의 시드 세션(901~1900)은 이미 COMPLETED 다.
+# 🔴 자기 프로브 계정(`probe%`)도 같이 푼다 (설계 §4-2). 프로브는 대상 박스에서 세션을 열고
+#    SIGTERM 으로 끝나므로 «닫고 나가는» 경로를 못 탈 때가 있다 — 그러면 그 계정이 다음
+#    판부터 409 로 막히고, 서버 시계가 조용히 사라진다.
 reset_sessions() {
   $SSH "docker exec -i -e MYSQL_PWD=$MYSQL_PW $MYSQL_CONTAINER mysql -u$MYSQL_USER shadowfit \
         -e \"UPDATE exercise_sessions s JOIN users u ON u.id = s.member_id \
              SET s.status='COMPLETED', s.end_time=NOW() \
-             WHERE s.status='IN_PROGRESS' AND u.email LIKE 'cores%@shadowfit.local';\"" \
+             WHERE s.status='IN_PROGRESS' AND (u.email LIKE 'cores%@shadowfit.local' \
+                                            OR u.email LIKE '$PROBE_PREFIX%@shadowfit.local');\"" \
     >/dev/null 2>&1 \
     || echo "  ⚠️ 남은 IN_PROGRESS 세션을 못 걷었다 — 다음 판의 세션 수가 목표보다 작아진다" >&2
 }
@@ -570,6 +702,7 @@ run_one() {  # $1=팔 $2=라운드 $3=세션수
   # CPU 는 «붙었나» 만 답하고 «부하기가 결과를 움직였나» 는 못 답한다(설계 §12-1).
   start_loader_stats "$tag"
   start_ghz "$tag"                # 팔 A 는 그냥 지나간다(정의상 유휴)
+  start_probe "$tag"              # 설계 §4-2 — 대상 박스 시계. SIGTERM 까지 돈다
   snap_side "$tag" pre            # #254 — 카운터의 원점
   # 창 한가운데 한 번 더. 🔴 게이지(threads_running·hikari pending)는 **부하 중에만** 뜻이
   # 있다 — pre·post 두 점은 둘 다 유휴 순간이라 「포화 때 옆이 어땠나」가 안 남는다.
@@ -581,6 +714,15 @@ run_one() {  # $1=팔 $2=라운드 $3=세션수
   local rc=$?
   wait "$side_pid" 2>/dev/null    # mid 가 post 보다 먼저 쓰이게 — 같은 파일에 이어 쓴다
   snap_side "$tag" post
+  # 🔴 프로브는 **부하기의 정상 구간으로 잘라서** 요약한다. 그 경계는 부하기만 안다
+  #    (요약 $15·$16 = warm_lo·warm_hi epoch). 없으면 프로브 전체 구간으로 적고 그 사실을
+  #    `window` 칸에 남긴다 — «잘랐다» 와 «못 잘랐다» 는 다른 값이다.
+  local wlo="-" whi="-"
+  if [ -f "$OUT/req_${tag}_summary.tsv" ]; then
+    wlo=$(tail -1 "$OUT/req_${tag}_summary.tsv" | awk -F'\t' '{print $15}')
+    whi=$(tail -1 "$OUT/req_${tag}_summary.tsv" | awk -F'\t' '{print $16}')
+  fi
+  stop_probe "$tag" "$wlo" "$whi"
   stop_ghz "$tag"
   stop_loader_stats "$tag"
   stop_stats "$tag"
@@ -597,6 +739,7 @@ run_one() {  # $1=팔 $2=라운드 $3=세션수
 # ── 실행 ─────────────────────────────────────────────────────────────────
 [ -f "$HERE/frames.json" ] || { echo "🔴 frames.json 이 없다 — gen_frames.py 로 먼저 만든다"; exit 1; }
 assert_arms_distinguishable || exit 1
+setup_probe   # 설계 §4-2 — 실패하면 PROBE=0 으로 내려가고, 그 사실이 로그에 남는다
 
 # 從 부하를 쓰는 팔이 하나라도 있으면, 그 부하가 **실제로 걸릴 수 있는지**를 먼저 본다.
 # 판이 다 돈 뒤에 «전부 FK 실패였다» 를 아는 것이 이 rig 에서 가장 비싼 실패다.
@@ -731,3 +874,7 @@ echo "     pre/post 는 카운터의 양 끝이다 — 게이지를 거기서 �
 echo "   · round=anc1..N → **앵커 판**. 본 격자가 아니라 «시간 축» 이다 — warm_lo 로 정렬해"
 echo "     처리량이 라운드 내내 평평한지 본다. 흐르면 팔 간 대조에 그 추세가 섞여 있는 것이다"
 echo "   · 레벨 순서는 라운드마다 치환된다(#252) — 같은 레벨이 블록 안 다른 자리에서 돈다"
+echo "   · probe_rtt.tsv 의 p50 ↔ coresidency.tsv 의 p50 → **두 시계**(설계 §4-2)."
+echo "     부하기 413ms 인데 로컬 50ms 면 큐는 «부하기 쪽», 둘 다 413ms 면 «서버» 다."
+echo "     window 칸이 warm 이 아니면 두 값을 같은 창에서 읽은 것이 아니다 — 비교 금지"
+echo "   · caps.tsv → 팔 C 의 캡이 실제로 물렸는지(#253). verdict 가 OK 가 아닌 판은 조건이 다르다"
