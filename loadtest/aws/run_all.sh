@@ -103,8 +103,9 @@ TARGET_SSH=${TARGET_SSH:-${TARGET_HOST:+ssh -o StrictHostKeyChecking=no -o Conne
 AI_PUBLIC_TOKEN=${AI_PUBLIC_TOKEN:-}
 
 CORES_ARMS=${CORES_ARMS:-"A B C"}            # D(관측 스택)를 넣으면 판이 33% 는다
-CORES_LEVELS=${CORES_LEVELS:-"20 40 60 80 120 160"}  # 2026-08-16 확정 — 설계 §5-2.
-                                             # 🔴 `coresidency_sweep.sh:43` 과 **같은 값**이어야 한다
+CORES_LEVELS=${CORES_LEVELS:-"20 40 60 80 90 100 120 160"}  # 2026-08-17 확정 — 설계 §5-3 ⑥.
+                                             # 90·100 은 천장(80~120)을 «점» 으로 짚으려고 넣었다.
+                                             # 🔴 `coresidency_sweep.sh` 의 LEVELS 와 **같은 값**이어야 한다
 CORES_DUR=${CORES_DUR:-90}
 CORES_REPEATS=${CORES_REPEATS:-3}
 CORES_REH_LEVELS=${CORES_REH_LEVELS:-"5 10"} # 축소 리허설 — README 「무인 실행 전 필수」
@@ -400,6 +401,21 @@ phase_coresidency_preflight() {
       note "✅ AI 메모리 캡 $((aimem/1024/1024))MB"
     fi
 
+    # 🔴 #254 — 옆(Spring) 지표는 **9090** 이고 compose 가 그 포트를 127.0.0.1 에만 연다.
+    #    못 긁으면 H3(«캡이 옆을 지키는가»)가 **또** 판정 열 없이 끝난다. 두 라운드가 그랬다.
+    #    백엔드가 아직 안 떠 있는 preflight 시점이면 경고만 하고, 리허설의 side 게이트가 다시 본다.
+    if $TARGET_SSH "docker ps --format '{{.Names}}' | grep -qx shadowfit-backend" 2>/dev/null; then
+      if $TARGET_SSH "curl -sf --max-time 5 http://127.0.0.1:9090/actuator/prometheus >/dev/null" 2>/dev/null; then
+        note "✅ 대상 actuator(9090) 스크레이프 가능 — H3 판정 열이 생긴다 (#254)"
+      else
+        note "🔴 대상에서 actuator(9090)를 못 긁는다 — H3 가 또 판정 열 없이 끝난다 (#254)"
+        note "   볼 곳: management.server.port=9090 · compose 의 127.0.0.1:9090 매핑 · 컨테이너 안에 curl 이 아니라 **호스트** curl 을 쓴다"
+        ok=1
+      fi
+    else
+      note "⚠️ 대상에 shadowfit-backend 가 아직 없다 — actuator 확인은 리허설의 side 게이트로 미룬다"
+    fi
+
     # 팔 C·D 는 대상 박스의 compose 가 AI_CPUS·MYSQL_CPUS·BACKEND_CPUS 를 **필수**로 읽는다
     # (`${AI_CPUS:?}`). 없으면 그 팔의 13판이 전부 죽는데, 표에는 팔 하나가 빈 것으로만 보인다.
     if echo "$CORES_ARMS" | grep -qE '(^| )(C|D)( |$)'; then
@@ -498,6 +514,41 @@ cores_assert_ghz() {  # $1 = ghz.tsv
     }' "$tsv"
 }
 
+# 🔴 「지표를 걷는 코드가 있다」와 「지표가 걷혔다」는 다르다 (#254 · #250 이 같은 자리에서
+#    두 번 막혔다). 옆(Spring·MySQL) 스냅샷은 **판정 열을 만드는 것이 존재 이유**인데,
+#    스크레이프가 조용히 실패하면 `side.tsv` 는 FAIL 행만 남고 라운드는 정상 종료한다.
+#    그 상태로 본판을 돌면 H3 는 **네 번째 라운드에도** 미답이다.
+cores_assert_side() {  # $1 = side.tsv
+  local tsv=$1
+  [ -f "$tsv" ] || { note "🔴 옆 지표 표가 없다: $tsv — H3 는 또 판정 열 없이 끝난다 (#254)"; return 1; }
+  awk -F'\t' '
+    NR>1 {
+      rows[$6]++
+      if ($8 == "FAIL") fails[$6]++
+      # 게이지는 창 한가운데 것만 뜻이 있다 — 그 한 점이 실제로 찍혔는지를 본다
+      if ($4 == "mid" && $6 == "mysql" && $7 == "Threads_running" && $8 != "FAIL") mid_gauge++
+    }
+    END {
+      bad = 0
+      for (src in rows) {
+        printf "     %s: %d행 (FAIL %d)\n", src, rows[src], fails[src]+0
+        if (rows[src] == fails[src]) { printf "  🔴 %s 스냅샷이 전부 실패했다\n", src; bad = 1 }
+      }
+      if (!("spring" in rows)) { print "  🔴 Spring(actuator) 행이 한 줄도 없다"; bad = 1 }
+      if (!("mysql"  in rows)) { print "  🔴 MySQL 행이 한 줄도 없다"; bad = 1 }
+      if (mid_gauge+0 == 0) {
+        print "  🔴 창 한가운데(mid) 게이지가 없다 — 포화 때 옆이 어땠는지가 안 남는다"
+        bad = 1
+      }
+      if (bad) {
+        print  "     이대로 본판을 돌면 H3(«캡이 옆을 지키는가»)는 이번에도 판정할 열이 없다 (#254)"
+        print  "     볼 곳: 대상 9090 도달 · MYSQL_USER/PW · SIDE_RE 가 실제 지표 이름과 맞는가"
+        exit 1
+      }
+      printf "  ✅ 옆 지표 수집 성립 (mid 게이지 %d점)\n", mid_gauge
+    }' "$tsv"
+}
+
 # 축소 리허설. **여기서 실패하면 본 측정으로 넘어가지 않는다** — 리허설의 존재 이유다.
 # README 「축소 리허설(무인 실행 전 필수)」와 같은 규모로 돈다.
 phase_coresidency_rehearsal() {
@@ -528,6 +579,8 @@ phase_coresidency_rehearsal() {
   cores_assert_usable "$out/coresidency.tsv" || return 1
   # 從 부하까지 봐야 «동거» 를 잰 것이다. AI 쪽만 성립해도 옆이 놀았으면 이 라운드는 헛돈다.
   cores_assert_ghz "$out/ghz.tsv" || return 1
+  # 그리고 옆 지표가 실제로 걷혔는지 (#254). 없으면 본판을 돌아도 H3 는 또 미답이다.
+  cores_assert_side "$out/side.tsv" || return 1
   return 0
 }
 
@@ -561,6 +614,8 @@ phase_coresidency() {
     || note "⚠️ 위 판들은 그대로 남긴다 — 지우지 말고 «성립 안 함» 으로 읽을 것"
   cores_assert_ghz "$out/ghz.tsv" \
     || note "⚠️ 從 부하가 안 걸린 판이 있다 — 그 판의 «동거» 는 «유휴 동거» 다. 표에 그대로 적을 것"
+  cores_assert_side "$out/side.tsv" \
+    || note "⚠️ 옆 지표가 빈다 — H3(«캡이 옆을 지키는가»)는 이 라운드로도 못 닫는다 (#254). 결과에 그대로 적을 것"
   return 0
 }
 
