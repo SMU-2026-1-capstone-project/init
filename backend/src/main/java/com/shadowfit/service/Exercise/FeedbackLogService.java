@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -30,6 +31,18 @@ public class FeedbackLogService {
     private final JdbcTemplate jdbcTemplate;
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
+    /** MySQL ER_NO_REFERENCED_ROW_2 — 부모 행이 없어 FK 를 못 건다. 세션 소멸의 신호다. */
+    private static final int MYSQL_NO_REFERENCED_ROW = 1452;
+
+    /**
+     * 참조 무결성 위반 SQLState — H2({@code 23503}/{@code 23506})·PostgreSQL({@code 23503}).
+     *
+     * <p>MySQL 은 무결성 위반 전부를 {@code 23000} 하나로 답해서 FK 와 NOT NULL 이 SQLState 로는
+     * 안 갈린다 — 그래서 MySQL 은 위 벤더 코드로 본다. 반대로 <b>테스트는 H2 로 돈다</b>(이
+     * 클래스의 테스트 주석). 둘 다 안 보면 운영과 테스트 중 한쪽에서 판정이 조용히 뒤집힌다.
+     */
+    private static final Set<String> REFERENTIAL_INTEGRITY_SQL_STATES = Set.of("23503", "23506");
 
     /**
      * 🔴 {@code INSERT IGNORE} 가 아니다 (이슈 #219). {@code IGNORE} 는 중복만 삼키지 않는다 —
@@ -128,13 +141,27 @@ public class FeedbackLogService {
                 }
             });
         } catch (DataIntegrityViolationException e) {
-            // 위 존재검사(:67)와 이 INSERT 사이에 세션이 사라진 경우다 — 회원 탈퇴가 users →
-            // exercise_sessions 를 CASCADE 로 지운다. 배치의 모든 행이 같은 session_id 라
-            // 이 배치는 통째로 무효이고, 부분 성공을 만들 여지가 없다.
+            // 🔴 FK 위반일 때만 «세션 소멸» 로 번역한다 (#238 리뷰 A-1).
+            //
+            // 이 catch 가 상정하는 것은 위 존재검사(:67)와 이 INSERT 사이에 세션이 사라진
+            // 경우다 — 회원 탈퇴가 users → exercise_sessions 를 CASCADE 로 지운다. 배치의 모든
+            // 행이 같은 session_id 라 이 배치는 통째로 무효이고, 부분 성공을 만들 여지가 없다.
+            //
+            // 그런데 catch 는 상위 타입을 받으므로 NOT NULL·값 범위·데이터 잘림 위반도 함께
+            // 걸린다. 그것까지 SESSION_NOT_FOUND 로 답하면 AI 는 「세션이 없어졌다」고 믿고
+            // 재전송 설계의 축 C 에 따라 <b>버퍼를 통째로 버린다</b> — 우리 쪽 값 오류 한 건이
+            // 정상 이벤트까지 없애는 셈이다(feedback-batch-retransmission.md 축 C).
             //
             // 예전에는 INSERT IGNORE 가 이걸 무음으로 만들어 «행은 사라지고 로그는 중복이라고
             // 말하는» 상태였다(#219). 사전검사와 같은 코드를 던지므로 AI 입장에서 답이 하나로
             // 통일된다 — 재시도해도 소용없음을 알 수 있다.
+            if (!isForeignKeyViolation(e)) {
+                // 세션 소멸이 아니다. 삼키지 않고 그대로 올린다 — gRPC 는 INTERNAL 로 답하고,
+                // 축 C 의 「그 외」 행이 받는다(버퍼 유지).
+                log.error("세션 {} 피드백 batch 실패 — FK 아닌 제약 위반(events={})",
+                        sessionId, events.size(), e);
+                throw e;
+            }
             log.warn("세션 {} 피드백 batch 실패 — 검사 후 세션이 사라졌다(events={})",
                     sessionId, events.size(), e);
             throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
@@ -146,6 +173,27 @@ public class FeedbackLogService {
         log.info("세션 {} 피드백 batch (set_no={}, is_final={}): inserted={}, skipped={}",
                 sessionId, request.getSetNo(), request.getIsFinal(), inserted, skipped);
         return inserted;
+    }
+
+    /**
+     * 이 무결성 위반이 <b>FK 위반</b>인가 — 즉 부모 행(세션)이 없어서 난 것인가.
+     *
+     * <p>MySQL {@code 1452}(ER_NO_REFERENCED_ROW_2)는 «자식 행을 넣으려는데 부모가 없다» 다.
+     * NOT NULL({@code 1048})·값 범위({@code 1264})·데이터 잘림({@code 1406})은 같은 Spring
+     * 예외로 올라오지만 세션 소멸과 무관하므로 여기서 갈라낸다.
+     *
+     * <p>Spring 예외는 드라이버 예외를 감싸고 있어 원인 체인을 따라 내려가야 {@code SQLException}
+     * 의 벤더 코드가 나온다.
+     */
+    private boolean isForeignKeyViolation(Throwable e) {
+        for (Throwable t = e; t != null && t.getCause() != t; t = t.getCause()) {
+            if (t instanceof SQLException sqlException
+                    && (sqlException.getErrorCode() == MYSQL_NO_REFERENCED_ROW
+                        || REFERENTIAL_INTEGRITY_SQL_STATES.contains(sqlException.getSQLState()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private int countBySession(long sessionId) {

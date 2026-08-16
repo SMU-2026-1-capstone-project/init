@@ -131,8 +131,22 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                 responseObserver.onNext(response);
                 responseObserver.onCompleted();
             } catch (com.shadowfit.global.error.BusinessException e) {
-                log.warn("피드백 batch 거부 - session={}, code={}", request.getSessionId(), e.getErrorCode().name());
-                responseObserver.onError(io.grpc.Status.INVALID_ARGUMENT
+                // 🔴 세션 소멸과 입력 오류를 <b>상태코드로</b> 가른다 (#238 리뷰 A-2).
+                //
+                // 재전송 설계(feedback-batch-retransmission.md 축 C)는 이 둘을 다른 행으로 두고
+                // 처리를 가른다 — 세션 소멸이면 버퍼를 버리고, 입력 오류면 그 건만 격리한다.
+                // 그런데 둘 다 INVALID_ARGUMENT 로 나가면 AI 가 구분할 방법이 description
+                // 문자열 파싱뿐이다. 그건 계약이 아니라 관습이고 문구가 바뀌면 조용히 깨진다.
+                //
+                // SESSION_NOT_FOUND 는 NOT_FOUND 가 맞기도 하다 — INVALID_ARGUMENT 는
+                // 「클라이언트가 잘못된 인자를 보냈다」는 뜻인데, 세션이 사라진 것은 AI 잘못이 아니다.
+                io.grpc.Status status =
+                        e.getErrorCode() == com.shadowfit.global.error.ErrorCode.SESSION_NOT_FOUND
+                                ? io.grpc.Status.NOT_FOUND
+                                : io.grpc.Status.INVALID_ARGUMENT;
+                log.warn("피드백 batch 거부 - session={}, code={}, grpcStatus={}",
+                        request.getSessionId(), e.getErrorCode().name(), status.getCode());
+                responseObserver.onError(status
                         .withDescription(e.getErrorCode().name() + ": " + e.getErrorCode().getMessage())
                         .asRuntimeException());
             } catch (Exception e) {
