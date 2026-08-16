@@ -1,0 +1,783 @@
+
+════════ 무인 측정 — coresidency-ec2-20260815-173245 ════════
+  결과   : /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245
+  S3     : s3://shadowfit-measure-055447613012/shadowfit/coresidency-ec2-20260815-173245
+  단계   : coresidency_preflight coresidency_rehearsal coresidency collect
+  자동정지: 꺼짐
+  S3 주기 동기화 시작 — 300초마다 → s3://shadowfit-measure-055447613012/shadowfit/coresidency-ec2-20260815-173245
+
+════════ coresidency_preflight ════════
+  ✅ S3 쓰기 가능 — s3://shadowfit-measure-055447613012/shadowfit/coresidency-ec2-20260815-173245
+  ✅ 대상 호스트: 172.31.36.96
+  ✅ AI_PUBLIC_TOKEN 있음
+  ✅ python: /usr/local/bin/python
+  ✅ 프레임 자산 418135 B
+  부하기 ulimit -n = 65535 (최고 레벨 160세션)
+  ✅ 대상 박스 도달 — /root/init · docker 사용 가능
+  ✅ AI 메모리 캡 20000MB
+  ✅ 팔 C 용 캡 변수 3개 확인 (.env)
+  ✅ 從 부하 19 req/s 고정 · c=50 · batch_multi.json
+  ⚠️ 인스턴스 태그를 못 읽었다 — 태그가 없거나 «메타데이터의 태그 허용» 이 꺼져 있다.
+     지금 붙일 것: aws ec2 create-tags --resources $(imds instance-id) --tags Key=Project,Value=shadowfit-measure
+  → coresidency_preflight : OK (2초)
+
+════════ coresidency_rehearsal ════════
+  게이트 G0~G3 → 축소 스윕 (LEVELS='5 10' DUR=20 REPEATS=1)
+  **이 판의 수치는 측정값이 아니다** — 경로만 본다
+════════ 동거 용량 rig — 승격 게이트 ════════
+
+──── G0. 합성 인체 사본 ↔ 원본 대조 ────
+  ✅ 사본이 원본과 글자 단위로 같다
+
+──── G1. 프레임 자산 — 검출이 되는가 ────
+  ✅ 30프레임 · 검출 30/30 · 무릎 85.23~124.3°
+     ⚠️ rep 문턱(155°)은 안 넘는다 — 그래서 Spring 부하는 ghz 로 따로 건다(README §2)
+
+──── G2. 세션 개설 → 프레임 수락 ────
+  ✅ 세션 생성 — sessionId=1947
+  ✅ 프레임 수락 + 검출 성공 (분석기 부착까지 0.1s 대기)
+
+──── G3. 컨테이너 자원 한도 — 팔이 실제로 갈리는가 ────
+  ✅ 메모리 한도 20000MB
+     CPU 한도: 없음  (팔 A·B 조건)
+
+✅ 전 게이트 통과 — EC2 로 올려도 된다
+     從 부하 세션 시드 1000/1000 확인 (id 901~1900)
+     從 부하: 19 req/s 고정 · c=50 · 172.31.36.96:6565 · batch_multi.json
+
+════ 팔 A ════
+     팔 A 구성
+time="2026-08-15T17:32:49Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     버림판 (표에 안 들어간다)
+
+──────── A_r1_5 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  요청 149 (정상구간 10s) · 처리 15.4/s · 검출성공 100.0%
+  지연 p50 24ms · p95 32ms · p99 34ms · 평균 25ms
+  분류 {'ok': 149}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_A_r1_5.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_A_r1_5_summary.tsv
+
+──────── A_r1_10 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  요청 300 (정상구간 10s) · 처리 30.1/s · 검출성공 100.0%
+  지연 p50 24ms · p95 28ms · p99 36ms · 평균 25ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_A_r1_10.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_A_r1_10_summary.tsv
+
+════ 팔 B ════
+     팔 B 구성
+time="2026-08-15T17:35:15Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     버림판 (표에 안 들어간다)
+
+──────── B_r1_5 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  요청 149 (정상구간 10s) · 처리 15.1/s · 검출성공 100.0%
+  지연 p50 24ms · p95 25ms · p99 27ms · 평균 24ms
+  분류 {'ok': 149}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_B_r1_5.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_B_r1_5_summary.tsv
+  ⚠️ 실측 18.8 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  요청 300 (정상구간 10s) · 처리 30.1/s · 검출성공 100.0%
+  지연 p50 24ms · p95 27ms · p99 30ms · 평균 24ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_B_r1_10.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_B_r1_10_summary.tsv
+  ⚠️ 실측 18.9 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 팔 C ════
+     팔 C 구성
+time="2026-08-15T17:38:15Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     버림판 (표에 안 들어간다)
+
+──────── C_r1_5 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  요청 150 (정상구간 10s) · 처리 15.3/s · 검출성공 100.0%
+  지연 p50 24ms · p95 25ms · p99 26ms · 평균 24ms
+  분류 {'ok': 150}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_C_r1_5.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_C_r1_5_summary.tsv
+  ⚠️ 실측 18.9 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  요청 300 (정상구간 10s) · 처리 30.0/s · 검출성공 100.0%
+  지연 p50 24ms · p95 33ms · p99 39ms · 평균 25ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_C_r1_10.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency_rehearsal/req_C_r1_10_summary.tsv
+
+════ 요약 ════
+arm	round	sessions	req	rps	detect_pct	p50	p95	p99	nolease	nopose	setup_fail
+A	discard	5	150	15.30	100.00	23.6	24.8	25.4	0	0	0
+A	r1	5	149	15.36	100.00	24.1	32.0	33.6	0	0	0
+A	r1	10	300	30.07	100.00	24.3	27.6	36.1	0	0	0
+B	discard	5	150	15.07	100.00	24.7	35.7	38.5	0	0	0
+B	r1	5	149	15.08	100.00	23.6	24.7	27.2	0	0	0
+B	r1	10	300	30.06	100.00	23.7	26.7	29.5	0	0	0
+C	discard	5	150	15.10	100.00	23.6	25.3	27.5	0	0	0
+C	r1	5	150	15.32	100.00	23.8	25.0	25.8	0	0	0
+C	r1	10	300	30.04	100.00	23.9	33.2	38.8	0	0	0
+
+🔴 판정은 사람이 한다. 특히 볼 것:
+   · nolease > 0  → 풀 자리 없음(용량). detect_pct 하락과 **다른 축**이다
+   · nopose  > 0  → 검출이 깨짐(품질). #164 가 고친 지표가 다시 무너진 것일 수 있다
+   · setup_fail>0 → 그 판의 «동시 세션 수» 는 목표값이 아니다. 값을 그대로 쓰지 말 것
+     A discard 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     A r1 5세션 → req=149 setup_fail=0 nolease=0 nopose=0
+     A r1 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+     B discard 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     B r1 5세션 → req=149 setup_fail=0 nolease=0 nopose=0
+     B r1 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+     C discard 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     C r1 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     C r1 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+  ✅ 9판 전부 성립 (setup_fail 0)
+  → coresidency_rehearsal : OK (533초)
+
+════════ coresidency ════════
+  정판 — 팔 'A B C' × 레벨 '20 40 80 160' × 3반복 (+팔당 버림 1)
+  ⚠️ #223 — ghz 부하 미배선. A·B 대조는 그때까지 성립하지 않는다
+════════ 동거 용량 rig — 승격 게이트 ════════
+
+──── G0. 합성 인체 사본 ↔ 원본 대조 ────
+  ✅ 사본이 원본과 글자 단위로 같다
+
+──── G1. 프레임 자산 — 검출이 되는가 ────
+  ✅ 30프레임 · 검출 30/30 · 무릎 85.23~124.3°
+     ⚠️ rep 문턱(155°)은 안 넘는다 — 그래서 Spring 부하는 ghz 로 따로 건다(README §2)
+
+──── G2. 세션 개설 → 프레임 수락 ────
+  ✅ 세션 생성 — sessionId=2008
+  ✅ 프레임 수락 + 검출 성공 (분석기 부착까지 0.1s 대기)
+
+──── G3. 컨테이너 자원 한도 — 팔이 실제로 갈리는가 ────
+  ✅ 메모리 한도 20000MB
+     CPU 한도: 8.00 cores  (팔 C·D 조건)
+
+✅ 전 게이트 통과 — EC2 로 올려도 된다
+     從 부하 세션 시드 1000/1000 확인 (id 901~1900)
+     從 부하: 19 req/s 고정 · c=50 · 172.31.36.96:6565 · batch_multi.json
+
+════ 팔 A ════
+     팔 A 구성
+time="2026-08-15T17:41:44Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Starting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     버림판 (표에 안 들어간다)
+
+──────── A_r1_20 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  요청 4795 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 25ms · p95 37ms · p99 42ms · 평균 26ms
+  분류 {'ok': 4795}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r1_20.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r1_20_summary.tsv
+
+──────── A_r1_40 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  요청 9586 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 28ms · p95 42ms · p99 47ms · 평균 30ms
+  분류 {'ok': 9586}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r1_40.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r1_40_summary.tsv
+
+──────── A_r1_80 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  요청 19182 (정상구간 80s) · 처리 239.8/s · 검출성공 100.0%
+  지연 p50 40ms · p95 74ms · p99 112ms · 평균 43ms
+  분류 {'ok': 19182}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r1_80.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r1_80_summary.tsv
+
+──────── A_r1_160 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  요청 23336 (정상구간 80s) · 처리 291.7/s · 검출성공 100.0%
+  지연 p50 543ms · p95 601ms · p99 623ms · 평균 549ms
+  분류 {'ok': 23336}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r1_160.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r1_160_summary.tsv
+
+──────── A_r2_20 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  요청 4798 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 27ms · p95 41ms · p99 46ms · 평균 29ms
+  분류 {'ok': 4798}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r2_20.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r2_20_summary.tsv
+
+──────── A_r2_40 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  요청 9587 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 29ms · p95 45ms · p99 52ms · 평균 31ms
+  분류 {'ok': 9587}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r2_40.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r2_40_summary.tsv
+
+──────── A_r2_80 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  요청 19186 (정상구간 80s) · 처리 240.1/s · 검출성공 100.0%
+  지연 p50 72ms · p95 126ms · p99 145ms · 평균 75ms
+  분류 {'ok': 19186}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r2_80.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r2_80_summary.tsv
+
+──────── A_r2_160 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  요청 23337 (정상구간 80s) · 처리 291.7/s · 검출성공 100.0%
+  지연 p50 543ms · p95 599ms · p99 616ms · 평균 548ms
+  분류 {'ok': 23337}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r2_160.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r2_160_summary.tsv
+
+──────── A_r3_20 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  요청 4800 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 26ms · p95 39ms · p99 43ms · 평균 27ms
+  분류 {'ok': 4800}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r3_20.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r3_20_summary.tsv
+
+──────── A_r3_40 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  요청 9592 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 27ms · p95 42ms · p99 50ms · 평균 29ms
+  분류 {'ok': 9592}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r3_40.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r3_40_summary.tsv
+
+──────── A_r3_80 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  요청 19182 (정상구간 80s) · 처리 239.8/s · 검출성공 100.0%
+  지연 p50 42ms · p95 82ms · p99 119ms · 평균 46ms
+  분류 {'ok': 19182}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r3_80.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r3_80_summary.tsv
+
+──────── A_r3_160 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  요청 22965 (정상구간 80s) · 처리 287.1/s · 검출성공 100.0%
+  지연 p50 551ms · p95 614ms · p99 638ms · 평균 557ms
+  분류 {'ok': 22965}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r3_160.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_A_r3_160_summary.tsv
+
+════ 팔 B ════
+     팔 B 구성
+time="2026-08-15T18:08:19Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     버림판 (표에 안 들어간다)
+
+──────── B_r1_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  요청 4797 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 25ms · p95 35ms · p99 40ms · 평균 26ms
+  분류 {'ok': 4797}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r1_20.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r1_20_summary.tsv
+
+──────── B_r1_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  요청 9593 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 28ms · p95 46ms · p99 53ms · 평균 31ms
+  분류 {'ok': 9593}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r1_40.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r1_40_summary.tsv
+
+──────── B_r1_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  요청 19186 (정상구간 80s) · 처리 239.8/s · 검출성공 100.0%
+  지연 p50 42ms · p95 84ms · p99 120ms · 평균 47ms
+  분류 {'ok': 19186}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r1_80.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r1_80_summary.tsv
+
+──────── B_r1_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  요청 23204 (정상구간 80s) · 처리 290.1/s · 검출성공 100.0%
+  지연 p50 546ms · p95 601ms · p99 622ms · 평균 552ms
+  분류 {'ok': 23204}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r1_160.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r1_160_summary.tsv
+
+──────── B_r2_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  요청 4798 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 25ms · p95 39ms · p99 42ms · 평균 27ms
+  분류 {'ok': 4798}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r2_20.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r2_20_summary.tsv
+
+──────── B_r2_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  요청 9593 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 27ms · p95 40ms · p99 46ms · 평균 29ms
+  분류 {'ok': 9593}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r2_40.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r2_40_summary.tsv
+
+──────── B_r2_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  요청 19184 (정상구간 80s) · 처리 239.8/s · 검출성공 100.0%
+  지연 p50 44ms · p95 80ms · p99 113ms · 평균 47ms
+  분류 {'ok': 19184}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r2_80.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r2_80_summary.tsv
+
+──────── B_r2_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  요청 23202 (정상구간 80s) · 처리 290.1/s · 검출성공 100.0%
+  지연 p50 545ms · p95 602ms · p99 625ms · 평균 552ms
+  분류 {'ok': 23202}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r2_160.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r2_160_summary.tsv
+  ⚠️ 실측 18.9 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r3_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  요청 4798 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 25ms · p95 41ms · p99 44ms · 평균 28ms
+  분류 {'ok': 4798}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r3_20.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r3_20_summary.tsv
+
+──────── B_r3_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  요청 9590 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 28ms · p95 44ms · p99 53ms · 평균 30ms
+  분류 {'ok': 9590}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r3_40.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r3_40_summary.tsv
+
+──────── B_r3_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  요청 19195 (정상구간 80s) · 처리 240.0/s · 검출성공 100.0%
+  지연 p50 46ms · p95 89ms · p99 122ms · 평균 50ms
+  분류 {'ok': 19195}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r3_80.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r3_80_summary.tsv
+
+──────── B_r3_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  요청 23228 (정상구간 80s) · 처리 290.4/s · 검출성공 100.0%
+  지연 p50 545ms · p95 602ms · p99 620ms · 평균 551ms
+  분류 {'ok': 23228}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r3_160.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_B_r3_160_summary.tsv
+
+════ 팔 C ════
+     팔 C 구성
+time="2026-08-15T18:35:49Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Recreate 
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     버림판 (표에 안 들어간다)
+
+──────── C_r1_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  요청 4793 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 25ms · p95 39ms · p99 43ms · 평균 27ms
+  분류 {'ok': 4793}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r1_20.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r1_20_summary.tsv
+
+──────── C_r1_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  요청 9595 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 28ms · p95 43ms · p99 49ms · 평균 30ms
+  분류 {'ok': 9595}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r1_40.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r1_40_summary.tsv
+
+──────── C_r1_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  요청 19187 (정상구간 80s) · 처리 240.0/s · 검출성공 100.0%
+  지연 p50 140ms · p95 216ms · p99 261ms · 평균 144ms
+  분류 {'ok': 19187}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r1_80.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r1_80_summary.tsv
+  ⚠️ 실측 18.9 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r1_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  요청 19607 (정상구간 80s) · 처리 245.1/s · 검출성공 100.0%
+  지연 p50 652ms · p95 711ms · p99 741ms · 평균 653ms
+  분류 {'ok': 19607}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r1_160.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r1_160_summary.tsv
+
+──────── C_r2_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  요청 4798 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 25ms · p95 39ms · p99 42ms · 평균 26ms
+  분류 {'ok': 4798}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r2_20.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r2_20_summary.tsv
+
+──────── C_r2_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  요청 9594 (정상구간 80s) · 처리 120.0/s · 검출성공 100.0%
+  지연 p50 31ms · p95 52ms · p99 59ms · 평균 33ms
+  분류 {'ok': 9594}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r2_40.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r2_40_summary.tsv
+
+──────── C_r2_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  요청 19187 (정상구간 80s) · 처리 239.9/s · 검출성공 100.0%
+  지연 p50 139ms · p95 207ms · p99 287ms · 평균 141ms
+  분류 {'ok': 19187}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r2_80.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r2_80_summary.tsv
+
+──────── C_r2_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  요청 19572 (정상구간 80s) · 처리 244.7/s · 검출성공 100.0%
+  지연 p50 652ms · p95 713ms · p99 745ms · 평균 654ms
+  분류 {'ok': 19572}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r2_160.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r2_160_summary.tsv
+
+──────── C_r3_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  요청 4795 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 25ms · p95 38ms · p99 41ms · 평균 27ms
+  분류 {'ok': 4795}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r3_20.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r3_20_summary.tsv
+  ⚠️ 실측 18.9 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r3_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  요청 9593 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 29ms · p95 45ms · p99 53ms · 평균 32ms
+  분류 {'ok': 9593}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r3_40.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r3_40_summary.tsv
+  ⚠️ 실측 18.9 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r3_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  요청 19187 (정상구간 80s) · 처리 239.9/s · 검출성공 100.0%
+  지연 p50 147ms · p95 246ms · p99 282ms · 평균 152ms
+  분류 {'ok': 19187}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r3_80.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r3_80_summary.tsv
+
+──────── C_r3_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  요청 19526 (정상구간 80s) · 처리 244.1/s · 검출성공 100.0%
+  지연 p50 655ms · p95 710ms · p99 740ms · 평균 656ms
+  분류 {'ok': 19526}
+  → /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r3_160.tsv · /root/init/loadtest/results/online-ddl-coresidency-ec2-20260815-173245/coresidency/req_C_r3_160_summary.tsv
+  ⚠️ 실측 18.9 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 요약 ════
+arm	round	sessions	req	rps	detect_pct	p50	p95	p99	nolease	nopose	setup_fail
+A	discard	20	4796	60.04	100.00	25.4	39.7	43.2	0	0	0
+A	r1	20	4795	60.00	100.00	25.2	36.9	41.7	0	0	0
+A	r1	40	9586	119.88	100.00	27.9	42.1	46.7	0	0	0
+A	r1	80	19182	239.83	100.00	40.0	73.5	112.3	0	0	0
+A	r1	160	23336	291.75	100.00	542.6	600.6	622.9	0	0	0
+A	r2	20	4798	60.04	100.00	26.7	40.8	45.9	0	0	0
+A	r2	40	9587	119.87	100.00	29.1	45.4	51.8	0	0	0
+A	r2	80	19186	240.07	100.00	72.4	125.9	144.7	0	0	0
+A	r2	160	23337	291.75	100.00	542.9	599.0	616.3	0	0	0
+A	r3	20	4800	60.04	100.00	25.6	39.2	43.4	0	0	0
+A	r3	40	9592	119.92	100.00	26.6	42.0	50.0	0	0	0
+A	r3	80	19182	239.81	100.00	41.8	81.9	118.7	0	0	0
+A	r3	160	22965	287.09	100.00	551.2	613.7	638.0	0	0	0
+B	discard	20	4793	59.91	100.00	26.0	40.0	43.6	0	0	0
+B	r1	20	4797	60.01	100.00	24.7	35.0	40.5	0	0	0
+B	r1	40	9593	119.92	100.00	28.5	45.9	53.3	0	0	0
+B	r1	80	19186	239.84	100.00	42.2	84.1	119.8	0	0	0
+B	r1	160	23204	290.05	100.00	545.7	601.5	622.0	0	0	0
+B	r2	20	4798	60.00	100.00	25.2	39.0	42.1	0	0	0
+B	r2	40	9593	119.94	100.00	26.8	40.2	45.7	0	0	0
+B	r2	80	19184	239.81	100.00	43.9	80.3	113.0	0	0	0
+B	r2	160	23202	290.06	100.00	545.5	601.6	625.2	0	0	0
+B	r3	20	4798	60.04	100.00	25.3	41.1	44.0	0	0	0
+B	r3	40	9590	119.90	100.00	27.7	44.0	53.4	0	0	0
+B	r3	80	19195	239.97	100.00	46.3	89.5	122.4	0	0	0
+B	r3	160	23228	290.37	100.00	544.7	602.5	620.3	0	0	0
+C	discard	20	4792	59.92	100.00	24.3	34.2	40.5	0	0	0
+C	r1	20	4793	59.95	100.00	25.2	39.2	42.7	0	0	0
+C	r1	40	9595	119.95	100.00	28.2	42.5	49.2	0	0	0
+C	r1	80	19187	239.99	100.00	139.6	215.8	260.6	0	0	0
+C	r1	160	19607	245.12	100.00	652.0	710.9	741.0	0	0	0
+C	r2	20	4798	59.98	100.00	24.9	38.5	41.6	0	0	0
+C	r2	40	9594	120.00	100.00	30.7	51.6	58.8	0	0	0
+C	r2	80	19187	239.87	100.00	138.7	206.5	287.0	0	0	0
+C	r2	160	19572	244.71	100.00	651.9	712.9	744.6	0	0	0
+C	r3	20	4795	59.99	100.00	25.0	38.1	40.8	0	0	0
+C	r3	40	9593	119.93	100.00	29.3	45.4	52.6	0	0	0
+C	r3	80	19187	239.90	100.00	147.2	246.1	282.0	0	0	0
+C	r3	160	19526	244.09	100.00	654.9	709.6	739.7	0	0	0
+
+🔴 판정은 사람이 한다. 특히 볼 것:
+   · nolease > 0  → 풀 자리 없음(용량). detect_pct 하락과 **다른 축**이다
+   · nopose  > 0  → 검출이 깨짐(품질). #164 가 고친 지표가 다시 무너진 것일 수 있다
+   · setup_fail>0 → 그 판의 «동시 세션 수» 는 목표값이 아니다. 값을 그대로 쓰지 말 것
+     A discard 20세션 → req=4796 setup_fail=0 nolease=0 nopose=0
+     A r1 20세션 → req=4795 setup_fail=0 nolease=0 nopose=0
+     A r1 40세션 → req=9586 setup_fail=0 nolease=0 nopose=0
+     A r1 80세션 → req=19182 setup_fail=0 nolease=0 nopose=0
+     A r1 160세션 → req=23336 setup_fail=0 nolease=0 nopose=0
+     A r2 20세션 → req=4798 setup_fail=0 nolease=0 nopose=0
+     A r2 40세션 → req=9587 setup_fail=0 nolease=0 nopose=0
+     A r2 80세션 → req=19186 setup_fail=0 nolease=0 nopose=0
+     A r2 160세션 → req=23337 setup_fail=0 nolease=0 nopose=0
+     A r3 20세션 → req=4800 setup_fail=0 nolease=0 nopose=0
+     A r3 40세션 → req=9592 setup_fail=0 nolease=0 nopose=0
+     A r3 80세션 → req=19182 setup_fail=0 nolease=0 nopose=0
+     A r3 160세션 → req=22965 setup_fail=0 nolease=0 nopose=0
+     B discard 20세션 → req=4793 setup_fail=0 nolease=0 nopose=0
+     B r1 20세션 → req=4797 setup_fail=0 nolease=0 nopose=0
+     B r1 40세션 → req=9593 setup_fail=0 nolease=0 nopose=0
+     B r1 80세션 → req=19186 setup_fail=0 nolease=0 nopose=0
+     B r1 160세션 → req=23204 setup_fail=0 nolease=0 nopose=0
+     B r2 20세션 → req=4798 setup_fail=0 nolease=0 nopose=0
+     B r2 40세션 → req=9593 setup_fail=0 nolease=0 nopose=0
+     B r2 80세션 → req=19184 setup_fail=0 nolease=0 nopose=0
+     B r2 160세션 → req=23202 setup_fail=0 nolease=0 nopose=0
+     B r3 20세션 → req=4798 setup_fail=0 nolease=0 nopose=0
+     B r3 40세션 → req=9590 setup_fail=0 nolease=0 nopose=0
+     B r3 80세션 → req=19195 setup_fail=0 nolease=0 nopose=0
+     B r3 160세션 → req=23228 setup_fail=0 nolease=0 nopose=0
+     C discard 20세션 → req=4792 setup_fail=0 nolease=0 nopose=0
+     C r1 20세션 → req=4793 setup_fail=0 nolease=0 nopose=0
+     C r1 40세션 → req=9595 setup_fail=0 nolease=0 nopose=0
+     C r1 80세션 → req=19187 setup_fail=0 nolease=0 nopose=0
+     C r1 160세션 → req=19607 setup_fail=0 nolease=0 nopose=0
+     C r2 20세션 → req=4798 setup_fail=0 nolease=0 nopose=0
+     C r2 40세션 → req=9594 setup_fail=0 nolease=0 nopose=0
+     C r2 80세션 → req=19187 setup_fail=0 nolease=0 nopose=0
+     C r2 160세션 → req=19572 setup_fail=0 nolease=0 nopose=0
+     C r3 20세션 → req=4795 setup_fail=0 nolease=0 nopose=0
+     C r3 40세션 → req=9593 setup_fail=0 nolease=0 nopose=0
+     C r3 80세션 → req=19187 setup_fail=0 nolease=0 nopose=0
+     C r3 160세션 → req=19526 setup_fail=0 nolease=0 nopose=0
+  ✅ 39판 전부 성립 (setup_fail 0)
+  → coresidency : OK (4925초)
+
+════════ collect ════════
+# 측정 조건 — coresidency-ec2-20260815-173245
+생성          : 2026-08-15T19:03:48+00:00
+커밋          : 4c124f7b9ff3096decade1f24b792248e0ac9cd6 (HEAD)
+인스턴스 타입 : c7i.large
+인스턴스 ID   : i-0cc00f283cf3a80c9
+AZ / 리전     : ap-northeast-2c / ap-northeast-2
+vCPU / RAM    : 2 / 4GB
+커널          : 6.1.177-224.371.amzn2023.x86_64
+디스크        : 30G 여유 26G
+MySQL         : 해당 없음 — 이 박스에 shadowfit-mysql 가 없다(러너가 측정 대상이 아닌 라운드)
+WRITER_MAX_SEC: 14400
+S3 결과       : s3://shadowfit-measure-055447613012/shadowfit/coresidency-ec2-20260815-173245
+
+# 대상 박스 (측정 대상 — 위 블록은 «부하기» 다)
+호스트        : 172.31.36.96
+인스턴스 타입 : c7i.4xlarge
+vCPU / RAM    : 16 31GB
+컨테이너 캡   :
+  shadowfit-backend      mem=0 cpus=4000000000
+  shadowfit-mysql        mem=0 cpus=4000000000
+  shadowfit-ai           mem=20971520000 cpus=8000000000
+동거 팔       : ARMS='A B C' LEVELS='20 40 80 160' DUR=90s REPEATS=3
+⚠️ 위 «캡» 은 라운드 **종료 시점** 값이다 — 스윕이 팔마다 갈아끼우므로 마지막 팔의 상태다
+
+# 단계
+phase	status	seconds	started_at
+coresidency_preflight	OK	2	2026-08-15T17:32:45+00:00
+coresidency_rehearsal	OK	533	2026-08-15T17:32:48+00:00
+coresidency	OK	4925	2026-08-15T17:41:42+00:00
+
+⚠️ 절대 소요 시간을 «운영에서 N분» 으로 인용 금지 — 하드웨어 종속(설계 §5)
+⚠️ rehearsal/ 의 수치는 측정값이 아니다 — 경로 점검용 축소 판
+  → collect : OK (1초)
+
+════════ 최종 업로드 ════════
+  ✅ s3://shadowfit-measure-055447613012/shadowfit/coresidency-ec2-20260815-173245
+
+════════ 단계 요약 ════════
+phase	status	seconds	started_at
+coresidency_preflight	OK	2	2026-08-15T17:32:45+00:00
+coresidency_rehearsal	OK	533	2026-08-15T17:32:48+00:00
+coresidency	OK	4925	2026-08-15T17:41:42+00:00
+collect	OK	1	2026-08-15T19:03:48+00:00
+  자동 정지 꺼짐 — 회수 확인 후 직접 정지할 것. AWS-RIDE-ALONG.md §5 체크리스트를 볼 것

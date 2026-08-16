@@ -1,0 +1,12 @@
+export S3_BASE=s3://shadowfit-measure-055447613012/shadowfit
+export TARGET_HOST=172.31.36.96
+export TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@172.31.36.96"
+export AI_PUBLIC_TOKEN=<redacted>
+export GHZ_TOKEN=<redacted>
+export GHZ_RPS=19
+export GHZ_DATA=/root/batch_multi.json
+export GHZ_BIN=/usr/local/bin/ghz
+export GHZ_TARGET=172.31.36.96:6565
+export CORES_ARMS="A B C"
+export CONTAINER=shadowfit-mysql
+export PHASES="coresidency_preflight coresidency_rehearsal coresidency collect"
