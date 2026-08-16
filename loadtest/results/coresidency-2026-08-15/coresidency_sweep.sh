@@ -49,6 +49,23 @@ ARMS=${ARMS:-"A B C"}               # D 를 넣으려면 "A B C D"
 LEVELS=${LEVELS:-"20 40 60 80 90 100 120 160"}
 DUR=${DUR:-90}                      # 판당 측정 구간(초). 앞뒤 5초는 부하기가 버린다
 REPEATS=${REPEATS:-3}               # 본판. 버림판 1은 팔마다 별도로 돈다
+
+# ── 레벨 순서 치환 — #252 (2026-08-17) ───────────────────────────────────
+#
+# 🔴 08-16 두 라운드는 **아홉 블록 전부 오름차순**이었다. 블록 하나가 12~17분이고 그 사이
+#    처리량이 흐르면(1라운드 분당 0.09~0.35%) **뒤에 오는 레벨이 체계적으로 유리**해진다 —
+#    그리고 뒤에 오는 것이 하필 plateau 를 정의하는 상위 레벨이다.
+#
+# 🔴 **「라운드마다 반전」으로는 안 고쳐진다.** 오름/내림/오름(3판)이면 레벨의 «평균 위치» 가
+#    여전히 레벨에 **완전 비례**한다(상관 r = 1.00). 실제로 계산해 보고 골랐다:
+#        반전 **r=1.000** · shift1 0.580 · **shift2 0.361** · shift3 0.411 · shift4 0.907 · shift6 0.316
+#    (레벨 «값» 20·40·60·80·90·100·120·160 과 «블록 안 평균 위치» 의 상관. 8레벨 × 3판)
+#    그래서 `rotate_arms` 와 같은 방식의 **치환**을 쓴다.
+# ⚠️ 최적 shift 는 (레벨 수 · 반복 수 · 레벨 «값» 간격)에 딸린 값이다. 2 는 **8레벨 × 3판**
+#    에서 고른 값이고(6 이 0.316 으로 사실상 같다 — 8 기준 거울상이다), 격자를 바꾸면 다시
+#    계산해야 한다. 그리고 **3판으로는 8자리를 완전 균형 못 잡는다** — 이 치환은 상관을
+#    «없애는» 것이 아니라 «1.000 → 0.361 로 줄이는» 것이다. 결과에 그대로 적는다.
+LEVEL_SHIFT=${LEVEL_SHIFT:-2}
 STATS_SEC=${STATS_SEC:-5}           # docker stats 폴링 간격 — 관측이 대상을 흔드는 비용
 
 # ── 從 부하: Spring·MySQL (ghz SavePoseDataBatch) — #223 ─────────────────
@@ -514,6 +531,15 @@ rotate_arms() {  # $1 = 왼쪽으로 돌릴 칸 수
   echo "${out# }"
 }
 
+# 레벨도 같은 방식으로 돌린다 (#252). $1 = 라운드 번호(1부터).
+rotate_levels() {
+  local -a a=($LEVELS)
+  local n=${#a[@]} k i out=""
+  k=$(( (($1 - 1) * LEVEL_SHIFT) % n ))
+  for ((i = 0; i < n; i++)); do out="$out ${a[$(((i + k) % n))]}"; done
+  echo "${out# }"
+}
+
 NARMS=$(echo "$ARMS" | wc -w)
 if [ "$((REPEATS % NARMS))" -ne 0 ]; then
   note "⚠️ REPEATS($REPEATS) 가 팔 수($NARMS)의 배수가 아니다 — 위치가 정확히 균형 잡히지 않는다."
@@ -523,8 +549,51 @@ fi
 # 버림판은 **팔당 1회**다(설계 §5). 팔이 처음 나오는 라운드에서만 돈다.
 DISCARDED=""
 
+# ── 앵커 판 — #251·2라운드 이후 승격 (2026-08-17) ────────────────────────
+#
+# 🔴 **라운드 «간» 절대값이 안 재현된다.** 같은 코드·같은 격자·같은 인스턴스 타입에서
+#    천장 환산이 89.2 → 105.0세션(+17.7%)으로 움직였다(2라운드 §5). 그리고 1라운드에서는
+#    라운드 «안» 에서도 팔 A 가 2시간에 +16% 흘렀다.
+#
+# 앵커는 그 흐름을 **보정 대상이 아니라 측정 대상**으로 만든다 — 동일 조건(기본 팔 B·80세션)
+# 한 판을 라운드마다 같은 자리에서 찍는다. 시각은 `warm_lo` 에 있으니 사후에 «시간 ↔ 처리량»
+# 을 직접 그릴 수 있다.
+#
+# 🔴 **첫 앵커가 워밍업을 뒤집어쓰면 앵커 계열 자체가 오염된다.** 그래서 첫 앵커 앞에서
+#    앵커 팔의 **버림판을 먼저 돌리고**, 그 팔은 `DISCARDED` 에 넣어 블록에서 다시 안 버린다.
+# ⚠️ 앵커는 본 격자에 안 들어간다 — 라운드 이름표가 `anc<N>` 이라 분석에서 골라낼 수 있다.
+#    대신 판 수가 REPEATS+1 만큼 는다(3판 라운드면 4판 ≈ 11분, 팔 전환 포함).
+ANCHOR=${ANCHOR:-1}                  # 0 이면 안 돈다
+ANCHOR_ARM=${ANCHOR_ARM:-B}          # 從 부하까지 걸린 «일하는» 조건이 기준선으로 낫다
+ANCHOR_LEVEL=${ANCHOR_LEVEL:-80}     # 포화 **직전** — 천장에 붙은 레벨은 天井이 흔들리면 같이 흔들린다
+ANCHOR_SEQ=0
+
+run_anchor() {
+  [ "$ANCHOR" = "1" ] || return 0
+  case " $ARMS " in
+    *" $ANCHOR_ARM "*) ;;
+    *) note "⚠️ 앵커 팔($ANCHOR_ARM)이 ARMS 에 없다 — 앵커를 건너뛴다. 시간 추세는 이 라운드에서 안 걷힌다"
+       ANCHOR=0; return 0 ;;
+  esac
+  ANCHOR_SEQ=$((ANCHOR_SEQ + 1))
+  step "앵커 판 anc$ANCHOR_SEQ — 팔 $ANCHOR_ARM · ${ANCHOR_LEVEL}세션 (시간 추세용 기준점)"
+  apply_arm "$ANCHOR_ARM" || { note "⚠️ 앵커 팔 구성 실패 — 이 앵커 점이 빈다. 시간 추세는 그만큼 성기어진다"; return 1; }
+  sleep 20
+  reset_sessions
+  case " $DISCARDED " in
+    *" $ANCHOR_ARM "*) ;;
+    *)  note "팔 $ANCHOR_ARM 버림판 (앵커 앞에서 먼저 — 첫 앵커가 워밍업을 타면 계열이 오염된다)"
+        run_one "$ANCHOR_ARM" "discard" "$ANCHOR_LEVEL" >/dev/null 2>&1
+        DISCARDED="$DISCARDED $ANCHOR_ARM"
+        reset_between ;;
+  esac
+  run_one "$ANCHOR_ARM" "anc$ANCHOR_SEQ" "$ANCHOR_LEVEL" || true
+  reset_between
+}
+
 for r in $(seq 1 "$REPEATS"); do
-  step "라운드 r$r — 팔 순서 $(rotate_arms "$((r - 1))")"
+  run_anchor                        # 라운드 시작마다 하나 — 마지막 하나는 루프 뒤에
+  step "라운드 r$r — 팔 순서 $(rotate_arms "$((r - 1))") · 레벨 순서 $(rotate_levels "$r")"
   for arm in $(rotate_arms "$((r - 1))"); do
     apply_arm "$arm" || exit 1
     sleep 20
@@ -533,17 +602,23 @@ for r in $(seq 1 "$REPEATS"); do
     case " $DISCARDED " in
       *" $arm "*) ;;
       *)  # 버림판 — 그 팔의 첫 판은 컨테이너 워밍업·JIT·버퍼풀을 가장 크게 탄다. **표에 안 넣는다.**
+          #    🔴 레벨은 **그 블록이 실제로 처음 도는 레벨**로 맞춘다(#252 치환 이후).
+          #       `$LEVELS` 첫 값으로 고정하면 내림/치환 블록에서 «버림판만 다른 레벨» 이 된다.
           note "팔 $arm 버림판 (표에 안 들어간다)"
-          run_one "$arm" "discard" "$(echo "$LEVELS" | awk '{print $1}')" >/dev/null 2>&1
+          run_one "$arm" "discard" "$(rotate_levels "$r" | awk '{print $1}')" >/dev/null 2>&1
           DISCARDED="$DISCARDED $arm"
           reset_between ;;
     esac
-    for n in $LEVELS; do
+    # 🔴 레벨 순서는 라운드마다 치환된다 (#252). 오름차순 고정이면 블록 안 시간 추세가
+    #    상위 레벨에 그대로 얹힌다 — 그리고 그 자리가 plateau 를 정의한다.
+    for n in $(rotate_levels "$r"); do
       run_one "$arm" "r$r" "$n" || true
       reset_between
     done
   done
 done
+
+run_anchor                          # 끝 — 이것이 있어야 라운드 «전 구간» 을 감싼다
 
 echo; echo "════ 요약 ════"; cat "$LOG"
 echo
@@ -555,3 +630,6 @@ echo "   · ghz.tsv 의 p50/p95/p99 → **H3 의 판정 열**(#254). 팔 B↔C �
 echo "     캡을 걸었더니 옆(Spring 적재)의 지연이 «안 나빠졌다» 면 캡이 옆을 지킨 것이다"
 echo "   · side.tsv 의 phase=mid → 포화 순간의 옆 상태(Threads_running·Hikari pending)."
 echo "     pre/post 는 카운터의 양 끝이다 — 게이지를 거기서 읽으면 «유휴» 를 읽게 된다"
+echo "   · round=anc1..N → **앵커 판**. 본 격자가 아니라 «시간 축» 이다 — warm_lo 로 정렬해"
+echo "     처리량이 라운드 내내 평평한지 본다. 흐르면 팔 간 대조에 그 추세가 섞여 있는 것이다"
+echo "   · 레벨 순서는 라운드마다 치환된다(#252) — 같은 레벨이 블록 안 다른 자리에서 돈다"

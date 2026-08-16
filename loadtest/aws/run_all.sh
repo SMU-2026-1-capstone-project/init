@@ -108,6 +108,12 @@ CORES_LEVELS=${CORES_LEVELS:-"20 40 60 80 90 100 120 160"}  # 2026-08-17 확정 
                                              # 🔴 `coresidency_sweep.sh` 의 LEVELS 와 **같은 값**이어야 한다
 CORES_DUR=${CORES_DUR:-90}
 CORES_REPEATS=${CORES_REPEATS:-3}
+# 레벨 순서 치환(#252)과 앵커 판(시간 추세 기준점). 유도·근거는 `coresidency_sweep.sh` 주석.
+CORES_LEVEL_SHIFT=${CORES_LEVEL_SHIFT:-2}    # 0 이면 오름차순 고정 — 그러면 #252 가 되살아난다
+CORES_ANCHOR=${CORES_ANCHOR:-1}              # 라운드마다 + 끝에 1판. REPEATS 3 이면 4판 ≈ 11분
+CORES_ANCHOR_ARM=${CORES_ANCHOR_ARM:-B}
+CORES_ANCHOR_LEVEL=${CORES_ANCHOR_LEVEL:-80} # 포화 «직전» — 천장에 붙은 레벨은 기준선 구실을 못 한다
+CORES_REH_ANCHOR_LEVEL=${CORES_REH_ANCHOR_LEVEL:-10}  # 리허설 격자(5·10)에 맞춘 값
 CORES_REH_LEVELS=${CORES_REH_LEVELS:-"5 10"} # 축소 리허설 — README 「무인 실행 전 필수」
 CORES_REH_DUR=${CORES_REH_DUR:-20}
 
@@ -566,6 +572,8 @@ phase_coresidency_rehearsal() {
   env OUT="$out" HOST="$TARGET_HOST" TOKEN="$AI_PUBLIC_TOKEN" SSH="$TARGET_SSH" \
       REPO_DIR="$TARGET_REPO_DIR" ARMS="$CORES_ARMS" LEVELS="$CORES_REH_LEVELS" \
       DUR="$CORES_REH_DUR" REPEATS=1 \
+      LEVEL_SHIFT="$CORES_LEVEL_SHIFT" ANCHOR="$CORES_ANCHOR" \
+      ANCHOR_ARM="$CORES_ANCHOR_ARM" ANCHOR_LEVEL="$CORES_REH_ANCHOR_LEVEL" \
       GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
       GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
       MYSQL_USER=root MYSQL_PW="$PW" \
@@ -602,6 +610,8 @@ phase_coresidency() {
   env OUT="$out" HOST="$TARGET_HOST" TOKEN="$AI_PUBLIC_TOKEN" SSH="$TARGET_SSH" \
       REPO_DIR="$TARGET_REPO_DIR" ARMS="$CORES_ARMS" LEVELS="$CORES_LEVELS" \
       DUR="$CORES_DUR" REPEATS="$CORES_REPEATS" STATS_SEC="${STATS_SEC:-5}" \
+      LEVEL_SHIFT="$CORES_LEVEL_SHIFT" ANCHOR="$CORES_ANCHOR" \
+      ANCHOR_ARM="$CORES_ANCHOR_ARM" ANCHOR_LEVEL="$CORES_ANCHOR_LEVEL" \
       GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
       GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
       MYSQL_USER=root MYSQL_PW="$PW" \
@@ -708,6 +718,7 @@ phase_collect() {
             \"\$(docker inspect -f '{{.HostConfig.Memory}}' \$c)\" \
             \"\$(docker inspect -f '{{.HostConfig.NanoCpus}}' \$c)\"; done" 2>/dev/null | tr -d '\r'
       echo "동거 팔       : ARMS='$CORES_ARMS' LEVELS='$CORES_LEVELS' DUR=${CORES_DUR}s REPEATS=$CORES_REPEATS"
+      echo "동거 배열     : LEVEL_SHIFT=$CORES_LEVEL_SHIFT (레벨 순서 치환 #252) · ANCHOR=$CORES_ANCHOR ${CORES_ANCHOR_ARM}@${CORES_ANCHOR_LEVEL}세션"
       echo "⚠️ 위 «캡» 은 라운드 **종료 시점** 값이다 — 스윕이 팔마다 갈아끼우므로 마지막 팔의 상태다"
     fi
 
