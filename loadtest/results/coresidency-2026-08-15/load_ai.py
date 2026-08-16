@@ -103,7 +103,7 @@ def classify(status, text):
     return "fail:" + msg[:40]
 
 
-def session_worker(idx, base, ai, tok, exercise_id, frames, fps, t0, token):
+def session_worker(idx, base, ai, tok, exercise_id, frames, fps, t0, token, attach_sec=20.0):
     st, body = http(base + "/exercises/sessions", "POST", {"exerciseId": exercise_id},
                     {"Authorization": "Bearer " + tok})
     try:
@@ -120,6 +120,25 @@ def session_worker(idx, base, ai, tok, exercise_id, frames, fps, t0, token):
     interval = 1.0 / fps
     i = 0
     hdr = {"Authorization": "Bearer " + token}
+
+    # 🔴 **분석기가 붙기를 기다린다.** 세션 생성 응답은 즉시 오지만 `StartAnalysis` 는
+    #    afterCommit + @Async 로 «그 뒤에» 나간다(ExerciseAnalysisService:210-217). 그래서
+    #    생성 직후 프레임은 «분석기가 없습니다» 로 거절되고, 그 응답은 `classify()` 에서
+    #    **nolease** 가 된다 — 즉 **기동 경합이 «풀에 자리 없음» 이라는 용량 신호로 위장한다.**
+    #    2026-08-16 EC2 에서 실측: 대기 0s 거절 → 2s 성공.
+    #    여기서 기다린 시간은 측정 구간 밖이다. 못 붙으면 그 세션은 setup_fail 이다.
+    deadline = time.monotonic() + attach_sec
+    while True:
+        st, tx = http(ai + "/api/v1/pose", "POST",
+                      {"image": frames[0], "exercise_type": "squat",
+                       "session_id": sid, "timestamp_sec": 0.0}, hdr)
+        if classify(st, tx) != "nolease":
+            break
+        if time.monotonic() >= deadline:
+            with LOCK:
+                SETUP_FAIL.append(f"[{idx}] 세션 {sid}: {attach_sec}s 안에 분석기가 안 붙었다")
+            return
+        time.sleep(0.5)   # AI 의 유입 간격 상한(300ms)보다 넉넉히
     while not STOP.is_set():
         due = time.monotonic()
         payload = {"image": frames[i % len(frames)], "exercise_type": "squat",
@@ -154,6 +173,8 @@ def main():
     ap.add_argument("--frames", default="frames.json")
     ap.add_argument("--sessions", type=int, required=True)
     ap.add_argument("--dur", type=int, default=60, help="측정 구간(초)")
+    # 분석기가 붙기를 기다리는 상한. 이 시간은 측정 구간 밖이다 — session_worker 주석 참고.
+    ap.add_argument("--attach-sec", type=float, default=20.0, dest="attach_sec")
     ap.add_argument("--fps", type=float, default=3.0)
     ap.add_argument("--pw", default="P@ssw0rd!")
     ap.add_argument("--exercise-id", type=int, default=1)
@@ -179,7 +200,8 @@ def main():
     print(f"측정 — 동시 세션 {a.sessions} · {a.fps}fps · {a.dur}초")
     t0 = time.monotonic()
     ths = [threading.Thread(target=session_worker,
-                            args=(i, a.base, a.ai, toks[i], a.exercise_id, frames, a.fps, t0, a.token),
+                            args=(i, a.base, a.ai, toks[i], a.exercise_id, frames, a.fps, t0, a.token,
+                                  a.attach_sec),
                             daemon=True)
            for i in range(a.sessions)]
     for t in ths:
