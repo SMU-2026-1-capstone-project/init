@@ -34,6 +34,35 @@
 > «A↔156 = 서비스 경로 오버헤드» 가 **«경로 오버헤드 + 유휴 동거 비용»** 이 되어 둘이 안 갈린다.
 > 결과 문서에 이 문장을 그대로 넣는다..
 
+> 🔴 **2라운드 조건이 확정됐다 (2026-08-16) — 이 rig 은 아직 그 조건이 아니다**
+>
+> 1라운드는 완주·회수했고([결과](../coresidency-aws-2026-08-16/README.md)), **못 닫은 셋**
+> (H1 동거 비용 · 부하기 천장 · H3 캡이 옆을 지키는가)을 닫는 2라운드가 확정됐다.
+> 전문은 [설계 §5-3 · §11](../../../docs/decisions/ai-coresidency-capacity.md).
+>
+> | 바뀌는 것 | 지금 이 rig | 2라운드 | 이슈 |
+> |---|---|---|---|
+> | 교대 단위 | **팔** (`coresidency_sweep.sh:436-456`) | **레벨** — `A_20 → B_20 → C_20 → A_40 …` | [#251](https://github.com/Shadowfit/init/issues/251) |
+> | 캡 전환 | compose override → **컨테이너 재생성**(`:111-118`) | `docker update --cpus` (재기동 없음) | [#251](https://github.com/Shadowfit/init/issues/251) |
+> | 캡 확인 | **없다** | `NanoCpus` 대조, 팔 A·B 는 0 이어야 한다 | [#253](https://github.com/Shadowfit/init/issues/253) |
+> | 레벨 순서 | 항상 오름차순(`:451`) | 라운드마다 반전 (버림판 레벨도 따라간다) | [#252](https://github.com/Shadowfit/init/issues/252) |
+> | 레벨 | 6개 | **8개** — 90·100 추가. **최고 160 은 고정**(`GHZ_RPS` 유도) | — |
+> | 앵커 판 | 없다 | 라운드 시작·중간·끝에 B@80 | — |
+> | 부하기 지표 | `loader_*.tsv` 있음(**EC2 검증 0**) | + `/proc/net/dev` · dt 일치 · **리허설 게이트** · 판정선 `load_ai_pct` ~100% | [#250](https://github.com/Shadowfit/init/issues/250) |
+> | 자기 프로브 | 없다 | 대상 박스 로컬 1세션 프로브 (RTT 를 두 시계로) | [#250](https://github.com/Shadowfit/init/issues/250) |
+> | 從 부하 표 | 지연 열 없음(`:90`) | ghz p50·p95·p99 + 판마다 actuator·`SHOW GLOBAL STATUS` 2회 | [#254](https://github.com/Shadowfit/init/issues/254) |
+>
+> **78판 · 스윕 ≈ 3h01m · 인스턴스 ≈ 3h20m.** 선행 조건(로컬 확인 5건)은 설계 §11.
+> ⚠️ **위 표는 전부 «아직 코드에 없다»** — 이 rig 은 1라운드를 돈 그 상태 그대로다.
+>
+> 🔴 **그리고 2라운드가 이미 돌았다** — [`../coresidency-aws-b-2026-08-16/`](../coresidency-aws-b-2026-08-16/README.md)
+> (설계 §12). **이 rig 을 한 줄도 안 고치고** 부하기만 4 vCPU 로 올린 라운드인데,
+> 팔 A 드리프트가 **+16.0% → +0.8%** 로 사라지고 **A≈B(−0.5%)** 로 H1 이 답을 얻었다.
+> → 위 표에서 **교대 단위·`docker update` 는 강등**되고, 남는 최우선은 **레벨 90·100** 과
+> **H3 판정 열**([#254](https://github.com/Shadowfit/init/issues/254))이다.
+> ⚠️ 단 **「부하기가 천장이었다」는 아니다** — AI CPU 가 869.3% → 869.0% 로 같은데 처리량만
+> +17.7% 다. **라운드 간 절대값 비재현**이 새로 열렸고, 그래서 **앵커 판**의 값이 올라간다.
+
 ---
 
 ## 무엇을 재는가
