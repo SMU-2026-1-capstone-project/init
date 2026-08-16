@@ -75,7 +75,10 @@ MYSQL_PW=${MYSQL_PW:-shadowfit}
 mkdir -p "$OUT" || { echo "🔴 결과 디렉터리를 못 만든다: $OUT" >&2; exit 1; }
 
 LOG="$OUT/coresidency.tsv"
-[ -f "$LOG" ] || printf "arm\tround\tsessions\treq\trps\tdetect_pct\tp50\tp95\tp99\tnolease\tnopose\tsetup_fail\n" > "$LOG"
+# 🔴 `warm_lo`·`warm_hi` 는 그 판의 **정상 상태 구간을 epoch 로** 적은 것이다. 이게 없으면
+#    `stats_*.tsv`(epoch)를 요청 표(t0 기준 상대초)와 같은 축에 못 올려, 포화 구간의
+#    컨테이너별 CPU 를 사후에 못 자른다 — Q2 의 답이 거기에 있다(2026-08-16 설계 대조).
+[ -f "$LOG" ] || printf "arm\tround\tsessions\treq\trps\tdetect_pct\tp50\tp95\tp99\tnolease\tnopose\tsetup_fail\twarm_lo\twarm_hi\n" > "$LOG"
 
 # 🔴 ghz 결과를 본 표에 섞지 않는다. 「AI 가 몇 세션을 먹었나」와 「옆에 얼마가 걸렸나」는
 #    다른 축이고, 뭉치면 둘 다 나빠진다(README 「세 결과를 뭉치지 않는다」와 같은 규약).
@@ -306,12 +309,13 @@ run_one() {  # $1=팔 $2=라운드 $3=세션수
   stop_ghz "$tag"
   stop_stats "$tag"
   if [ $rc -ne 0 ] || [ ! -f "$OUT/req_${tag}_summary.tsv" ]; then
-    printf "%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\n" "$arm" "$round" "$n" >> "$LOG"
+    printf "%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n" "$arm" "$round" "$n" >> "$LOG"
     return 1
   fi
+  # $14·$15 = warm_lo_epoch·warm_hi_epoch (load_ai.py 가 **끝에** 붙인다 — 위치로 읽으므로)
   tail -1 "$OUT/req_${tag}_summary.tsv" \
     | awk -v a="$arm" -v r="$round" -v n="$n" -F'\t' \
-      '{printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", a,r,n,$5,$6,$7,$8,$9,$10,$11,$12,$13}' >> "$LOG"
+      '{printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", a,r,n,$5,$6,$7,$8,$9,$10,$11,$12,$13,$15,$16}' >> "$LOG"
 }
 
 # ── 실행 ─────────────────────────────────────────────────────────────────
@@ -331,17 +335,48 @@ if echo " $ARMS " | grep -qE ' (B|C|D) '; then
   fi
 fi
 
-for arm in $ARMS; do
-  step "팔 $arm"
-  apply_arm "$arm" || exit 1
-  sleep 20
-  # 팔을 바꾸면 컨테이너가 재기동되므로 앞 팔의 세션이 IN_PROGRESS 로 남는다. 먼저 푼다.
-  reset_sessions
-  # 버림판 — 첫 판은 컨테이너 워밍업·JIT·버퍼풀을 가장 크게 탄다. **표에 안 넣는다.**
-  note "버림판 (표에 안 들어간다)"
-  run_one "$arm" "discard" "$(echo "$LEVELS" | awk '{print $1}')" >/dev/null 2>&1
-  reset_between
-  for r in $(seq 1 "$REPEATS"); do
+# 🔴 **팔을 블록으로 돌지 않는다** (2026-08-16, 설계 §5 대조에서 잡혔다).
+#    초판은 «A 13판 → B 13판 → C 13판» 이었다. 그러면 팔 C 는 **항상 라운드의 마지막**이라
+#    «캡 효과» 와 «시간이 흐르며 생긴 것»(EBS 버스트 크레딧 소진·테이블 성장·열)이 같은 축에
+#    겹쳐 원리적으로 안 갈린다. 4차 풀 사이징 라운드가 «N 클수록 +32%» 를 냈다가 순서를
+#    뒤집으니 «작을수록 +36%» 로 부호가 바뀐 것이 정확히 이 오염이었다
+#    ([[feedback_measure_design_needs_repeats]]).
+#
+#    설계 §5 가 요구하는 것은 «각 팔이 판 순서 1·2·3 에 한 번씩» 이다. 라운드마다 팔 순서를
+#    한 칸씩 돌린다 — 팔이 3개·REPEATS 3이면 그것이 라틴 방격이다:
+#        r1: A B C  /  r2: B C A  /  r3: C A B
+#    대가는 팔 전환이 3회 → 9회로 느는 것(판당 ~40초, 총 +4분 안팎)이다. 싸다.
+rotate_arms() {  # $1 = 왼쪽으로 돌릴 칸 수
+  local -a a=($ARMS)
+  local k=$1 n=${#a[@]} i out=""
+  for ((i = 0; i < n; i++)); do out="$out ${a[$(((i + k) % n))]}"; done
+  echo "${out# }"
+}
+
+NARMS=$(echo "$ARMS" | wc -w)
+if [ "$((REPEATS % NARMS))" -ne 0 ]; then
+  note "⚠️ REPEATS($REPEATS) 가 팔 수($NARMS)의 배수가 아니다 — 위치가 정확히 균형 잡히지 않는다."
+  note "   순서 효과가 남을 수 있으니 결과에 그대로 적을 것 (방격이 아니라 «부분 균형» 이다)"
+fi
+
+# 버림판은 **팔당 1회**다(설계 §5). 팔이 처음 나오는 라운드에서만 돈다.
+DISCARDED=""
+
+for r in $(seq 1 "$REPEATS"); do
+  step "라운드 r$r — 팔 순서 $(rotate_arms "$((r - 1))")"
+  for arm in $(rotate_arms "$((r - 1))"); do
+    apply_arm "$arm" || exit 1
+    sleep 20
+    # 팔을 바꾸면 컨테이너가 재기동되므로 앞 팔의 세션이 IN_PROGRESS 로 남는다. 먼저 푼다.
+    reset_sessions
+    case " $DISCARDED " in
+      *" $arm "*) ;;
+      *)  # 버림판 — 그 팔의 첫 판은 컨테이너 워밍업·JIT·버퍼풀을 가장 크게 탄다. **표에 안 넣는다.**
+          note "팔 $arm 버림판 (표에 안 들어간다)"
+          run_one "$arm" "discard" "$(echo "$LEVELS" | awk '{print $1}')" >/dev/null 2>&1
+          DISCARDED="$DISCARDED $arm"
+          reset_between ;;
+    esac
     for n in $LEVELS; do
       run_one "$arm" "r$r" "$n" || true
       reset_between

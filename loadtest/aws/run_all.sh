@@ -462,6 +462,41 @@ cores_assert_usable() {  # $1 = coresidency.tsv
     }' "$tsv"
 }
 
+# 🔴 「ghz 가 돌았다」와 「옆이 실제로 일했다」는 다르다 — 그리고 **판정이 여기 없었다**
+#    (2026-08-16 설계 대조에서 잡혔다).
+#
+#    `stop_ghz` 는 성공 응답 0건을 **stdout 에 🔴 로 찍을 뿐** 종료 코드에 영향이 없고,
+#    `cores_assert_usable` 은 `coresidency.tsv` 만 본다. 그래서 GHZ_TOKEN 이 틀렸거나 6565 가
+#    막혀 從 부하가 전멸해도 **리허설이 통과**하고, 본판 6시간이 통째로 «유휴 동거» 가 된다.
+#    A 와 B 를 가르는 것이 그 부하 하나뿐이므로(#222 (a)안) 결과는 «동거 비용이 작다» 로
+#    정상처럼 읽힌다 — #201·#202 와 같은 부류라 사람이 아니라 게이트가 잡아야 한다.
+#
+#    버림판은 판정에서 뺀다. 그 판은 표에 안 들어가고, 워밍업 중 한 번 튄 것으로 라운드를
+#    막으면 «환경 결함이 아닌 것» 때문에 멈추게 된다.
+cores_assert_ghz() {  # $1 = ghz.tsv
+  local tsv=$1
+  echo " $CORES_ARMS " | grep -qE ' (B|C|D) ' || { note "從 부하 없는 라운드 — ghz 판정 생략"; return 0; }
+  [ -f "$tsv" ] || { note "🔴 從 부하 표가 없다: $tsv — «걸었는지» 를 단언할 수 없다"; return 1; }
+  awk -F'\t' '
+    NR>1 && $2 != "A" && $1 !~ /_discard_/ {
+      rows++
+      if ($5 == "FAIL")                { bad++; printf "     %s %s → 리포트를 못 읽었다\n", $1, $2; next }
+      if ($7+0 == 0)                   { bad++; printf "     %s %s → 성공 0건 (%s건 전부 실패)\n", $1, $2, $6; next }
+      if ($4+0 > 0 && $5+0 < $4*0.5)   { printf "     ⚠️ %s %s → 실측 %s < 목표 %s 의 절반 — 다른 조건이다\n", $1, $2, $5, $4 }
+      if ($8+0 > 0)                    { printf "     ⚠️ %s %s → 실패 %s/%s\n", $1, $2, $8, $6 }
+    }
+    END {
+      if (rows == 0) { print "  🔴 從 부하를 쓰는 팔의 판이 한 줄도 없다 — 그 팔들이 안 돌았거나 부하가 안 붙었다"; exit 1 }
+      if (bad > 0) {
+        printf "  🔴 %d/%d 판에서 從 부하가 걸리지 않았다.\n", bad, rows
+        print  "     이 상태로 본판을 돌면 팔 B·C 가 «유휴 동거» 가 되고, 표는 «동거 비용이 작다» 로 읽힌다"
+        print  "     볼 곳: GHZ_TOKEN(INTERNAL_API_TOKEN 과 같은 값인가) · 대상 6565 도달 · 페이로드 세션 시드"
+        exit 1
+      }
+      printf "  ✅ 從 부하 %d판 전부 성립 (성공 응답 > 0)\n", rows
+    }' "$tsv"
+}
+
 # 축소 리허설. **여기서 실패하면 본 측정으로 넘어가지 않는다** — 리허설의 존재 이유다.
 # README 「축소 리허설(무인 실행 전 필수)」와 같은 규모로 돈다.
 phase_coresidency_rehearsal() {
@@ -490,6 +525,8 @@ phase_coresidency_rehearsal() {
   #    #222 의 팔 A 가 그 상태였고 (a)안으로 고쳤다 — 이 판정은 그 수정이 실제로 섰는지를
   #    EC2 에서 처음으로 확인하는 자리이기도 하다(코드 판독만 돼 있다).
   cores_assert_usable "$out/coresidency.tsv" || return 1
+  # 從 부하까지 봐야 «동거» 를 잰 것이다. AI 쪽만 성립해도 옆이 놀았으면 이 라운드는 헛돈다.
+  cores_assert_ghz "$out/ghz.tsv" || return 1
   return 0
 }
 
@@ -521,6 +558,8 @@ phase_coresidency() {
   # (판정은 사람이 한다: sweep 말미의 「특히 볼 것」 세 줄)
   cores_assert_usable "$out/coresidency.tsv" \
     || note "⚠️ 위 판들은 그대로 남긴다 — 지우지 말고 «성립 안 함» 으로 읽을 것"
+  cores_assert_ghz "$out/ghz.tsv" \
+    || note "⚠️ 從 부하가 안 걸린 판이 있다 — 그 판의 «동거» 는 «유휴 동거» 다. 표에 그대로 적을 것"
   return 0
 }
 
