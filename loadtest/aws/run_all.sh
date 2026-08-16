@@ -103,7 +103,8 @@ TARGET_SSH=${TARGET_SSH:-${TARGET_HOST:+ssh -o StrictHostKeyChecking=no -o Conne
 AI_PUBLIC_TOKEN=${AI_PUBLIC_TOKEN:-}
 
 CORES_ARMS=${CORES_ARMS:-"A B C"}            # D(관측 스택)를 넣으면 판이 33% 는다
-CORES_LEVELS=${CORES_LEVELS:-"20 40 80 160"}
+CORES_LEVELS=${CORES_LEVELS:-"20 40 60 80 120 160"}  # 2026-08-16 확정 — 설계 §5-2.
+                                             # 🔴 `coresidency_sweep.sh:43` 과 **같은 값**이어야 한다
 CORES_DUR=${CORES_DUR:-90}
 CORES_REPEATS=${CORES_REPEATS:-3}
 CORES_REH_LEVELS=${CORES_REH_LEVELS:-"5 10"} # 축소 리허설 — README 「무인 실행 전 필수」
