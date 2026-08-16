@@ -44,17 +44,17 @@
 > |---|---|---|---|
 > | 교대 단위 | **팔** (`coresidency_sweep.sh:436-456`) | **레벨** — `A_20 → B_20 → C_20 → A_40 …` | [#251](https://github.com/Shadowfit/init/issues/251) |
 > | 캡 전환 | compose override → **컨테이너 재생성**(`:111-118`) | `docker update --cpus` (재기동 없음) | [#251](https://github.com/Shadowfit/init/issues/251) |
-> | 캡 확인 | **없다** | `NanoCpus` 대조, 팔 A·B 는 0 이어야 한다 | [#253](https://github.com/Shadowfit/init/issues/253) |
+> | 캡 확인 | ~~없다~~ → **✅ 반영(2026-08-17)** | 전환마다 `NanoCpus` ↔ `.env` 대조 · 팔 A·B 는 **0이어야** 한다(앞 팔 캡 잔존 차단) · 관측값은 `caps.tsv` | [#253](https://github.com/Shadowfit/init/issues/253) |
 > | 레벨 순서 | ~~항상 오름차순~~ → **✅ 반영(2026-08-17)** | 라운드마다 **치환**(`LEVEL_SHIFT=2`). 반전은 상관이 1.000 으로 남아서 안 쓴다 → 0.361. 버림판 레벨도 블록 첫 레벨을 따라간다 | [#252](https://github.com/Shadowfit/init/issues/252) |
 > | 레벨 | ~~6개~~ → **8개** ✅ 반영(2026-08-17) | **20 40 60 80 90 100 120 160**. 최고 160 은 고정(`GHZ_RPS` 유도) | — |
 > | 앵커 판 | ~~없다~~ → **✅ 반영(2026-08-17)** | 라운드마다 + 끝에 **B@80** 4판(`round=anc1..4`). 첫 앵커 앞에서 그 팔의 버림판을 먼저 돌린다 | — |
-> | 부하기 지표 | `loader_*.tsv` 있음(**EC2 검증 0**) | + `/proc/net/dev` · dt 일치 · **리허설 게이트** · 판정선 `load_ai_pct` ~100% | [#250](https://github.com/Shadowfit/init/issues/250) |
+> | 부하기 지표 | `loader_*.tsv` 있음 → **✅ 보강(2026-08-17)** | `rx_mbps`·`tx_mbps` 추가 · 프로세스 %도 **실측 dt** 로 · 종료 구간은 **-1**([#255](https://github.com/Shadowfit/init/issues/255)) · **리허설 게이트**(`load_ai` 가 한 표본도 안 보이면 차단) | [#250](https://github.com/Shadowfit/init/issues/250) |
 > | 자기 프로브 | 없다 | 대상 박스 로컬 1세션 프로브 (RTT 를 두 시계로) | [#250](https://github.com/Shadowfit/init/issues/250) |
 > | 從 부하 표 · 옆 지표 | ~~지연 열 없음~~ → **✅ 반영(2026-08-17)** | `ghz.tsv` 에 **p50·p95·p99** · 판마다 **pre·mid·post 3회** 스냅샷 → `side.tsv`. 리허설 게이트 `cores_assert_side` 가 빈 표를 막는다 | [#254](https://github.com/Shadowfit/init/issues/254) |
 >
 > **78판 · 스윕 ≈ 3h01m · 인스턴스 ≈ 3h20m.** 선행 조건(로컬 확인 5건)은 설계 §11.
-> ✅ **레벨 8개(⑥) · 옆 지표(⑨) · 레벨 순서 치환(④) · 앵커 판(⑤)이 2026-08-17 에 들어갔다.**
-> 나머지(교대 단위·캡 단언·자기 프로브·샘플러 보강)는 **아직 코드에 없다.**
+> ✅ **③④⑤⑥⑦⑨ 가 2026-08-17 에 들어갔다** — 레벨 8개 · 옆 지표 · 레벨 순서 치환 · 앵커 판 ·
+> 캡 단언 · 부하기 샘플러 보강. **남은 것은 ①②(교대 단위, 강등) 와 ⑧(자기 프로브)뿐이다.**
 > 판 수는 **79**(본판 72 + 버림 3 + 앵커 4) · 스윕 ≈ 2h52m.
 > ⚠️ 들어간 둘도 **EC2 실행 검증은 0** 이다 — 로컬에서 파서·awk·게이트를 조각 단위로만 돌렸다.
 >
@@ -154,7 +154,7 @@ ghz   ──SavePoseDataBatch──> Spring → MySQL   (기존 loadtest/ghz/ ri
 | `frames.json` | 생성물. 30프레임 · 408KB · 프레임당 13.6KB |
 | `load_ai.py` | 동시 세션 부하기. **세션을 Spring 통해 실물로 연다**(안 그러면 전부 거절) |
 | `probe.sh` | 승격 게이트 G0~G3 |
-| `coresidency_sweep.sh` | 팔 × ramp × 판 오케스트레이션 + `docker stats`·부하기·**옆 지표** 샘플러 |
+| `coresidency_sweep.sh` | 팔 × ramp × 판 오케스트레이션 · `docker stats`·부하기·옆 지표 샘플러 · 캡 단언 |
 
 ---
 

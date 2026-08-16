@@ -143,6 +143,80 @@ YML
     D) $SSH "cd $REPO_DIR && docker compose -f docker-compose.yml -f docker-compose.cap.yml --profile obs up -d" ;;
     *) echo "🔴 모르는 팔: $arm" >&2; return 1 ;;
   esac
+  local rc=$?
+  [ $rc -eq 0 ] || { echo "🔴 팔 $arm 구성 명령이 실패했다 (rc=$rc)" >&2; return $rc; }
+  assert_caps "$arm"
+}
+
+# ── 캡이 실제로 물렸는가 — #253 ──────────────────────────────────────────
+#
+# 🔴 **캡이 안 물리면 팔 C ≡ 팔 B 인데 표는 정상이다.** 결함 카운터도 0, 검출률도 100% 라
+#    사후에는 «캡이 아무것도 안 깎았다 = H3 반증» 으로 읽힌다 — 실제로는 캡이 없었을 뿐인데.
+#    [#223](ghz 미배선)과 **정확히 같은 부류**를 캡 축에서만 안 막고 있었다.
+#    08-16 라운드의 「물렸다」는 사후 관측(AI 가 789% 로 캡 800% 에 붙었다)이지 게이트가 아니다.
+#
+# 🔴 **팔 A·B 에서는 반대 방향으로 단언한다** — `NanoCpus` 가 **0이어야** 한다. override 를
+#    지우고 `up -d` 했는데 컨테이너가 재생성되지 않으면 **앞 팔의 캡이 그대로 남는다.**
+#
+# 관측한 값은 `caps.tsv` 에 남긴다. 캡은 **측정 조건**이라 «단언했다» 로 끝내면 결과 문서에
+# 적을 근거가 없다.
+CAPS_LOG="$OUT/caps.tsv"
+[ -f "$CAPS_LOG" ] || printf "epoch\tarm\tcontainer\tnanocpus\texpected\tverdict\n" > "$CAPS_LOG"
+
+arm_wants_cap() { case $1 in C|D) return 0 ;; *) return 1 ;; esac; }
+
+assert_caps() {  # $1 = 팔
+  local arm=$1 want=0 now rc=0 out name nano expv expn verdict
+  arm_wants_cap "$arm" && want=1
+  now=$(date +%s)
+
+  out=$($SSH "docker inspect -f '{{.Name}} {{.HostConfig.NanoCpus}}' \
+        shadowfit-ai shadowfit-backend $MYSQL_CONTAINER" 2>/dev/null | tr -d '\r')
+  if [ -z "$out" ]; then
+    echo "  🔴 컨테이너 캡을 못 물어봤다 — «캡이 없다» 가 아니라 «못 물었다» 다. 팔 $arm 을 시작하지 않는다" >&2
+    printf "%s\t%s\t-\t-\t-\tUNREADABLE\n" "$now" "$arm" >> "$CAPS_LOG"
+    return 1
+  fi
+
+  while read -r name nano; do
+    [ -n "$name" ] || continue
+    name=${name#/}
+    expv="-"; expn=""
+    if [ "$want" = 1 ]; then
+      case $name in
+        shadowfit-ai)      expv=$($SSH "grep -E '^AI_CPUS=' $REPO_DIR/.env      | cut -d= -f2" 2>/dev/null | tr -d '\r"'"'"' ') ;;
+        shadowfit-backend) expv=$($SSH "grep -E '^BACKEND_CPUS=' $REPO_DIR/.env | cut -d= -f2" 2>/dev/null | tr -d '\r"'"'"' ') ;;
+        *)                 expv=$($SSH "grep -E '^MYSQL_CPUS=' $REPO_DIR/.env   | cut -d= -f2" 2>/dev/null | tr -d '\r"'"'"' ') ;;
+      esac
+      [ -n "$expv" ] && expn=$(awk -v v="$expv" 'BEGIN{ printf "%.0f", v * 1000000000 }')
+    fi
+
+    if [ "$want" = 1 ]; then
+      if [ "${nano:-0}" = "0" ]; then
+        verdict=MISSING; rc=1
+      elif [ -n "$expn" ] && [ "$nano" != "$expn" ]; then
+        verdict=MISMATCH; rc=1
+      elif [ -z "$expn" ]; then
+        verdict=SET_UNVERIFIED     # 캡은 있는데 기대값을 .env 에서 못 읽었다
+      else
+        verdict=OK
+      fi
+    else
+      if [ "${nano:-0}" = "0" ]; then verdict=OK; else verdict=STALE; rc=1; fi
+    fi
+    printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$now" "$arm" "$name" "${nano:-0}" "${expv:--}" "$verdict" >> "$CAPS_LOG"
+    case $verdict in
+      MISSING)  echo "  🔴 $name 에 CPU 캡이 없다 — 팔 $arm 이 팔 B 와 같은 조건이 된다 (#253)" >&2 ;;
+      MISMATCH) echo "  🔴 $name 캡이 기대와 다르다: $nano ≠ $expn (.env $expv vCPU) — 다른 조건이다" >&2 ;;
+      STALE)    echo "  🔴 $name 에 앞 팔의 캡이 남아 있다($nano) — 팔 $arm 은 «캡 없음» 이어야 한다 (#253)" >&2 ;;
+      SET_UNVERIFIED) echo "  ⚠️ $name 캡 $nano — .env 에서 기대값을 못 읽어 «0이 아니다» 까지만 확인했다" >&2 ;;
+    esac
+  done <<EOF
+$out
+EOF
+
+  [ $rc -eq 0 ] && note "캡 확인 — 팔 $arm ($([ "$want" = 1 ] && echo "캡 있음" || echo "캡 없음")) · caps.tsv 에 기록"
+  return $rc
 }
 
 # ── 從 부하 구동 ─────────────────────────────────────────────────────────
@@ -373,28 +447,52 @@ _ghz_jiffies() {      # $1 = 태그 → start_ghz 가 남긴 PID 하나. 팔 A �
   [ -f "$f" ] || { echo 0; return; }
   _pid_jiffies "$(cat "$f")"
 }
+# 🔴 네트워크도 걷는다 (2026-08-17, #250 후속). **CPU 가 안 붙었는데 천장이면 다음 용의자가
+#    대역**인데 2라운드까지 그 자료가 없었다. `lo` 는 뺀다 — 부하기 트래픽은 전부 밖으로 나간다.
+_net_bytes() {        # "rx tx" (누적 바이트)
+  awk -F'[: ]+' 'NR>2 && $2 != "lo" { rx += $3; tx += $11 } END { print rx+0, tx+0 }' /proc/net/dev
+}
 
 start_loader_stats() {  # $1 = 태그
   local f="$OUT/loader_$1.tsv"
-  printf 'epoch\tcpu_pct\tload_ai_pct\tghz_pct\tload1\tmem_used_mib\tmem_total_mib\n' > "$f"
-  ( b0=""; t0=""; a0=0; g0=0
+  # 🔴 **판정선은 «총 CPU 200%» 가 아니다** (2026-08-17 정정). 2라운드에서 부하기 CPU 는
+  #    4 vCPU 중 0.68 만 쓰면서도, 부하기를 키우자 결과가 +17.7% 움직였다(설계 §12-1).
+  #    이 표가 답하는 것은 «부하기 CPU 가 붙었나» 까지다 — «부하기가 결과를 움직였나» 는
+  #    자기 프로브가 답한다. 그래서 대역(rx·tx)도 같이 걷는다.
+  printf 'epoch\tcpu_pct\tload_ai_pct\tghz_pct\tload1\tmem_used_mib\tmem_total_mib\trx_mbps\ttx_mbps\n' > "$f"
+  ( b0=""; t0=""; a0=0; g0=0; r0=0; x0=0
     read -r b0 t0 <<<"$(_cpu_busy_total)"
     a0=$(_proc_jiffies 'load_ai\.py'); g0=$(_ghz_jiffies "$1")
+    read -r r0 x0 <<<"$(_net_bytes)"
     while :; do
       sleep "$STATS_SEC"
       read -r b1 t1 <<<"$(_cpu_busy_total)"
       a1=$(_proc_jiffies 'load_ai\.py'); g1=$(_ghz_jiffies "$1")
+      read -r r1 x1 <<<"$(_net_bytes)"
       dt=$((t1 - t0)); db=$((b1 - b0))
       if [ "$dt" -gt 0 ]; then
+        # 🔴 프로세스 %도 **실측 dt** 로 나눈다 (2026-08-17). 초판은 총 CPU 만 jiffies 로 재고
+        #    프로세스는 `STATS_SEC`(가정)로 나눠서, 샘플러 루프가 밀리면 **프로세스만** 과소
+        #    평가됐다. 경과초는 `dt/(hz*n)` 로 jiffies 에서 그대로 나온다 — 가정을 안 쓴다.
+        # 🔴 **음수는 «-1» 로 적는다** (#255). 프로세스가 창 안에서 끝나면 다음 표본의 누적이
+        #    0 이라 차분이 음수가 되는데, 그대로 평균 내면 부하기 CPU 가 «작게» 나온다.
+        #    빈칸도 0 도 아니고 **«못 잰 구간»** 이다 — 이 rig 의 -1 규약과 같다.
         awk -v e="$(date +%s)" -v db="$db" -v dt="$dt" -v da="$((a1 - a0))" -v dg="$((g1 - g0))" \
-            -v n="$LOADER_NCPU" -v hz="$LOADER_HZ" -v s="$STATS_SEC" \
+            -v drx="$((r1 - r0))" -v dtx="$((x1 - x0))" \
+            -v n="$LOADER_NCPU" -v hz="$LOADER_HZ" \
             -v l1="$(awk '{print $1}' /proc/loadavg)" \
             -v mem="$(awk '/^MemTotal/{t=$2}/^MemAvailable/{a=$2}
                            END{ if (t=="" || a=="") printf "-1\t-1";      # 🔴 MemAvailable 이 없으면
                                 else printf "%.1f\t%.1f",(t-a)/1024,t/1024 }' /proc/meminfo)" \
-            'BEGIN{printf "%s\t%.1f\t%.1f\t%.1f\t%s\t%s\n", e, 100*db/dt*n, 100*da/(hz*s), 100*dg/(hz*s), l1, mem}' >> "$f"
+            'BEGIN{ el = dt / (hz * n); pc = (el > 0) ? 100 / (hz * el) : 0;
+                    printf "%s\t%.1f\t%s\t%s\t%s\t%s\t%s\t%s\n", e, 100*db/dt*n,
+                           (da < 0 ? "-1" : sprintf("%.1f", da * pc)),
+                           (dg < 0 ? "-1" : sprintf("%.1f", dg * pc)),
+                           l1, mem,
+                           (drx < 0 || el <= 0 ? "-1" : sprintf("%.2f", 8 * drx / el / 1000000)),
+                           (dtx < 0 || el <= 0 ? "-1" : sprintf("%.2f", 8 * dtx / el / 1000000)) }' >> "$f"
       fi
-      b0=$b1; t0=$t1; a0=$a1; g0=$g1
+      b0=$b1; t0=$t1; a0=$a1; g0=$g1; r0=$r1; x0=$x1
     done ) & echo $! > "/tmp/loader_$1.pid"
 }
 stop_loader_stats() { [ -f "/tmp/loader_$1.pid" ] && kill "$(cat "/tmp/loader_$1.pid")" 2>/dev/null; rm -f "/tmp/loader_$1.pid"; }
