@@ -9,7 +9,7 @@
 
 ## 1. 배경 / 문제
 
-`pose_data` 파티셔닝(Range by `created_at`, TTL 만료 시 `DROP PARTITION`이 `DELETE WHERE`보다 ~625배 빠름)은 `loadtest/measure_partition.sh`로 스크래치 테이블에서 실측 완료했으나, 실제 `mysql/schema.sql`에는 아직 반영 안 됨.
+`pose_data` 파티셔닝(Range by `created_at`, TTL 만료 시 `DROP PARTITION`이 `DELETE WHERE`보다 ~625배 빠름 — 행당 정규화 570배, 로컬·더미 기준. 조건표는 [`../portfolio/realmysql-experiments.md` §②d](../portfolio/realmysql-experiments.md))은 `loadtest/measure_partition.sh`로 스크래치 테이블에서 실측 완료했으나, 실제 `mysql/schema.sql`에는 아직 반영 안 됨.
 
 실스키마에 반영 시도 중 로컬 MySQL 8.0에서 다음 에러로 막힘:
 
@@ -68,7 +68,7 @@ exercise_sessions(id) ──ON DELETE CASCADE──▶ pose_data.session_id  (+ 
 
 | 선택지 | 의미 | 장점 | 단점 |
 |---|---|---|---|
-| **A1. 파티셔닝 보류** | FK·CASCADE 유지, 파티션은 스크래치 테이블 실측으로만 남김 | 구현 비용 0, 리스크 0 | TTL 만료 시 625배 비용 차이를 실스키마에서 못 누림. 데이터 계속 쌓이면 `DELETE` 기반 만료가 운영 부담(18분+ 락) |
+| **A1. 파티셔닝 보류** | FK·CASCADE 유지, 파티션은 스크래치 테이블 실측으로만 남김 | 구현 비용 0, 리스크 0 | TTL 만료 시 625배(행당 570배) 비용 차이를 실스키마에서 못 누림. 데이터 계속 쌓이면 `DELETE` 기반 만료가 운영 부담(18분+ 락) |
 | **A2. 파티셔닝 진행** | FK 제거 + 분기 B의 대체 메커니즘 도입 | TTL 만료가 사실상 무료(DROP PARTITION), 장기 운영 관점에서 이득 큼 | 구현 비용 발생(분기 B), PK 복합키화(`(id, created_at)`) 동반 필요 |
 
 **추천**: **A2 (파티셔닝 진행)**. 이유:
