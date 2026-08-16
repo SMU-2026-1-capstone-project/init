@@ -49,12 +49,13 @@
 > | 레벨 | ~~6개~~ → **8개** ✅ 반영(2026-08-17) | **20 40 60 80 90 100 120 160**. 최고 160 은 고정(`GHZ_RPS` 유도) | — |
 > | 앵커 판 | ~~없다~~ → **✅ 반영(2026-08-17)** | 라운드마다 + 끝에 **B@80** 4판(`round=anc1..4`). 첫 앵커 앞에서 그 팔의 버림판을 먼저 돌린다 | — |
 > | 부하기 지표 | `loader_*.tsv` 있음 → **✅ 보강(2026-08-17)** | `rx_mbps`·`tx_mbps` 추가 · 프로세스 %도 **실측 dt** 로 · 종료 구간은 **-1**([#255](https://github.com/Shadowfit/init/issues/255)) · **리허설 게이트**(`load_ai` 가 한 표본도 안 보이면 차단) | [#250](https://github.com/Shadowfit/init/issues/250) |
-> | 자기 프로브 | 없다 | 대상 박스 로컬 1세션 프로브 (RTT 를 두 시계로) | [#250](https://github.com/Shadowfit/init/issues/250) |
+> | 자기 프로브 | ~~없다~~ → **✅ 반영(2026-08-17)** | 대상 박스에서 `load_ai.py --sessions 1 --dur 0`(SIGTERM 까지) · 계정 prefix `probe` · **부하기 warm 창으로 잘라** `probe_rtt.tsv` 에 기록 | [#250](https://github.com/Shadowfit/init/issues/250) · 설계 §4-2 |
 > | 從 부하 표 · 옆 지표 | ~~지연 열 없음~~ → **✅ 반영(2026-08-17)** | `ghz.tsv` 에 **p50·p95·p99** · 판마다 **pre·mid·post 3회** 스냅샷 → `side.tsv`. 리허설 게이트 `cores_assert_side` 가 빈 표를 막는다 | [#254](https://github.com/Shadowfit/init/issues/254) |
 >
 > **78판 · 스윕 ≈ 3h01m · 인스턴스 ≈ 3h20m.** 선행 조건(로컬 확인 5건)은 설계 §11.
-> ✅ **③④⑤⑥⑦⑨ 가 2026-08-17 에 들어갔다** — 레벨 8개 · 옆 지표 · 레벨 순서 치환 · 앵커 판 ·
-> 캡 단언 · 부하기 샘플러 보강. **남은 것은 ①②(교대 단위, 강등) 와 ⑧(자기 프로브)뿐이다.**
+> ✅ **③④⑤⑥⑦⑧⑨ 가 2026-08-17 에 들어갔다** — 레벨 8개 · 옆 지표 · 레벨 순서 치환 · 앵커 판 ·
+> 캡 단언 · 부하기 샘플러 보강 · 자기 프로브. **남은 것은 ①②(교대 단위, 강등)뿐이다.**
+> ⚠️ 전부 **EC2 실행 검증 0** 이다 — 로컬에서 파서·awk·게이트·루프를 조각 단위로만 돌렸다.
 > 판 수는 **79**(본판 72 + 버림 3 + 앵커 4) · 스윕 ≈ 2h52m.
 > ⚠️ 들어간 둘도 **EC2 실행 검증은 0** 이다 — 로컬에서 파서·awk·게이트를 조각 단위로만 돌렸다.
 >
@@ -152,9 +153,21 @@ ghz   ──SavePoseDataBatch──> Spring → MySQL   (기존 loadtest/ghz/ ri
 | `gen_frames.py` | 합성 스쿼트 → base64 JPEG 배열(`frames.json`). **각도·검출을 먼저 재고 사실을 meta 에 박는다** |
 | `synthetic_body.py` | 합성 인체 — `measure_ai_concurrency.py:55-96` 의 **사본**(사유는 파일 docstring) |
 | `frames.json` | 생성물. 30프레임 · 408KB · 프레임당 13.6KB |
-| `load_ai.py` | 동시 세션 부하기. **세션을 Spring 통해 실물로 연다**(안 그러면 전부 거절) |
+| `load_ai.py` | 동시 세션 부하기. **세션을 Spring 통해 실물로 연다**(안 그러면 전부 거절). `--dur 0`(SIGTERM 까지)·`--user-prefix` 로 **자기 프로브**도 이 파일을 쓴다 |
 | `probe.sh` | 승격 게이트 G0~G3 |
 | `coresidency_sweep.sh` | 팔 × ramp × 판 오케스트레이션 · `docker stats`·부하기·옆 지표 샘플러 · 캡 단언 |
+
+### 산출물 (판마다)
+
+| 파일 | 무엇 | 왜 |
+|---|---|---|
+| `coresidency.tsv` | 판별 요약(부하기 시계) | 主 |
+| `ghz.tsv` | 從 부하 — 요청 수·성공·**지연 p50/p95/p99** | H3 판정 열 ([#254](https://github.com/Shadowfit/init/issues/254)) |
+| `side.tsv` | Spring actuator + MySQL 상태, 판당 **pre·mid·post** | 게이지는 `mid` 에서만 뜻이 있다 |
+| `probe_rtt.tsv` · `probe_req_*.tsv` | **대상 박스 시계**(1세션 프로브), 부하기 warm 창으로 자름 | 서버↔부하기 지연을 가른다 (설계 §4-2) |
+| `loader_*.tsv` | 부하기 자신의 CPU·메모리·**대역** | [#250](https://github.com/Shadowfit/init/issues/250) |
+| `caps.tsv` | 팔별 `NanoCpus` 관측값과 판정 | 캡은 **측정 조건**이다 ([#253](https://github.com/Shadowfit/init/issues/253)) |
+| `stats_*.tsv` | 대상 컨테이너 3종 `docker stats` | 귀속 |
 
 ---
 

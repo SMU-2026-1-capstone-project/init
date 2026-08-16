@@ -114,6 +114,10 @@ CORES_ANCHOR=${CORES_ANCHOR:-1}              # 라운드마다 + 끝에 1판. RE
 CORES_ANCHOR_ARM=${CORES_ANCHOR_ARM:-B}
 CORES_ANCHOR_LEVEL=${CORES_ANCHOR_LEVEL:-80} # 포화 «직전» — 천장에 붙은 레벨은 기준선 구실을 못 한다
 CORES_REH_ANCHOR_LEVEL=${CORES_REH_ANCHOR_LEVEL:-10}  # 리허설 격자(5·10)에 맞춘 값
+# 자기 프로브(설계 §4-2) — 대상 박스에서 1세션을 돌려 **서버 쪽 시계**를 따로 잰다.
+# 이게 없으면 「천장이 서버인가 부하기인가」가 CPU 지표만으로는 안 갈린다(2라운드가 실증).
+CORES_PROBE=${CORES_PROBE:-1}
+CORES_PROBE_PREFIX=${CORES_PROBE_PREFIX:-probe}   # 부하기 계정(cores*)과 갈라야 한다
 CORES_REH_LEVELS=${CORES_REH_LEVELS:-"5 10"} # 축소 리허설 — README 「무인 실행 전 필수」
 CORES_REH_DUR=${CORES_REH_DUR:-20}
 
@@ -422,6 +426,16 @@ phase_coresidency_preflight() {
       note "⚠️ 대상에 shadowfit-backend 가 아직 없다 — actuator 확인은 리허설의 side 게이트로 미룬다"
     fi
 
+    # 자기 프로브는 **대상 박스에서** 파이썬을 돌린다(설계 §4-2). 없으면 스윕이 프로브를
+    # 스스로 끄는데, 그러면 「서버인가 부하기인가」를 또 못 가른 채 라운드가 끝난다.
+    if [ "$CORES_PROBE" = "1" ]; then
+      local tpy
+      tpy=$($TARGET_SSH "command -v python3 || command -v python" 2>/dev/null | head -1 | tr -d '\r')
+      [ -n "$tpy" ] \
+        && note "✅ 대상 박스 python: $tpy (자기 프로브)" \
+        || { note "🔴 대상 박스에 python 이 없다 — 자기 프로브가 안 돈다 (설계 §4-2). 깔거나 CORES_PROBE=0 으로 «없이 돈다» 를 명시할 것"; ok=1; }
+    fi
+
     # 팔 C·D 는 대상 박스의 compose 가 AI_CPUS·MYSQL_CPUS·BACKEND_CPUS 를 **필수**로 읽는다
     # (`${AI_CPUS:?}`). 없으면 그 팔의 13판이 전부 죽는데, 표에는 팔 하나가 빈 것으로만 보인다.
     if echo "$CORES_ARMS" | grep -qE '(^| )(C|D)( |$)'; then
@@ -525,6 +539,32 @@ cores_assert_ghz() {  # $1 = ghz.tsv
 #    샘플러가 들어간 뒤에도 위험은 남는다 — `pgrep -f 'load_ai\.py'` 가 안 맞으면
 #    `load_ai_pct` 가 **전부 0** 인 표가 조용히 생기고, 파일은 있으니 «걷었다» 로 보인다.
 #    그래서 «행이 있는가» 가 아니라 **«부하기 프로세스가 실제로 보였는가»** 를 판정한다.
+# 🔴 자기 프로브(설계 §4-2)도 «있는가» 가 아니라 **«두 시계를 같은 창에서 읽었는가»** 로
+#    판정한다. `window` 가 warm 이 아니면 부하기 p50 과 나란히 못 놓는다 — 그런 표는
+#    「서버가 빨랐다」로 잘못 읽히고, 그게 이 프로브를 넣은 이유를 통째로 무너뜨린다.
+cores_assert_probe() {  # $1 = probe_rtt.tsv
+  local tsv=$1
+  [ "$CORES_PROBE" = "1" ] || { note "자기 프로브 꺼짐(CORES_PROBE=0) — 서버 시계 없이 도는 라운드다"; return 0; }
+  [ -f "$tsv" ] || { note "🔴 probe_rtt.tsv 가 없다 — 대상 박스 시계를 못 걷었다 (설계 §4-2)"; return 1; }
+  awk -F'\t' '
+    NR>1 {
+      rows++; win[$10]++
+      if ($10 == "warm" && $7+0 > 0) { ok++; if ($7+0 > worst) worst = $7+0 }
+    }
+    END {
+      printf "     판 %d — warm %d · full %d · no_overlap %d · empty %d · FAIL %d\n",
+             rows, win["warm"]+0, win["full"]+0, win["no_overlap"]+0, win["empty"]+0, win["-"]+0
+      if (ok+0 > 0) printf "     서버 시계 최대 p50 %.1f ms\n", worst
+      if (rows == 0) { print "  🔴 프로브 행이 한 줄도 없다 — 대상 박스에서 안 돌았다"; exit 1 }
+      if (ok+0 == 0) {
+        print "  🔴 부하기 창과 겹치는 프로브 표본이 **한 판도** 없다"
+        print "     볼 곳: 대상 박스 python · $PROBE_DIR 자산 · probe 계정이 409 로 막혔는지(reset_sessions)"
+        exit 1
+      }
+      printf "  ✅ 두 시계 성립 (%d판)\n", ok
+    }' "$tsv"
+}
+
 cores_assert_loader() {  # $1 = 결과 디렉터리
   local dir=$1 n
   n=$(ls "$dir"/loader_*.tsv 2>/dev/null | wc -l)
@@ -604,6 +644,7 @@ phase_coresidency_rehearsal() {
       DUR="$CORES_REH_DUR" REPEATS=1 \
       LEVEL_SHIFT="$CORES_LEVEL_SHIFT" ANCHOR="$CORES_ANCHOR" \
       ANCHOR_ARM="$CORES_ANCHOR_ARM" ANCHOR_LEVEL="$CORES_REH_ANCHOR_LEVEL" \
+      PROBE="$CORES_PROBE" PROBE_PREFIX="$CORES_PROBE_PREFIX" \
       GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
       GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
       MYSQL_USER=root MYSQL_PW="$PW" \
@@ -621,6 +662,8 @@ phase_coresidency_rehearsal() {
   cores_assert_side "$out/side.tsv" || return 1
   # 부하기 자신도 (#250). 「파일은 있는데 전부 0」이 이 축의 실패 모드다.
   cores_assert_loader "$out" || return 1
+  # 두 시계가 같은 창에서 읽혔는지 (설계 §4-2). 이게 없으면 「서버인가 부하기인가」가 또 미결이다.
+  cores_assert_probe "$out/probe_rtt.tsv" || return 1
   return 0
 }
 
@@ -644,6 +687,7 @@ phase_coresidency() {
       DUR="$CORES_DUR" REPEATS="$CORES_REPEATS" STATS_SEC="${STATS_SEC:-5}" \
       LEVEL_SHIFT="$CORES_LEVEL_SHIFT" ANCHOR="$CORES_ANCHOR" \
       ANCHOR_ARM="$CORES_ANCHOR_ARM" ANCHOR_LEVEL="$CORES_ANCHOR_LEVEL" \
+      PROBE="$CORES_PROBE" PROBE_PREFIX="$CORES_PROBE_PREFIX" \
       GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
       GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
       MYSQL_USER=root MYSQL_PW="$PW" \
@@ -660,6 +704,8 @@ phase_coresidency() {
     || note "⚠️ 옆 지표가 빈다 — H3(«캡이 옆을 지키는가»)는 이 라운드로도 못 닫는다 (#254). 결과에 그대로 적을 것"
   cores_assert_loader "$out" \
     || note "⚠️ 부하기 지표가 빈다 — 「천장이 서버인가 부하기인가」가 세 번째로 미결이다 (#250)"
+  cores_assert_probe "$out/probe_rtt.tsv" \
+    || note "⚠️ 서버 쪽 시계가 없다 — 이 라운드도 «서버가 느린 것»과 «부하기가 느린 것»을 못 가른다"
   return 0
 }
 
@@ -753,6 +799,7 @@ phase_collect() {
             \"\$(docker inspect -f '{{.HostConfig.NanoCpus}}' \$c)\"; done" 2>/dev/null | tr -d '\r'
       echo "동거 팔       : ARMS='$CORES_ARMS' LEVELS='$CORES_LEVELS' DUR=${CORES_DUR}s REPEATS=$CORES_REPEATS"
       echo "동거 배열     : LEVEL_SHIFT=$CORES_LEVEL_SHIFT (레벨 순서 치환 #252) · ANCHOR=$CORES_ANCHOR ${CORES_ANCHOR_ARM}@${CORES_ANCHOR_LEVEL}세션"
+      echo "자기 프로브   : PROBE=$CORES_PROBE (대상 박스 1세션 · 계정 prefix '$CORES_PROBE_PREFIX') — 설계 §4-2"
       echo "⚠️ 위 «캡» 은 라운드 **종료 시점** 값이다 — 스윕이 팔마다 갈아끼우므로 마지막 팔의 상태다"
     fi
 
