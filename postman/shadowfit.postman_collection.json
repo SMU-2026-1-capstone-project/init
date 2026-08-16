@@ -146,19 +146,6 @@
           }
         },
         {
-          "name": "[Deprecated] 운동 세션 종료 (옛 흐름)",
-          "request": {
-            "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/exercises/sessions/{{sessionId}}/complete", "host": ["{{baseUrl}}"], "path": ["exercises", "sessions", "{{sessionId}}", "complete"] },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"totalReps\": 12,\n  \"syncRate\": 78.5\n}"
-            },
-            "description": "사용 자제. PATCH /sessions/{id}/end (ET-H) 로 대체됨."
-          }
-        },
-        {
           "name": "세션 종료 (ET-H, ⭐ 현행)",
           "request": {
             "method": "PATCH",

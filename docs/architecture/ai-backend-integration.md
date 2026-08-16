@@ -163,7 +163,7 @@ AI 컨테이너가 재시작되면 in-memory `SessionState` 가 사라지는데,
 
 > 📌 **`StartAnalysis` 와 왜 분리했나** — proto 주석이 직접 적어놨다: 이 RPC 의 계약은 *"있으면 보존"* 이고 정상 시작은 *"새로 만든다"* 라 **멱등 규칙이 정반대**다. 한 핸들러에 섞으면 **정상 시작 요청이 조용히 no-op** 이 될 수 있다. 상세: [`../decisions/session-resume-and-ai-state.md`](../decisions/session-resume-and-ai-state.md) §4-B.
 
-`/exercises/sessions/{id}/complete` 는 디프리케이트됨 — 프론트가 직접 통계를 보내던 경로였고, AI 단일 진실 원칙으로 폐기.
+`/exercises/sessions/{id}/complete` 는 제거됨 — 프론트가 직접 통계를 보내던 경로였고, AI 단일 진실 원칙으로 폐기. 엔드포인트는 `23c8953`(2026-07-11), 뒤에 남아 있던 서비스·DTO 는 이슈 #179 에서 걷어냈다.
 
 ### 타임아웃
 - `SessionTimeoutScheduler` @Scheduled(fixedDelay=1분)

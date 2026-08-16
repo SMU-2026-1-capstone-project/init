@@ -1,7 +1,6 @@
 package com.shadowfit.service.Exercise;
 
 import com.shadowfit.dto.exercises.VideoRequestDto;
-import com.shadowfit.dto.exercises.session.SessionUpdateRequestDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.exercise.Exercise;
@@ -25,7 +24,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * ExerciseAnalysisService 통합테스트 — 실제 Spring 컨텍스트(자기주입 self, @GrpcClient 스텁 모두
  * 정상 구성)로 검증. AI 서버로 나가는 실제 gRPC 호출이 필요한 성공 경로는 서킷브레이커를 강제로
- * OPEN시켜 우회하고, 그 앞단의 검증 로직·완료 콜백 처리 로직만 검증한다.
+ * OPEN시켜 우회하고, 그 앞단의 검증 로직만 검증한다.
  */
 @SpringBootTest
 @Transactional
@@ -159,54 +157,4 @@ class ExerciseAnalysisServiceTest {
         analysisService.stopAnalysis(1L, false);
     }
 
-    // ---- completeSession / applyCompleteFromApp (AI 콜백, 자기주입 self 필요 — 실컨텍스트라 정상 동작) ----
-
-    private Session inProgressSession() {
-        return sessionRepository.saveAndFlush(Session.builder()
-                .member(member).exercise(exercise)
-                .startTime(LocalDateTime.now().minusMinutes(10))
-                .status(Status.IN_PROGRESS).totalReps(0).difficultyLevel(1).build());
-    }
-
-    private SessionUpdateRequestDto completeDto() {
-        return new SessionUpdateRequestDto(10, 82.5, 95.0, 40.0, 120.5, 3);
-    }
-
-    @Test
-    @DisplayName("완료 콜백 — 존재하지 않는 세션이면 SESSION_NOT_FOUND")
-    void completeSession_unknownSession_throws() {
-        assertThatThrownBy(() -> analysisService.completeSession(999999L, completeDto()))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(ErrorCode.SESSION_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("완료 콜백 — 정상 처리 시 COMPLETED로 갱신, 결과값 반영")
-    void completeSession_success_updatesSession() {
-        Session session = inProgressSession();
-
-        analysisService.completeSession(session.getId(), completeDto());
-
-        Session result = sessionRepository.findById(session.getId()).orElseThrow();
-        assertThat(result.getStatus()).isEqualTo(Status.COMPLETED);
-        assertThat(result.getTotalReps()).isEqualTo(10);
-        assertThat(result.getAvgSyncRate()).isEqualByComparingTo(new BigDecimal("82.5"));
-        assertThat(result.getEndTime()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("완료 콜백 — 이미 COMPLETED면 멱등적으로 재적용 안 함")
-    void completeSession_alreadyCompleted_isIdempotent() {
-        Session session = inProgressSession();
-        analysisService.completeSession(session.getId(), completeDto());
-        LocalDateTime firstEndTime = sessionRepository.findById(session.getId()).orElseThrow().getEndTime();
-
-        // 다른 값으로 재호출해도 첫 결과가 보존돼야 함
-        analysisService.completeSession(session.getId(), new SessionUpdateRequestDto(99, 10.0, 10.0, 10.0, 10.0, 1));
-
-        Session result = sessionRepository.findById(session.getId()).orElseThrow();
-        assertThat(result.getTotalReps()).isEqualTo(10); // 99로 덮이지 않음
-        assertThat(result.getEndTime()).isEqualTo(firstEndTime);
-    }
 }

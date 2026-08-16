@@ -24,6 +24,7 @@ import com.shadowfit.repository.outbox.OutboxEventRepository;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
+import com.shadowfit.model.exercise.SyncStats;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.report.Report;
 import com.shadowfit.model.report.ReportType;
@@ -226,18 +227,21 @@ public class SessionService {
         Session session = sessionRepository.findById(request.getSessionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
 
-        // 멱등성: FastAPI가 응답 유실로 같은 결과를 재전송한 경우(2-1, 2-2) 첫 완료 시각/기록을 보존하고 즉시 종료
-        if (session.getStatus() == Status.COMPLETED) {
+        // 싱크 통계는 AI 가 보낸 값을 쓰지 않고 pose_data 에서 직접 집계한다 (이슈 #75).
+        SyncStats sync = resolveSyncStats(session, request);
+
+        // 멱등성: FastAPI가 응답 유실로 같은 결과를 재전송한 경우(2-1, 2-2) 첫 완료 시각/기록을 보존하고
+        // 즉시 종료한다. 판정은 Session.complete 안에만 있다 — 여기서 미리 한 번 더 보면 위 집계
+        // 쿼리를 아낄 수 있지만, 그러면 가드가 두 곳이 되고 엔티티 쪽 분기는 도달 불가능해진다.
+        // 재전송은 드물고 그 쿼리는 인덱스 집계 하나라, 가드가 한 곳인 쪽을 택했다.
+        boolean transitioned = session.complete(
+                request.getTotalReps(),
+                sync,
+                java.math.BigDecimal.valueOf(request.getCaloriesBurned()),
+                LocalDateTime.now());
+        if (!transitioned) {
             return;
         }
-
-        session.setStatus(Status.COMPLETED);
-        session.setEndTime(LocalDateTime.now());
-
-        session.setTotalReps(request.getTotalReps());
-        // 싱크 통계는 AI 가 보낸 값을 쓰지 않고 pose_data 에서 직접 집계한다 (이슈 #75).
-        applySyncStats(session, request);
-        session.setCaloriesBurned(java.math.BigDecimal.valueOf(request.getCaloriesBurned()));
 
         sessionRepository.saveAndFlush(session);
 
@@ -251,7 +255,11 @@ public class SessionService {
     }
 
     /**
-     * [싱크 통계 집계] 세션의 avg/max/min sync 를 {@code pose_data} 에서 직접 계산해 채운다 (이슈 #75).
+     * [싱크 통계 집계] 세션의 avg/max/min sync 를 {@code pose_data} 에서 직접 계산한다 (이슈 #75).
+     *
+     * <p>집계는 여기(조회가 필요하다), 대입은 {@link Session#complete} 안(상태 전이의 일부다).
+     * 그 경계를 {@link SyncStats} 가 넘는다 — 셋을 묶어서 넘기므로 "avg 만 쓰고 max/min 은
+     * 빠뜨리는" 아래 ②번 결함이 타입 수준에서 다시 일어날 수 없다.
      *
      * <p><b>왜 AI 가 보낸 값을 안 쓰는가</b> — 세 가지가 한꺼번에 틀려 있었다.
      * <ol>
@@ -274,7 +282,7 @@ public class SessionService {
      * <p>rep 가중 평균을 유지하는 이유는 {@code findRepAverageSyncRates} 주석 참고 — 다운샘플 때문에
      * 프레임 단위로 평균 내면 값이 달라진다.
      */
-    private void applySyncStats(Session session, SessionCompleteRequest request) {
+    private SyncStats resolveSyncStats(Session session, SessionCompleteRequest request) {
         List<Double> repAverages = poseDataRepository.findRepAverageSyncRates(session.getId());
 
         if (repAverages.isEmpty()) {
@@ -284,31 +292,15 @@ public class SessionService {
                 // proto3 기본값 0 으로 들어와 위 쿼리(repNumber > 0)에 안 걸린다. 배포 순서를 안 맞춰도
                 // 깨지지 않게 하려던 설계인데(PoseDataService 주석), 여기서 null 로 덮으면 그 구간에
                 // 통계가 통째로 사라진다. 우리가 더 잘 계산할 수 없으므로 AI 가 보낸 값을 쓴다.
-                session.setAvgSyncRate(scaleSync(request.getAvgSyncRate()));
-                session.setMaxSyncRate(scaleSync(request.getMaxSyncRate()));
-                session.setMinSyncRate(scaleSync(request.getMinSyncRate()));
-                return;
+                return SyncStats.of(request.getAvgSyncRate(), request.getMaxSyncRate(), request.getMinSyncRate());
             }
             // (2) 측정된 rep 이 정말 없다(0회 세션 등). 이때 AI 는 0.0 을 보내는데 그걸 저장하면 안 된다.
-            session.setAvgSyncRate(null);
-            session.setMaxSyncRate(null);
-            session.setMinSyncRate(null);
-            return;
+            return SyncStats.none();
         }
 
-        java.util.DoubleSummaryStatistics stats = repAverages.stream()
+        return SyncStats.from(repAverages.stream()
                 .mapToDouble(Double::doubleValue)
-                .summaryStatistics();
-
-        session.setAvgSyncRate(scaleSync(stats.getAverage()));
-        session.setMaxSyncRate(scaleSync(stats.getMax()));
-        session.setMinSyncRate(scaleSync(stats.getMin()));
-    }
-
-    /** 컬럼이 {@code DECIMAL(5,2)} 라 저장 전에 맞춰 둔다 — 반올림 위치를 DB 에 맡기지 않는다. */
-    private java.math.BigDecimal scaleSync(double value) {
-        return java.math.BigDecimal.valueOf(value)
-                .setScale(2, java.math.RoundingMode.HALF_UP);
+                .summaryStatistics());
     }
 
     /**
@@ -365,11 +357,9 @@ public class SessionService {
         }
 
         // 멱등: 이미 endTime 기록된 세션은 변경 없음 (AI 재호출도 안 함)
-        if (session.getEndTime() != null) {
+        if (!session.markEnded(LocalDateTime.now())) {
             return;
         }
-
-        session.setEndTime(LocalDateTime.now());
         sessionRepository.saveAndFlush(session);
 
         // AI 통보를 "지금 gRPC"가 아니라 "같은 트랜잭션 안 아웃박스 행 INSERT"로 바꾼다.
@@ -478,14 +468,16 @@ public class SessionService {
      */
     private boolean failIfInProgress(Long sessionId, LocalDateTime endTime, boolean notifyAi) {
         Session session = sessionRepository.findById(sessionId).orElse(null);
-        if (session == null || session.getStatus() != Status.IN_PROGRESS) {
+        if (session == null) {
             return false;
         }
         // 덮어쓰기 전에 읽어둔다 — 아래 통보 중복 판정의 근거다.
         boolean hadEndTime = session.getEndTime() != null;
 
-        session.setStatus(Status.FAILED);
-        session.setEndTime(endTime);
+        // IN_PROGRESS 가 아니면 false — 그 가드는 Session.fail 안에 있다.
+        if (!session.fail(endTime)) {
+            return false;
+        }
         sessionRepository.saveAndFlush(session);
 
         // 여기서 endTime 이 이미 있었다면 그건 endSession 이 남긴 것이다 — 이 메서드가 남긴

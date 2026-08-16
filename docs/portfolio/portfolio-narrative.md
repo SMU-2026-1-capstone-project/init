@@ -25,7 +25,7 @@
 **해결**(실코드):
 - **afterCommit 외부 호출**: DB 커밋 확정 후에만 AI에 gRPC 통보(`SessionService` endSession afterCommit → StopAnalysis).
 - **`@Version` 낙관락**: 스케줄러↔콜백 충돌 감지(`Session.java`), 충돌 시 **재시도 3회**(`completeSession`), **콜백 결과 우선** 정책.
-- **멱등 수신**: `applyCompleteFromApp`의 `if (status==COMPLETED) return` (first-write-wins) — 중복 콜백 안전.
+- **멱등 수신**: 콜백 진입점은 `SessionService.applyComplete` 이고, 상태 가드는 `Session.complete` 가 소유한다 — 이미 `COMPLETED` 면 아무것도 바꾸지 않고 `false` 를 돌려준다(first-write-wins). 호출자는 그 반환값으로 완료 지표·통계 재적산을 막는다. 중복 콜백 안전.
 
 **증명(실측)**: lost-update 재현·방지 카드(③), MVCC 격리수준 카드(④ — RR/RC/SERIALIZABLE + `data_locks` 관찰). → "동시성·정합성"을 말이 아니라 실험으로.
 

@@ -2,7 +2,6 @@ package com.shadowfit.service.Exercise;
 
 import com.shadowfit.dto.exercises.VideoRequestDto;
 import com.shadowfit.dto.exercises.session.ReattachSessionResponseDto;
-import com.shadowfit.dto.exercises.session.SessionUpdateRequestDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.observability.CorrelationIds;
@@ -57,7 +56,8 @@ public class ExerciseAnalysisService {
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final SessionMetrics sessionMetrics;
 
-    // 자기 주입: completeSession → applyCompleteFromApp 호출이 Spring 프록시를 통과하도록 함.
+    // 자기 주입: startAnalysis → sendAnalysisRequestToFastApi 호출이 Spring 프록시를 통과해
+    // @Async가 적용되도록 함(:199 주석 참조).
     @Lazy
     @Autowired
     private ExerciseAnalysisService self;
@@ -199,8 +199,7 @@ public class ExerciseAnalysisService {
 
         // 비동기로 FastAPI에 분석 요청 — self를 거쳐야 @Async가 Spring 프록시를 타고 실제로
         // 비동기 실행됨. this.로 호출하면 자기호출(self-invocation)이라 AOP 프록시를 우회해서
-        // @Async가 조용히 무시되고 동기 실행되는 문제가 있었음(2026-07-24, 테스트로 발견) —
-        // completeSession→applyCompleteFromApp에 이미 쓰던 self 패턴을 여기에도 동일 적용.
+        // @Async가 조용히 무시되고 동기 실행되는 문제가 있었음(2026-07-24, 테스트로 발견).
         //
         // ⚠️ CodeRabbit 지적으로 추가 수정(2026-07-24): self.로 진짜 비동기가 되면서 세션 INSERT가
         // 커밋되기 전에 이 비동기 작업이 먼저 실행될 수 있는 레이스가 새로 생김 — 서킷 OPEN/gRPC
@@ -545,50 +544,5 @@ public class ExerciseAnalysisService {
         }
     }
 
-    /**
-     * [STEP 5: 분석 결과 영속화 (Callback)]
-     * AI 서버가 분석을 마치고 gRPC로 보고해온 최종 결과를 DB에 반영합니다.
-     *
-     * 낙관적 락 충돌 시(스케줄러가 동시에 FAILED로 변경한 경우) 재조회 후 COMPLETED로 덮어씁니다.
-     */
-    public void completeSession(Long sessionId, SessionUpdateRequestDto dto) {
-        try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
-            int maxAttempts = 3;
-            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-                try {
-                    self.applyCompleteFromApp(sessionId, dto);
-                    log.info("세션 {} DB 업데이트 완료", sessionId);
-                    return;
-                } catch (ObjectOptimisticLockingFailureException e) {
-                    // 상대는 보통 SessionTimeoutScheduler. 지표로 남겨두면 "이 경쟁이 운영 중
-                    // 실제로 얼마나 일어나는가"를 로그 grep 없이 집계로 볼 수 있다.
-                    sessionMetrics.optimisticLockConflict("app-callback", attempt == maxAttempts ? "exhausted" : "retry");
-                    if (attempt == maxAttempts) {
-                        throw e;
-                    }
-                    log.warn("세션 {} 완료 처리 충돌 - 재시도 {}/{}", sessionId, attempt, maxAttempts);
-                }
-            }
-        }
-    }
-
-    @Transactional
-    public void applyCompleteFromApp(Long sessionId, SessionUpdateRequestDto dto) {
-        Session session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
-
-        // 멱등성: 같은 결과가 재전송된 경우(2-1, 2-2) 첫 완료 시각/기록을 보존하고 즉시 종료
-        if (session.getStatus() == Status.COMPLETED) {
-            return;
-        }
-
-        session.setTotalReps(dto.getTotalReps());
-        session.setAvgSyncRate(java.math.BigDecimal.valueOf(dto.getAvgSyncRate()));
-        session.setStatus(Status.COMPLETED);
-        session.setEndTime(LocalDateTime.now());
-
-        sessionRepository.saveAndFlush(session);
-        sessionMetrics.sessionTransition(Status.COMPLETED, "app-callback");
-    }
 }
 
