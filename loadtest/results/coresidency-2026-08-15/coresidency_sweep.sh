@@ -40,11 +40,13 @@ SSH=${SSH:-ssh root@$HOST}          # 팔 전환은 대상 박스에서 compose 
 REPO_DIR=${REPO_DIR:-/root/init}
 
 ARMS=${ARMS:-"A B C"}               # D 를 넣으려면 "A B C D"
-# 동시 세션 ramp — 2026-08-16 확정(설계 §5-2). 초판 `20 40 80 160` 은 «단독 156» 을 감싸는
-# 격자였는데, 이 실험의 가설은 «동거하면 내려간다» 라 천장이 40~80 사이면 포화점을 낀 점이
-# 위아래 하나씩뿐이었다. 60·120 을 넣어 해상도를 올린다. **최고 160 은 고정** — GHZ_RPS 유도가
-# «160세션 × 0.12» 라 최고 레벨이 바뀌면 從 부하 값도 같이 바뀐다.
-LEVELS=${LEVELS:-"20 40 60 80 120 160"}
+# 동시 세션 ramp — 2026-08-17 확정(설계 §5-3 ⑥). 08-16 격자 `20 40 60 80 120 160` 은
+# 천장을 **「80 초과 120 미만」 구간으로만** 짚었다 — 80 은 목표의 100%, 120 은 88% 라 그
+# 사이에 관측점이 없다. 6레벨로 넓힌 이유가 「천장이 40~80 이면 구간으로밖에 못 적는다」
+# 였는데 천장이 한 칸 위에 있어 **같은 문제가 반복됐다.** 90·100 을 넣어 점으로 짚는다.
+# **최고 160 은 고정** — GHZ_RPS 유도가 «160세션 × 0.12» 라 최고 레벨이 바뀌면 從 부하 값도
+# 같이 바뀐다. 대가는 판이 팔당 6 → 8 로 느는 것(라운드 +40분).
+LEVELS=${LEVELS:-"20 40 60 80 90 100 120 160"}
 DUR=${DUR:-90}                      # 판당 측정 구간(초). 앞뒤 5초는 부하기가 버린다
 REPEATS=${REPEATS:-3}               # 본판. 버림판 1은 팔마다 별도로 돈다
 STATS_SEC=${STATS_SEC:-5}           # docker stats 폴링 간격 — 관측이 대상을 흔드는 비용
@@ -86,8 +88,13 @@ LOG="$OUT/coresidency.tsv"
 
 # 🔴 ghz 결과를 본 표에 섞지 않는다. 「AI 가 몇 세션을 먹었나」와 「옆에 얼마가 걸렸나」는
 #    다른 축이고, 뭉치면 둘 다 나빠진다(README 「세 결과를 뭉치지 않는다」와 같은 규약).
+# 🔴 **지연 백분위를 같이 남긴다** (#254, 2026-08-17). 가설 H3 의 반증 조건이 «팔 C 에서
+#    Spring p99·MySQL 지표가 팔 B 와 차이 없다» 인데, 08-16 두 라운드 모두 이 표에 **지연
+#    열이 없어** 판정할 자료가 아예 안 생겼다. ghz JSON 은 이미 `latencyDistribution` 을
+#    담고 있었고 이 스윕이 그 파일을 이미 파싱하고 있었다 — **꺼내 적기만 하면 됐다.**
+#    새 열은 **끝에만** 붙인다: `run_all.sh` 의 `cores_assert_ghz` 가 $1~$8 을 위치로 읽는다.
 GHZ_LOG="$OUT/ghz.tsv"
-[ -f "$GHZ_LOG" ] || printf "tag\tarm\tsessions\ttarget_rps\tachieved_rps\tcount\tok\tfail\n" > "$GHZ_LOG"
+[ -f "$GHZ_LOG" ] || printf "tag\tarm\tsessions\ttarget_rps\tachieved_rps\tcount\tok\tfail\tp50_ms\tp95_ms\tp99_ms\n" > "$GHZ_LOG"
 
 step() { echo; echo "════ $* ════"; }
 note() { echo "     $*"; }
@@ -190,7 +197,7 @@ start_ghz() {  # $1 = 태그.  ghz 창이 AI 측정 창을 **감싸도록** 먼�
 
 stop_ghz() {  # $1 = 태그
   if ! arm_uses_ghz "$CUR_ARM"; then
-    printf "%s\t%s\t%s\t-\t-\t-\t-\t-\n" "$1" "$CUR_ARM" "$CUR_N" >> "$GHZ_LOG"
+    printf "%s\t%s\t%s\t-\t-\t-\t-\t-\t-\t-\t-\n" "$1" "$CUR_ARM" "$CUR_N" >> "$GHZ_LOG"
     return 0
   fi
   [ -n "${GHZ_PID:-}" ] || return 0
@@ -214,12 +221,29 @@ try:
     j = json.load(open(f, encoding='utf-8'))
 except Exception as e:
     print(f"  🔴 ghz 리포트를 못 읽었다 ({f}): {e} — 이 판은 «옆이 일했다» 를 단언할 수 없다")
-    open(log, "a", encoding='utf-8').write(f"{tag}\t{arm}\t{n}\t{target}\tFAIL\t-\t-\t-\n")
+    open(log, "a", encoding='utf-8').write(f"{tag}\t{arm}\t{n}\t{target}\tFAIL\t-\t-\t-\t-\t-\t-\n")
     raise SystemExit(0)
 sc = j.get("statusCodeDistribution") or {}
 count = j.get("count", 0); ok = sc.get("OK", 0); fail = count - ok
 rps = round(j.get("rps", 0), 1)
-open(log, "a", encoding='utf-8').write(f"{tag}\t{arm}\t{n}\t{target}\t{rps}\t{count}\t{ok}\t{fail}\n")
+
+# 🔴 지연 백분위 (#254). ghz 는 ns 로 준다 — ms 로 바꿔 적는다.
+#    없는 백분위를 0 으로 채우지 않는다. «0ms» 와 «안 나왔다» 는 다른 사실이고,
+#    이 rig 이 반복해서 당한 실패 모드가 «없는 값을 그럴듯한 값으로 채우기» 다.
+lat = {}
+for d in (j.get("latencyDistribution") or []):
+    try:
+        lat[int(round(float(d.get("percentage"))))] = float(d.get("latency"))
+    except (TypeError, ValueError):
+        pass
+def ms(p):
+    v = lat.get(p)
+    return "-" if v is None else f"{v / 1e6:.1f}"
+p50, p95, p99 = ms(50), ms(95), ms(99)
+open(log, "a", encoding='utf-8').write(
+    f"{tag}\t{arm}\t{n}\t{target}\t{rps}\t{count}\t{ok}\t{fail}\t{p50}\t{p95}\t{p99}\n")
+if p50 == "-":
+    print(f"  ⚠️ ghz 리포트에 latencyDistribution 이 없다 ({f}) — H3(캡이 옆을 지키는가)는 이 판에서 못 읽는다")
 if ok == 0:
     print(f"  🔴 從 부하의 성공 응답이 0 이다 ({count}건 전부 실패) — 이 판은 «유휴 동거» 를 잰 것이다")
 elif fail:
@@ -358,6 +382,62 @@ start_loader_stats() {  # $1 = 태그
 }
 stop_loader_stats() { [ -f "/tmp/loader_$1.pid" ] && kill "$(cat "/tmp/loader_$1.pid")" 2>/dev/null; rm -f "/tmp/loader_$1.pid"; }
 
+# ── 옆(Spring·MySQL) 지표 스냅샷 — #254 ──────────────────────────────────
+#
+# 🔴 **H3 의 반증 조건이 이 표다.** *「캡을 걸면 총 용량은 줄지만 다른 서비스가 산다」* 는
+#    «팔 C 에서 Spring p99·MySQL 지표가 팔 B 와 차이 없다» 로 반증되는데, 08-16 두 라운드
+#    모두 **그 열이 아예 생성되지 않았다.** 설계 §4 는 세 소스(docker stats · mysqld_exporter ·
+#    actuator)를 적었는데 rig 은 첫째만 걷고 있었다 — 그래서 「캡 축이 닫혔다」가 실제로는
+#    «AI 처리량이 캡만큼 깎였다» 였고, #212 가 물은 «옆이 사는가» 는 세 라운드째 미답이다.
+#
+# 판당 **3회**로 묶는다. 관측이 관측 대상을 흔드는 비용(설계 §8)을 시계열로 늘리지 않는다.
+#   · `pre` / `post`  — 카운터(요청 수·fsync·lock wait)는 **post − pre** 가 그 판의 «일» 이다
+#   · `mid`           — 게이지(`Threads_running`·Hikari `pending`)는 **여기서만 뜻이 있다.**
+#                       앞뒤 두 점은 부하가 없는 순간이라, 두 점만 찍으면 «포화 때 옆이
+#                       어땠나» 가 통째로 안 남는다
+#
+# 🔴 **actuator 는 9090 이고, compose 가 그 포트를 127.0.0.1 에만 연다**(`application.yml` [6] ·
+#    `docker-compose.yml:67`). 부하기에서 직접 못 긁는다 — **대상 박스 안에서** curl 해야 하고,
+#    그래서 SG 에 포트를 더 열지 않아도 된다.
+SIDE_LOG="$OUT/side.tsv"
+[ -f "$SIDE_LOG" ] || printf "tag\tarm\tsessions\tphase\tepoch\tsource\tmetric\tvalue\n" > "$SIDE_LOG"
+
+ACTUATOR=${ACTUATOR:-http://127.0.0.1:9090/actuator/prometheus}
+# 전부 담지 않는다 — 판당 3회 × 78판이라 원문이면 표가 사람이 못 읽는 크기가 된다.
+SIDE_RE=${SIDE_RE:-'^(hikaricp_connections|grpc_server|http_server_requests_seconds|shadowfit_|jvm_threads_live_threads|jvm_memory_used_bytes|process_cpu_usage|system_cpu_usage|tomcat_threads)'}
+SIDE_MYSQL_VARS=${SIDE_MYSQL_VARS:-"Threads_running Threads_connected Queries Com_insert Innodb_rows_inserted Innodb_data_fsyncs Innodb_os_log_fsyncs Innodb_row_lock_waits Innodb_row_lock_time Innodb_buffer_pool_wait_free"}
+
+snap_side() {  # $1 = 태그, $2 = 국면(pre|mid|post)
+  local tag=$1 phase=$2 now spring my vars
+  now=$(date +%s)
+
+  # ── Spring (actuator) ──
+  spring=$($SSH "curl -sf --max-time 5 '$ACTUATOR'" 2>/dev/null | grep -Ev '^#' | grep -E "$SIDE_RE")
+  if [ -n "$spring" ]; then
+    printf '%s\n' "$spring" \
+      | awk -v t="$tag" -v a="$CUR_ARM" -v n="$CUR_N" -v p="$phase" -v e="$now" \
+          '{ v = $NF; name = $0; sub(/[ \t]+[^ \t]+$/, "", name);
+             printf "%s\t%s\t%s\t%s\t%s\tspring\t%s\t%s\n", t, a, n, p, e, name, v }' >> "$SIDE_LOG"
+  else
+    # 🔴 «못 걷었다» 를 빈칸으로 남기지 않는다. 빈칸은 «0» 으로도, «안 걸었다» 로도 읽힌다.
+    printf "%s\t%s\t%s\t%s\t%s\tspring\t_scrape\tFAIL\n" "$tag" "$CUR_ARM" "$CUR_N" "$phase" "$now" >> "$SIDE_LOG"
+    echo "  ⚠️ actuator 스크레이프 실패($phase) — H3 판정 열이 이 판에서 빈다 (#254)" >&2
+  fi
+
+  # ── MySQL (SHOW GLOBAL STATUS) ──
+  vars=$(printf "'%s'," $SIDE_MYSQL_VARS); vars=${vars%,}
+  my=$($SSH "docker exec -i -e MYSQL_PWD=$MYSQL_PW $MYSQL_CONTAINER mysql -u$MYSQL_USER shadowfit -N \
+        -e \"SHOW GLOBAL STATUS WHERE Variable_name IN ($vars);\"" 2>/dev/null | tr -d '\r')
+  if [ -n "$my" ]; then
+    printf '%s\n' "$my" \
+      | awk -F'\t' -v t="$tag" -v a="$CUR_ARM" -v n="$CUR_N" -v p="$phase" -v e="$now" \
+          'NF >= 2 { printf "%s\t%s\t%s\t%s\t%s\tmysql\t%s\t%s\n", t, a, n, p, e, $1, $2 }' >> "$SIDE_LOG"
+  else
+    printf "%s\t%s\t%s\t%s\t%s\tmysql\t_status\tFAIL\n" "$tag" "$CUR_ARM" "$CUR_N" "$phase" "$now" >> "$SIDE_LOG"
+    echo "  ⚠️ MySQL 상태 조회 실패($phase) — «없다» 가 아니라 «못 물었다» 다 (#254)" >&2
+  fi
+}
+
 # ── 한 판 ────────────────────────────────────────────────────────────────
 run_one() {  # $1=팔 $2=라운드 $3=세션수
   # 🔴 `local a=$1 b=$2 t="${a}_${b}"` 로 한 줄에 쓰면 안 된다. bash 는 `local` 의 인자
@@ -370,12 +450,22 @@ run_one() {  # $1=팔 $2=라운드 $3=세션수
   CUR_ARM=$arm; CUR_N=$n          # start_ghz·stop_ghz 가 읽는다
   echo; echo "──────── $tag ────────"
   start_stats "$tag"
-  start_loader_stats "$tag"       # #250 — 부하기 자신도 걷는다. 200% 면 부하기가 천장이다
+  # #250 — 부하기 자신도 걷는다. 🔴 판정선은 «총 CPU 200%» 가 **아니다**: 2라운드 실측에서
+  # 부하기 CPU 는 4 vCPU 중 0.68 만 쓰면서도 부하기를 키우자 결과가 +17.7% 움직였다.
+  # CPU 는 «붙었나» 만 답하고 «부하기가 결과를 움직였나» 는 못 답한다(설계 §12-1).
+  start_loader_stats "$tag"
   start_ghz "$tag"                # 팔 A 는 그냥 지나간다(정의상 유휴)
+  snap_side "$tag" pre            # #254 — 카운터의 원점
+  # 창 한가운데 한 번 더. 🔴 게이지(threads_running·hikari pending)는 **부하 중에만** 뜻이
+  # 있다 — pre·post 두 점은 둘 다 유휴 순간이라 「포화 때 옆이 어땠나」가 안 남는다.
+  ( sleep $(( DUR / 2 )); snap_side "$tag" mid ) &
+  local side_pid=$!
   python "$HERE/load_ai.py" --base "$BASE" --ai "$AI" --token "$TOKEN" \
       --frames "$HERE/frames.json" --sessions "$n" --dur "$DUR" \
       --out "$OUT/req_$tag.tsv" --label "$tag"
   local rc=$?
+  wait "$side_pid" 2>/dev/null    # mid 가 post 보다 먼저 쓰이게 — 같은 파일에 이어 쓴다
+  snap_side "$tag" post
   stop_ghz "$tag"
   stop_loader_stats "$tag"
   stop_stats "$tag"
@@ -461,3 +551,7 @@ echo "🔴 판정은 사람이 한다. 특히 볼 것:"
 echo "   · nolease > 0  → 풀 자리 없음(용량). detect_pct 하락과 **다른 축**이다"
 echo "   · nopose  > 0  → 검출이 깨짐(품질). #164 가 고친 지표가 다시 무너진 것일 수 있다"
 echo "   · setup_fail>0 → 그 판의 «동시 세션 수» 는 목표값이 아니다. 값을 그대로 쓰지 말 것"
+echo "   · ghz.tsv 의 p50/p95/p99 → **H3 의 판정 열**(#254). 팔 B↔C 를 여기서 대조한다 —"
+echo "     캡을 걸었더니 옆(Spring 적재)의 지연이 «안 나빠졌다» 면 캡이 옆을 지킨 것이다"
+echo "   · side.tsv 의 phase=mid → 포화 순간의 옆 상태(Threads_running·Hikari pending)."
+echo "     pre/post 는 카운터의 양 끝이다 — 게이지를 거기서 읽으면 «유휴» 를 읽게 된다"

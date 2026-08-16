@@ -46,14 +46,16 @@
 > | 캡 전환 | compose override → **컨테이너 재생성**(`:111-118`) | `docker update --cpus` (재기동 없음) | [#251](https://github.com/Shadowfit/init/issues/251) |
 > | 캡 확인 | **없다** | `NanoCpus` 대조, 팔 A·B 는 0 이어야 한다 | [#253](https://github.com/Shadowfit/init/issues/253) |
 > | 레벨 순서 | 항상 오름차순(`:451`) | 라운드마다 반전 (버림판 레벨도 따라간다) | [#252](https://github.com/Shadowfit/init/issues/252) |
-> | 레벨 | 6개 | **8개** — 90·100 추가. **최고 160 은 고정**(`GHZ_RPS` 유도) | — |
+> | 레벨 | ~~6개~~ → **8개** ✅ 반영(2026-08-17) | **20 40 60 80 90 100 120 160**. 최고 160 은 고정(`GHZ_RPS` 유도) | — |
 > | 앵커 판 | 없다 | 라운드 시작·중간·끝에 B@80 | — |
 > | 부하기 지표 | `loader_*.tsv` 있음(**EC2 검증 0**) | + `/proc/net/dev` · dt 일치 · **리허설 게이트** · 판정선 `load_ai_pct` ~100% | [#250](https://github.com/Shadowfit/init/issues/250) |
 > | 자기 프로브 | 없다 | 대상 박스 로컬 1세션 프로브 (RTT 를 두 시계로) | [#250](https://github.com/Shadowfit/init/issues/250) |
-> | 從 부하 표 | 지연 열 없음(`:90`) | ghz p50·p95·p99 + 판마다 actuator·`SHOW GLOBAL STATUS` 2회 | [#254](https://github.com/Shadowfit/init/issues/254) |
+> | 從 부하 표 · 옆 지표 | ~~지연 열 없음~~ → **✅ 반영(2026-08-17)** | `ghz.tsv` 에 **p50·p95·p99** · 판마다 **pre·mid·post 3회** 스냅샷 → `side.tsv`. 리허설 게이트 `cores_assert_side` 가 빈 표를 막는다 | [#254](https://github.com/Shadowfit/init/issues/254) |
 >
 > **78판 · 스윕 ≈ 3h01m · 인스턴스 ≈ 3h20m.** 선행 조건(로컬 확인 5건)은 설계 §11.
-> ⚠️ **위 표는 전부 «아직 코드에 없다»** — 이 rig 은 1라운드를 돈 그 상태 그대로다.
+> ✅ **레벨 8개(⑥)와 옆 지표(⑨)는 2026-08-17 에 코드로 들어갔다.** 나머지(교대 단위·캡 단언·
+> 레벨 순서·앵커 판·자기 프로브·샘플러 보강)는 **아직 코드에 없다.**
+> ⚠️ 들어간 둘도 **EC2 실행 검증은 0** 이다 — 로컬에서 파서·awk·게이트를 조각 단위로만 돌렸다.
 >
 > 🔴 **그리고 2라운드가 이미 돌았다** — [`../coresidency-aws-b-2026-08-16/`](../coresidency-aws-b-2026-08-16/README.md)
 > (설계 §12). **이 rig 을 한 줄도 안 고치고** 부하기만 4 vCPU 로 올린 라운드인데,
@@ -151,7 +153,7 @@ ghz   ──SavePoseDataBatch──> Spring → MySQL   (기존 loadtest/ghz/ ri
 | `frames.json` | 생성물. 30프레임 · 408KB · 프레임당 13.6KB |
 | `load_ai.py` | 동시 세션 부하기. **세션을 Spring 통해 실물로 연다**(안 그러면 전부 거절) |
 | `probe.sh` | 승격 게이트 G0~G3 |
-| `coresidency_sweep.sh` | 팔 × ramp × 판 오케스트레이션 + `docker stats` 샘플러 |
+| `coresidency_sweep.sh` | 팔 × ramp × 판 오케스트레이션 + `docker stats`·부하기·**옆 지표** 샘플러 |
 
 ---
 
