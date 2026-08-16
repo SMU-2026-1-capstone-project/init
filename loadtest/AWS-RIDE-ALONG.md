@@ -2,7 +2,8 @@
 
 작성일: 2026-08-12
 상태: **3회 탑승 완료 (P1 2026-08-12 · P3 2026-08-13 · P3-b 2026-08-13~14) + 팔 B 교정 1판 (2026-08-14)**
-      — 남은 主 는 P2·P4·P5·P6, 착수·채택은 사용자 confirm 후 박제
+      — 남은 主 는 P2·P4·P5·P6. **P6 는 착수 확정(2026-08-16)이고 탑승만 남았다**(§4 P6 전용 목록),
+      나머지는 착수·채택 모두 사용자 confirm 후 박제
 연관: [`../docs/decisions/online-ddl-vs-blocking-alter.md`](../docs/decisions/online-ddl-vs-blocking-alter.md), [`../docs/portfolio/one-pager.md`](../docs/portfolio/one-pager.md), [`results/`](results/)
 
 ---
@@ -39,7 +40,7 @@
 | ~~**P3-b**~~ | ~~**백업 재측정 — 내구성·행 크기**~~ | 🔴 08-13 라운드가 두 곳에서 다른 것을 쟀다. ① 팔 B 복구가 **페이지 캐시**를 쟀고([#201](https://github.com/Shadowfit/init/issues/201)), ② 설계에서 확정됐던 **real-JSON 대조**가 rig 에 없었다([#202](https://github.com/Shadowfit/init/issues/202)). 둘 다 **디스크가 지배**해서 로컬로는 못 닫는다 | ✅ **완료 (2026-08-13~14)** — [b 라운드](results/backup-restore-aws-b-2026-08-13/README.md) · [팔 B 교정](results/restore-reflink-2026-08-14/README.md). #201 은 원인이 캐시가 **아니라 xfs reflink** 였고([#210](https://github.com/Shadowfit/init/issues/210)), #202 는 돌았는데 **예상과 방향이 반대**였다 | **실측 3.32시간**(러너 3.06h) + 교정 1판 |
 | **P4** | **복제 지연 · 반동기 대가** | 인스턴스 2대가 전제. ⭐ **반동기 대가는 AZ 간 RTT 에 지배**되므로 로컬에선 구조적으로 과소평가된다 | 🟡 **설계 완료 (2026-08-13)** · rig 없음 — [`../docs/decisions/replication-lag-and-semisync.md`](../docs/decisions/replication-lag-and-semisync.md) | 게이트 2~3h + 측정 2~3h |
 | **P5** | **세션 분산도 스윕** (1·2·5·20·100) | 🔴 정본 baseline **649.4 RPS 가 «100세션» 에서 나온 값**인데 그 100 은 잰 값이 아니다. 이 앱은 회원당 활성 세션이 1개라 **동시 세션 수 = 동시에 운동 중인 사람 수**다 — baseline 이 가정한 부하보다 분산된 조건일 수 있다. 4대 구성이라 로컬 불가 | 🟢 **설계·rig 완료 (2026-08-14)** — [`../docs/decisions/session-spread-sweep.md`](../docs/decisions/session-spread-sweep.md) · [rig](results/session-spread-2026-08-13/README.md) | 主 25판 + 從 6판 · **지켜보는 1~2h**(무인 아님) |
-| **P6** | **동거 용량** — 「156세션」은 혼자 살 때의 값 | 🔴 08-14 의 **156세션은 AI 컨테이너만 있는 박스** 값이다. 실제 배포는 MySQL·Spring 이 한 호스트에 산다. **동거하면 얼마로 내려가는지가 미측정**이고, 그 숫자가 「한 대로 되나 = 수평확장이 필요한가」를 가른다. 단독 대조군이 필요해 로컬 불가 | 🟢 **설계·rig 완료 (2026-08-15)** — [설계](../docs/decisions/ai-coresidency-capacity.md) · [rig](results/coresidency-2026-08-15/README.md). 기존 `measure_ai_concurrency.py` 는 검출기를 in-process 로 불러 못 쓴다(§2). 🔴 rig 작성 중 **«합성 인체로는 rep 이 안 생긴다»** 가 실측돼 부하를 두 갈래로 나눴다 | 12판 + 버림 4판 · 부하기 별도 1대 |
+| **P6** | **동거 용량** — 「156세션」은 혼자 살 때의 값 | 🔴 08-14 의 **156세션은 AI 컨테이너만 있는 박스** 값이다. 실제 배포는 MySQL·Spring 이 한 호스트에 산다. **동거하면 얼마로 내려가는지가 미측정**이고, 그 숫자가 「한 대로 되나 = 수평확장이 필요한가」를 가른다. 단독 대조군이 필요해 로컬 불가 | 🟢 **착수 확정 (2026-08-16) · 설계·rig·조건 완료, 실행 남음** — [설계](../docs/decisions/ai-coresidency-capacity.md) §10(6건 전부 닫힘) · [rig](results/coresidency-2026-08-15/README.md) · [2대 구성 절차](aws/README.md). 기존 `measure_ai_concurrency.py` 는 검출기를 in-process 로 불러 못 쓴다(§2). 🔴 rig 작성 중 **«합성 인체로는 rep 이 안 생긴다»** 가 실측돼 부하를 두 갈래로 나눴다. 🔴 **실행 검증 0** — 리허설이 첫 관문 | **12판**(팔 A·B·C × 본 3 + 버림 3) · 레벨 6개 · ≈**3.5시간** · **2대**(대상 c7i.4xlarge + 부하기 c7i.large) |
 
 > P2 가 눈에 띈다 — **이미 한 번 헤드라인을 무효화한 것과 같은 계열의 조건**이 아직 정본에
 > 열린 채로 남아 있다. P1 과 같은 라운드에 태울 수 있으면 가장 싸다(단 §7 오염 주의).
@@ -92,6 +93,17 @@
   «real-JSON 축소 대조 1판» 이 **rig 에 아예 구현돼 있지 않았고**, 그대로 무인 실행됐다.
   표는 정상으로 나오므로 **사후에 안 보인다.** 설계의 확정 목록을 열어 **팔·무대가 실제로
   코드에 있는지** 한 줄씩 대조한다
+
+**P6 전용 — 이 라운드만 2대다** (다른 라운드는 위까지로 끝난다)
+
+- [ ] 인스턴스 **2대** — 대상 `c7i.4xlarge` · 부하기 `c7i.large`, 같은 VPC·서브넷
+- [ ] 보안그룹 인바운드 — 부하기 → 대상 **22 · 8000 · 8080 · 6565**
+- [ ] **SSH 키를 부하기에** 둔다(`/root/.ssh/measure.pem`, `chmod 600`). 러너가 부하기에서 돌며 대상을 몬다
+- [ ] **양쪽 토큰 일치** — `AI_PUBLIC_TOKEN`·`INTERNAL_API_TOKEN`. 다르면 preflight 가 막는다
+- [ ] `ROLE=p6-target` / `ROLE=p6-loader` 로 부트스트랩을 **갈라 돌린다**. 기본 `ROLE=db` 는 MySQL 만 띄운다
+- [ ] 🔴 `PHASES` 에 `coresidency*` 를 `ddl`·`backup` 과 **섞지 않는다** — 러너의 자리가 다르다
+- [ ] `GHZ_BIN=/usr/local/bin/ghz` 를 실행 명령에 적는다 — 러너 기본값이 옛 경로다
+- [ ] 절차 전문: [`aws/README.md` 「P6 — 2대 구성」](aws/README.md)
 
 ---
 
@@ -150,6 +162,9 @@
   미결정**이다([`../docs/decisions/replication-lag-and-semisync.md`](../docs/decisions/replication-lag-and-semisync.md) §9 미결정 9건)
 - [ ] 🔴 **P4 는 2대 구성이라 이 목록의 전제가 하나 깨진다** — 지금까지 라운드는 전부 1대였다.
   보안그룹 3306 인바운드 · `server_id` 분리 · (다른 AZ 대조판이면) AZ 간 전송 요금이 새로 붙는다
+- [x] **P6 착수 여부** → 🟢 **착수 확정 (2026-08-16 사용자 confirm).** 조건 6건이 전부 닫혔다
+  ([`ai-coresidency-capacity.md` §10](../docs/decisions/ai-coresidency-capacity.md)).
+  **P6 도 2대다** — 위 P4 항목과 같은 전제 파괴이고, 이쪽은 §4 에 전용 준비 목록을 넣어 막았다
 
 ---
 
@@ -201,3 +216,17 @@
   - **삭제까지 끝냈다** — 인스턴스 terminate, 볼륨 200GB 는 `DeleteOnTermination=true` 로 함께
     삭제 확인(`InvalidVolume.NotFound`). 08-12 에 지적된 「stopped 인스턴스에 볼륨이 붙어 계속
     과금」 이 이번엔 반복되지 않았다. 청구액은 Cost Explorer 반영 후 `MANIFEST.txt` 에 채운다.
+
+- **2026-08-16: P6 착수가 확정됐다 — 아직 탑승은 안 했다.** 조건 6건이 닫히고(설계 §10),
+  ramp 레벨이 4개 → **6개(20/40/60/80/120/160)** 로 늘었다. 초판 격자가 «단독 156» 을 감싸는
+  것이라 **가설(«동거하면 내려간다»)이 참일수록 빗나가는 쪽**이었다.
+  - **§4 에 P6 전용 준비 목록을 넣었다.** P4 때 *「2대 구성이라 §4·§5 의 전제가 깨진다」* 를
+    적어만 두고 목록으로 만들지 않았는데, P6 가 먼저 2대로 뜨게 됐다. SSH 키·SG 4포트·토큰
+    일치·`ROLE` 갈래가 그것이고, **절차가 `bootstrap.sh` 출력에만 있던 것**([#247](https://github.com/Shadowfit/init/issues/247))도
+    같이 닫았다 — 인스턴스 타입·대수를 정하는 시점은 부트스트랩보다 **앞**이다.
+  - **§4 대조가 또 한 건을 잡았다** — 설계 §5 「판 사이 스택 재기동」이 rig(AI 만 재기동)과
+    달랐다([#246](https://github.com/Shadowfit/init/issues/246)). #245 의 3건과 달리 **이번엔 rig 이 맞아** 설계를 고쳤다.
+    §4 에 이 대조를 넣은 것이 08-13 의 ② 결함 이후인데, **두 라운드 연속으로 값을 했다.**
+  - 🔴 **덤으로 하나 더 나왔다** — `run_all.sh:118` 의 `GHZ_BIN` 기본값(`/home/ec2-user/go/bin/ghz`)이
+    `bootstrap.sh:179` 의 설치 경로(`/usr/local/bin/ghz`)와 다르다. preflight 가 막으므로
+    라운드를 버리진 않지만, **README 대로 따라 하면 걸린다.** 실행 명령에 명시하는 것으로 덮었다
