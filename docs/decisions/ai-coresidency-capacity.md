@@ -467,6 +467,30 @@ H1 은 *「동거하면 내려간다」* 이므로, 내려간 천장이 **40~80 
 둘뿐이고 **`loader_*.tsv` 를 안 본다.** 샘플러가 빈 파일을 남겨도 라운드는 성공으로 끝난다 —
 「걷은 줄 알았는데 안 걷혔다」가 #250 의 실패 모드 그 자체다.
 
+### 🍚 점심때 할 일 (2026-08-17 기록)
+
+**1차 EC2 리허설을 돌렸고 절반이 섰다** — 결과·실무 메모는
+[`rehearsal-aws-2026-08-17/`](../../loadtest/results/coresidency-2026-08-15/rehearsal-aws-2026-08-17/README.md).
+인스턴스는 둘 다 terminate 했다(인스턴스 0 · 볼륨 0 확인).
+
+| # | 할 일 | 왜 지금 안 됐나 |
+|---|---|---|
+| 1 | **2차 리허설** — 고친 스윕으로 ⑧(자기 프로브) · ⑩(§T) · `cores_assert_*` 4종 검증 | 프로브는 `-n` 결함으로 꺼졌고, §T 는 격자 **뒤**에 붙는데 그 전에 중단했다 |
+| 2 | 🔴 **`TARGET_SSH` 에서 `-n` 을 뺀다** | 붙이면 프로브 자산이 0바이트로 간다(rig 이 크기 대조로 잡아 프로브를 끈다) |
+| 3 | 🔴 **S3 를 풀 것** — 인스턴스 프로파일을 붙이거나 IAM 권한을 연다 | `preflight_s3` 가 하드 실패라 **정식 라운드가 아예 안 돈다**. 1차는 preflight 를 건너뛰고 scp 로 받았다 |
+| 4 | 부하기는 **`c7i.xlarge` 이상**으로 띄운다 | 2 vCPU 면 §T 가 성립하지 않는다(제한 = 전체) |
+| 5 | 대상 박스 **root SSH 열기** · scp 후 **CRLF 제거** | AL2023 은 root 로그인 차단이 기본 · Windows 작업 트리는 CRLF 라 `$''` 로 죽는다 |
+
+**2차 리허설 명령** (부하기에서, `-n` 없이):
+
+```bash
+cd /root/init && sudo env   S3_BASE=s3://shadowfit-measure-055447613012/shadowfit TARGET_HOST=<대상 사설 IP>   TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>"   AI_PUBLIC_TOKEN=<대상 .env 와 같은 값> GHZ_TOKEN=<같음>   GHZ_RPS=19 GHZ_DATA=/root/batch_multi.json GHZ_BIN=/usr/local/bin/ghz   CORES_ARMS="C A" CORES_REH_LEVELS="5" CORES_ANCHOR=0   PHASES=coresidency_rehearsal nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+```
+
+팔을 `C A` 로 두는 이유는 **캡이 걸린 뒤 풀리는 전이**를 보기 위해서다(`STALE` 판정 경로).
+⚠️ 이 명령은 **S3 없이** 도는 형태다 — 3번을 풀면 `PHASES` 에 `coresidency_preflight` 와
+`collect` 를 다시 넣는다.
+
 **선행 조건 (탑승 전, 로컬)**
 
 - [ ] `docker update --cpus` 가 실제로 물리는지 확인 (안 되면 ①이 +23분으로 되돌아간다)
@@ -872,3 +896,24 @@ H1 은 *「동거하면 내려간다」* 이므로, 내려간 천장이 **40~80 
     전부 `full` 인 것 ④ 건너뛰는 세 경우(taskset 없음 · 부하기 2코어 · 팔이 ARMS 에 없음)가
     **죽지 않고 경고로 지나가는** 것을 확인. 게이트 `cores_assert_taskset` 은 4가지로 대조했고,
     쌍이 한쪽만 남으면 차단한다. 🔴 **EC2 실행 검증은 0.**
+
+- **2026-08-17: EC2 리허설 1차 — 절반이 섰고, 두 결함을 잡았다** (§11 「점심때 할 일」).
+  대상 c7i.4xlarge + 부하기 **c7i.xlarge** 를 띄워 축소 리허설을 돌렸다. 13판 중 8판에서
+  사람이 끊었고 **인스턴스는 둘 다 terminate**(볼륨 0 확인). 기록:
+  [`rehearsal-aws-2026-08-17/`](../../loadtest/results/coresidency-2026-08-15/rehearsal-aws-2026-08-17/README.md).
+  - ✅ **EC2 에서 실제로 선 것**: ③ 캡 단언(팔 C 가 `8/4/4 vCPU` 로 물렸고 `.env` 기대값과 일치,
+    팔 A·B 는 0 → `STALE` 없음) · ④ 레벨 치환과 새 열 `loader_cpus` · ⑤ 앵커 판(앞에 버림판이
+    먼저 돈다) · ⑦ 부하기 샘플러 · ⑨ **ghz 지연 백분위(11.0~13.7ms)와 `side.tsv` 4,639행** —
+    `grpc_server_*`·`hikaricp_*`·`Threads_running` 이 걷힌다. **H3 판정 열이 처음으로 존재한다**
+  - ⭐ **부수 확인**: `STALE` 이 한 번도 안 났다 = compose 가 override 를 지우면 컨테이너를
+    실제로 재생성한다. 지금까지 «아마 그럴 것» 이던 전제가 사실이 됐다
+  - 🔴 **결함 ①**: `$SSH` 에 `-n` 이 있으면 `setup_probe` 의 자산 push(`cat > … < 파일`)가
+    **0바이트**로 간다. ⭐ **rig 이 스스로 잡았다** — 크기 대조가 `0/418135 B` 를 보고 프로브를
+    끄고 사유를 남겼다. 경고문에 «-n 이면 이것» 을 박았다
+  - 🔴 **결함 ②**: 같은 함정이 `assert_caps` 에 잠복해 있었다 — `while read … <<EOF` 안에서
+    `$SSH` 를 부르면 그 ssh 가 heredoc 을 먹어 **루프가 첫 줄만 돈다**(= 컨테이너 하나만 확인).
+    이번엔 `-n` 덕에 우연히 안 터졌다. 기대값을 루프 앞에서 한 번에 읽도록 고쳤다
+  - 🔴 **S3 가 막혀 있다**: 이 IAM 사용자는 인스턴스 프로파일을 못 붙인다 → `preflight_s3` 가
+    하드 실패라 **정식 라운드가 아예 안 돈다.** 1차는 `PHASES=coresidency_rehearsal` 만 돌리고
+    scp 로 회수했다. **탑승 전 반드시 풀어야 하는 항목**이다
+  - **아직 미검증**: ⑧ 자기 프로브 · ⑩ §T · `cores_assert_*` 게이트 4종 · preflight 단계
