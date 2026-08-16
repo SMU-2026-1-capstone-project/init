@@ -241,13 +241,13 @@ precompute 도입 이전에 이미 `COMPLETED`된 세션들은 `reports` row가 
 
 > **2026-07-24 최종 갱신**: precompute-on-write(§9)가 먼저 구현되면서 ②(삭제 근거)가 풀렸고, 그 위에 TTL 자동화(⑤⑥) 및 나머지 안전장치(보존기간·아카이빙·안전마진·검증)까지 전부 결정·구현 완료. `PoseDataPartitionScheduler`(신규, `com.shadowfit.service.Exercise`) 참조.
 
-`pose_data` TTL(§6 ④)은 개념·실측(`realmysql-experiments.md` §4②d, DROP PARTITION 625배)에 스키마 반영(PR #43)과 자동화까지 모두 끝났다. 6가지 축 — ①~④는 **정책 설계**, ⑤~⑥은 **운영 실행**.
+`pose_data` TTL(§6 ④)은 개념·실측([`realmysql-experiments.md` §4②d](../portfolio/realmysql-experiments.md), DROP PARTITION 625배 — 조건은 그 절의 조건표)에 스키마 반영(PR #43)과 자동화까지 모두 끝났다. 6가지 축 — ①~④는 **정책 설계**, ⑤~⑥은 **운영 실행**.
 
 | # | 축 | 내용 | 이 프로젝트 상태 |
 |---|---|---|---|
 | ① | 버퍼 vs 영속 구분 | `pose_data`(raw, 단기) vs `reports`(집계, 영속) | ✅ 판단 완료(`db-deep-dive.md` §2-0) |
 | ② | 삭제 근거 | raw를 지워도 되는 건 precompute로 요약이 `reports`에 이미 박제됐을 때뿐 | ✅ precompute-on-write 완료(2026-07-24, §9) — 삭제 근거 확보 |
-| ③ | 삭제 메커니즘 | DROP PARTITION vs DELETE — DROP 채택(625배, 디스크 즉시 회수) | ✅ 실측 완료 |
+| ③ | 삭제 메커니즘 | DROP PARTITION vs DELETE — DROP 채택(625배[행당 570배], 디스크 즉시 회수. 조건은 [§②d 조건표](../portfolio/realmysql-experiments.md)) | ✅ 실측 완료 |
 | ④ | 파티션 단위 | 월별 — 너무 잘게(일별) 관리부담, 너무 크게(연별) 만료 단위가 거칠어짐 | ✅ 월별 14파티션 + `pfuture`, 실스키마 반영(`mysql/schema.sql`, PR #43) |
 | ⑤ | 실행 트리거 | 스케줄러가 주기적으로 DROP/ADD PARTITION 실행 | ✅ `PoseDataPartitionScheduler` 신설, 매일 새벽 4시(`@Scheduled(cron=...)`), `SessionTimeoutScheduler`와 동일 패턴 |
 | ⑥ | 파티션 유지보수 | 미래 파티션(`pfuture`)이 계속 커지지 않도록, 다다음 달 파티션을 미리 만들어둬야 함 | ✅ 이번 달 기준 +2개월(`lookahead-months`)까지 항상 실명 파티션 유지, 부족하면 `REORGANIZE PARTITION pfuture INTO (...)`로 확장 |

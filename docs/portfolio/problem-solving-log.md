@@ -128,7 +128,7 @@
 | **읽기 최적화 (projection)** | 🔴 헤드라인 | ✅ `PoseDataRepository:29` `PoseFrameProjection`(3컬럼). 실측 payload **−98.7%**, warm 쿼리 **8x**(로컬 412만 행) → **29~41x**(AWS 1억 행, 2026-07-15) ([`report-read-path.md`](../decisions/report-read-path.md) ①)<br>⚠️ precompute가 세션당 1회 도는 비동기 잡 — "리포트가 빨라졌다"가 아니라 **잡의 I/O·버퍼풀 점유 절감**<br>🔴 **정상 조회는 이 쿼리를 안 부른다**(precompute + 폴백 전용, 코드 판독·미측정). 3컬럼 시절 값이고 현재 4컬럼으로는 재검증 안 함 — [조건표](./realmysql-experiments.md) |
 | **일일 집계 lost-update** | 🟠 동시성 | ✅ `DailyLogRepository:30` `ON DUPLICATE KEY UPDATE` 원자 upsert. 재현·비교는 `loadtest/measure_lock.sh`(scratch `lock_lab`) |
 | **report 생성 멱등성** | 🟠 정합성 | ✅ `mysql/schema.sql:204` `UNIQUE KEY uk_report_session (session_id)` |
-| **파티셔닝 + TTL** | 시계열 운영 | ✅ `mysql/schema.sql:148` `PARTITION BY RANGE(UNIX_TIMESTAMP(created_at))` + 자동 운영 스케줄러. **DROP PARTITION 625배** 실측 |
+| **파티셔닝 + TTL** | 시계열 운영 | ✅ `mysql/schema.sql:148` `PARTITION BY RANGE(UNIX_TIMESTAMP(created_at))` + 자동 운영 스케줄러. **DROP PARTITION 625배** 실측<br>⚠️ 조건: 로컬·더미, 행수 불일치로 raw 625배 = **행당 570배**, DROP 도 진짜 O(1) 아님(파일 삭제 I/O). AWS 축소 재현 421배 — [조건표](./realmysql-experiments.md) |
 | **Resilience4j** | 운영 신뢰성 | ✅ `ExerciseAnalysisService:83` `aiCircuitBreaker()` + gRPC deadline |
 
 > ⚠️ **"구현됨"과 "카드가 됨"은 다르다.** 위 다섯은 코드가 있다는 것까지만 확인했고, §2 카드들처럼 **문제 → 원인 → 해결 → 수치**로 정리된 상태가 아니다. 특히 *일일 집계 lost-update* 와 *report 멱등성* 은 **"경합이 실제로 일어나 손실이 났다"는 재현 근거**가 카드에 필요한데, 지금은 scratch 테이블 실험(`measure_lock.sh`)만 있고 실코드 경로의 사례가 아니다. 면접에서 "실제로 겪었나"를 물으면 갈린다.

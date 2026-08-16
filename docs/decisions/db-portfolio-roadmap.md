@@ -105,7 +105,7 @@
 | 시간 파티셔닝 | ✅ `PARTITION BY RANGE (unix_timestamp(created_at))` 월별 (DB 실측 2026-08-12) |
 | 만료 파티션 폐기 | ✅ `PoseDataPartitionScheduler.dropExpiredPartitions` — `DROP PARTITION` |
 | 미래 파티션 자동 생성 | ✅ 같은 스케줄러 `ensureFuturePartitions` (`REORGANIZE PARTITION pfuture`) |
-| 실측 근거 | ✅ ALTER 96분 / DROP PARTITION 1.8초 / DELETE 대비 **625배** ([`../portfolio/realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §4-②d) |
+| 실측 근거 | ✅ ALTER 96분 / DROP PARTITION 1.8초 / DELETE 대비 **625배**(행당 정규화 570배, 로컬·더미. AWS 축소 재현 421배 — 조건표는 [`../portfolio/realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §4-②d) |
 | 볼륨 | ✅ 1억 행 시드 (133,334세션 × 750행, ~11GB) |
 
 FK 비호환 블로커도 **해소됐다** — FK 를 제거하고 애플리케이션 검증으로 대체했다

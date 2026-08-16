@@ -141,7 +141,8 @@
 - **완료(2026-07-24)**: `PoseDataPartitionScheduler`(`@Scheduled`, 매일 새벽 4시) 신설. 이번 달(쓰기 중) + 지난 1개월(버퍼)만 남기고 그 이전 파티션을 `DROP PARTITION` — 아카이빙 없이 완전 폐기(개인정보보호법 제21조 "지체없이 파기" 취지, S3 이전은 파기가 아니라는 판단). `pfuture`가 실데이터를 안 떠안도록 이번 달 기준 +2개월치 파티션을 `REORGANIZE`로 미리 생성. 안전마진: 파티션 이름이 `pYYYY_MM` 패턴과 정확히 일치할 때만 드롭 후보로 인정(정보스키마 조회 + 이름 파싱 이중 확인), `pfuture`는 쿼리 단계에서부터 제외. 세부 설계(보존기간·아카이빙·안전마진·실행주기)는 [`report-read-path.md §9-B`](../decisions/report-read-path.md).
 - **precompute-on-write 선행 완료(2026-07-24, §B-3)** — TTL이 안전하게 켜질 수 있었던 전제. 세션 완료 시 worst 구간이 이미 `reports`에 저장되므로, `pose_data` 원본이 드롭돼도 리포트는 영향 없음.
 - **pose_data는 중간 산출물(버퍼)** — precompute로 worst 구간을 `reports`에 옮긴 직후 cold → TTL 안전(UX 손실 0).
-- **구현 방향은 DELETE 아니라 DROP PARTITION**: 날짜 Range 파티셔닝 → 가장 오래된 파티션을 **O(1) 메타데이터 연산**으로 제거(락 거의 없음). 대량 DELETE는 락·undo 폭발. → **실측 확인**(1억 행 rig, [`realmysql-experiments §②(d)`](./realmysql-experiments.md)): 같은 ~8M행 만료가 **DELETE 18.6분(빈 952MB 파일 잔존) vs DROP PARTITION 1.8초(파일째 회수) ≈ 625x**.
+- **구현 방향은 DELETE 아니라 DROP PARTITION**: 날짜 Range 파티셔닝 → 가장 오래된 파티션을 **행단위 비용 없이**(`.ibd` 파일째 unlink) 제거. 대량 DELETE는 락·undo 폭발. → **실측 확인**(1억 행 rig, [`realmysql-experiments §②(d)`](./realmysql-experiments.md)): ~8M행대 만료가 **DELETE 18.6분(빈 952MB 파일 잔존) vs DROP PARTITION 1.8초(파일째 회수) ≈ 625x**.
+  ⚠️ **«O(1) 메타데이터 연산» 이라고 말하면 부정확하다** — DROP 1.8초에는 ~910MB 파일 삭제 I/O 가 들어 있다(로컬 디스크가 느려서 1.8초이고, 빠른 스토리지면 sub-100ms). 「O(1)」은 *행단위 비용이 0* 이라는 뜻이지 상수 시간이 아니다. 또 두 작업의 행수가 같지 않아(DELETE 8,301,450 vs DROP 7,560,000) **625배는 raw 비율이고 행당 정규화하면 570배**다. 조건 전체는 [§②d 조건표](./realmysql-experiments.md).
 - **파티셔닝의 진짜 가치 = 쿼리 pruning 아니라 "값싼 TTL"** (쿼리는 이미 인덱스로 빠름, §4.3). 이 reframe이 핵심.
 - ⚠️ **파티션 전제 = PK에 파티션 키 포함** — pose_data PK `id`만으론 created_at 파티션 불가, PK를 `(id, created_at)`로 변경 완료(위 참고).
 - **샤딩은 안 함** — 단일 MySQL로 충분. 스케일 시에도 샤딩 전에 raw를 S3 티어링이 먼저(§0).
