@@ -87,12 +87,28 @@ DB마다 MVCC 구현과 기본 격리수준이 다릅니다 — 예를 들어 Or
 
 ```
 근거:
-payload:      1,716.8 KB → 22.4 KB   (-98.7%)
+payload:      1,716.8 KB → 22.4 KB   (-98.7%)   ← DB→앱. API 응답 바이트가 아니다
 warm 쿼리:   12.1 ms → 1.5 ms         (8x, -87%)
 풀스캔 대조: IGNORE INDEX 시 412만 행 스캔 + filesort = 85초 (AWS 1억 행 재검증: 2,120.9초=35분20초, 85×24.27배 선형추정 2,063초와 거의 일치)
 코드: PoseDataRepository.findFramesBySessionId (JPQL projection)
      ReportService.selectWorstSection / buildWorstReason (PoseFrameProjection 사용)
+
+조건: 3컬럼 시절 값 (지금은 4컬럼 — repNumber·smoothedKneeAngle 추가, feedbackMessage 제거)
+      이 쿼리가 도는 곳은 precompute 잡과 조회 폴백뿐 (아래 Q 참고)
 ```
+
+> ⚠️ **말할 때 주의** — 위 문단은 «조회를 고쳤다» 로 들린다. 실제로 이 쿼리가 도는 자리는
+> 아래 Q 가 말하는 대로 좁으니, 먼저 짚고 들어가는 편이 안전하다.
+
+### Q. 그래서 리포트 조회가 그만큼 빨라진 건가요?
+
+아닙니다. 정직하게 말하면 **정상적인 리포트 조회는 그 쿼리를 아예 안 탑니다.**
+
+세션이 끝날 때 `precomputeReport`가 분석 결과를 미리 계산해 `report.detailed_analysis`에 넣어둡니다. 조회는 그 JSON을 파싱하고 끝나서 `pose_data`를 읽지 않습니다. projection 쿼리가 도는 곳은 **① precompute 잡(세션당 1회, 비동기)** 과 **② 그 컬럼이 비었거나 구버전일 때의 폴백** 두 곳뿐입니다.
+
+그래서 −98.7%의 수혜자는 사용자 체감 지연이 아니라 **세션마다 반복되는 precompute 잡의 I/O·버퍼풀 점유**입니다. "리포트가 빨라졌다"고 말하면 부정확합니다.
+
+덧붙이면 이건 **코드를 읽어서 안 것이고 아직 측정하지는 않았습니다.** 「정상 경로 기여가 0이다」를 실제로 재는 것을 다음 실험의 1차 산출물로 잡아뒀습니다(`projection-end-to-end-remeasure.md`). 최적화를 했다는 것보다 **그 최적화가 지금 어느 경로에서만 사는지 아는 것**이 중요하다고 봤습니다.
 
 ### Q. payload는 98.7% 줄었는데 속도는 왜 87%(8배)밖에 안 줄었어요?
 

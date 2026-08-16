@@ -174,7 +174,7 @@
 - **처리량 +99%**, **p99 지연 −37%**.
 
 ### 5.2 읽기 — JSON projection
-세션 리포트 조회 시 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장) 전체를 헛로드하던 경로를 3컬럼 DTO projection으로 교체:
+세션 분석 계산 시 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장) 전체를 헛로드하던 경로를 3컬럼 DTO projection으로 교체:
 
 | 지표 | before | after | 효과 |
 |---|---|---|---|
@@ -186,6 +186,8 @@
 → 인덱스는 동일. 차이는 JSON이 off-page overflow로 저장돼 SELECT 시 추가 random I/O가 발생하는데, projection이 이를 회피한 것.
 
 → **1억 행 재검증(2026-07-15, AWS EC2 m6i.xlarge)에서 배수가 오히려 커졌다.** 버퍼풀은 2GB로 동일한데 테이블이 25배(~230GB) 커지며 작업셋 대비 버퍼풀 비율이 나빠져, 풀엔티티 로드의 off-page 랜덤 I/O가 캐시에 덜 걸리고 실제 디스크를 더 탄 탓. 결론이 뒤집힌 게 아니라 스케일에 비례해 강화된 것이다. payload 감소율은 두 환경에서 동일(세션당 바이트 비율이라 행수 무관).
+
+> 📌 **조건** — 🔴 **정상적인 리포트 «조회» 는 이 쿼리를 부르지 않는다.** 세션 종료 시 `precomputeReport` 가 결과를 `report.detailed_analysis` 에 미리 넣고, 조회는 그 JSON 을 파싱하고 끝난다. projection 이 도는 곳은 **precompute 잡(세션당 1회, 비동기)** 과 **폴백**(그 컬럼이 비었거나 구버전일 때)뿐이라, 위 수치는 **사용자 체감 지연이 아니라 그 잡의 자원 소모 절감**이다. 이건 코드 판독이고 아직 측정은 아니다([`decisions/projection-end-to-end-remeasure.md`](./decisions/projection-end-to-end-remeasure.md) Q1). 또 위 값은 **3컬럼 시절** 프로젝션의 것이고 현재 4컬럼 형상으로는 재검증하지 않았다. 조건 전체는 [`portfolio/realmysql-experiments.md §②b`](./portfolio/realmysql-experiments.md).
 
 → ⚠️ **프레임 주의**: 이 쿼리는 사용자가 매번 누르는 조회가 아니라 **세션 종료 시 precompute가 세션당 한 번 도는 것**이고, 비동기라 사용자는 이 지연을 원래 못 느낀다. "리포트가 빨라졌다"가 아니라 **"세션마다 반복되는 잡의 I/O·버퍼풀 점유를 줄여 시스템 자원 부담을 낮췄다"**가 정확한 표현이다.
 
@@ -262,7 +264,7 @@ MediaPipe가 뱉는 **33개 landmark 전부**를 `joint_coordinates`에 저장�
 | 영역 | 개선 | 수치 |
 |---|---|---|
 | 쓰기 | 배치 INSERT | 처리량 +99%, p99 −37% |
-| 읽기 | JSON projection | payload −98.7%, warm 쿼리 8x(로컬 412만 행) → 29~41x(AWS 1억 행)<br>⚠️ precompute 잡의 자원 절감이지 사용자 체감 지연 아님 |
+| 읽기 | JSON projection | payload −98.7%, warm 쿼리 8x(로컬 412만 행) → 29~41x(AWS 1억 행)<br>⚠️ precompute 잡의 자원 절감이지 사용자 체감 지연 아님 — **정상 조회는 이 쿼리를 안 탄다**(§5.2 📌), 3컬럼 시절 값 |
 | 인덱스 | 풀스캔 대조 | 인덱스 부재 시 85초 |
 | 페이지네이션 | offset→keyset | 최대 489,868x |
 | 보존 | DROP PARTITION | DELETE 대비 625x |

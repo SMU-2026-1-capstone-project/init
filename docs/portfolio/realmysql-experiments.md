@@ -127,6 +127,15 @@
     - ⚠️ **측정 도구 자체의 함정도 잡아냄**(§0 Performance Schema 백본 참고): 이 29~41배는 재측정 결과 — 첫 시도는 SSH+`docker exec` 왕복 wall-clock(~50ms 오버헤드)로 쟀다가 **2배로 축소돼 나왔음**. sub-100ms 쿼리 차이가 그 오버헤드에 묻힌 것. `SET profiling=1`(DB 내부 타이밍, 네트워크 왕복 배제)로 바꿔 재측정해서 진짜 29~41배를 찾음 — 첫 숫자를 그대로 안 믿고 측정 도구 자체를 의심·교정한 과정.
   - **✅ 풀스캔 대조도 1억 행으로 재검증(2026-07-15)**: `IGNORE INDEX` 강제 풀스캔 = **2,120.9초(35분 20초)**. 412만 행의 85초 대비 1억 행은 412만 행의 약 24.27배인데, 85×24.27≈2,063초(34.4분) 선형 추정치와 **거의 정확히 일치**(2,120.9초) — 풀스캔 비용이 행 수에 선형(O(N))으로 늘어난다는 걸 실제 1억 행 규모에서 재확인.
   - ⚠️ **실무 프레임 명확화**: 이 쿼리는 사용자가 매번 누르는 조회가 아니라 **세션 종료 시 precompute가 세션당 딱 한 번 도는 것**([`db-deep-dive §2-0`](./db-deep-dive.md)). 그래서 8~40배 개선의 의미는 "사용자 체감 지연이 빨라졌다"가 아니라 — precompute는 비동기라 사용자는 이 지연을 원래 못 느낌 — **"세션마다 반복되는 이 잡의 I/O·버퍼풀 점유를 줄여 시스템 전체 자원 부담을 낮췄다"**는 쪽. "리포트가 빨라졌다"로 말하면 부정확, "정기적으로 도는 무거운 잡의 자원 소모를 줄였다"가 정직한 프레임.
+
+  - 📌 **이 수를 인용할 때 같이 가야 하는 조건 (2026-08-17 박제)** — 값은 정확하다. 빠져 있던 것은 **조건**이다. 인용처 12곳에 이 표를 단서로 달았다(«3.47배» 13곳에 조건을 단 `0d68b52` 와 같은 작업).
+
+    | 축 | 조건 |
+    |---|---|
+    | **경로** | projection 쿼리(`findFramesBySessionId`)는 **두 곳에서만 돈다** — ① `SessionService.precomputeReport`(세션 종료 시 1회, 비동기), ② `ReportService.resolveDetailedAnalysis` 의 **폴백**(`detailed_analysis` 가 비었거나 구버전일 때). **정상 리포트 조회는 저장된 JSON 을 파싱하고 끝나 pose_data 를 안 읽는다** → 정상 경로에서 이 수의 응답시간 기여는 **0**. 🔴 이건 **코드 판독이고 아직 측정이 아니다**([`../decisions/projection-end-to-end-remeasure.md`](../decisions/projection-end-to-end-remeasure.md) Q1 이 «0 임을 재는 것» 을 1차 산출물로 세워둔 상태) |
+    | **층** | **DB→앱 payload** 다. 앱→클라이언트 API 응답 바이트가 아니다 — API 응답이 안 변하는 건 정상이며 «효과 없음» 으로 읽으면 틀린다 |
+    | **형상** | **3컬럼 시절**(`timestampSec`·`syncRate`·`feedbackMessage`)의 값이다. 지금 `PoseFrameProjection` 은 **4컬럼**(`repNumber` [#78](https://github.com/Shadowfit/init/issues/78) 추가 · `smoothedKneeAngle` 추가 · `feedbackMessage` [#80](https://github.com/Shadowfit/init/issues/80) 제거). `joint_coordinates`(2.3KB)를 안 싣는 핵심은 그대로라 배수가 크게 흔들리진 않겠지만, **«현재 값» 으로 인용된 적은 검증된 바 없다** |
+    | **환경** | payload −98.7% 는 로컬 412만 행(2026-06-02)과 AWS 1억 행(2026-07-15)에서 **둘 다 동일**. 반면 warm 쿼리 배수는 환경 종속이다 — 8x(로컬 412만) → 29~41x(AWS 1억). 배수를 인용할 땐 어느 쪽인지 밝힐 것 |
 - **결과 (c) 페이지네이션 ✅ (2026-06-03, 1억 행 합성[측정 시점 9,750만, 결론 동일], warm 3회째, EXPLAIN ANALYZE)**:
 
   | 깊이(OFFSET) | offset ms | keyset ms | speedup |

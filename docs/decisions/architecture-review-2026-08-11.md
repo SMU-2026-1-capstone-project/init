@@ -60,7 +60,7 @@
   **general log 에서 실제 SQL 을 건져** EXPLAIN 에 건다(`:18`). *"EXPLAIN 은 «결과가 없는 것» 보다 나쁘다(그럴듯해 보이므로)"*(`:274`)
 - **자기 주장을 스스로 반증한 기록** — 엔진 우위 3개([`mysql-vs-postgresql.md §2`](./mysql-vs-postgresql.md)), 파티션 pruning 이득 0
 - **미검증을 미검증이라 쓰는 습관** — #164 이슈의 «⚠️ 확정하지 말 것» 캐비엇 3개
-- 실제 병목을 잡음 — projection `−98.7%`, keyset
+- 실제 병목을 잡음 — projection `−98.7%`(조건: precompute·폴백 경로 한정 — [조건표](../portfolio/realmysql-experiments.md)), keyset
 
 ---
 
