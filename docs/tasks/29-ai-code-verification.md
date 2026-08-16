@@ -122,7 +122,7 @@ grep "\.completeSession(" backend/src/main
 
 즉 미결 항목의 **질문 자체가 잘못 세워져 있었다** — "적용할지"가 아니라 "이 코드가 살아 있는 게 맞는지"다.
 
-✅ **해소 (2026-08-16).** [#179](https://github.com/Shadowfit/init/issues/179) 로 등록한 뒤 **삭제**로 결정했다. 판단 근거는 코드 밖에 있었다 — 프런트가 호출하는 종료 지점은 `PATCH /sessions/{id}/end` 하나뿐이고(`exercisesService.ts:21`), 앱이 결과를 직접 보고하는 갈래는 분기 2.A.ET 에서 **ET-H 채택(2026-05-26)으로 이미 폐기**된 설계다. 되살리는 쪽이 오히려 결정을 뒤집는 일이었다. 함께 없어진 테스트 7개 중 낙관락 재시도·exhausted 검증은 살아 있는 gRPC 경로(`ai-callback`)에 같은 시나리오가 남아 있어 메커니즘 커버리지 손실은 없다.
+✅ **해소 (2026-08-16).** [#179](https://github.com/Shadowfit/init/issues/179) 로 등록한 뒤 **삭제**로 결정했다. 판단 근거는 코드 밖에 있었다 — 프런트가 호출하는 종료 지점은 `PATCH /sessions/{id}/end` 하나뿐이고(`exercisesService.endSession`), 앱이 결과를 직접 보고하는 갈래는 분기 2.A.ET 에서 **ET-H 채택(2026-05-26)으로 이미 폐기**된 설계다. 되살리는 쪽이 오히려 결정을 뒤집는 일이었다. 함께 없어진 테스트 7개 중 낙관락 재시도·exhausted 검증은 살아 있는 gRPC 경로(`ai-callback`)에 같은 시나리오가 남아 있어 메커니즘 커버리지 손실은 없다.
 
 ---
 
