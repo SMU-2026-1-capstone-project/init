@@ -51,8 +51,13 @@ SESS_HI=$(( SESS_LO + ${LEVELS[-1]} - 1 ))
 
 C=${C:-100}
 N_REQ=${N_REQ:-30000}
-REPS=${REPS:-25}          # 요청당 프레임 수. 다운샘플 R=5 를 거쳐 5행이 저장된다
-ROWS_PER_REQ=5            # `_rig.sh` 의 rows/s 계산이 읽는다
+REPS=${REPS:-25}          # 요청당 프레임 수
+# 🔴 유도한다. 예전엔 `ROWS_PER_REQ=5` 상수였는데 `REPS` 는 환경변수로 덮을 수 있어서,
+#    `REPS` 를 바꾸면 `rows_s` 열이 **조용히 틀렸다**(#273 ②). 둘은 같이 움직여야 한다.
+#    창 크기 5 의 출처는 `PoseDataService.java:58` 의 `DOWNSAMPLE_WINDOW` 다 — 저기가 바뀌면
+#    여기도 바뀌어야 하고, 그 사실을 상수로 숨기지 않는다.
+DOWNSAMPLE_WINDOW=${DOWNSAMPLE_WINDOW:-5}
+ROWS_PER_REQ=$(( (REPS + DOWNSAMPLE_WINDOW - 1) / DOWNSAMPLE_WINDOW ))   # ceil
 GEN=../../ghz/gen_batch_multi.py
 PY=${PY:-python}
 
@@ -179,7 +184,7 @@ init_spread_log() {
     "tag\tlevel\trep\tpos\tt0_utc\tt1_utc\tsecs\trow_lock_waits\trow_lock_time_ms\tdirty_pages\trows_inserted\trows_expected\n" \
     > "$SPREAD_LOG"
   [ -f "$WRITER_LOG" ] || printf \
-    "tag\tlevel\tattempts\terrors\tp50_ms\tp95_ms\tmax_ms\tmax_gap_ms\n" > "$WRITER_LOG"
+    "tag\tlevel\tattempts\terrors\tp50_ms\tp95_ms\tmax_ms\tmax_gap_ms\tended_early\n" > "$WRITER_LOG"
 }
 
 # ── 백그라운드 writer — «번짐 반경» 관측 채널 ────────────────────────────
@@ -220,6 +225,22 @@ start_writer() {  # $1 = 태그
 }
 
 stop_writer() {  # $1 = 태그
+  # 🔴 **멈추라고 하기 전에** 아직 살아 있었는지 본다(#273 ④). `WRITER_MAX_SEC` 는 백스톱인데
+  #    판이 그보다 길면 writer 가 판 도중에 스스로 끝난다 — 그러면 이 판의 «번짐 반경» 은
+  #    판 후반을 못 본 값이다. 그런데 그건 **정지가 아니라 관측 종료**라 `max_gap_ms` 에
+  #    안 잡히고, `attempts` 가 조금 작을 뿐이라 표에서 안 보인다.
+  #    임계값이 아니라 **이진 사실**로 잡는다: 제어행이 이미 없거나 커넥션이 죽어 있으면 그렇다.
+  local early="no" cid0 alive0
+  cid0=$(mysql_q "SELECT conn_id FROM spread_writer_ctl WHERE id=1;" | tr -d '[:space:]')
+  if [ -z "${cid0:-}" ]; then
+    early="yes"   # 프로시저가 끝나며 제어행을 스스로 지웠다
+  else
+    alive0=$(mysql_q "SELECT COUNT(*) FROM performance_schema.processlist WHERE id=$cid0;")
+    [ "${alive0:-0}" = "0" ] && early="yes"
+  fi
+  [ "$early" = "yes" ] && echo "  ⚠️ writer 가 판보다 먼저 멈췄다 (WRITER_MAX_SEC=$WRITER_MAX_SEC 초과 또는 죽음)" \
+    "— 이 판의 번짐 반경은 판 전체를 못 봤다" >&2
+
   mysql_q "UPDATE spread_writer_ctl SET stop=1 WHERE id=1;" >/dev/null
   local cid alive i
   cid=$(mysql_q "SELECT conn_id FROM spread_writer_ctl WHERE id=1;" | tr -d '[:space:]')
@@ -248,8 +269,8 @@ stop_writer() {  # $1 = 태그
                         TIMESTAMPDIFF(MICROSECOND,
                           LAG(started_at) OVER (ORDER BY seq), started_at)/1000 gap
                  FROM spread_writer_log WHERE arm='$1') t;" \
-    | awk -v tag="$1" -v lvl="$CUR_LEVEL" 'BEGIN{OFS="\t"}
-        {print tag, lvl, $1, $2, $3, $4, $5, $6}' >> "$WRITER_LOG"
+    | awk -v tag="$1" -v lvl="$CUR_LEVEL" -v early="$early" 'BEGIN{OFS="\t"}
+        {print tag, lvl, $1, $2, $3, $4, $5, $6, early}' >> "$WRITER_LOG"
 
   # writer 가 넣은 행은 부하 대역 밖이라 `reset_rows` 가 안 지운다. 여기서 지운다 —
   # 안 지우면 판이 갈수록 테이블이 커져 «판 순서» 가 조작 변수에 섞인다.
@@ -260,13 +281,8 @@ stop_writer() {  # $1 = 태그
 #
 # 전부 «틀려도 표는 정상으로 보이는» 것들이다. 무인이 아니라 사람이 지켜보는 스윕이어도
 # 1시간 뒤에 알아채면 1시간을 버린다.
-assert_sessions_exist() {
-  local want=$(( SESS_HI - SESS_LO + 1 )) got
-  got=$(mysql_q "SELECT COUNT(*) FROM exercise_sessions WHERE id BETWEEN $SESS_LO AND $SESS_HI;")
-  [ "$got" = "$want" ] \
-    || die "세션 시드가 부족하다 — $SESS_LO~$SESS_HI 중 '$got'/$want 개만 있다. FK 로 전 요청이 실패한다"
-  echo "  세션 시드: $SESS_LO~$SESS_HI $want개 확인"
-}
+# `assert_sessions_exist` 는 공통부(`_rig.sh`)로 옮겼다 — 從 스크립트에도 같은 그물이
+# 필요한데 여기 있으면 복사본이 생긴다(#273 ③).
 
 assert_default_durability() {
   local got
@@ -329,9 +345,13 @@ PLANS=()
 
 echo "──────── 버림판 (레벨 $DISCARD_LEVEL) ────────"
 CUR_LEVEL=$DISCARD_LEVEL; CUR_REP=0; CUR_POS=0
+# 🔴 실패해도 **집계에 안 넣는다**(#273 ①). 예전엔 행만 지우고 FAILED 에는 남아서, 본판
+#    25개가 전부 멀쩡해도 스윕이 exit 1 로 끝나고 요약이 표에 없는 태그를 지목했다.
+GHZ_DISCARD=1
 run_ghz "discard_s$DISCARD_LEVEL" "/tmp/spread_$DISCARD_LEVEL.json" "$C" "$N_REQ" || true
+GHZ_DISCARD=0
 # 🔴 버림판은 **표에서 지운다.** 남겨두면 다음 사람이 판 수를 세다가 레벨 하나만 6판이 되는
-#    것을 못 보고 평균에 넣는다. FAIL 이었어도 마찬가지다 — 버릴 판이었다.
+#    것을 못 보고 평균에 넣는다.
 sed -i "/^discard_s$DISCARD_LEVEL\t/d" "$LOG" 2>/dev/null
 echo "  (버림판은 표에서 제외했다)"
 echo

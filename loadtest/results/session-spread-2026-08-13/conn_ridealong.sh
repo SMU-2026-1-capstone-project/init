@@ -49,7 +49,9 @@ SESS_HI=$(( SESS_LO + LEVEL - 1 ))   # reset_rows 범위
 C=${C:-100}
 N_REQ=${N_REQ:-30000}
 REPS=${REPS:-25}
-ROWS_PER_REQ=5
+# 본 스윕과 같은 유도식 — 상수로 두면 `REPS` 를 덮었을 때 `rows_s` 가 조용히 틀린다(#273 ②)
+DOWNSAMPLE_WINDOW=${DOWNSAMPLE_WINDOW:-5}     # 출처: PoseDataService.java:58
+ROWS_PER_REQ=$(( (REPS + DOWNSAMPLE_WINDOW - 1) / DOWNSAMPLE_WINDOW ))
 CONNS=(1 4 16)
 GEN=../../ghz/gen_batch_multi.py
 PY=${PY:-python}
@@ -80,6 +82,10 @@ source ./../commit-count-2026-08-09/_rig.sh
 
 learn_all_hosts
 init_log
+
+echo "=== 사전 확인 ==="
+assert_sessions_exist   # 공통부에 있다 — 단독 실행돼도 그물이 선다 (#273 ③)
+echo
 
 # 🔴 «보낸 요청이 실제로 행을 만들었는가» — 본 스윕과 같은 그물(#271).
 #    이쪽은 관측 채널이 없어 훅을 안 쓰던 자리인데, 이 확인만은 본 스윕과 같아야 한다.
@@ -116,7 +122,9 @@ PLANS=()
 
 echo "──────── 버림판 (기본 내구성 · --connections 4) ────────"
 set_durability 1 1
+GHZ_DISCARD=1                                                   # 실패해도 집계 밖 (#273 ①)
 GHZ_EXTRA="--connections 4" run_ghz "discard_conn" "$DATA" "$C" "$N_REQ" || true
+GHZ_DISCARD=0
 sed -i "/^discard_conn\t/d" "$LOG" 2>/dev/null
 echo "  (버림판은 표에서 제외했다)"
 echo
