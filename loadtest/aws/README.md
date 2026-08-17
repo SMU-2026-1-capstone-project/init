@@ -186,7 +186,8 @@ PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
 
 - `GHZ_RPS` — **기본값이 없다.** 「정한 값」이라 근거가 결과의 조건 칸에 같이 가야 해서다
   ([`../../docs/decisions/ai-coresidency-capacity.md`](../../docs/decisions/ai-coresidency-capacity.md) §5-2·결정 로그)
-- `GHZ_BIN` — 🔴 **기본값이 부트스트랩 설치 경로와 다르다.** `bootstrap.sh` 는 릴리스 바이너리를
+- ~~`GHZ_BIN`~~ → ✅ **고쳤다 (#249, 2026-08-17)** — 기본값이 `/usr/local/bin/ghz` 라 이제 안 적어도 된다.
+  아래는 왜 그 함정이 있었는지의 기록이다. 🔴 **기본값이 부트스트랩 설치 경로와 다르다.** `bootstrap.sh` 는 릴리스 바이너리를
   `/usr/local/bin/ghz` 에 깔지만(`bootstrap.sh:179`) 러너 기본값은 `/home/ec2-user/go/bin/ghz`
   다(`run_all.sh:118`, 옛 라운드의 go install 경로). 안 적으면 preflight 가 `GHZ_BIN(실행권한)`
   으로 막는다 — 막히긴 하니 라운드를 버리진 않는다
