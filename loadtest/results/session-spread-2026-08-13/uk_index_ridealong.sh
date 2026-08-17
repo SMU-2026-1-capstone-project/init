@@ -203,4 +203,19 @@ echo
 echo "=== 기제 ($MECH_LOG) ==="
 cat "$MECH_LOG"
 
+# 🔴 덤 — 인덱스가 실제로 얼마나 큰가 (#272 의 미검증: "행당 약 33바이트는 실측이 아니라
+#    컬럼 폭에서 나온 산술이다"). 마지막 판이 with 팔이 아닐 수 있으므로 키를 되돌린 뒤 잰다.
+#    비용 0 이고, 「쓰기가 느려진 만큼 무엇이 늘었나」의 다른 쪽 절반이다.
+echo
+echo "=== 인덱스 크기 실측 (#272 미검증 항목) ==="
+mysql_q "ALTER TABLE pose_data ADD UNIQUE KEY uk_pose_event
+         (session_id, rep_number, timestamp_sec, created_at);" >/dev/null 2>&1
+mysql_q "SELECT index_name, stat_name, stat_value
+         FROM mysql.innodb_index_stats
+         WHERE database_name='shadowfit' AND table_name LIKE 'pose_data%'
+           AND stat_name IN ('size','n_leaf_pages')
+         ORDER BY index_name, stat_name;" | sed 's/^/  /'
+echo "  (size·n_leaf_pages 는 **페이지 수**다. × 16KB 가 바이트다)"
+mysql_q "SELECT 'pose_data 행수', COUNT(*) FROM pose_data;" | sed 's/^/  /'
+
 finish ${#PLANS[@]}
