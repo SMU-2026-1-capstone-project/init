@@ -69,11 +69,14 @@ DUPFILE=$OUT/_payload/dup_$LEVEL.json
 import re, sys
 p = sys.argv[1]
 s = open(p, encoding='utf-8').read()
-# `{{ add 901 (mod .RequestNumber N) }}` → 901 (한 세션에 몰아 중복을 최대화)
-s = re.sub(r'\{\{\s*add\s+(\d+)\s+\(mod[^}]*\}\}', r'\1', s)
-# `{{ .RequestNumber }}` → 0 (요청마다 같은 rep_number)
+# 🔴 **세션 라우팅은 그대로 둔다.** 1차 시도(2026-08-18)는 세션까지 901 로 접었더니
+#    데드락이 **한 건도 안 났다**(2,000요청 전부 OK). 모든 요청이 같은 행을 같은 순서로
+#    잠그면 순환이 안 생기기 때문이다 — 그건 데드락이 아니라 그냥 락 대기다.
+#    아침 게이트에서 34.8%가 죽은 조건은 **다세션 중복**이었다. 그 조건을 되살린다.
+# `{{ .RequestNumber }}` → 0 만 바꾼다 (요청마다 같은 rep_number = 중복)
 s = re.sub(r'\{\{\s*\.RequestNumber\s*\}\}', '0', s)
-assert '{{' not in s, '템플릿이 남았다'
+assert '.RequestNumber }}' not in s, 'repNumber 템플릿이 남았다'
+assert 'mod .RequestNumber' in s, '세션 라우팅이 사라졌다 — 다세션 중복이어야 한다'
 open(p, 'w', encoding='utf-8').write(s)
 print(f"  키 고정 완료: {p} ({len(s)/1024:.1f}KB)")
 PY
