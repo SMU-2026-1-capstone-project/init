@@ -34,7 +34,10 @@
 #    돈다 — **그 선을 잇는 것이 아니라**, 이 라운드 안에서 «기본 ↔ 완화» 를 짝지어 답한다.
 #    3차 숫자와 나란히 놓지 말 것.
 #
-# 설계: docs/decisions/session-spread-sweep.md §4-4
+# 🔴 2026-08-17 (#271): 페이로드가 ghz 템플릿이 됐다 — 본 스윕과 같은 파일을 쓰므로 같이 바뀐다.
+#    `--connections` 는 이 스윕의 조작 변수이고, `GHZ_EXTRA` 가 워밍업에도 걸린다는 규약은 그대로다.
+#
+# 설계: docs/decisions/session-spread-sweep.md §4-4 · docs/decisions/loadtest-payload-uniqueness.md
 # 사용: sessions_sweep.sh 와 같은 환경변수 (OUT 은 같은 디렉터리를 준다)
 
 set -uo pipefail
@@ -77,6 +80,18 @@ source ./../commit-count-2026-08-09/_rig.sh
 
 learn_all_hosts
 init_log
+
+# 🔴 «보낸 요청이 실제로 행을 만들었는가» — 본 스윕과 같은 그물(#271).
+#    이쪽은 관측 채널이 없어 훅을 안 쓰던 자리인데, 이 확인만은 본 스윕과 같아야 한다.
+#    멈추는 것은 0 하나다(임계값이 아니라 «측정 불성립» 의 정의).
+round_end_hook() {  # $1=태그 $2=t0 $3=t1 — reset_rows 보다 먼저 돈다
+  local rows want
+  rows=$(mysql_q "SELECT COUNT(*) FROM pose_data WHERE session_id BETWEEN $SESS_LO AND $SESS_HI;")
+  want=$(( N_REQ * ROWS_PER_REQ ))
+  [ "${rows:-0}" = "0" ] && die "판 $1 이 행을 하나도 안 만들었다 — 요청은 갔는데 저장이 안 됐다 (#271)"
+  [ "${rows:-0}" = "$want" ] || echo "  ⚠️ 행수가 기대와 다르다 — $rows / $want" >&2
+  return 0
+}
 
 # 🔴 어떻게 끝나든 완화 상태를 남기지 않는다. 다음 실험이 그걸 모른 채 재면 3.47배만큼
 #    틀린 결론이 나온다. 4차 pool 스윕이 같은 이유로 같은 trap 을 갖고 있다.

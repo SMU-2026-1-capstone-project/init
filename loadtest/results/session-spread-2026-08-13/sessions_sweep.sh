@@ -22,6 +22,13 @@
 #   - 생성기         : 전 레벨 `gen_batch_multi.py` 하나. 🔴 4차의 «단일 220.4 RPS» 는
 #                      **다른 생성기**(`gen_batch.py`)로 잰 값이라 이 표의 레벨 1 과
 #                      **같은 판이 아니다.** 레벨 간 비교는 이 표 안에서만 한다
+#
+# 🔴 2026-08-17 (#271): 페이로드가 **배열이 아니라 ghz 템플릿**이 됐다. 세션 라우팅은
+#    `mod .RequestNumber <레벨>` 이 하고(예전 배열 순환과 같은 일), `repNumber` 가 요청마다
+#    달라져 멱등 키를 움직인다. 안 그러면 세션당 첫 요청만 행을 만들고 나머지는 no-op 인데
+#    `fail=0` 에 RPS 도 정상으로 찍혀 **표를 봐서는 안 보인다.**
+#    부수 효과: 레벨 100 페이로드가 5.2MB → 54KB. 대신 부하기에 요청마다 템플릿·파싱이
+#    붙는다 — 리허설에서 부하기 CPU 와 달성 rate 를 볼 것(설계 문서 §3).
 #   - 총 행수        : 판마다 N_REQ × 5 행으로 같다. 흩어지는 «자리» 만 다르다
 #   - 내구성         : 기본값(flush=1 / sync_binlog=1). 완화판은 이 스윕이 묻는 질문이 아니다
 #   - 풀 크기        : 재기동하지 않는다. pool 은 이 실험의 조작 변수가 아니라 **고정 조건**이라
@@ -130,8 +137,28 @@ spread_counters() {  # stdout: "row_lock_waits row_lock_time dirty_pages"
 CUR_LEVEL=""; CUR_REP=""; CUR_POS=""; S0=""
 round_begin_hook() { S0=$(spread_counters); start_writer "$1"; }
 round_end_hook() {   # $1=태그 $2=t0 $3=t1
-  local tag=$1 t0=$2 t1=$3 s1 w0 w1 tm0 tm1 d0 d1
+  local tag=$1 t0=$2 t1=$3 s1 w0 w1 tm0 tm1 d0 d1 rows want
   s1=$(spread_counters)
+
+  # 🔴 «보낸 요청이 실제로 행을 만들었는가». 이 그물이 없어서 #271 을 못 봤다 —
+  #    멱등 키가 중복을 삼키면 `ON DUPLICATE KEY UPDATE` 가 **성공**이라 fail=0 에
+  #    RPS 도 정상으로 찍히고, 표를 봐서는 아무것도 안 보인다.
+  #    **`reset_rows` 보다 먼저 도는 자리**여야 한다(run_ghz 의 훅 호출 순서가 그렇다).
+  #
+  #    임계값을 두지 않는다. 「몇 % 이하면 문제」는 근거 없는 선이라 판정을 내리는 척만 한다.
+  #    멈추는 것은 **0** 하나 — 그건 기준이 아니라 «측정이 성립하지 않았다» 의 정의다.
+  #    그 밖의 어긋남은 숫자를 표에 남기고 사람이 읽는다(설계 §4-1 이 «총 행수는 판마다
+  #    같다» 를 고정 조건으로 걸어뒀으므로, want 와 다르면 그 조건이 깨진 것이다).
+  rows=$(mysql_q "SELECT COUNT(*) FROM pose_data WHERE session_id BETWEEN $SESS_LO AND $SESS_HI;")
+  want=$(( N_REQ * ROWS_PER_REQ ))
+  if [ "${rows:-0}" = "0" ]; then
+    stop_writer "$tag"
+    die "판 $tag 이 행을 하나도 안 만들었다 — 요청은 갔는데 저장이 안 됐다.
+   멱등 키가 전부 삼켰거나(#271) 페이로드가 같은 값을 반복하고 있다.
+   RPS·fail 은 정상으로 보이지만 이 판은 처리량이 아니라 «중복 감지» 를 잰 것이다"
+  fi
+  [ "${rows:-0}" = "$want" ] || echo "  ⚠️ 행수가 기대와 다르다 — $rows / $want (조작 변수 밖 조건이 흔들렸다)" >&2
+
   stop_writer "$tag"
   read -r w0 tm0 d0 <<< "$S0"
   read -r w1 tm1 d1 <<< "$s1"
@@ -139,16 +166,17 @@ round_end_hook() {   # $1=태그 $2=t0 $3=t1
   local waits="-" lock_ms="-"
   [ -n "${w0:-}" ] && [ -n "${w1:-}" ] && waits=$(( w1 - w0 ))
   [ -n "${tm0:-}" ] && [ -n "${tm1:-}" ] && lock_ms=$(( tm1 - tm0 ))
-  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
     "$tag" "$CUR_LEVEL" "$CUR_REP" "$CUR_POS" \
     "$(date -u -d "@$t0" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "-")" \
     "$(date -u -d "@$t1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "-")" \
-    "$(( t1 - t0 ))" "$waits" "$lock_ms" "${d0:--}→${d1:--}" >> "$SPREAD_LOG"
+    "$(( t1 - t0 ))" "$waits" "$lock_ms" "${d0:--}→${d1:--}" \
+    "${rows:--}" "$want" >> "$SPREAD_LOG"
 }
 
 init_spread_log() {
   [ -f "$SPREAD_LOG" ] || printf \
-    "tag\tlevel\trep\tpos\tt0_utc\tt1_utc\tsecs\trow_lock_waits\trow_lock_time_ms\tdirty_pages\n" \
+    "tag\tlevel\trep\tpos\tt0_utc\tt1_utc\tsecs\trow_lock_waits\trow_lock_time_ms\tdirty_pages\trows_inserted\trows_expected\n" \
     > "$SPREAD_LOG"
   [ -f "$WRITER_LOG" ] || printf \
     "tag\tlevel\tattempts\terrors\tp50_ms\tp95_ms\tmax_ms\tmax_gap_ms\n" > "$WRITER_LOG"
