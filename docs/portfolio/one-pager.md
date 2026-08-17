@@ -31,16 +31,16 @@
 
 | 무엇을 고쳤나 | 결과 | **조건** | 근거 |
 |---|---|---|---|
-| **JSON over-fetch** — 리포트 계산에 안 쓰는 2.3KB JSON까지 로드 | payload **−98.7%**(DB→앱), warm 쿼리 **8배** | 2026-06-02, warm, 750행/세션, 로컬 412만 행, **3컬럼 시절 프로젝션**(현재는 4컬럼, 재검증 안 함). AWS 1억 행 재검증 29~41배. ⚠️ **정상 리포트 조회는 이 쿼리를 안 부른다** — precompute 잡과 폴백에서만 돈다(코드 판독, 미측정). 사용자 체감 지연이 아니라 **잡 자원 절감** | [§②b](./realmysql-experiments.md) |
-| **TTL 삭제** — 만료 데이터를 DELETE로 지움 | `DROP PARTITION`이 DELETE 대비 **625배**(행당 정규화 **570배**) | 로컬·더미, ~8M행대 만료(18.6분 → 1.8초). **두 작업의 행수가 같지 않아**(8,301,450 vs 7,560,000) 625는 raw 비율이다. DELETE는 빈 952MB 파일도 남긴다. ⚠️ DROP 1.8초도 **진짜 O(1)이 아니라** ~910MB 파일 삭제 I/O — 빠른 스토리지면 sub-100ms. AWS 축소 재현은 **421배**. **조회 pruning 이득은 0**(별도 실측으로 반증) | [§②d](./realmysql-experiments.md) |
-| **쓰기 천장** — 「커넥션 풀이 병목」 가설 | 다세션 천장 **649 RPS**, `pool=5`는 plateau의 **69%**, 10부터 평탄 | 2026-08-09 EC2 4차. **단일 핫세션 페이로드에선 이 절벽이 안 보인다** — 그 조건에선 천장이 fsync였고(231.6→803.1, 3.47배) 풀이 가려졌다 | [§5-1(9)](../decisions/pose-ingest-downsampling.md) |
+| **JSON over-fetch** — 리포트 계산에 안 쓰는 2.3KB JSON까지 로드 | payload **−98.7%**, warm 쿼리 **8배** | 2026-06-02, warm, 750행/세션, 로컬 412만 행, **3컬럼 시절 프로젝션**. AWS 1억 행 재검증 29~41배. ⚠️ **precompute 잡이 부르는 쿼리**라 사용자 체감 지연이 아니라 잡 자원 절감 | [§②b](./realmysql-experiments.md) |
+| **TTL 삭제** — 만료 데이터를 DELETE로 지움 | `DROP PARTITION`이 DELETE 대비 **625배** | 8.3M행 만료 기준(18.6분 → 1.8초). DELETE는 빈 952MB 파일도 남긴다. **조회 pruning 이득은 0**(별도 실측으로 반증) | [§②d](./realmysql-experiments.md) |
+| **쓰기 천장** — 「커넥션 풀이 병목」 가설 | 다세션 천장 **649 RPS**(⚠️ **«100세션» 조건 · `uk_pose_event` 이전 스키마**), `pool=5`는 plateau의 **69%**, 10부터 평탄 | 2026-08-09 EC2 4차. **단일 핫세션 페이로드에선 이 절벽이 안 보인다** — 그 조건에선 천장이 fsync였고(231.6→803.1, 3.47배) 풀이 가려졌다. ✅ **2026-08-18 P5**: 그 «100세션» 은 잰 값이 아니었고, 실제 **plateau 는 10세션에서 붙는다**(266→1,013 RPS, 그 위로 평탄). 기제는 락 대기 **29,999 → 40** | [§5-1(9)](../decisions/pose-ingest-downsampling.md) |
 
 ## 그 외 실측
 
 | 항목 | 결과 | 조건 | 근거 |
 |---|---|---|---|
 | 배치 INSERT (`JdbcTemplate.batchUpdate`) | 처리량 **+99%**(23.5 → 46.7 RPS), p99 **−37%**(7,549 → 4,784ms) | 로컬. JPA `saveAll`은 IDENTITY PK 때문에 Hibernate 배치가 원천 차단됨을 확인 후 우회 | [§②a](./realmysql-experiments.md) · [`load-test §7.6`](../decisions/load-test-strategy.md) |
-| 다운샘플 R≈5 (대표 프레임 추출) | 처리량 **1.7배**(98.3 → 168.7 RPS), p99 **4.9배**, 저장 행 **5배↓** | 2026-08-08 EC2 3대, c=100·pool=10, cold vs cold, `DOWNSAMPLE_WINDOW=1` 대조군. ⚠️ **단일 핫세션 페이로드**(`batch.json`, session 801) — fsync 3.47배를 1.03배로 만든 그 조건이고, **다세션에서 재측정한 적 없다** | [`pool-cliff §3`](../../loadtest/results/pool-cliff-2026-08-08/README.md) · [`pose-ingest-downsampling.md`](../decisions/pose-ingest-downsampling.md) |
+| 다운샘플 R≈5 (대표 프레임 추출) | 요청 처리량 **4.11배**(222.3 → 913.7 RPS), p99 **9.5배**(3,776 → 396ms), 저장 행 **5배↓** | ✅ **2026-08-18 다세션 재측정 (P2)** — EC2 2대, 레벨 20세션, ABBA 8판, `pose-data.downsample-window` 1↔5. 🔴 **옛 값 「1.7배」는 단일 핫세션**(`batch.json`, session 801) 조건이었고 — fsync 3.47배를 1.03배로 만든 바로 그 조건 — 다세션에서는 **2.4배 더 크다**. ⚠️ 저장 처리량(rows/s)으로 보면 방향이 **뒤집힌다**(4,568 ↔ 5,557): R=1 은 «느린» 것이 아니라 «행을 5배 많이 넣는» 것이다 | [`pool-cliff §3`](../../loadtest/results/pool-cliff-2026-08-08/README.md) · [`pose-ingest-downsampling.md`](../decisions/pose-ingest-downsampling.md) |
 | 인덱스 유무 대조 | 약 **9,000배** | 실제 2.1KB JSON·412만 행. 더미 JSON이면 660배로 **과소평가**된다(행 크기가 배수를 증폭) | [`realmysql-experiments.md`](./realmysql-experiments.md) · rig `loadtest/measure_admin_index.sh` |
 | offset → keyset 페이지네이션 | 최대 **489,868배** | 1억 행. offset은 깊이에 O(N), keyset은 평탄. ⚠️ keyset 절대값은 SSH 왕복 오버헤드(~50ms)가 바닥에 깔려 **액면가로 안 쓴다** — 배수 결론만 유효 | [`realmysql-experiments.md`](./realmysql-experiments.md) · rig `loadtest/measure_pagination.sh` |
 | 무중단 스키마 변경 — 차단 비용 | `ALTER ... PARTITION BY` = **96분**(5,767초) 차단 | 더미 JSON 1억 행 풀 리빌드(~24,700행/초). `ALGORITHM=INPLACE`는 서버가 거절(errno 1845, "Try ALGORITHM=COPY") | [`online-ddl-vs-blocking-alter.md`](../decisions/online-ddl-vs-blocking-alter.md) · [rig](../../loadtest/results/online-ddl-2026-08-09/README.md) |

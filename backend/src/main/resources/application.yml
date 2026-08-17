@@ -13,7 +13,14 @@ spring:
 
   # [1] 데이터베이스 및 JPA 설정 (spring 하위로 정렬)
   datasource:
-    # rewriteBatchedStatements=true: JDBC 드라이버가 batch INSERT 를 multi-row SQL 한 방으로 재작성 (부하테스트 §7.5 개선)
+    # rewriteBatchedStatements=true: JDBC 드라이버가 batch INSERT 를 multi-row SQL 한 방으로 재작성.
+    # 🔴 2026-08-18 실측 정정 (#221) — «개선» 이 아니다. 레벨 20세션·ABBA 8판 대조:
+    #      true   RPS 923.7  p50 88  p95 201  p99 486
+    #      false  RPS 964.8  p50 95  p95 131  p99 261
+    #    처리량 차이는 이상치 하나에 끌려 중앙값끼리는 942 ↔ 965 지만, **p99 는 4판 전부 일관되게
+    #    나쁘다**(444~595 ↔ 209~338). 팔은 Com_insert 30,000 ↔ 150,000 으로 확정했다.
+    #    ⚠️ 값을 아직 안 바꾼다 — 이 판은 레벨 20 한 지점이고, 끄는 결정은 별도 판단이다.
+    #    결과: loadtest/results/session-spread-aws-2026-08-17/
     url: jdbc:mysql://${DB_HOST:shadowfit-mysql}:${DB_PORT:3306}/${DB_NAME:shadowfit}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&rewriteBatchedStatements=true
     username: ${DB_USERNAME:shadowfit}
     password: ${DB_PASSWORD:shadowfit}
