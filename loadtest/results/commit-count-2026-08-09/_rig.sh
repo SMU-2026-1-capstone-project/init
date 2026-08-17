@@ -87,8 +87,27 @@ learn_all_hosts() {
 rsh() { ssh "${SSH_OPTS[@]}" "ec2-user@$1" "${@:2}"; }
 
 # ── MySQL ────────────────────────────────────────────────────────────────
+#
+# 🔴 컨테이너 이름을 박지 않는다. 예전엔 `sf-mysql` 이 하드코딩이었는데 **부트스트랩과
+#    docker-compose 가 만드는 이름은 `shadowfit-mysql`** 이다. 이름이 어긋나면
+#    `docker exec` 이 «No such container» 를 내는데, 아래가 stderr 를 버려서 결과가
+#    **빈 문자열**로 돌아온다 — 그러면 사전 확인이 「세션 시드가 부족하다 — ''/100」 처럼
+#    **엉뚱한 곳**을 가리킨다. 2026-08-17 P5 리허설에서 실제로 그렇게 헤맸다.
+MYSQL_CTN=${MYSQL_CTN:-shadowfit-mysql}
+
 mysql_q() {  # $1 = SQL. stdout 으로 결과(탭 구분, 헤더 없음)
-  rsh "$DB_PUB" "sudo docker exec sf-mysql mysql -ushadowfit -pshadowfit shadowfit -N -e \"$1\"" 2>/dev/null
+  rsh "$DB_PUB" "sudo docker exec $MYSQL_CTN mysql -ushadowfit -pshadowfit shadowfit -N -e \"$1\"" 2>/dev/null
+}
+
+# 🔴 stderr 를 버리는 대가를 여기서 갚는다. **한 번은** 삼키지 않고 물어본다 —
+#    이게 없으면 「DB 에 못 붙는다」가 「데이터가 없다」로 위장한다.
+assert_mysql_reachable() {
+  local out
+  out=$(rsh "$DB_PUB" "sudo docker exec $MYSQL_CTN mysql -ushadowfit -pshadowfit shadowfit -N -e 'SELECT 1;'" 2>&1)
+  [ "$(echo "$out" | tr -d '[:space:]')" = "1" ]     || die "MySQL 에 질의할 수 없다 (컨테이너 '$MYSQL_CTN' @ $DB_PUB) — 받은 것: '$out'
+   이름이 다르면 MYSQL_CTN 으로 넘긴다. 이 확인이 없으면 다음 사전 확인들이
+   전부 «데이터가 없다» 로 잘못 보고한다"
+  echo "  MySQL: 컨테이너 '$MYSQL_CTN' 응답 확인"
 }
 
 # 🔴 카운터는 Prometheus 가 아니라 MySQL 에서 직접 읽는다.
