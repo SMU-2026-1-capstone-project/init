@@ -13,7 +13,7 @@
 ## 0. 무엇이 깨졌나
 
 `uk_pose_event (session_id, rep_number, timestamp_sec, created_at)` 가 들어오면서
-([`V5__add_pose_data_idempotency_key.sql:66`](../../backend/src/main/resources/db/migration/V5__add_pose_data_idempotency_key.sql)),
+([`V6__add_pose_data_idempotency_key.sql:66`](../../backend/src/main/resources/db/migration/V6__add_pose_data_idempotency_key.sql)),
 **부하 rig 이 보내는 두 번째 요청부터는 행을 만들지 않는다.** 네 열이 전부 상수이기 때문이다:
 
 | 열 | 왜 상수인가 |
@@ -137,12 +137,12 @@ ghz 는 [sprig](http://masterminds.github.io/sprig/) 함수를 지원하므로 `
 
 ---
 
-## 6. 미결정 (사용자 confirm 필요)
+## 6. 결정 (2026-08-17 사용자 confirm)
 
-- [ ] **ㄱ~ㄹ 중 무엇으로 가나** — 추천은 ㄴ(§3)
-- [ ] **리허설 게이트를 걸 것인가** — 부하기 CPU·달성 rate 둘. 안 걸면 본 라운드에서 안다
-- [ ] **P2 도 같은 수정을 받나** — 같은 결함이지만 라운드가 다르다
-- [ ] **#273 을 같은 커밋에서 처리하나** — 파일이 겹친다
+- [x] **ㄴ 채택** — 메시지 1개 + sprig 라우팅. 구현 `d2d32fe`
+- [x] **리허설 게이트를 건다** — 부하기 CPU · 달성 rate. 통과해야 [#271](https://github.com/Shadowfit/init/issues/271) 을 닫는다
+- [x] **P2 생성기도 같이 고친다** — `gen_batch.py` 도 같은 결함이다. 라운드는 다르지만 같은 수법을 지금 적용한다
+- [x] **[#273](https://github.com/Shadowfit/init/issues/273) 은 같이 손대되 커밋 분리** — `b0c4383`
 
 ---
 
@@ -152,12 +152,20 @@ ghz 는 [sprig](http://masterminds.github.io/sprig/) 함수를 지원하므로 `
   안 받으면 `printf`·`until` 같은 우회가 필요하다
 - **템플릿 실행 비용의 실제 크기** — 35MB/s 는 «데이터 크기 × 목표 RPS» 산술이지 실측이 아니다.
   ghz 가 워커별로 병렬 실행하는지, 파싱 결과를 요청 간에 얼마나 재활용하는지는 안 봤다
-- **EC2 배포분에 V5 가 적용됐는지** — 스윕은 로컬 빌드 jar 를 올린다. 안 올라가 있으면
+- **EC2 배포분에 V6(멱등)이 적용됐는지** — 스윕은 로컬 빌드 jar 를 올린다. 안 올라가 있으면
   중복이 «안 삼켜지는» 상태로 돌 수도 있는데, 그건 그것대로 프로덕션과 다른 조건이다
 
 ---
 
 ## 결정 로그
+
+- **2026-08-17: ㄴ 채택 후 리허설 박스를 띄우려다 하나 더 나왔다.** `bootstrap.sh` 는
+  `REF=main` 으로 빌드하는데 **main 에 멱등이 없다** — 그대로 띄웠으면 «멱등 없는 코드» 에
+  부하를 걸고 「고쳐졌다」는 틀린 확신을 얻었을 것이다. 그러다 **V5 번호가 두 갈래로 갈린 것**을
+  봤다([#274](https://github.com/Shadowfit/init/issues/274)): main 은 `V5__feedback_log_rep_key`,
+  이 브랜치는 `V5__add_pose_data_idempotency_key`. 각자는 멀쩡하고 **합치는 순간** Flyway 가
+  기동을 거부한다. 로컬 `flyway_schema_history` 를 확인해 **V4 까지만 적용된 것**을 보고
+  이 브랜치 쪽을 **V6 으로 올렸다**(적용 이력이 없어야 안전한 조작이다).
 
 - **2026-08-17: 문서 신설.** P5 탑승 전 「설계에서 확정된 것이 rig 에 실제로 있는지」 대조에서
   나왔다. 08-13 라운드의 교훈은 «설계엔 있는데 rig 엔 없다» 였는데, 이번은 **정반대 방향**이다
