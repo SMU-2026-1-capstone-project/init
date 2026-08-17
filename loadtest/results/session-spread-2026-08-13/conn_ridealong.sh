@@ -84,6 +84,7 @@ learn_all_hosts
 init_log
 
 echo "=== 사전 확인 ==="
+assert_mysql_reachable
 assert_sessions_exist   # 공통부에 있다 — 단독 실행돼도 그물이 선다 (#273 ③)
 echo
 

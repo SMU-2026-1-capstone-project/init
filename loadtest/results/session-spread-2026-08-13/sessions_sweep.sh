@@ -22,6 +22,10 @@
 #   - 생성기         : 전 레벨 `gen_batch_multi.py` 하나. 🔴 4차의 «단일 220.4 RPS» 는
 #                      **다른 생성기**(`gen_batch.py`)로 잰 값이라 이 표의 레벨 1 과
 #                      **같은 판이 아니다.** 레벨 간 비교는 이 표 안에서만 한다
+#   - 총 행수        : 판마다 N_REQ × 5 행으로 같다. 흩어지는 «자리» 만 다르다
+#   - 내구성         : 기본값(flush=1 / sync_binlog=1). 완화판은 이 스윕이 묻는 질문이 아니다
+#   - 풀 크기        : 재기동하지 않는다. pool 은 이 실험의 조작 변수가 아니라 **고정 조건**이라
+#                      값을 확인만 하고 다르면 멈춘다
 #
 # 🔴 2026-08-17 (#271): 페이로드가 **배열이 아니라 ghz 템플릿**이 됐다. 세션 라우팅은
 #    `mod .RequestNumber <레벨>` 이 하고(예전 배열 순환과 같은 일), `repNumber` 가 요청마다
@@ -29,10 +33,6 @@
 #    `fail=0` 에 RPS 도 정상으로 찍혀 **표를 봐서는 안 보인다.**
 #    부수 효과: 레벨 100 페이로드가 5.2MB → 54KB. 대신 부하기에 요청마다 템플릿·파싱이
 #    붙는다 — 리허설에서 부하기 CPU 와 달성 rate 를 볼 것(설계 문서 §3).
-#   - 총 행수        : 판마다 N_REQ × 5 행으로 같다. 흩어지는 «자리» 만 다르다
-#   - 내구성         : 기본값(flush=1 / sync_binlog=1). 완화판은 이 스윕이 묻는 질문이 아니다
-#   - 풀 크기        : 재기동하지 않는다. pool 은 이 실험의 조작 변수가 아니라 **고정 조건**이라
-#                      값을 확인만 하고 다르면 멈춘다
 #
 # 사용:
 #   PLAN_ONLY=1 bash sessions_sweep.sh          # 판 배치만 출력하고 끝낸다(EC2 불필요)
@@ -201,7 +201,7 @@ WRITER_MAX_SEC=${WRITER_MAX_SEC:-900}    # 판이 끝나면 stop 으로 멈춘�
 
 install_writer() {
   ssh "${SSH_OPTS[@]}" "ec2-user@$DB_PUB" \
-    "sudo docker exec -i sf-mysql mysql -ushadowfit -pshadowfit shadowfit" < ./spread_writer.sql \
+    "sudo docker exec -i $MYSQL_CTN mysql -ushadowfit -pshadowfit shadowfit" < ./spread_writer.sql \
     || die "spread_writer.sql 적재 실패"
   mysql_q "SELECT COUNT(*) FROM information_schema.routines
            WHERE routine_schema='shadowfit' AND routine_name='spread_writer';" | grep -q '^1$' \
@@ -214,7 +214,7 @@ install_writer() {
 
 start_writer() {  # $1 = 태그
   mysql_q "DELETE FROM spread_writer_log WHERE arm='$1'; DELETE FROM spread_writer_ctl;" >/dev/null
-  rsh "$DB_PUB" "sudo docker exec -d sf-mysql mysql -ushadowfit -pshadowfit shadowfit \
+  rsh "$DB_PUB" "sudo docker exec -d $MYSQL_CTN mysql -ushadowfit -pshadowfit shadowfit \
     -e \"CALL spread_writer('$1', $WRITER_SESSION, $WRITER_MAX_SEC, $WRITER_GAP_MS);\"" >/dev/null 2>&1
   sleep 3   # 부하 전 평상시 구간을 몇 건 확보한다 — 「원래 몇 ms 인가」의 기준선
   local n
@@ -331,6 +331,7 @@ init_spread_log
 : > "$OUT/_conditions.txt"
 
 echo "=== 사전 확인 ==="
+assert_mysql_reachable
 assert_sessions_exist
 assert_default_durability
 assert_pool_fixed
