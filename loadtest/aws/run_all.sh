@@ -134,7 +134,9 @@ CORES_REH_DUR=${CORES_REH_DUR:-20}
 GHZ_RPS=${GHZ_RPS:-}
 GHZ_DATA=${GHZ_DATA:-}                       # gen_batch_multi.py 산출물 (부하기 로컬)
 GHZ_TOKEN=${GHZ_TOKEN:-}                     # INTERNAL_API_TOKEN
-GHZ_BIN=${GHZ_BIN:-/home/ec2-user/go/bin/ghz}
+GHZ_BIN=${GHZ_BIN:-/usr/local/bin/ghz}       # bootstrap.sh:179 의 설치 경로 (#249). 옛 기본값은
+                                             # go install 시절의 /home/ec2-user/go/bin/ghz 였고,
+                                             # 두 리허설 모두 이 값을 손으로 넘겨 우회하고 있었다
 GHZ_CONC=${GHZ_CONC:-50}
 
 # 소요 환산(rig 파라미터 기준): 팔당 버림1+본판12 = 13판 × (DUR 90s + AI 재기동 ~18s +

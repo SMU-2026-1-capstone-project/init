@@ -112,7 +112,7 @@ STATS_SEC=${STATS_SEC:-5}           # docker stats 폴링 간격 — 관측이 �
 # 🔴 **`GHZ_RPS` 에 기본값을 두지 않는다.** 이 값은 «생겨난» 값이 아니라 «정한» 값이라
 #    (README §2), 근거 없이 숫자를 박으면 그게 출처 없는 기준값이 된다. 부르는 쪽이 정하고,
 #    무엇을 근거로 정했는지를 결과의 조건 칸에 적는다.
-GHZ_BIN=${GHZ_BIN:-/home/ec2-user/go/bin/ghz}
+GHZ_BIN=${GHZ_BIN:-/usr/local/bin/ghz}       # bootstrap.sh:179 의 설치 경로 (#249)
 GHZ_DATA=${GHZ_DATA:-}                       # gen_batch_multi.py 산출물 (부하기 로컬 경로)
 GHZ_TOKEN=${GHZ_TOKEN:-}                     # INTERNAL_API_TOKEN — Spring gRPC 메타데이터
 GHZ_RPS=${GHZ_RPS:-}                         # 요청/초. 기본값 없음(위)
@@ -148,7 +148,10 @@ LOG="$OUT/coresidency.tsv"
 #    담고 있었고 이 스윕이 그 파일을 이미 파싱하고 있었다 — **꺼내 적기만 하면 됐다.**
 #    새 열은 **끝에만** 붙인다: `run_all.sh` 의 `cores_assert_ghz` 가 $1~$8 을 위치로 읽는다.
 GHZ_LOG="$OUT/ghz.tsv"
-[ -f "$GHZ_LOG" ] || printf "tag\tarm\tsessions\ttarget_rps\tachieved_rps\tcount\tok\tfail\tp50_ms\tp95_ms\tp99_ms\n" > "$GHZ_LOG"
+# `req_expected`·`req_missing` 은 **끝에** 붙인다 (#259) — 옛 라운드의 11열 ghz.tsv 를 읽는
+# 파서가 안 깨지게. 「몇 개 모자랐나」는 사실이고, **몇 개부터 경고할지는 아직 안 정했다**:
+# 정식 라운드 1회분 분포를 보고 근거와 함께 정한다. 근거 없는 임계값을 지금 박지 않는다.
+[ -f "$GHZ_LOG" ] || printf "tag\tarm\tsessions\ttarget_rps\tachieved_rps\tcount\tok\tfail\tp50_ms\tp95_ms\tp99_ms\treq_expected\treq_missing\n" > "$GHZ_LOG"
 
 step() { echo; echo "════ $* ════"; }
 note() { echo "     $*"; }
@@ -356,14 +359,14 @@ stop_ghz() {  # $1 = 태그
   wait "$GHZ_PID" 2>/dev/null
 
   # 🔴 「ghz 가 돌았다」와 「부하가 걸렸다」는 다르다. OK 가 0 이면 그 판의 «동거» 는 거짓이다.
-  python - "$OUT/ghz_$1.json" "$1" "$CUR_ARM" "$CUR_N" "$GHZ_RPS" "$GHZ_LOG" <<'PY'
+  python - "$OUT/ghz_$1.json" "$1" "$CUR_ARM" "$CUR_N" "$GHZ_RPS" "$GHZ_LOG" "$(( DUR + 2 * GHZ_PAD ))" <<'PY'
 import json, sys
-f, tag, arm, n, target, log = sys.argv[1:7]
+f, tag, arm, n, target, log, span = sys.argv[1:8]
 try:
     j = json.load(open(f, encoding='utf-8'))
 except Exception as e:
     print(f"  🔴 ghz 리포트를 못 읽었다 ({f}): {e} — 이 판은 «옆이 일했다» 를 단언할 수 없다")
-    open(log, "a", encoding='utf-8').write(f"{tag}\t{arm}\t{n}\t{target}\tFAIL\t-\t-\t-\t-\t-\t-\n")
+    open(log, "a", encoding='utf-8').write(f"{tag}\t{arm}\t{n}\t{target}\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\n")
     raise SystemExit(0)
 sc = j.get("statusCodeDistribution") or {}
 count = j.get("count", 0); ok = sc.get("OK", 0); fail = count - ok
@@ -382,16 +385,32 @@ def ms(p):
     v = lat.get(p)
     return "-" if v is None else f"{v / 1e6:.1f}"
 p50, p95, p99 = ms(50), ms(95), ms(99)
+
+# 🔴 «몇 개 모자랐나» 를 사실로 남긴다 (#259). 판정은 `rps` 가 아니라 `count` 로 한다 —
+#    2026-08-17 2차 리허설에서 **6판 전부 count=569 로 동일**한데 `rps` 만 18.7~19.0 으로
+#    흔들렸다. 즉 요청 수는 결정론적이고, 흔들리는 것은 ghz 가 잰 창 길이다. 「부하기가 못
+#    따라갔다」를 흔들리는 쪽 값으로 판정하면 없는 사건을 만든다.
+# ⚠️ **몇 개부터 경고할지는 아직 안 정했다.** 위 6판의 모자람은 전부 «1개»(570→569)였고,
+#    그것이 정수 양자화 바닥인지 실제 미달인지는 20초 창 6건으로 못 가른다. 정식 라운드
+#    (DUR=90 → 창 100초, 기대 1900)의 분포를 보고 근거와 함께 정한다.
+try:
+    exp_f = float(target) * float(span)
+    miss_f = exp_f - count
+    req_expected, req_missing = f"{exp_f:g}", f"{miss_f:g}"
+except (TypeError, ValueError):
+    exp_f = miss_f = None
+    req_expected = req_missing = "-"
 open(log, "a", encoding='utf-8').write(
-    f"{tag}\t{arm}\t{n}\t{target}\t{rps}\t{count}\t{ok}\t{fail}\t{p50}\t{p95}\t{p99}\n")
+    f"{tag}\t{arm}\t{n}\t{target}\t{rps}\t{count}\t{ok}\t{fail}\t{p50}\t{p95}\t{p99}\t{req_expected}\t{req_missing}\n")
 if p50 == "-":
     print(f"  ⚠️ ghz 리포트에 latencyDistribution 이 없다 ({f}) — H3(캡이 옆을 지키는가)는 이 판에서 못 읽는다")
 if ok == 0:
     print(f"  🔴 從 부하의 성공 응답이 0 이다 ({count}건 전부 실패) — 이 판은 «유휴 동거» 를 잰 것이다")
 elif fail:
     print(f"  ⚠️ 從 부하 실패 {fail}/{count} — 사유를 {f} 에서 볼 것")
-if rps and float(target) and rps < float(target):
-    print(f"  ⚠️ 실측 {rps} req/s < 목표 {target} — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)")
+if miss_f is not None and miss_f > 0:
+    print(f"  ⚠️ 요청 {req_missing}개 모자람 — 기대 {req_expected}({target} req/s × {span}s) · 실제 {count} · 실측 {rps} req/s")
+    print("     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)")
     print("     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다")
 PY
 }
