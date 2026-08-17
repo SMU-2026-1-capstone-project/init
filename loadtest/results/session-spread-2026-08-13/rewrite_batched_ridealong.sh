@@ -76,8 +76,14 @@ source ./../commit-count-2026-08-09/_rig.sh
 
 JDBC_BASE="jdbc:mysql://shadowfit-mysql:3306/shadowfit?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&rewriteBatchedStatements="
 
-com_insert() { mysql_q "SELECT VARIABLE_VALUE FROM performance_schema.global_status
-                        WHERE VARIABLE_NAME='COM_INSERT';" | tr -d '[:space:]'; }
+# 🔴 `Com_*` 는 **`performance_schema.global_status` 에 없다** — `SHOW GLOBAL STATUS` 에만 있다
+#    (2026-08-18 실측: 같은 계정으로 SHOW 는 1,768,168 을 주는데 performance_schema 는 행이 없다).
+#    초판이 performance_schema 를 읽어 델타가 늘 0 이었고, 그래서 팔 단언이 «안 물렸다» 로 멈췄다.
+#    ⚠️ 단언이 제 역할을 한 것이다 — 그 그물이 없었으면 **두 팔이 같은 설정으로 8판을 돌았다**.
+#    그리고 `Com_stmt_execute=0` 이라 이 드라이버는 서버 측 prepared statement 를 안 쓴다
+#    (Connector/J 기본 `useServerPrepStmts=false`) — 그래서 텍스트 프로토콜의 `Com_insert` 가
+#    실제로 문장 수를 센다.
+com_insert() { mysql_q "SHOW GLOBAL STATUS WHERE Variable_name='Com_insert';"                  | awk '{print $2}' | tr -d '[:space:]'; }
 
 # ── 팔 전환 ──────────────────────────────────────────────────────────────
 switch_arm() {  # $1 = rewrite|norewrite
