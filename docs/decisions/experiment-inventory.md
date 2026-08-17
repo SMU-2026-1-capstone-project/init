@@ -36,8 +36,9 @@ DBA 지원축의 결손 3개(백업 · 복제 · 무중단 DDL) 중 **복제만 
 | **1** | **P4 — 복제 지연 · 반동기 대가** | 🟡 [설계 완료](./replication-lag-and-semisync.md) · **rig 없음** | **결손 3축 중 유일한 공백.** ⭐ 반동기 대가는 **AZ 간 RTT 가 지배**하므로 로컬에선 구조적으로 과소평가된다 → **인스턴스 2대 필수.** 리드타임이 길다(rig 부터) |
 | **2** | **[#204](https://github.com/Shadowfit/init/issues/204) 리포트 핵심 쿼리** | 미측정 | 파티션 프루닝·커버링·정렬을 **동시에** 놓치고 있다. 읽기축 단일 최대 건 |
 | **3** | **[#205](https://github.com/Shadowfit/init/issues/205) 포폴 카드 쿼리 3개** | EXPLAIN 스윕 선행 | 읽기축 결과물이 아직 «후보» 상태다 |
-| 4 | **[#219](https://github.com/Shadowfit/init/issues/219) `INSERT IGNORE` 전수 확인** | 미검증 | 「중복만 삼킨다」가 **틀렸다** — FK 위반은 행을 지우고 NOT NULL 위반은 빈 값을 쓴다 |
-| 5 | **pose_data 행 모양 × 파티션 상호작용** | 미검증 | DELETE 파편화 자체는 닫혔다(FIFO 누적 없음 · 구멍 뚫기 +24% 계단 1회). 이 **조합**은 안 봤다 |
+| **4** | 🆕 **[#272](https://github.com/Shadowfit/init/issues/272) `uk_pose_event` 의 쓰기 대가** | 미측정 · **설계부터** | 2026-08-17 에 유니크 secondary index 가 들어왔다. change buffer 를 못 쓰므로 쓰기 경로에 랜덤 읽기가 붙는데 **그 크기를 모른다.** 🔴 그래서 **정본 baseline 649.4 와 이후 측정을 나란히 못 놓는다** — P5·P2 를 고쳐 돌려도 이건 남는다 |
+| 5 | **[#219](https://github.com/Shadowfit/init/issues/219) `INSERT IGNORE` 전수 확인** | 미검증 | 「중복만 삼킨다」가 **틀렸다** — FK 위반은 행을 지우고 NOT NULL 위반은 빈 값을 쓴다 |
+| 6 | **pose_data 행 모양 × 파티션 상호작용** | 미검증 | DELETE 파편화 자체는 닫혔다(FIFO 누적 없음 · 구멍 뚫기 +24% 계단 1회). 이 **조합**은 안 봤다 |
 
 ⚠️ **#204·#205 는 합성 데이터의 한계를 먼저 읽을 것** — 로드테스트 rig 은 단일 템플릿 복제라
 **값 분포가 균일**하다. 옵티마이저 카디널리티·generated column 선택도처럼 **분포에 의존하는
@@ -57,6 +58,8 @@ DBA 지원축의 결손 3개(백업 · 복제 · 무중단 DDL) 중 **복제만 
 | **3** | **P2 — 다운샘플 «1.7배» 다세션 재측정** | 🟡 rig 있음 · 페이로드 재생성 필요 | 🔴 `one-pager.md` 의 **정본 수치인데 조건이 단일 핫세션**이다. **fsync 3.47배를 1.03배로 무너뜨린 바로 그 조건**이고, 「다세션에서 재측정한 적 없다」가 문서에 그대로 붙어 있다 |
 | **1** ⭐ | **P5 — 세션 분산도 스윕** (1·2·5·20·100) | 🟢 [설계·rig 완료](./session-spread-sweep.md) · **측정 0판** · ✅ **다음 EC2 라운드 主 로 확정 (2026-08-17 사용자 결정)** | 🔴 **정본 baseline 649.4 RPS 가 «100세션» 값인데 그 100 은 잰 값이 아니다.** 이 앱은 회원당 활성 세션이 1개라 **동시 세션 수 = 동시에 운동 중인 사람 수** — baseline 이 가정한 것보다 분산된 조건일 수 있다. 從 R4(커넥션 스윕)가 **이 라운드에만** 얹힌다 |
 | **2** | **P2 — 다운샘플 «1.7배» 다세션 재측정** | 🟡 rig 있음 · 페이로드 재생성 필요 | 🔴 `one-pager.md` 의 **정본 수치인데 조건이 단일 핫세션**이다. **fsync 3.47배를 1.03배로 무너뜨린 바로 그 조건**이고, 「다세션에서 재측정한 적 없다」가 문서에 그대로 붙어 있다 |
+| **1** ⭐ | **P5 — 세션 분산도 스윕** (1·2·5·20·100) | 🟢 **막던 것이 풀렸다 (2026-08-17)** — [#271](https://github.com/Shadowfit/init/issues/271) 을 고치고 [게이트 라운드](../../loadtest/results/payload-uniqueness-gate-aws-2026-08-17/README.md)로 실증했다(요청 3,000 → 행 15,000 · 실패 0 · 리허설 25판 완주). [설계·rig 완료](./session-spread-sweep.md) · **본 측정 0판** · ✅ 다음 EC2 라운드 主. **남은 것은 §8 미결정 4건**(레벨 집합·반복 수·N_REQ·무인화) | 🔴 **정본 baseline 649.4 RPS 가 «100세션» 값인데 그 100 은 잰 값이 아니다.** 이 앱은 회원당 활성 세션이 1개라 **동시 세션 수 = 동시에 운동 중인 사람 수** — baseline 이 가정한 것보다 분산된 조건일 수 있다. 從 R4(커넥션 스윕)가 **이 라운드에만** 얹힌다 |
+| **2** | **P2 — 다운샘플 «1.7배» 다세션 재측정** | 🟡 **생성기는 같이 고쳤다**(`gen_batch.py`, [#271](https://github.com/Shadowfit/init/issues/271)) · rig 있음 · 페이로드 재생성 필요 | 🔴 `one-pager.md` 의 **정본 수치인데 조건이 단일 핫세션**이다. **fsync 3.47배를 1.03배로 무너뜨린 바로 그 조건**이고, 「다세션에서 재측정한 적 없다」가 문서에 그대로 붙어 있다 |
 | 4 | **[#221](https://github.com/Shadowfit/init/issues/221) `rewriteBatchedStatements` 기여분** | 미측정 | 「효과 없음」은 **JPA 경로 얘기**였고, 지금 그 대가는 확인됐다 |
 | 5 | **[#211](https://github.com/Shadowfit/init/issues/211) hibernate `batch_size`** | 미측정 | 엔티티가 전부 IDENTITY 라 **insert batch 가 애초에 꺼져 있다.** 켜져 있다고 믿는 설정이 있다 |
 | 6 | **[#207](https://github.com/Shadowfit/init/issues/207) 타임아웃 스윕 메모리** | 미측정 | IN_PROGRESS 세션 **전부**를 매분 메모리에 올린다 — 세션이 안 끝날수록 무거워지는 방향이다 |
@@ -90,6 +93,7 @@ DBA 지원축의 결손 3개(백업 · 복제 · 무중단 DDL) 중 **복제만 
 | 구분 | 항목 |
 |---|---|
 | 🔴 **보안 — 측정보다 먼저** | [#187](https://github.com/Shadowfit/init/issues/187) AI HTTP 세션 소유권 검증 부재(번들 토큰만 있으면 **남의 session_id 로 주입**되고 Spring DB 까지 간다) · [#185](https://github.com/Shadowfit/init/issues/185) refresh token 평문 저장 |
+| 🔴 **신뢰성 — 재전송의 선행** | 🆕 [#276](https://github.com/Shadowfit/init/issues/276) **멱등 INSERT 가 동시 재전송에서 데드락**(c=10 에서 34.8% 실패, 실측). 재시도를 안전하게 만들려고 넣은 장치가 정작 재시도에서 500 을 낸다 — **[#188](https://github.com/Shadowfit/init/issues/188) 을 구현하기 전에 풀어야 한다** |
 | 신뢰성 | [#188](https://github.com/Shadowfit/init/issues/188) 재시도 부재(rep 하나가 통째로 사라진다) · [#206](https://github.com/Shadowfit/init/issues/206) gRPC 예산 미전파 · [#208](https://github.com/Shadowfit/init/issues/208) 종료 정책 3갈래 |
 | 계약 | [#209](https://github.com/Shadowfit/init/issues/209) 핸들러 4개 중 1개만 클라이언트 잘못을 `INVALID_ARGUMENT` 로 낸다 · [#218](https://github.com/Shadowfit/init/issues/218) 국면 이름표와 rep 판정이 다른 자를 쓴다 |
 | 기능 부재 | [#193](https://github.com/Shadowfit/init/issues/193) · [#228](https://github.com/Shadowfit/init/issues/228) 자세 문제 유형 감지기가 **통째로 없다** |
