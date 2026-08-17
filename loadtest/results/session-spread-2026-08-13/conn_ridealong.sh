@@ -44,7 +44,7 @@ set -uo pipefail
 cd "$(dirname "$0")"
 
 SESS_LO=901
-LEVEL=${LEVEL:-100}                  # 본 스윕의 최고 레벨과 같은 무대에서 본다
+LEVEL=${LEVEL:-50}                   # 본 스윕의 최고 레벨과 같은 무대에서 본다(2026-08-17 격자 변경)
 SESS_HI=$(( SESS_LO + LEVEL - 1 ))   # reset_rows 범위
 C=${C:-100}
 N_REQ=${N_REQ:-30000}
