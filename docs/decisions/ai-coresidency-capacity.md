@@ -506,12 +506,20 @@ cd /root/init && sudo env   S3_BASE=s3://shadowfit-measure-055447613012/shadowfi
 ⚠️ 이 명령은 **S3 없이** 도는 형태다 — 3번을 풀면 `PHASES` 에 `coresidency_preflight` 와
 `collect` 를 다시 넣는다.
 
+🔴 **terminate 전에 R6·R7 을 태운다 (2026-08-17 추가)** — [`AWS-RIDE-ALONG.md`](../../loadtest/AWS-RIDE-ALONG.md) §1 從.
+**P6 대상 박스(`c7i.4xlarge` = 물리 8코어)가 R6 의 유일한 무대다** — GIL 이냐 캐시냐는
+로컬 물리 2코어로는 **구조적으로 못 가른다**(4워커에서 스레드와 프로세스가 같은 천장에 붙는다).
+**R6 ~10분 + R7 ~5분** · 도커·MySQL·시딩 **불필요**(venv + `frames.json` 만) · 스윕과 독립.
+판정선: 프로세스 2개에서 처리량 **1.7~2배** + AI CPU **8.7→14~16** 이면 GIL, 아니면 캐시·HT.
+⚠️ **2026-08-17 2차 리허설에서 이 박스를 45분 띄웠다가 그냥 껐다.** 같은 실수를 반복하지 말 것.
+
 **선행 조건 (탑승 전, 로컬)**
 
 - [ ] `docker update --cpus` 가 실제로 물리는지 확인 (안 되면 ①이 +23분으로 되돌아간다)
 - [ ] 대상 박스에서 actuator(8080)·`SHOW GLOBAL STATUS` 가 부하기 쪽에서 닿는지
 - [x] ~~자기 프로브 자산을 `ROLE=p6-target` 부트스트랩에 넣기~~ → **스윕이 `$SSH` 로 직접 민다**(부트스트랩 변경 불필요). 대신 **대상 박스에 python 이 있어야** 하고, preflight 가 그걸 묻는다
-- [ ] [#249](https://github.com/Shadowfit/init/issues/249) `GHZ_BIN` 기본값(`/home/ec2-user/go/bin/ghz`) ≠ 설치 경로(`/usr/local/bin/ghz`)
+- [x] ~~[#249](https://github.com/Shadowfit/init/issues/249) `GHZ_BIN` 기본값 ≠ 설치 경로~~ → ✅ **고쳤다 (2026-08-17)** — 기본값이 `/usr/local/bin/ghz` 다. `run_all.sh` 와 `coresidency_sweep.sh` **두 곳**에 있었다
+- [ ] `docker update --cpus` 해제는 `--cpus 0` 이 아니라 `--cpu-quota -1` ([#263](https://github.com/Shadowfit/init/issues/263)) — ② 를 되살릴 때만 해당
 - [ ] 축소 리허설 통과 — **1라운드는 여기서 세 번 막혔다.** 실제 리드타임은 라운드 3시간이 아니라 **리허설 재시도 횟수**가 정한다
 
 **이번에도 안 하는 것**
