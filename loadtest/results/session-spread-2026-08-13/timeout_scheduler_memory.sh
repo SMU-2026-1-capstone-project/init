@@ -84,6 +84,10 @@ set_arm() {  # $1 = 원하는 IN_PROGRESS 개수
   local want=$1 have
   mysql_q "DELETE FROM exercise_sessions WHERE id >= $FAKE_LO;" >/dev/null
   if [ "$want" -gt 0 ]; then
+    # 🔴 `cte_max_recursion_depth` 기본값이 **1000** 이다 — 2026-08-18 1차 실행이 팔 3(1만 개)에서
+    #    «IN_PROGRESS 를 10000 개로 원했는데 0 개다» 로 멈췄다. 팔 단언이 잡았다.
+    #    올리는 것은 이 세션 한정이 아니라 GLOBAL 이라야 rig 의 다음 커넥션에도 걸린다.
+    mysql_q "SET GLOBAL cte_max_recursion_depth=200000;" >/dev/null
     # 재귀 CTE 로 want 개를 한 번에 만든다. 값은 전부 씨앗 복제 + id/시각만 다르다.
     mysql_q "INSERT INTO exercise_sessions
                (id, member_id, exercise_id, start_time, last_active_at, status, version, created_at)
@@ -102,6 +106,18 @@ refresh_arm() {  # 타임아웃으로 걷혀 나가지 않게 시각을 현재�
   mysql_q "UPDATE exercise_sessions SET start_time=NOW(), last_active_at=NOW()
            WHERE id >= $FAKE_LO AND status='IN_PROGRESS';" >/dev/null
 }
+
+# 🔴 지표가 실제로 나오는지 먼저 본다. 2026-08-18 1차 실행이 **백엔드 부팅 중**에 시작돼
+#    세 지표가 전부 0 으로 찍혔다 — `grep` 이 아무것도 못 찾으면 `awk` 가 0 을 내므로
+#    «측정했더니 0» 과 «못 읽었다» 가 구분되지 않는다. 그 구분을 여기서 한 번 만든다.
+assert_metrics() {
+  local v
+  v=$(prom "jvm_gc_memory_allocated_bytes_total")
+  [ -n "$v" ] && [ "$v" != "0" ]     || die "JVM 할당 지표를 못 읽었다 (받은 값 '$v') — 백엔드가 아직 부팅 중이거나 관리 포트가 막혔다.
+   0 은 «측정했더니 0» 이 아니라 «grep 이 아무것도 못 찾았다» 다"
+  echo "  JVM 지표 확인 (할당 누적 $v)"
+}
+assert_metrics
 
 [ -f "$LOG" ] || printf "arm_idx\tin_progress\ttick\talloc_bytes\theap_used\tgc_pause_count\tsecs\n" > "$LOG"
 
