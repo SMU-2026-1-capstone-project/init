@@ -29,10 +29,10 @@
 | 파일 | 내용 |
 |---|---|
 | `sessions.tsv` | RPS · rows/s · p50/95/99 · fail · 커밋 · fsync — 4차 형식 그대로 |
-| `spread.tsv` | 판별 **시간 창(UTC)** · `Innodb_row_lock_waits` 델타 · 락 대기 시간 · dirty pages |
+| `spread.tsv` | 판별 **시간 창(UTC)** · `Innodb_row_lock_waits` 델타 · 락 대기 시간 · dirty pages · **`rows_inserted` / `rows_expected`**(#271 그물) |
 | `writer.tsv` | 무관한 세션(1001)의 쓰기 지연 — 시도 · 에러 · p50/p95/max · **최대 시도 간격** |
 | `conn.tsv` | **從** 커넥션 스윕 — 기본↔완화 내구성 × `--connections` 1·4·16 |
-| `_payload/` | 레벨별 ghz 페이로드(gitignore 대상 — 수 MB) |
+| `_payload/` | 레벨별 ghz 페이로드. **JSON 이 아니라 템플릿**이고 레벨과 무관하게 ~54KB (#271) |
 | `_conditions.txt` | 고정 조건 기록(풀 크기 등) |
 
 `sessions.tsv` 와 나머지는 **`tag` 로 조인**한다(`s20_r3` = 레벨 20, 반복 3).
@@ -47,6 +47,10 @@
 - 내구성이 **기본값**(`flush=1 / sync_binlog=1`) — 4차 pool 스윕이 완화 상태를 남겼을 수 있다
 - 백엔드 풀 크기 — 조작 변수가 아니라 **고정 조건**이라 값을 기록만 한다
 - 페이로드가 부하기에 **실제로 올라갔는지**(원격 파일 크기 대조)
+- 🔴 **판마다 «행이 실제로 늘었는가»** — 판 끝(초기화 전)에 `pose_data` 를 세고, **0 이면 멈춘다.**
+  #271 이 이 그물이 없어서 안 보였다: 멱등 키가 중복을 삼키면 `ON DUPLICATE KEY UPDATE` 가
+  **성공**이라 `fail=0` 에 RPS 도 정상으로 찍힌다. 사전 확인 다섯 개는 전부 **환경**을 봤고,
+  「보낸 요청이 행을 만드는가」를 보는 것은 하나도 없었다
 
 ## 판 배치만 먼저 보기 (EC2 불필요)
 
