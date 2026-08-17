@@ -23,6 +23,25 @@ FRAMES_PATH = sys.argv[1]
 MODE = sys.argv[2] if len(sys.argv) > 2 else "all"
 
 
+def _physical_cores():
+    """물리 코어 수. 이 실험의 판정선이 «코어가 먼저 걸리나»라서 vCPU 가 아니라 물리 코어를 본다."""
+    try:
+        with open("/proc/cpuinfo") as f:
+            pairs = set()
+            phys = core = None
+            for line in f:
+                if line.startswith("physical id"):
+                    phys = line.split(":")[1].strip()
+                elif line.startswith("core id"):
+                    core = line.split(":")[1].strip()
+                    pairs.add((phys, core))
+            if pairs:
+                return len(pairs)
+    except OSError:
+        pass
+    return os.cpu_count()
+
+
 def _worker_loop(frames, n, barrier=None, out=None):
     """프레임 n 장을 추론한다. 반환 = **루프만** 걸린 초.
 
@@ -82,11 +101,19 @@ def scaling():
     """③ 스레드 vs 프로세스 — 같은 총 프레임 수를 나눠 돌린다."""
     frames = json.load(open(FRAMES_PATH))["frames"]
     PER = 100
-    print(f"\n③ 확장성 — 워커당 {PER}프레임 추론(모델 로드·워밍업 제외), 물리 2코어 박스")
+
+    # 워커 격자는 박스마다 다르다. 로컬(물리 2코어)에서는 1·2·4 로 충분했지만 — 거기선
+    # 4워커에서 스레드와 프로세스가 **같은 천장**에 붙어 GIL 과 코어를 못 가른다(코어가 먼저
+    # 걸린다) — 물리 8코어 박스에서는 8·16 까지 넓혀야 판정선이 보인다.
+    # 판정선: 프로세스 2개에서 처리량 1.7~2배 + AI CPU 8.7→14~16 이면 GIL, 아니면 캐시·HT.
+    workers = tuple(int(x) for x in os.environ.get("SCALING_WORKERS", "1,2,4").split(","))
+    physical = _physical_cores()
+    print(f"\n③ 확장성 — 워커당 {PER}프레임 추론(모델 로드·워밍업 제외), "
+          f"물리 {physical}코어 / {os.cpu_count()} vCPU")
     print(f"{'워커':>4} {'스레드 fps':>11} {'배수':>7} {'프로세스 fps':>13} {'배수':>7} {'프로세스/스레드':>14}")
     print("-" * 68)
     b_t = b_p = None
-    for nw in (1, 2, 4):
+    for nw in workers:
         # 스레드
         bar = threading.Barrier(nw)
         res = []

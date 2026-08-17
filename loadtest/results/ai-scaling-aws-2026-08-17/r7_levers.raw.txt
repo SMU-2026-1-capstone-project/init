@@ -1,0 +1,23 @@
+# R7 원시 출력 — docker exec shadowfit-ai python profile_levers2.py frames.json 60
+# ⚠️ 파일이 아니라 stdout 으로 회수했다(드라이버를 안 거치고 대화형으로 돌렸다).
+# 모델 다운로드 2줄은 lite/heavy 가 이미지에 없어서 나온 것이다(base 만 들어 있다).
+
+Downloading model to /usr/local/lib/python3.12/site-packages/mediapipe/modules/pose_landmark/pose_landmark_lite.tflite
+Downloading model to /usr/local/lib/python3.12/site-packages/mediapipe/modules/pose_landmark/pose_landmark_heavy.tflite
+
+(가) model_complexity — 원본 640x480 · 60프레임/팔 · 번갈아
+           팔     중앙ms     p25     p75     기준 대비
+------------------------------------------------
+ complexity0     11.0    10.9    11.3     0.79x
+ complexity1     14.0    13.8    14.2     1.00x
+ complexity2     38.6    38.1    39.4     2.76x
+
+(나) 입력 해상도 — complexity=1 · 60프레임/팔 · 번갈아
+           팔     중앙ms     p25     p75     기준 대비
+------------------------------------------------
+     320x240     13.7    13.5    13.9     1.00x
+     640x480     13.7    13.6    13.9     1.00x
+     960x720     13.9    13.7    14.1     1.02x
+     320x240 검출 10/10
+     640x480 검출 10/10
+     960x720 검출 10/10
