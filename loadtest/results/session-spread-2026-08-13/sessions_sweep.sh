@@ -258,7 +258,8 @@ stop_writer() {  # $1 = 태그
 
   # 이 판의 writer 지연을 요약해 남긴다. `max_gap_ms` 는 **시도 «시작» 시각의 최대 간격** —
   # 한 건이 오래 걸린 것과 아예 시도가 끊긴 것을 가르는 값이다.
-  mysql_q "SELECT COUNT(*), SUM(errno<>0),
+  local wsum
+  wsum=$(mysql_q "SELECT COUNT(*), SUM(errno<>0),
                   MAX(CASE WHEN rn=p50 THEN elapsed_ms END),
                   MAX(CASE WHEN rn=p95 THEN elapsed_ms END),
                   MAX(elapsed_ms), MAX(gap)
@@ -268,9 +269,22 @@ stop_writer() {  # $1 = 태그
                         CEIL(COUNT(*) OVER () * 0.95) p95,
                         TIMESTAMPDIFF(MICROSECOND,
                           LAG(started_at) OVER (ORDER BY seq), started_at)/1000 gap
-                 FROM spread_writer_log WHERE arm='$1') t;" \
+                 FROM spread_writer_log WHERE arm='$1') t;")
+  printf '%s\n' "$wsum" \
     | awk -v tag="$1" -v lvl="$CUR_LEVEL" -v early="$early" 'BEGIN{OFS="\t"}
         {print tag, lvl, $1, $2, $3, $4, $5, $6, early}' >> "$WRITER_LOG"
+
+  # 🔴 실패를 표에만 남기지 않는다. 2026-08-17 리허설에서 판당 44건 중 34건이 1062(중복)로
+  #    죽고 있었는데 **표에 열이 있는데도 아무도 안 봤다**. 그리고 실패한 삽입은 즉시 돌아오므로
+  #    `p50` 이 0 으로 찍힌다 — 채널이 죽었는데 표는 「번지지 않는다」로 읽힌다.
+  #    임계값이 아니다: 이 채널에서 실패는 **한 건이라도 곧 오염**이다.
+  local werr
+  werr=$(printf '%s\n' "$wsum" | awk '{print $2}')
+  case "${werr:-0}" in
+    0|NULL|"") : ;;
+    *) echo "  ⚠️ writer 가 ${werr}건 실패했다 — «번짐 반경» 채널이 오염됐다." \
+            "실패한 삽입은 즉시 돌아와 p50 을 0 으로 만든다(#271)" >&2 ;;
+  esac
 
   # writer 가 넣은 행은 부하 대역 밖이라 `reset_rows` 가 안 지운다. 여기서 지운다 —
   # 안 지우면 판이 갈수록 테이블이 커져 «판 순서» 가 조작 변수에 섞인다.
