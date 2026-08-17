@@ -467,21 +467,36 @@ H1 은 *「동거하면 내려간다」* 이므로, 내려간 천장이 **40~80 
 둘뿐이고 **`loader_*.tsv` 를 안 본다.** 샘플러가 빈 파일을 남겨도 라운드는 성공으로 끝난다 —
 「걷은 줄 알았는데 안 걷혔다」가 #250 의 실패 모드 그 자체다.
 
-### 🍚 점심때 할 일 (2026-08-17 기록)
+### 🍚 점심때 할 일 (2026-08-17 기록 · **2차 리허설 후 갱신**)
 
 **1차 EC2 리허설을 돌렸고 절반이 섰다** — 결과·실무 메모는
 [`rehearsal-aws-2026-08-17/`](../../loadtest/results/coresidency-2026-08-15/rehearsal-aws-2026-08-17/README.md).
 인스턴스는 둘 다 terminate 했다(인스턴스 0 · 볼륨 0 확인).
 
+> ✅ **2차 리허설 완주 (2026-08-17)** — [`rehearsal2-aws-2026-08-17/`](../../loadtest/results/coresidency-2026-08-15/rehearsal2-aws-2026-08-17/README.md).
+> 8판 + §T 2판 · 스윕 549초 · **`cores_assert_*` 6종 전부 통과**. ⑧ 자기 프로브와 ⑩ §T 가
+> **처음으로 EC2 에서 실제로 걷혔다.** 인스턴스 둘 다 terminate(인스턴스 0 · 볼륨 0 확인).
+> **rig 쪽으로 새로 만들 것은 남아 있지 않다** — 남은 것은 결함 수정뿐이다
+> ([#259](https://github.com/Shadowfit/init/issues/259) · [#260](https://github.com/Shadowfit/init/issues/260) ·
+> [#261](https://github.com/Shadowfit/init/issues/261) · [#262](https://github.com/Shadowfit/init/issues/262) ·
+> [#263](https://github.com/Shadowfit/init/issues/263) · [#264](https://github.com/Shadowfit/init/issues/264) ·
+> [#265](https://github.com/Shadowfit/init/issues/265)).
+> 🔴 **정식 라운드를 막는 것은 이제 3번(S3) 하나다.**
+>
+> ⚠️ §T 의 `제한 30.2 ↔ 전체 30.1 fps (+0.3%)` 를 「부하기는 병목이 아니다」로 읽지 말 것 —
+> 그 판에서 부하기 CPU 가 **5~17%** 라 애초에 놀고 있었다. 참인 것은 «§T 장치가 작동한다»
+> 까지고, [#250](https://github.com/Shadowfit/init/issues/250) 의 답은 **레벨 120·160**
+> 에서 나온다(`CORES_TASKSET_LEVELS` 기본값이 그것이다).
+
 | # | 할 일 | 왜 지금 안 됐나 |
 |---|---|---|
-| 1 | **2차 리허설** — 고친 스윕으로 ⑧(자기 프로브) · ⑩(§T) · `cores_assert_*` 4종 검증 | 프로브는 `-n` 결함으로 꺼졌고, §T 는 격자 **뒤**에 붙는데 그 전에 중단했다 |
-| 2 | 🔴 **`TARGET_SSH` 에서 `-n` 을 뺀다** | 붙이면 프로브 자산이 0바이트로 간다(rig 이 크기 대조로 잡아 프로브를 끈다) |
+| 1 | ~~**2차 리허설** — 고친 스윕으로 ⑧(자기 프로브) · ⑩(§T) · `cores_assert_*` 4종 검증~~ → ✅ **완료** | ~~프로브는 `-n` 결함으로 꺼졌고, §T 는 격자 **뒤**에 붙는데 그 전에 중단했다~~ |
+| 2 | ~~🔴 **`TARGET_SSH` 에서 `-n` 을 뺀다**~~ → ✅ **완료** (빼고 돌렸고 프로브가 8판 전부 걷혔다) | ~~붙이면 프로브 자산이 0바이트로 간다(rig 이 크기 대조로 잡아 프로브를 끈다)~~ |
 | 3 | 🔴 **S3 를 풀 것** — 인스턴스 프로파일을 붙이거나 IAM 권한을 연다 | `preflight_s3` 가 하드 실패라 **정식 라운드가 아예 안 돈다**. 1차는 preflight 를 건너뛰고 scp 로 받았다 |
-| 4 | 부하기는 **`c7i.xlarge` 이상**으로 띄운다 | 2 vCPU 면 §T 가 성립하지 않는다(제한 = 전체) |
-| 5 | 대상 박스 **root SSH 열기** · scp 후 **CRLF 제거** | AL2023 은 root 로그인 차단이 기본 · Windows 작업 트리는 CRLF 라 `$''` 로 죽는다 |
+| 4 | ~~부하기는 **`c7i.xlarge` 이상**으로 띄운다~~ → ✅ **완료** (2차도 `c7i.xlarge`, `ncpu=4`) | ~~2 vCPU 면 §T 가 성립하지 않는다(제한 = 전체)~~ |
+| 5 | ✅ **완료** — CRLF 는 `sed` 가 답이 아니었다: repo 블롭은 LF 이고 바꾸는 건 작업 트리의 `core.autocrlf=true` 다. `git show HEAD:<path>` 로 뽑으면 애초에 안 생긴다. ~~대상 박스 **root SSH 열기** · scp 후 **CRLF 제거** | AL2023 은 root 로그인 차단이 기본 · Windows 작업 트리는 CRLF 라 `$''` 로 죽는다 |
 
-**2차 리허설 명령** (부하기에서, `-n` 없이):
+**2차 리허설 명령** (부하기에서, `-n` 없이) — 🔴 **아래 명령에 결함 둘이 있다. 그대로 쓰지 말 것.** `CORES_ARMS="C A"` 로는 **§T 가 안 돈다**(`TASKSET_ARM=B` 가 `ARMS` 에 없어 조용히 건너뛴다, [#260](https://github.com/Shadowfit/init/issues/260)) — 2차는 `"C A B"` 로 고쳐서 태웠다. `GHZ_TOKEN=<같음>` 은 **`INTERNAL_API_TOKEN`** 을 뜻하며, `AI_PUBLIC_TOKEN` 과 **같으면 AI 가 아예 안 뜬다**([#261](https://github.com/Shadowfit/init/issues/261) · #230 단언).
 
 ```bash
 cd /root/init && sudo env   S3_BASE=s3://shadowfit-measure-055447613012/shadowfit TARGET_HOST=<대상 사설 IP>   TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>"   AI_PUBLIC_TOKEN=<대상 .env 와 같은 값> GHZ_TOKEN=<같음>   GHZ_RPS=19 GHZ_DATA=/root/batch_multi.json GHZ_BIN=/usr/local/bin/ghz   CORES_ARMS="C A" CORES_REH_LEVELS="5" CORES_ANCHOR=0   PHASES=coresidency_rehearsal nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
