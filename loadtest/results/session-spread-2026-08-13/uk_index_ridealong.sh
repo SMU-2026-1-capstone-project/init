@@ -106,17 +106,26 @@ set_arm() {  # $1 = with|without
 # 아니라 **어떤 차이든** 지지하는 것처럼 보인다. 그래서 읽기를 직접 센다:
 #   · `Innodb_buffer_pool_reads`         — 버퍼풀에서 못 찾아 **디스크로 간** 횟수
 #   · `Innodb_buffer_pool_read_requests` — 전체 읽기 요청
-#   · `Innodb_ibuf_merges` / `_merged_inserts` — change buffer 가 실제로 일한 양
-# 팔 B 에서 ibuf 가 늘고 팔 A 에서 reads 가 늘면 기제가 그대로 보인다.
+#   · `Innodb_data_reads` / `Innodb_pages_read` — 실제 디스크 읽기 횟수·페이지 수
+# 팔 A(키 있음)에서 reads 가 늘면 기제가 그대로 보인다.
+#
+# 🔴 `Innodb_ibuf_*` 는 **MySQL 8 의 상태 변수가 아니다** — `INNODB_METRICS` 쪽이고 기본
+#    비활성일 수 있다. 초판이 `global_status` 에서 찾다 **NULL** 을 받았고, 그 NULL 이 산술에
+#    들어가 `set -u` 로 스크립트가 즉사했다(2026-08-18 1차 시도, 버림판에서 죽었다).
+#    `INNODB_METRICS` 로 옮겨봤지만 **rig 계정에 PROCESS 권한이 없어 그것도 막힌다**
+#    (2026-08-18 확인). 그래서 ibuf 는 포기하고 `Innodb_data_reads`·`Innodb_pages_read` 로
+#    바꿨다 — 둘 다 상태 변수라 권한이 필요 없다. ② **모든 값에 IFNULL** 을 씌운다.
+#    남은 핵심 증거는 `buffer_pool_reads`(버퍼풀에서 못 찾아 디스크로 간 횟수)다 —
+#    「유니크 키라 change buffer 를 못 써서 랜덤 읽기가 붙는다」의 직접 지표가 그쪽이다.
 mech_counters() {
   mysql_q "SELECT
-      MAX(CASE WHEN VARIABLE_NAME='INNODB_BUFFER_POOL_READS' THEN VARIABLE_VALUE END),
-      MAX(CASE WHEN VARIABLE_NAME='INNODB_BUFFER_POOL_READ_REQUESTS' THEN VARIABLE_VALUE END),
-      MAX(CASE WHEN VARIABLE_NAME='INNODB_IBUF_MERGES' THEN VARIABLE_VALUE END),
-      MAX(CASE WHEN VARIABLE_NAME='INNODB_IBUF_MERGED_INSERTS' THEN VARIABLE_VALUE END)
+      IFNULL(MAX(CASE WHEN VARIABLE_NAME='INNODB_BUFFER_POOL_READS' THEN VARIABLE_VALUE END),0),
+      IFNULL(MAX(CASE WHEN VARIABLE_NAME='INNODB_BUFFER_POOL_READ_REQUESTS' THEN VARIABLE_VALUE END),0),
+      IFNULL(MAX(CASE WHEN VARIABLE_NAME='INNODB_DATA_READS' THEN VARIABLE_VALUE END),0),
+      IFNULL(MAX(CASE WHEN VARIABLE_NAME='INNODB_PAGES_READ' THEN VARIABLE_VALUE END),0)
     FROM performance_schema.global_status
     WHERE VARIABLE_NAME IN ('INNODB_BUFFER_POOL_READS','INNODB_BUFFER_POOL_READ_REQUESTS',
-                            'INNODB_IBUF_MERGES','INNODB_IBUF_MERGED_INSERTS');" | tr '\t' ' '
+                            'INNODB_DATA_READS','INNODB_PAGES_READ');" | tr '\t' ' '
 }
 
 CUR_ARM=""; M0=""
@@ -134,6 +143,12 @@ round_end_hook() {   # $1=태그 $2=t0 $3=t1
 
   read -r r0 rr0 im0 ii0 <<< "$M0"
   read -r r1 rr1 im1 ii1 <<< "$m1"
+  # 🔴 산술에 비숫자가 들어가면 bash 는 그것을 **변수 이름**으로 읽고 `set -u` 에서 즉사한다.
+  #    NULL 하나가 판 전체를 죽인 자리라 여기서 한 번 더 막는다.
+  local _v
+  for _v in r0 rr0 im0 ii0 r1 rr1 im1 ii1; do
+    case "$(eval echo "\${$_v:-}")" in ''|*[!0-9]*) eval "$_v=0" ;; esac
+  done
   printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
     "$tag" "$CUR_ARM" "$(( ${r1:-0} - ${r0:-0} ))" "$(( ${rr1:-0} - ${rr0:-0} ))" \
     "$(( ${im1:-0} - ${im0:-0} ))" "$(( ${ii1:-0} - ${ii0:-0} ))" \
