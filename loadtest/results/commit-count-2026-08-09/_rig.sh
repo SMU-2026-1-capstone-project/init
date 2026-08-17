@@ -94,17 +94,27 @@ rsh() { ssh "${SSH_OPTS[@]}" "ec2-user@$1" "${@:2}"; }
 #    **빈 문자열**로 돌아온다 — 그러면 사전 확인이 「세션 시드가 부족하다 — ''/100」 처럼
 #    **엉뚱한 곳**을 가리킨다. 2026-08-17 P5 리허설에서 실제로 그렇게 헤맸다.
 MYSQL_CTN=${MYSQL_CTN:-shadowfit-mysql}
+# 자격증명도 같은 이유로 뺀다. 예전엔 `-ushadowfit -pshadowfit` 이 박혀 있었는데 부트스트랩이
+# 만드는 비밀번호는 **`.env` 의 `MYSQL_PASSWORD`**(기본 1234)다 — 탑승 목록도 «rig 기본 PW(1234)»
+# 라고 적고 있었으니, 코드 쪽이 문서와 어긋나 있었다.
+MYSQL_USER=${MYSQL_USER:-shadowfit}
+MYSQL_PW=${MYSQL_PW:-1234}
 
 mysql_q() {  # $1 = SQL. stdout 으로 결과(탭 구분, 헤더 없음)
-  rsh "$DB_PUB" "sudo docker exec $MYSQL_CTN mysql -ushadowfit -pshadowfit shadowfit -N -e \"$1\"" 2>/dev/null
+  rsh "$DB_PUB" "sudo docker exec $MYSQL_CTN mysql -u$MYSQL_USER -p$MYSQL_PW shadowfit -N -e \"$1\"" 2>/dev/null
 }
 
 # 🔴 stderr 를 버리는 대가를 여기서 갚는다. **한 번은** 삼키지 않고 물어본다 —
 #    이게 없으면 「DB 에 못 붙는다」가 「데이터가 없다」로 위장한다.
 assert_mysql_reachable() {
   local out
-  out=$(rsh "$DB_PUB" "sudo docker exec $MYSQL_CTN mysql -ushadowfit -pshadowfit shadowfit -N -e 'SELECT 1;'" 2>&1)
-  [ "$(echo "$out" | tr -d '[:space:]')" = "1" ]     || die "MySQL 에 질의할 수 없다 (컨테이너 '$MYSQL_CTN' @ $DB_PUB) — 받은 것: '$out'
+  out=$(rsh "$DB_PUB" "sudo docker exec $MYSQL_CTN mysql -u$MYSQL_USER -p$MYSQL_PW shadowfit -N -e 'SELECT 1;'" 2>&1)
+  # 🔴 stderr 를 같이 받는 것이 이 확인의 요점인데, mysql 클라이언트는 **성공해도**
+  #    "Using a password on the command line interface can be insecure." 를 stderr 로 낸다.
+  #    그 줄을 안 걷어내면 «정상인데 실패» 로 읽는다 — 2026-08-17 리허설 1차가 여기서 멈췄다.
+  #    경고만 지우고 나머지는 메시지에 그대로 보여준다(진짜 오류는 보여야 한다).
+  [ "$(printf '%s\n' "$out" | grep -vi 'warning' | tr -d '[:space:]')" = "1" ] \
+    || die "MySQL 에 질의할 수 없다 (컨테이너 '$MYSQL_CTN' @ $DB_PUB) — 받은 것: '$out'
    이름이 다르면 MYSQL_CTN 으로 넘긴다. 이 확인이 없으면 다음 사전 확인들이
    전부 «데이터가 없다» 로 잘못 보고한다"
   echo "  MySQL: 컨테이너 '$MYSQL_CTN' 응답 확인"
@@ -223,7 +233,10 @@ restart_backend() {  # $1 = pool
 #    «워밍업 ghz 실패» 로 죽었고, 메시지는 «백엔드 미기동 / 포트 차단?» 을 가리켜
 #    엉뚱한 곳을 보게 만들었다. (restart_backend 안의 `~/app.jar` 등은 큰따옴표 안이라
 #    로컬 전개가 안 되고 원격에서 풀린다 — 그래서 그쪽은 멀쩡했다.)
-GHZ=/home/ec2-user/go/bin/ghz
+# 🔴 경로도 박지 않는다. 예전 값 `/home/ec2-user/go/bin/ghz` 는 **go 툴체인으로 깔던 시절**의
+#    자리인데, 지금 `bootstrap.sh` 는 릴리스 바이너리를 `/usr/local/bin/ghz` 에 넣는다.
+#    (#249·#259 가 run_all.sh 쪽에서 같은 것을 이미 고쳤고, 여기만 남아 있었다.)
+GHZ=${GHZ:-/usr/local/bin/ghz}
 WARM_C=3; WARM_SEC=30
 
 # 스윕이 ghz 에 인자를 더 얹는 통로. 기본은 빈 값이라 기존 스윕은 그대로다.

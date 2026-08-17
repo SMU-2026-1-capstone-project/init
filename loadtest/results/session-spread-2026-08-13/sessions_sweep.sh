@@ -201,7 +201,7 @@ WRITER_MAX_SEC=${WRITER_MAX_SEC:-900}    # 판이 끝나면 stop 으로 멈춘�
 
 install_writer() {
   ssh "${SSH_OPTS[@]}" "ec2-user@$DB_PUB" \
-    "sudo docker exec -i $MYSQL_CTN mysql -ushadowfit -pshadowfit shadowfit" < ./spread_writer.sql \
+    "sudo docker exec -i $MYSQL_CTN mysql -u$MYSQL_USER -p$MYSQL_PW shadowfit" < ./spread_writer.sql \
     || die "spread_writer.sql 적재 실패"
   mysql_q "SELECT COUNT(*) FROM information_schema.routines
            WHERE routine_schema='shadowfit' AND routine_name='spread_writer';" | grep -q '^1$' \
@@ -214,7 +214,7 @@ install_writer() {
 
 start_writer() {  # $1 = 태그
   mysql_q "DELETE FROM spread_writer_log WHERE arm='$1'; DELETE FROM spread_writer_ctl;" >/dev/null
-  rsh "$DB_PUB" "sudo docker exec -d $MYSQL_CTN mysql -ushadowfit -pshadowfit shadowfit \
+  rsh "$DB_PUB" "sudo docker exec -d $MYSQL_CTN mysql -u$MYSQL_USER -p$MYSQL_PW shadowfit \
     -e \"CALL spread_writer('$1', $WRITER_SESSION, $WRITER_MAX_SEC, $WRITER_GAP_MS);\"" >/dev/null 2>&1
   sleep 3   # 부하 전 평상시 구간을 몇 건 확보한다 — 「원래 몇 ms 인가」의 기준선
   local n
