@@ -75,7 +75,24 @@ spring:
      properties:
        hibernate:
          jdbc:
-           batch_size: 25      # saveAll 을 batch 로 묶음 (부하테스트 §7.5 개선)
+           # 🔴 2026-08-18 정정 (#211). 예전 주석은 «saveAll 을 batch 로 묶음 (부하테스트 §7.5 개선)»
+           #    이었는데 **둘 다 사실이 아니다.**
+           #
+           #    ① **INSERT 는 이 설정으로 안 묶인다.** 이 프로젝트의 엔티티는 **11개 전부
+           #       `GenerationType.IDENTITY`** 다. IDENTITY 는 행마다 생성된 키를 받아와야 해서
+           #       Hibernate 가 insert 를 batch 로 못 묶는다 — 설정값과 무관하게 **꺼져 있다.**
+           #    ② **§7.5 의 개선은 이 설정이 낸 것이 아니다.** 그 개선은 pose 적재를 JPA 에서
+           #       `JdbcTemplate.batchUpdate` 로 옮긴 것이고(PoseDataService), 그 경로는 Hibernate 를
+           #       아예 안 탄다. 즉 이 줄은 그 성과의 공을 잘못 가져가고 있었다.
+           #
+           #    ⚠️ 그렇다고 죽은 설정은 아니다 — **UPDATE·DELETE 배치에는 그대로 걸린다**
+           #       (생성 키를 받을 필요가 없어서다). 지금 남은 `saveAll` 은 레퍼런스 저장
+           #       한 곳뿐이고(PoseDataService), 그것도 INSERT 라 배치가 안 된다.
+           #    📌 값을 바꾸려면 «무엇이 실제로 묶이는지» 부터 재고할 것. 지금 근거로는 25 를
+           #       유지할 이유도 바꿀 이유도 없다.
+           batch_size: 25
+         # 위와 같은 이유로 order_inserts 는 지금 효과가 없다(묶일 insert 자체가 없다).
+         # order_updates 는 유효하다.
          order_inserts: true
          order_updates: true
 
