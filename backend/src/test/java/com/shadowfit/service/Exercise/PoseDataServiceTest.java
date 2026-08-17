@@ -371,4 +371,67 @@ class PoseDataServiceTest {
 
         assertThat(referenceRepository.findByExerciseId(exercise.getId())).isEmpty();
     }
+
+    // --- 멱등 (#188) ---
+    //
+    // AI 재시도가 붙으면 같은 배치가 두 번 도착한다. 그때 행이 늘어나면 리포트 집계(평균
+    // sync·worst 구간)가 중복 수만큼 왜곡된다 — 즉 유실을 막으려다 다른 오염을 들이는 셈이다.
+    //
+    // ⚠️ 이 검증이 성립하는 이유는 엔티티에 uk_pose_event 가 선언돼 있어서다. 테스트는 H2 +
+    //    ddl-auto 라 Flyway(V5)를 보지 않으므로, 마이그레이션에만 넣었다면 제약 없는 스키마
+    //    위에서 초록불이 났을 것이다(test/resources/application.yml 의 경고와 같은 함정).
+
+    @Test
+    @DisplayName("멱등 — 같은 배치를 두 번 보내도 행 수가 그대로다")
+    void savePoseDataBatch_resend_isIdempotent() {
+        List<PoseDataRequest> batch = realisticBatch(1, 10, 70.0);
+
+        poseDataService.savePoseDataBatch(session.getId(), batch);
+        Integer afterFirst = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pose_data WHERE session_id = ?", Integer.class, session.getId());
+
+        poseDataService.savePoseDataBatch(session.getId(), batch);
+        Integer afterSecond = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pose_data WHERE session_id = ?", Integer.class, session.getId());
+
+        assertThat(afterFirst).isPositive();
+        assertThat(afterSecond).isEqualTo(afterFirst);
+    }
+
+    @Test
+    @DisplayName("멱등 — created_at 은 적재 시각이 아니라 세션 시작 시각이다")
+    void savePoseDataBatch_createdAt_isSessionAnchor() {
+        poseDataService.savePoseDataBatch(session.getId(), realisticBatch(1, 10, 70.0));
+
+        List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT DISTINCT created_at FROM pose_data WHERE session_id = ?", session.getId());
+
+        // 한 세션의 모든 행이 값 하나를 공유한다 — 이게 재전송에도 같은 값이 나오는 근거이고,
+        // 세션이 파티션 경계에서 쪼개지지 않는 이유다.
+        assertThat(rows).hasSize(1);
+
+        // 초 단위로 비교하는 것은 편의가 아니라 **DB 컬럼 정밀도** 때문이다. 운영 MySQL 의
+        // created_at 은 TIMESTAMP(소수 이하 0자리)이고 H2 는 마이크로초까지 잡는데, 자바
+        // LocalDateTime.now() 는 나노초를 갖는다. 어느 쪽이든 잘림은 **결정론적**이라 멱등에는
+        // 무해하다 — 재전송 때도 같은 값이 저장된다.
+        assertThat(((java.sql.Timestamp) rows.get(0).get("CREATED_AT")).toLocalDateTime()
+                        .truncatedTo(java.time.temporal.ChronoUnit.SECONDS))
+                .isEqualTo(session.getStartTime().truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
+    }
+
+    @Test
+    @DisplayName("멱등 — rep 이 다르면 같은 timestamp_sec 이어도 별개 행이다")
+    void savePoseDataBatch_differentRep_notAbsorbed() {
+        poseDataService.savePoseDataBatch(session.getId(), realisticBatch(1, 10, 70.0));
+        Integer afterRep1 = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pose_data WHERE session_id = ?", Integer.class, session.getId());
+
+        // 같은 세션·같은 timestamp_sec·같은 created_at 이지만 rep 이 다르다. 키에 rep_number 가
+        // 있으므로 흡수되면 안 된다 — 흡수되면 2rep 째 프레임이 통째로 사라진다.
+        poseDataService.savePoseDataBatch(session.getId(), realisticBatch(2, 10, 70.0));
+        Integer afterRep2 = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pose_data WHERE session_id = ?", Integer.class, session.getId());
+
+        assertThat(afterRep2).isEqualTo(afterRep1 * 2);
+    }
 }
