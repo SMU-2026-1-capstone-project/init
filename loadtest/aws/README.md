@@ -103,6 +103,13 @@ aws iam put-user-policy --user-name "$(aws sts get-caller-identity --query Arn \
 키**를 담고 있어 한참 헤맸다. 붙이기 전에 `aws sts get-caller-identity` 로 **UserId 를 직접
 확인**한다(위 명령이 그 값을 그대로 쓰는 이유).
 
+> ✅ **2026-08-17 확인 — 이 계정에는 `shadowfit-measure` 프로파일이 이미 있고, 임시 사용자
+> (`shadowfit-loadtest-temp`)로도 기동 시 붙일 수 있다.** 위 `create-role` 절차는 **처음
+> 만들 때만** 필요하다. 그냥 기동 명령에 `--iam-instance-profile Name=shadowfit-measure` 를 넣을 것.
+> 🔴 **`iam:GetInstanceProfile` 이 거절된다고 「못 붙인다」로 결론내지 말 것** — 조회 권한과
+> 사용 권한은 다르다. 2026-08-17 리허설 두 번이 그 오진으로 S3 를 통째로 건너뛰었다.
+> 확인은 `run-instances --dry-run` 을 **가짜 이름과 대조**해서 한다(가짜는 `InvalidParameterValue`).
+
 인스턴스 시작 시 이 인스턴스 프로파일을 붙이거나, 이미 떠 있으면
 `aws ec2 associate-iam-instance-profile --instance-id i-xxx --iam-instance-profile Name=shadowfit-measure`.
 

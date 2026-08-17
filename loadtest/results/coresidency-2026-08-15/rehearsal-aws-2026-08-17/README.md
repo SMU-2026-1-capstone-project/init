@@ -53,6 +53,18 @@ ssh 는 **heredoc 을 먹으므로** 루프가 첫 줄만 돌고 끝난다 — �
 
 ### 3-3. S3 를 못 쓴다 — `preflight_s3` 가 하드 실패다
 
+> 🔴 **이 절의 결론은 2026-08-17 에 뒤집혔다. 아래 진단은 틀렸다** (기록으로 남긴다).
+> **인스턴스 프로파일은 붙일 수 있었다** — 기동 시 `--iam-instance-profile Name=shadowfit-measure`
+> 한 줄이면 되고, 관리자 자격증명도 IAM 수정도 필요 없었다. `t3.micro` 로 EC2→버킷 쓰기를
+> 실증했다(`_iam_probe_20260817-135448/put_ok.txt`).
+> **왜 틀렸나**: `iam:GetInstanceProfile` 거절 **하나**를 보고 「붙일 수 없다」로 갔는데,
+> **조회 권한과 사용 권한은 다른 것**이다(최소권한 정책에서는 오히려 흔한 모양이다).
+> 이 rig 이 `assert_caps` 에 `UNREADABLE` 을 따로 둔 이유 —「캡이 없다」가 아니라
+> 「못 물었다」— 와 **같은 실패 모드를 IAM 쪽에서 저질렀다.**
+> **판별법**: `run-instances --dry-run` 을 진짜 이름과 **가짜 이름으로 대조**한다. 가짜가
+> `InvalidParameterValue` 로 거절되면 AWS 가 존재를 실제로 검증한다는 뜻이고, 그때에야
+> 진짜 쪽 `DryRunOperation` 을 신뢰할 수 있다.
+
 이 IAM 사용자(`shadowfit-loadtest-temp`)는 `iam:GetInstanceProfile`·`ListInstanceProfiles` 가
 없어 인스턴스 프로파일을 붙일 수 없다. `phase_coresidency_preflight` 는 S3 쓰기 실패 시
 `break` 라 **리허설까지 통째로 안 돈다.**
