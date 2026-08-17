@@ -1,7 +1,16 @@
 # Decision: TTS 음성 안내 설계
 
-상태: **OPEN (사용자 결정 대기)**
-작성: 2026-05-25 · 갱신: 2026-05-26 (gRPC 통일 결정 추가)
+상태: **결정은 대부분 닫혔고, 구현이 «수신부» 에서 멈춰 있다** (상태줄 재정리 2026-08-17)
+      기존 표기 «OPEN (사용자 결정 대기)» 는 낡았다 — 아래 세 줄이 실제다. 근거는 결정 로그 + 2026-08-17 코드 대조.
+      - ✅ **닫힌 결정**: 송신 채널 gRPC 단일화(2026-05-26) · 세션 종료 트리거 **ET-H**([`session-end-trigger.md`](./session-end-trigger.md) CLOSED, §2.A.ET 의 ET-A 추천을 대체) ·
+        분기 1(1-B) · 분기 2(2-A) · 2.A.BT(BT-SET) · 분기 3(3-A)+RC-2 · 분기 4(4-A) · 분기 6(6-A) · 분기 7(7-1) · 분기 8(8-A) · 분기 9(9-1) · 시간대·직렬화(갱신 15·17) · payload snake_case(갱신 12)
+      - 🔶 **아직 열린 결정**: **분기 5**(TTS off·실패 fallback — 갱신 4 에서 «명시적 confirm 필요» 로 남음) · 협의 안건 **#15**(preferences 즉시 효과, Front UI 확정 후 재검토)
+      - 🔴 **구현 실태 — 계약은 섰고 «분류» 와 «발화» 가 통째로 없다**(2026-08-17 확인):
+        **Spring 수신부는 완료** — `ExerciseGrpcService.reportFeedbackBatch`(`ExerciseGrpcService.java:120`) · `FeedbackLogService.saveBatch` · `SessionFeedbackQueryService` · proto `FeedbackEvent`(`feedback_type`·`sync_rate_at_trigger`·`occurred_at`) + `set_no`·`is_final`.
+        **AI 송신부는 0** — 8종 분류 함수가 없고(`KNEE_OUT`·`BACK_BENT`·`HIP_HIGH` grep 0건, `squat_analyzer` 는 자유 문자열 `feedback_message` 만), `ReportFeedbackBatch` 호출도 없다. `PoseResponse` 에 `feedback_type` 이 없어 **분기 7-1 도 미반영**이다.
+        **프론트 발화도 0** — `expo-speech`·`expo-av` 의존성과 `ttsEnabled`/`ttsSpeed` 설정 UI(`mypage.tsx`)는 있는데 `Speech.speak` 호출이 없다.
+        → **「분기 1·7-1 이 결정됐다」와 「그게 돌아간다」는 다른 말이다.** 이 문서 본문은 결정 시점 원형이므로, 구현 여부는 이 줄을 볼 것
+작성: 2026-05-25 · 갱신: 2026-05-26 (gRPC 통일 결정 추가) · 2026-08-17 (상태줄 재정리)
 배경 문서: [`../REQUIREMENTS.md`](../REQUIREMENTS.md) §5·6·8, [`../11-tts-youtube-guide.md`](../11-tts-youtube-guide.md), [`../05-database-design.md`](../05-database-design.md) (TTS 스키마 섹션)
 연관: [`./ai-backend-coupling.md`](./ai-backend-coupling.md), [`../tasks/22-backend-tasks-detail.md`](../tasks/22-backend-tasks-detail.md), [`../tasks/23-ai-tasks-detail.md`](../tasks/23-ai-tasks-detail.md), [`../handoff/ai-tts-feedback-batch.md`](../handoff/ai-tts-feedback-batch.md)
 
@@ -1441,6 +1450,13 @@ Speech.speak(message, { language: 'ko-KR', rate: userTtsSpeed });
 
 ## 결정 로그
 
+- **2026-08-17 (상태줄 재정리, 새 결정 없음)**: 상태줄이 **«OPEN (사용자 결정 대기)»** 로 2.7개월 서 있었는데
+  그 사이 분기 대부분이 이 로그 안에서 닫혔고 ET-A 는 [`session-end-trigger.md`](./session-end-trigger.md) 의 **ET-H 로 대체**됐다.
+  「무엇이 남았나」를 물을 때마다 1,500줄을 다시 읽어야 했으므로 **상태줄에 (a) 닫힌 결정 (b) 남은 결정 2건 (c) 구현 실태**를 요약했다.
+  ⚠️ 재정리 중 **본문에 없던 사실 하나가 나왔다** — 코드 대조 결과 **AI 송신부와 프론트 발화가 통째로 없다.**
+  Spring 수신부(`ExerciseGrpcService.java:120` · `FeedbackLogService` · proto `FeedbackEvent`)만 완성돼 있어
+  **«수신자만 있고 송신자가 없는»** 상태다. 이건 결정 문제가 아니라 미구현이므로 결정 로그가 아니라 상태줄 🔴 줄에 적었다.
+  본문 §1~§12 는 결정 시점 원형 그대로 둔다(예측과 결과를 대조할 수 있게).
 - **2026-05-25 (초안)**: 5개 분기 추천안 작성. 요구사항 미확인으로 분기 2 가 잘못 작성됨 (Client → Spring 직송 추천).
 - **2026-05-25 (갱신 1)**: 사용자 지적으로 REQUIREMENTS.md §5·6·8 반영. 변경 사항:
   - 분기 1: 1-B 유지, 비용 재산정 (8종 분류 로직 신설 명시)
