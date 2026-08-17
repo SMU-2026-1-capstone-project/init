@@ -245,6 +245,8 @@ Thread ... (idle): "AnyIO worker thread"
 | `anyio_limiter.tsv` | §2-2 anyio 한도 실험 4판(교차 배열) |
 | `pyspy_dumps_under_load.txt` | §2-3 부하 중 스레드 덤프 3회(유효판, `nolease=0`) |
 | `loader_process_sweep.tsv` | §2-4 부하기 프로세스 수 실험 — **무효판 3개 포함**(`nolease` 열로 갈린다) |
+| `payload_size_sweep.tsv` | 페이로드 크기 실험(§2-2 of 설계문서) |
+| `keepalive_sweep.tsv` | keep-alive vs urllib — **keep-alive 팔은 전부 풀 소진으로 무효**(답 못 냄) |
 | `conditions.txt` | CPU·mediapipe·python·complexity |
 
 ---
