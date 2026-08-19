@@ -32,6 +32,7 @@
 import argparse
 import json
 import random
+import signal
 import statistics
 import sys
 import threading
@@ -61,11 +62,16 @@ def http(url, method="GET", body=None, headers=None, timeout=20):
         return 0, f"{type(e).__name__}: {e}"
 
 
-def setup_account(base, idx, pw):
-    """계정 하나. 이미 있으면 로그인만 한다(판을 반복해도 계정이 쌓이지 않게)."""
-    email = f"cores{idx}@shadowfit.local"
+def setup_account(base, idx, pw, prefix="cores"):
+    """계정 하나. 이미 있으면 로그인만 한다(판을 반복해도 계정이 쌓이지 않게).
+
+    🔴 `prefix` 가 갈리지 않으면 **자기 프로브가 부하기의 0번 세션과 같은 계정**을 쓴다.
+    이 앱은 회원당 활성 세션이 1개라, 그러면 둘 중 하나가 409 로 조용히 빠지고 그 판의
+    «동시 세션 수» 가 목표보다 작아진다(그리고 표에는 setup_fail 로만 남는다).
+    """
+    email = f"{prefix}{idx}@shadowfit.local"
     http(base + "/member/signup", "POST", {
-        "username": f"cores{idx}", "email": email, "password": pw,
+        "username": f"{prefix}{idx}", "email": email, "password": pw,
         "sex": "MALE", "role": "USER"})
     st, body = http(base + "/member/login", "POST", {"email": email, "password": pw})
     if st != 200:
@@ -172,11 +178,14 @@ def main():
     ap.add_argument("--token", required=True, help="AI_PUBLIC_TOKEN")
     ap.add_argument("--frames", default="frames.json")
     ap.add_argument("--sessions", type=int, required=True)
-    ap.add_argument("--dur", type=int, default=60, help="측정 구간(초)")
+    ap.add_argument("--dur", type=int, default=60,
+                    help="측정 구간(초). **0 이면 SIGTERM 까지** — 자기 프로브용(아래 주석)")
     # 분석기가 붙기를 기다리는 상한. 이 시간은 측정 구간 밖이다 — session_worker 주석 참고.
     ap.add_argument("--attach-sec", type=float, default=20.0, dest="attach_sec")
     ap.add_argument("--fps", type=float, default=3.0)
     ap.add_argument("--pw", default="P@ssw0rd!")
+    # 자기 프로브(대상 박스에서 도는 1세션)는 `--user-prefix probe` 로 부른다 — setup_account 주석.
+    ap.add_argument("--user-prefix", default="cores", dest="user_prefix")
     ap.add_argument("--exercise-id", type=int, default=1)
     ap.add_argument("--out", default="")
     ap.add_argument("--label", default="")
@@ -188,10 +197,10 @@ def main():
     print(f"프레임 {len(frames)}장 (무릎 {meta.get('knee_deg_min')}~{meta.get('knee_deg_max')}°, "
           f"검출 {meta.get('detect_ok')}/{meta.get('n')})")
 
-    print(f"준비 — 계정 {a.sessions}개")
+    print(f"준비 — 계정 {a.sessions}개 (prefix={a.user_prefix})")
     toks = []
     for i in range(a.sessions):
-        tok, err = setup_account(a.base, i, a.pw)
+        tok, err = setup_account(a.base, i, a.pw, a.user_prefix)
         if tok is None:
             print(f"🔴 계정 {i} 준비 실패 — {err}")
             sys.exit(1)
@@ -213,10 +222,23 @@ def main():
            for i in range(a.sessions)]
     for t in ths:
         t.start()
-    time.sleep(a.dur)
-    STOP.set()
+    # 🔴 **`--dur 0` 은 «SIGTERM 까지» 다** — 자기 프로브(대상 박스에서 도는 1세션)가 쓴다.
+    #    프로브는 «판이 끝날 때» 같이 끝나야 하는데, 그 시각을 미리 못 정한다: 부하기 쪽
+    #    계정 준비가 세션 수에 비례해 길어져(160세션이면 20초를 넘는다) 측정창의 시작이
+    #    판마다 다르기 때문이다. 고정 dur 로 맞추려 들면 «서버 시계» 가 부하 없는 구간을
+    #    같이 담게 된다.
+    #    SIGTERM 은 **정상 종료 경로를 그대로 태운다** — 요약과 원본이 남는다.
+    #    `kill -9` 로 잡으면 그 판의 서버 시계가 통째로 사라진다(load_ai 는 끝에 한 번 쓴다).
+    signal.signal(signal.SIGTERM, lambda *_: STOP.set())
+    if a.dur > 0:
+        time.sleep(a.dur)
+        STOP.set()
+    else:
+        STOP.wait()
     for t in ths:
         t.join(timeout=15)
+    # 앞뒤 5초를 버릴 기준. `--dur 0` 이면 «실제로 돈 시간» 이 그 기준이다.
+    dur_eff = float(a.dur) if a.dur > 0 else max((r[0] for r in ROWS), default=0.0)
 
     if SETUP_FAIL:
         print(f"🔴 세션 생성 실패 {len(SETUP_FAIL)}건 — 이 판의 «동시 세션 수» 는 목표값이 아니다")
@@ -224,7 +246,7 @@ def main():
             print("   " + m)
 
     # 🔴 **앞뒤 5초는 버린다.** 세션이 붙고 빠지는 구간이라 정상 상태가 아니다.
-    warm = [r for r in ROWS if 5.0 <= r[0] <= a.dur - 5.0]
+    warm = [r for r in ROWS if 5.0 <= r[0] <= dur_eff - 5.0]
     if not warm:
         print("🔴 정상 상태 구간에 요청이 없다 — 판 무효")
         sys.exit(1)
@@ -262,7 +284,7 @@ def main():
             #    읽어 본 표에 옮기므로(run_one), 중간에 끼우면 표가 조용히 어긋난다.
             fp.write("label\tsessions\tfps\tdur\treq\trps\tdetect_pct\tp50\tp95\tp99\tnolease\tnopose\tsetup_fail\t"
                      "t0_epoch\twarm_lo_epoch\twarm_hi_epoch\n")
-            fp.write(f"{a.label}\t{a.sessions}\t{a.fps}\t{a.dur}\t{len(warm)}\t{len(warm)/span:.2f}\t"
+            fp.write(f"{a.label}\t{a.sessions}\t{a.fps}\t{dur_eff:.0f}\t{len(warm)}\t{len(warm)/span:.2f}\t"
                      f"{ok/len(warm)*100:.2f}\t{pct(ms,50):.1f}\t{pct(ms,95):.1f}\t{pct(ms,99):.1f}\t"
                      f"{kinds.get('nolease',0)}\t{kinds.get('nopose',0)}\t{len(SETUP_FAIL)}\t"
                      f"{epoch0:.3f}\t{warm_lo:.3f}\t{warm_hi:.3f}\n")

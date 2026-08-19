@@ -103,9 +103,29 @@ TARGET_SSH=${TARGET_SSH:-${TARGET_HOST:+ssh -o StrictHostKeyChecking=no -o Conne
 AI_PUBLIC_TOKEN=${AI_PUBLIC_TOKEN:-}
 
 CORES_ARMS=${CORES_ARMS:-"A B C"}            # D(관측 스택)를 넣으면 판이 33% 는다
-CORES_LEVELS=${CORES_LEVELS:-"20 40 80 160"}
+CORES_LEVELS=${CORES_LEVELS:-"20 40 60 80 90 100 120 160"}  # 2026-08-17 확정 — 설계 §5-3 ⑥.
+                                             # 90·100 은 천장(80~120)을 «점» 으로 짚으려고 넣었다.
+                                             # 🔴 `coresidency_sweep.sh` 의 LEVELS 와 **같은 값**이어야 한다
 CORES_DUR=${CORES_DUR:-90}
 CORES_REPEATS=${CORES_REPEATS:-3}
+# 레벨 순서 치환(#252)과 앵커 판(시간 추세 기준점). 유도·근거는 `coresidency_sweep.sh` 주석.
+CORES_LEVEL_SHIFT=${CORES_LEVEL_SHIFT:-2}    # 0 이면 오름차순 고정 — 그러면 #252 가 되살아난다
+CORES_ANCHOR=${CORES_ANCHOR:-1}              # 라운드마다 + 끝에 1판. REPEATS 3 이면 4판 ≈ 11분
+CORES_ANCHOR_ARM=${CORES_ANCHOR_ARM:-B}
+CORES_ANCHOR_LEVEL=${CORES_ANCHOR_LEVEL:-80} # 포화 «직전» — 천장에 붙은 레벨은 기준선 구실을 못 한다
+CORES_REH_ANCHOR_LEVEL=${CORES_REH_ANCHOR_LEVEL:-10}  # 리허설 격자(5·10)에 맞춘 값
+# 자기 프로브(설계 §4-2) — 대상 박스에서 1세션을 돌려 **서버 쪽 시계**를 따로 잰다.
+# 이게 없으면 「천장이 서버인가 부하기인가」가 CPU 지표만으로는 안 갈린다(2라운드가 실증).
+CORES_PROBE=${CORES_PROBE:-1}
+CORES_PROBE_PREFIX=${CORES_PROBE_PREFIX:-probe}   # 부하기 계정(cores*)과 갈라야 한다
+# §T 부하기 코어 팔 — 「부하기 구성 탓」과 「대상 박스 물리 호스트 개체차 탓」을 가른다.
+# 같은 세션·같은 호스트에서 부하기 코어 수만 흔든다(taskset). 상세는 sweep 의 §T 주석.
+CORES_TASKSET=${CORES_TASKSET:-1}
+CORES_TASKSET_CPUS=${CORES_TASKSET_CPUS:-2}       # 1라운드 무대(c7i.large)와 같은 코어 수
+CORES_TASKSET_ARM=${CORES_TASKSET_ARM:-B}
+CORES_TASKSET_LEVELS=${CORES_TASKSET_LEVELS:-"120 160"}
+CORES_TASKSET_REPS=${CORES_TASKSET_REPS:-3}
+CORES_REH_TASKSET_LEVELS=${CORES_REH_TASKSET_LEVELS:-"10"}  # 리허설 격자에 맞춘 값
 CORES_REH_LEVELS=${CORES_REH_LEVELS:-"5 10"} # 축소 리허설 — README 「무인 실행 전 필수」
 CORES_REH_DUR=${CORES_REH_DUR:-20}
 
@@ -114,7 +134,9 @@ CORES_REH_DUR=${CORES_REH_DUR:-20}
 GHZ_RPS=${GHZ_RPS:-}
 GHZ_DATA=${GHZ_DATA:-}                       # gen_batch_multi.py 산출물 (부하기 로컬)
 GHZ_TOKEN=${GHZ_TOKEN:-}                     # INTERNAL_API_TOKEN
-GHZ_BIN=${GHZ_BIN:-/home/ec2-user/go/bin/ghz}
+GHZ_BIN=${GHZ_BIN:-/usr/local/bin/ghz}       # bootstrap.sh:179 의 설치 경로 (#249). 옛 기본값은
+                                             # go install 시절의 /home/ec2-user/go/bin/ghz 였고,
+                                             # 두 리허설 모두 이 값을 손으로 넘겨 우회하고 있었다
 GHZ_CONC=${GHZ_CONC:-50}
 
 # 소요 환산(rig 파라미터 기준): 팔당 버림1+본판12 = 13판 × (DUR 90s + AI 재기동 ~18s +
@@ -377,6 +399,21 @@ phase_coresidency_preflight() {
   local nofile; nofile=$(ulimit -n 2>/dev/null)
   note "부하기 ulimit -n = ${nofile:-?} (최고 레벨 ${CORES_LEVELS##* }세션)"
 
+  # §T — 부하기 코어 팔은 **부하기가 제한값보다 커야** 뜻이 있다. 2 vCPU 박스에서 «2코어 제한»
+  #      과 «전체» 는 같은 조건이고, 그러면 「부하기 탓 ↔ 호스트 탓」이 또 안 갈린다.
+  if [ "$CORES_TASKSET" = "1" ]; then
+    local lcpu; lcpu=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+    if ! command -v taskset >/dev/null 2>&1; then
+      note "🔴 부하기에 taskset 이 없다(util-linux) — §T 코어 팔이 통째로 안 돈다"; ok=1
+    elif [ "$lcpu" -le "$CORES_TASKSET_CPUS" ]; then
+      note "🔴 부하기가 ${lcpu}코어 — «제한 $CORES_TASKSET_CPUS» 와 «전체» 가 같은 조건이다."
+      note "   더 큰 부하기(c7i.xlarge 이상)로 띄우거나 CORES_TASKSET=0 으로 «안 가른다» 를 명시할 것"
+      ok=1
+    else
+      note "✅ §T 코어 팔 — 부하기 ${lcpu}코어 · 제한 ${CORES_TASKSET_CPUS}코어로 대조"
+    fi
+  fi
+
   if [ -n "$TARGET_SSH" ]; then
     if $TARGET_SSH "test -d $TARGET_REPO_DIR && docker ps >/dev/null 2>&1" 2>/dev/null; then
       note "✅ 대상 박스 도달 — $TARGET_REPO_DIR · docker 사용 가능"
@@ -397,6 +434,31 @@ phase_coresidency_preflight() {
       ok=1
     else
       note "✅ AI 메모리 캡 $((aimem/1024/1024))MB"
+    fi
+
+    # 🔴 #254 — 옆(Spring) 지표는 **9090** 이고 compose 가 그 포트를 127.0.0.1 에만 연다.
+    #    못 긁으면 H3(«캡이 옆을 지키는가»)가 **또** 판정 열 없이 끝난다. 두 라운드가 그랬다.
+    #    백엔드가 아직 안 떠 있는 preflight 시점이면 경고만 하고, 리허설의 side 게이트가 다시 본다.
+    if $TARGET_SSH "docker ps --format '{{.Names}}' | grep -qx shadowfit-backend" 2>/dev/null; then
+      if $TARGET_SSH "curl -sf --max-time 5 http://127.0.0.1:9090/actuator/prometheus >/dev/null" 2>/dev/null; then
+        note "✅ 대상 actuator(9090) 스크레이프 가능 — H3 판정 열이 생긴다 (#254)"
+      else
+        note "🔴 대상에서 actuator(9090)를 못 긁는다 — H3 가 또 판정 열 없이 끝난다 (#254)"
+        note "   볼 곳: management.server.port=9090 · compose 의 127.0.0.1:9090 매핑 · 컨테이너 안에 curl 이 아니라 **호스트** curl 을 쓴다"
+        ok=1
+      fi
+    else
+      note "⚠️ 대상에 shadowfit-backend 가 아직 없다 — actuator 확인은 리허설의 side 게이트로 미룬다"
+    fi
+
+    # 자기 프로브는 **대상 박스에서** 파이썬을 돌린다(설계 §4-2). 없으면 스윕이 프로브를
+    # 스스로 끄는데, 그러면 「서버인가 부하기인가」를 또 못 가른 채 라운드가 끝난다.
+    if [ "$CORES_PROBE" = "1" ]; then
+      local tpy
+      tpy=$($TARGET_SSH "command -v python3 || command -v python" 2>/dev/null | head -1 | tr -d '\r')
+      [ -n "$tpy" ] \
+        && note "✅ 대상 박스 python: $tpy (자기 프로브)" \
+        || { note "🔴 대상 박스에 python 이 없다 — 자기 프로브가 안 돈다 (설계 §4-2). 깔거나 CORES_PROBE=0 으로 «없이 돈다» 를 명시할 것"; ok=1; }
     fi
 
     # 팔 C·D 는 대상 박스의 compose 가 AI_CPUS·MYSQL_CPUS·BACKEND_CPUS 를 **필수**로 읽는다
@@ -497,6 +559,130 @@ cores_assert_ghz() {  # $1 = ghz.tsv
     }' "$tsv"
 }
 
+# 🔴 부하기 지표(#250)도 같은 이유로 게이트가 필요하다. 08-15·08-16 두 라운드가 **부하기를
+#    안 걷은 채** 끝났고, 그래서 「천장이 서버인가 부하기인가」가 두 번 미결로 남았다.
+#    샘플러가 들어간 뒤에도 위험은 남는다 — `pgrep -f 'load_ai\.py'` 가 안 맞으면
+#    `load_ai_pct` 가 **전부 0** 인 표가 조용히 생기고, 파일은 있으니 «걷었다» 로 보인다.
+#    그래서 «행이 있는가» 가 아니라 **«부하기 프로세스가 실제로 보였는가»** 를 판정한다.
+# 🔴 자기 프로브(설계 §4-2)도 «있는가» 가 아니라 **«두 시계를 같은 창에서 읽었는가»** 로
+#    판정한다. `window` 가 warm 이 아니면 부하기 p50 과 나란히 못 놓는다 — 그런 표는
+#    「서버가 빨랐다」로 잘못 읽히고, 그게 이 프로브를 넣은 이유를 통째로 무너뜨린다.
+cores_assert_probe() {  # $1 = probe_rtt.tsv
+  local tsv=$1
+  [ "$CORES_PROBE" = "1" ] || { note "자기 프로브 꺼짐(CORES_PROBE=0) — 서버 시계 없이 도는 라운드다"; return 0; }
+  [ -f "$tsv" ] || { note "🔴 probe_rtt.tsv 가 없다 — 대상 박스 시계를 못 걷었다 (설계 §4-2)"; return 1; }
+  awk -F'\t' '
+    NR>1 {
+      rows++; win[$10]++
+      if ($10 == "warm" && $7+0 > 0) { ok++; if ($7+0 > worst) worst = $7+0 }
+    }
+    END {
+      printf "     판 %d — warm %d · full %d · no_overlap %d · empty %d · FAIL %d\n",
+             rows, win["warm"]+0, win["full"]+0, win["no_overlap"]+0, win["empty"]+0, win["-"]+0
+      if (ok+0 > 0) printf "     서버 시계 최대 p50 %.1f ms\n", worst
+      if (rows == 0) { print "  🔴 프로브 행이 한 줄도 없다 — 대상 박스에서 안 돌았다"; exit 1 }
+      if (ok+0 == 0) {
+        print "  🔴 부하기 창과 겹치는 프로브 표본이 **한 판도** 없다"
+        print "     볼 곳: 대상 박스 python · $PROBE_DIR 자산 · probe 계정이 409 로 막혔는지(reset_sessions)"
+        exit 1
+      }
+      printf "  ✅ 두 시계 성립 (%d판)\n", ok
+    }' "$tsv"
+}
+
+# §T — 부하기 코어 팔. 「돌았나」와 「쌍이 성립했나」는 다르다: 한쪽 조건만 남으면 대조가
+#      없는 것이고, 그러면 「부하기 탓 ↔ 호스트 탓」이 이번에도 안 갈린다.
+#      🔴 기아 가설은 이미 기각됐으므로(AI CPU 등가) 여기서 볼 것은 **처리량 차이**다 —
+#         차이가 나면 부하기 구성이 결과를 움직인다는 뜻이고, 안 나면 라운드 간 +17.7% 는
+#         호스트 개체차 쪽으로 기운다.
+cores_assert_taskset() {  # $1 = coresidency.tsv
+  local tsv=$1
+  [ "$CORES_TASKSET" = "1" ] || { note "§T 코어 팔 꺼짐(CORES_TASKSET=0)"; return 0; }
+  [ -f "$tsv" ] || { note "🔴 결과 표가 없다: $tsv"; return 1; }
+  awk -F'\t' '
+    NR>1 && $2 ~ /^lc(2|F)_t/ {
+      rows++
+      key = ($2 ~ /^lc2_/) ? "lc2" : "lcF"
+      if ($4 == "FAIL" || $4+0 == 0) { bad++; next }
+      cnt[key]++; sum[key] += $5+0
+      lv[$3] = 1
+    }
+    END {
+      if (rows == 0) {
+        print "     §T 판이 없다 — 부하기가 작거나 taskset 이 없어 스윕이 건너뛴 것이다(그 사유는 스윕 로그에)"
+        exit 0
+      }
+      printf "     §T %d판 (제한 %d · 전체 %d · 성립 안 함 %d)\n", rows, cnt["lc2"]+0, cnt["lcF"]+0, bad+0
+      if (cnt["lc2"]+0 == 0 || cnt["lcF"]+0 == 0) {
+        print "  🔴 한쪽 조건만 남았다 — 대조가 성립하지 않는다"
+        exit 1
+      }
+      a = sum["lc2"]/cnt["lc2"]; b = sum["lcF"]/cnt["lcF"]
+      printf "  ✅ §T 성립 — 제한 %.1f fps ↔ 전체 %.1f fps (차 %+.1f%%)\n", a, b, 100*(a-b)/b
+      print  "     차이가 크면 «부하기 구성 탓», 없으면 라운드 간 +17.7% 는 «호스트 개체차» 쪽이다"
+    }' "$tsv"
+}
+
+cores_assert_loader() {  # $1 = 결과 디렉터리
+  local dir=$1 n
+  n=$(ls "$dir"/loader_*.tsv 2>/dev/null | wc -l)
+  [ "$n" -gt 0 ] || { note "🔴 loader_*.tsv 가 하나도 없다 — 부하기를 또 안 걷었다 (#250)"; return 1; }
+  awk -F'\t' '
+    FNR>1 {
+      rows++
+      if ($3 == "-1") neg++              # #255 — 프로세스가 창 안에서 끝난 구간
+      else if ($3+0 > 0) seen++
+      if ($2+0 > max) max = $2+0
+      if ($9 != "-1" && $9+0 > tx) tx = $9+0
+    }
+    END {
+      printf "     표본 %d행 · load_ai 가 보인 표본 %d · 못 잰 구간(-1) %d\n", rows, seen+0, neg+0
+      printf "     부하기 최대 CPU %.1f%% (100%% = 1 vCPU) · 최대 송신 %.2f Mbps\n", max+0, tx+0
+      if (rows == 0)  { print "  🔴 표본이 한 줄도 없다 — 샘플러가 안 돌았다"; exit 1 }
+      if (seen+0 == 0) {
+        print "  🔴 load_ai 프로세스가 **한 표본도** 안 보였다 — pgrep 패턴이 안 맞는 것이다"
+        print "     이대로면 부하기 CPU 가 전부 0 인 표가 생기고, 「부하기는 안 붙었다」로 잘못 읽힌다"
+        exit 1
+      }
+      printf "  ✅ 부하기 계측 성립\n"
+    }' "$dir"/loader_*.tsv
+}
+
+# 🔴 「지표를 걷는 코드가 있다」와 「지표가 걷혔다」는 다르다 (#254 · #250 이 같은 자리에서
+#    두 번 막혔다). 옆(Spring·MySQL) 스냅샷은 **판정 열을 만드는 것이 존재 이유**인데,
+#    스크레이프가 조용히 실패하면 `side.tsv` 는 FAIL 행만 남고 라운드는 정상 종료한다.
+#    그 상태로 본판을 돌면 H3 는 **네 번째 라운드에도** 미답이다.
+cores_assert_side() {  # $1 = side.tsv
+  local tsv=$1
+  [ -f "$tsv" ] || { note "🔴 옆 지표 표가 없다: $tsv — H3 는 또 판정 열 없이 끝난다 (#254)"; return 1; }
+  awk -F'\t' '
+    NR>1 {
+      rows[$6]++
+      if ($8 == "FAIL") fails[$6]++
+      # 게이지는 창 한가운데 것만 뜻이 있다 — 그 한 점이 실제로 찍혔는지를 본다
+      if ($4 == "mid" && $6 == "mysql" && $7 == "Threads_running" && $8 != "FAIL") mid_gauge++
+    }
+    END {
+      bad = 0
+      for (src in rows) {
+        printf "     %s: %d행 (FAIL %d)\n", src, rows[src], fails[src]+0
+        if (rows[src] == fails[src]) { printf "  🔴 %s 스냅샷이 전부 실패했다\n", src; bad = 1 }
+      }
+      if (!("spring" in rows)) { print "  🔴 Spring(actuator) 행이 한 줄도 없다"; bad = 1 }
+      if (!("mysql"  in rows)) { print "  🔴 MySQL 행이 한 줄도 없다"; bad = 1 }
+      if (mid_gauge+0 == 0) {
+        print "  🔴 창 한가운데(mid) 게이지가 없다 — 포화 때 옆이 어땠는지가 안 남는다"
+        bad = 1
+      }
+      if (bad) {
+        print  "     이대로 본판을 돌면 H3(«캡이 옆을 지키는가»)는 이번에도 판정할 열이 없다 (#254)"
+        print  "     볼 곳: 대상 9090 도달 · MYSQL_USER/PW · SIDE_RE 가 실제 지표 이름과 맞는가"
+        exit 1
+      }
+      printf "  ✅ 옆 지표 수집 성립 (mid 게이지 %d점)\n", mid_gauge
+    }' "$tsv"
+}
+
 # 축소 리허설. **여기서 실패하면 본 측정으로 넘어가지 않는다** — 리허설의 존재 이유다.
 # README 「축소 리허설(무인 실행 전 필수)」와 같은 규모로 돈다.
 phase_coresidency_rehearsal() {
@@ -514,6 +700,11 @@ phase_coresidency_rehearsal() {
   env OUT="$out" HOST="$TARGET_HOST" TOKEN="$AI_PUBLIC_TOKEN" SSH="$TARGET_SSH" \
       REPO_DIR="$TARGET_REPO_DIR" ARMS="$CORES_ARMS" LEVELS="$CORES_REH_LEVELS" \
       DUR="$CORES_REH_DUR" REPEATS=1 \
+      LEVEL_SHIFT="$CORES_LEVEL_SHIFT" ANCHOR="$CORES_ANCHOR" \
+      ANCHOR_ARM="$CORES_ANCHOR_ARM" ANCHOR_LEVEL="$CORES_REH_ANCHOR_LEVEL" \
+      PROBE="$CORES_PROBE" PROBE_PREFIX="$CORES_PROBE_PREFIX" \
+      TASKSET_BLOCK="$CORES_TASKSET" TASKSET_CPUS="$CORES_TASKSET_CPUS" \
+      TASKSET_ARM="$CORES_TASKSET_ARM" TASKSET_LEVELS="$CORES_REH_TASKSET_LEVELS" TASKSET_REPS=1 \
       GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
       GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
       MYSQL_USER=root MYSQL_PW="$PW" \
@@ -527,6 +718,14 @@ phase_coresidency_rehearsal() {
   cores_assert_usable "$out/coresidency.tsv" || return 1
   # 從 부하까지 봐야 «동거» 를 잰 것이다. AI 쪽만 성립해도 옆이 놀았으면 이 라운드는 헛돈다.
   cores_assert_ghz "$out/ghz.tsv" || return 1
+  # 그리고 옆 지표가 실제로 걷혔는지 (#254). 없으면 본판을 돌아도 H3 는 또 미답이다.
+  cores_assert_side "$out/side.tsv" || return 1
+  # 부하기 자신도 (#250). 「파일은 있는데 전부 0」이 이 축의 실패 모드다.
+  cores_assert_loader "$out" || return 1
+  # 두 시계가 같은 창에서 읽혔는지 (설계 §4-2). 이게 없으면 「서버인가 부하기인가」가 또 미결이다.
+  cores_assert_probe "$out/probe_rtt.tsv" || return 1
+  # §T 코어 팔의 쌍이 성립하는지. 리허설에서 경로를 밟아둬야 본판에서 한쪽만 남는 일이 없다.
+  cores_assert_taskset "$out/coresidency.tsv" || return 1
   return 0
 }
 
@@ -548,6 +747,12 @@ phase_coresidency() {
   env OUT="$out" HOST="$TARGET_HOST" TOKEN="$AI_PUBLIC_TOKEN" SSH="$TARGET_SSH" \
       REPO_DIR="$TARGET_REPO_DIR" ARMS="$CORES_ARMS" LEVELS="$CORES_LEVELS" \
       DUR="$CORES_DUR" REPEATS="$CORES_REPEATS" STATS_SEC="${STATS_SEC:-5}" \
+      LEVEL_SHIFT="$CORES_LEVEL_SHIFT" ANCHOR="$CORES_ANCHOR" \
+      ANCHOR_ARM="$CORES_ANCHOR_ARM" ANCHOR_LEVEL="$CORES_ANCHOR_LEVEL" \
+      PROBE="$CORES_PROBE" PROBE_PREFIX="$CORES_PROBE_PREFIX" \
+      TASKSET_BLOCK="$CORES_TASKSET" TASKSET_CPUS="$CORES_TASKSET_CPUS" \
+      TASKSET_ARM="$CORES_TASKSET_ARM" TASKSET_LEVELS="$CORES_TASKSET_LEVELS" \
+      TASKSET_REPS="$CORES_TASKSET_REPS" \
       GHZ_RPS="$GHZ_RPS" GHZ_DATA="$GHZ_DATA" GHZ_TOKEN="$GHZ_TOKEN" \
       GHZ_BIN="$GHZ_BIN" GHZ_CONC="$GHZ_CONC" MYSQL_CONTAINER="$CONTAINER" \
       MYSQL_USER=root MYSQL_PW="$PW" \
@@ -560,6 +765,14 @@ phase_coresidency() {
     || note "⚠️ 위 판들은 그대로 남긴다 — 지우지 말고 «성립 안 함» 으로 읽을 것"
   cores_assert_ghz "$out/ghz.tsv" \
     || note "⚠️ 從 부하가 안 걸린 판이 있다 — 그 판의 «동거» 는 «유휴 동거» 다. 표에 그대로 적을 것"
+  cores_assert_side "$out/side.tsv" \
+    || note "⚠️ 옆 지표가 빈다 — H3(«캡이 옆을 지키는가»)는 이 라운드로도 못 닫는다 (#254). 결과에 그대로 적을 것"
+  cores_assert_loader "$out" \
+    || note "⚠️ 부하기 지표가 빈다 — 「천장이 서버인가 부하기인가」가 세 번째로 미결이다 (#250)"
+  cores_assert_probe "$out/probe_rtt.tsv" \
+    || note "⚠️ 서버 쪽 시계가 없다 — 이 라운드도 «서버가 느린 것»과 «부하기가 느린 것»을 못 가른다"
+  cores_assert_taskset "$out/coresidency.tsv" \
+    || note "⚠️ §T 코어 팔의 대조가 안 섰다 — 「부하기 탓 ↔ 호스트 개체차」는 이번에도 미결이다"
   return 0
 }
 
@@ -652,6 +865,9 @@ phase_collect() {
             \"\$(docker inspect -f '{{.HostConfig.Memory}}' \$c)\" \
             \"\$(docker inspect -f '{{.HostConfig.NanoCpus}}' \$c)\"; done" 2>/dev/null | tr -d '\r'
       echo "동거 팔       : ARMS='$CORES_ARMS' LEVELS='$CORES_LEVELS' DUR=${CORES_DUR}s REPEATS=$CORES_REPEATS"
+      echo "동거 배열     : LEVEL_SHIFT=$CORES_LEVEL_SHIFT (레벨 순서 치환 #252) · ANCHOR=$CORES_ANCHOR ${CORES_ANCHOR_ARM}@${CORES_ANCHOR_LEVEL}세션"
+      echo "자기 프로브   : PROBE=$CORES_PROBE (대상 박스 1세션 · 계정 prefix '$CORES_PROBE_PREFIX') — 설계 §4-2"
+      echo "코어 팔(§T)   : TASKSET=$CORES_TASKSET · ${CORES_TASKSET_CPUS}코어↔전체 · 팔 $CORES_TASKSET_ARM · 레벨 '$CORES_TASKSET_LEVELS' × ${CORES_TASKSET_REPS}쌍"
       echo "⚠️ 위 «캡» 은 라운드 **종료 시점** 값이다 — 스윕이 팔마다 갈아끼우므로 마지막 팔의 상태다"
     fi
 

@@ -1,0 +1,218 @@
+
+════════ 무인 측정 — ec2-20260817-040939 ════════
+  결과   : /root/init/loadtest/results/online-ddl-ec2-20260817-040939
+  S3     : s3://shadowfit-measure-055447613012/shadowfit/ec2-20260817-040939
+  단계   : coresidency_rehearsal
+  자동정지: 꺼짐
+  S3 주기 동기화 시작 — 300초마다 → s3://shadowfit-measure-055447613012/shadowfit/ec2-20260817-040939
+
+════════ coresidency_rehearsal ════════
+  게이트 G0~G3 → 축소 스윕 (LEVELS='5' DUR=20 REPEATS=1)
+  **이 판의 수치는 측정값이 아니다** — 경로만 본다
+════════ 동거 용량 rig — 승격 게이트 ════════
+
+──── G0. 합성 인체 사본 ↔ 원본 대조 ────
+  ✅ 사본이 원본과 글자 단위로 같다
+
+──── G1. 프레임 자산 — 검출이 되는가 ────
+  ✅ 30프레임 · 검출 30/30 · 무릎 85.23~124.3°
+     ⚠️ rep 문턱(155°)은 안 넘는다 — 그래서 Spring 부하는 ghz 로 따로 건다(README §2)
+
+──── G2. 세션 개설 → 프레임 수락 ────
+  ✅ 세션 생성 — sessionId=1901
+  ✅ 프레임 수락 + 검출 성공 (분석기 부착까지 0.5s 대기)
+
+──── G3. 컨테이너 자원 한도 — 팔이 실제로 갈리는가 ────
+  ✅ 메모리 한도 20000MB
+     CPU 한도: 없음  (팔 A·B 조건)
+
+✅ 전 게이트 통과 — EC2 로 올려도 된다
+     자기 프로브 준비 — /usr/bin/python3 · /tmp/p6probe · 프레임 418135 B · 계정 prefix 'probe'
+     從 부하 세션 시드 1000/1000 확인 (id 901~1900)
+     從 부하: 19 req/s 고정 · c=50 · 172.31.44.18:6565 · batch_multi.json
+     ⚠️ REPEATS(1) 가 팔 수(3)의 배수가 아니다 — 위치가 정확히 균형 잡히지 않는다.
+        순서 효과가 남을 수 있으니 결과에 그대로 적을 것 (방격이 아니라 «부분 균형» 이다)
+
+════ 라운드 r1 — 팔 순서 C A B · 레벨 순서 5 ════
+     팔 C 구성
+time="2026-08-17T04:09:43Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Starting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 C (캡 있음) · caps.tsv 에 기록
+     팔 C 버림판 (표에 안 들어간다)
+
+──────── C_r1_5 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개 (prefix=cores)
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786939892.5 · 정상구간 1786939897.5 ~ 1786939907.4  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 150 (정상구간 10s) · 처리 15.1/s · 검출성공 100.0%
+  지연 p50 19ms · p95 20ms · p99 21ms · 평균 19ms
+  분류 {'ok': 150}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-040939/coresidency_rehearsal/req_C_r1_5.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-040939/coresidency_rehearsal/req_C_r1_5_summary.tsv
+  ⚠️ 실측 18.9 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+     팔 A 구성
+time="2026-08-17T04:12:17Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 A (캡 없음) · caps.tsv 에 기록
+     팔 A 버림판 (표에 안 들어간다)
+
+──────── A_r1_5 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개 (prefix=cores)
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786940032.8 · 정상구간 1786940037.8 ~ 1786940047.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 149 (정상구간 10s) · 처리 15.0/s · 검출성공 100.0%
+  지연 p50 19ms · p95 22ms · p99 23ms · 평균 19ms
+  분류 {'ok': 149}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-040939/coresidency_rehearsal/req_A_r1_5.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-040939/coresidency_rehearsal/req_A_r1_5_summary.tsv
+     팔 B 구성
+time="2026-08-17T04:14:33Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+     팔 B 버림판 (표에 안 들어간다)
+
+──────── B_r1_5 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개 (prefix=cores)
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786940156.4 · 정상구간 1786940161.4 ~ 1786940171.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 150 (정상구간 10s) · 처리 15.2/s · 검출성공 100.0%
+  지연 p50 19ms · p95 19ms · p99 25ms · 평균 19ms
+  분류 {'ok': 150}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-040939/coresidency_rehearsal/req_B_r1_5.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-040939/coresidency_rehearsal/req_B_r1_5_summary.tsv
+  ⚠️ 실측 18.7 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ §T 부하기 코어 팔 — 팔 B · 레벨 '10' · 1쌍 (2코어 ↔ 전체 4코어) ════
+     팔 B 구성
+time="2026-08-17T04:16:41Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_lc2_t1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786940232.0 · 정상구간 1786940237.0 ~ 1786940246.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 300 (정상구간 10s) · 처리 30.2/s · 검출성공 100.0%
+  지연 p50 19ms · p95 23ms · p99 26ms · 평균 19ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-040939/coresidency_rehearsal/req_B_lc2_t1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-040939/coresidency_rehearsal/req_B_lc2_t1_10_summary.tsv
+
+──────── B_lcF_t1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786940284.9 · 정상구간 1786940289.9 ~ 1786940299.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 300 (정상구간 10s) · 처리 30.1/s · 검출성공 100.0%
+  지연 p50 19ms · p95 26ms · p99 28ms · 평균 20ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-040939/coresidency_rehearsal/req_B_lcF_t1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-040939/coresidency_rehearsal/req_B_lcF_t1_10_summary.tsv
+  ⚠️ 실측 18.9 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 요약 ════
+arm	round	sessions	req	rps	detect_pct	p50	p95	p99	nolease	nopose	setup_fail	warm_lo	warm_hi	loader_cpus
+C	discard	5	150	15.07	100.00	18.8	20.8	29.6	0	0	0	1786939845.367	1786939855.321	full
+C	r1	5	150	15.11	100.00	19.0	20.0	21.3	0	0	0	1786939897.503	1786939907.427	full
+A	discard	5	150	15.29	100.00	19.0	20.4	20.6	0	0	0	1786939994.142	1786940003.955	full
+A	r1	5	149	15.04	100.00	18.7	22.3	23.0	0	0	0	1786940037.826	1786940047.736	full
+B	discard	5	150	15.19	100.00	18.6	19.6	25.0	0	0	0	1786940108.521	1786940118.394	full
+B	r1	5	150	15.19	100.00	18.7	19.4	24.8	0	0	0	1786940161.413	1786940171.289	full
+B	lc2_t1	10	300	30.16	100.00	18.9	22.9	26.1	0	0	0	1786940236.979	1786940246.927	2
+B	lcF_t1	10	300	30.07	100.00	19.2	26.3	27.6	0	0	0	1786940289.918	1786940299.894	full
+
+🔴 판정은 사람이 한다. 특히 볼 것:
+   · nolease > 0  → 풀 자리 없음(용량). detect_pct 하락과 **다른 축**이다
+   · nopose  > 0  → 검출이 깨짐(품질). #164 가 고친 지표가 다시 무너진 것일 수 있다
+   · setup_fail>0 → 그 판의 «동시 세션 수» 는 목표값이 아니다. 값을 그대로 쓰지 말 것
+   · ghz.tsv 의 p50/p95/p99 → **H3 의 판정 열**(#254). 팔 B↔C 를 여기서 대조한다 —
+     캡을 걸었더니 옆(Spring 적재)의 지연이 «안 나빠졌다» 면 캡이 옆을 지킨 것이다
+   · side.tsv 의 phase=mid → 포화 순간의 옆 상태(Threads_running·Hikari pending).
+     pre/post 는 카운터의 양 끝이다 — 게이지를 거기서 읽으면 «유휴» 를 읽게 된다
+   · round=anc1..N → **앵커 판**. 본 격자가 아니라 «시간 축» 이다 — warm_lo 로 정렬해
+     처리량이 라운드 내내 평평한지 본다. 흐르면 팔 간 대조에 그 추세가 섞여 있는 것이다
+   · 레벨 순서는 라운드마다 치환된다(#252) — 같은 레벨이 블록 안 다른 자리에서 돈다
+   · probe_rtt.tsv 의 p50 ↔ coresidency.tsv 의 p50 → **두 시계**(설계 §4-2).
+     부하기 413ms 인데 로컬 50ms 면 큐는 «부하기 쪽», 둘 다 413ms 면 «서버» 다.
+     window 칸이 warm 이 아니면 두 값을 같은 창에서 읽은 것이 아니다 — 비교 금지
+   · caps.tsv → 팔 C 의 캡이 실제로 물렸는지(#253). verdict 가 OK 가 아닌 판은 조건이 다르다
+   · round=lc2_t*/lcF_t* → **부하기 코어 팔**(§T). 같은 레벨의 두 판을 짝으로 읽는다:
+     차이가 나면 «부하기 구성», 없으면 라운드 간 +17.7% 는 «호스트 개체차» 였다는 뜻이다
+     🔴 볼 것은 rps 만이 아니라 **AI CPU ÷ rps**(프레임당 비용)다 — 기아는 이미 기각됐다
+     C discard 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     C r1 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     A discard 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     A r1 5세션 → req=149 setup_fail=0 nolease=0 nopose=0
+     B discard 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     B r1 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     B lc2_t1 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+     B lcF_t1 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+  ✅ 8판 전부 성립 (setup_fail 0)
+  ✅ 從 부하 4판 전부 성립 (성공 응답 > 0)
+     spring: 8778행 (FAIL 0)
+     mysql: 240행 (FAIL 0)
+  ✅ 옆 지표 수집 성립 (mid 게이지 8점)
+     표본 44행 · load_ai 가 보인 표본 32 · 못 잰 구간(-1) 6
+     부하기 최대 CPU 16.9% (100% = 1 vCPU) · 최대 송신 0.01 Mbps
+  ✅ 부하기 계측 성립
+     판 8 — warm 8 · full 0 · no_overlap 0 · empty 0 · FAIL 0
+     서버 시계 최대 p50 20.3 ms
+  ✅ 두 시계 성립 (8판)
+     §T 2판 (제한 1 · 전체 1 · 성립 안 함 0)
+  ✅ §T 성립 — 제한 30.2 fps ↔ 전체 30.1 fps (차 +0.3%)
+     차이가 크면 «부하기 구성 탓», 없으면 라운드 간 +17.7% 는 «호스트 개체차» 쪽이다
+  → coresidency_rehearsal : OK (549초)
+
+════════ 최종 업로드 ════════
+fatal error: Unable to locate credentials
+  🔴 최종 업로드 실패
+
+════════ 단계 요약 ════════
+phase	status	seconds	started_at
+coresidency_rehearsal	OK	549	2026-08-17T04:09:39+00:00
+  자동 정지 꺼짐 — 회수 확인 후 직접 정지할 것. AWS-RIDE-ALONG.md §5 체크리스트를 볼 것

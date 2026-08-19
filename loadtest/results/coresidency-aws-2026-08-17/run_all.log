@@ -1,0 +1,2034 @@
+
+════════ 무인 측정 — ec2-20260817-050448 ════════
+  결과   : /root/init/loadtest/results/online-ddl-ec2-20260817-050448
+  S3     : s3://shadowfit-measure-055447613012/shadowfit/ec2-20260817-050448
+  단계   : coresidency_preflight coresidency_rehearsal coresidency collect
+  자동정지: 꺼짐
+  S3 주기 동기화 시작 — 300초마다 → s3://shadowfit-measure-055447613012/shadowfit/ec2-20260817-050448
+
+════════ coresidency_preflight ════════
+  ✅ S3 쓰기 가능 — s3://shadowfit-measure-055447613012/shadowfit/ec2-20260817-050448
+  ✅ 대상 호스트: 172.31.43.202
+  ✅ AI_PUBLIC_TOKEN 있음
+  ✅ python: /usr/local/bin/python
+  ✅ 프레임 자산 418135 B
+  부하기 ulimit -n = 65535 (최고 레벨 160세션)
+  ✅ §T 코어 팔 — 부하기 4코어 · 제한 2코어로 대조
+  ✅ 대상 박스 도달 — /root/init · docker 사용 가능
+  ✅ AI 메모리 캡 20000MB
+  ✅ 대상 actuator(9090) 스크레이프 가능 — H3 판정 열이 생긴다 (#254)
+  ✅ 대상 박스 python: /usr/bin/python3 (자기 프로브)
+  ✅ 팔 C 용 캡 변수 3개 확인 (.env)
+  ✅ 從 부하 19 req/s 고정 · c=50 · batch_multi.json
+  ✅ 요금 태그 있음 — Cost Explorer 에서 이 측정만 뽑을 수 있다
+  → coresidency_preflight : OK (3초)
+
+════════ coresidency_rehearsal ════════
+  게이트 G0~G3 → 축소 스윕 (LEVELS='5 10' DUR=20 REPEATS=1)
+  **이 판의 수치는 측정값이 아니다** — 경로만 본다
+════════ 동거 용량 rig — 승격 게이트 ════════
+
+──── G0. 합성 인체 사본 ↔ 원본 대조 ────
+  ✅ 사본이 원본과 글자 단위로 같다
+
+──── G1. 프레임 자산 — 검출이 되는가 ────
+  ✅ 30프레임 · 검출 30/30 · 무릎 85.23~124.3°
+     ⚠️ rep 문턱(155°)은 안 넘는다 — 그래서 Spring 부하는 ghz 로 따로 건다(README §2)
+
+──── G2. 세션 개설 → 프레임 수락 ────
+  ✅ 세션 생성 — sessionId=1901
+  ✅ 프레임 수락 + 검출 성공 (분석기 부착까지 0.5s 대기)
+
+──── G3. 컨테이너 자원 한도 — 팔이 실제로 갈리는가 ────
+  ✅ 메모리 한도 20000MB
+     CPU 한도: 없음  (팔 A·B 조건)
+
+✅ 전 게이트 통과 — EC2 로 올려도 된다
+     자기 프로브 준비 — /usr/bin/python3 · /tmp/p6probe · 프레임 418135 B · 계정 prefix 'probe'
+     從 부하 세션 시드 1000/1000 확인 (id 901~1900)
+     從 부하: 19 req/s 고정 · c=50 · 172.31.43.202:6565 · batch_multi.json
+     ⚠️ REPEATS(1) 가 팔 수(3)의 배수가 아니다 — 위치가 정확히 균형 잡히지 않는다.
+        순서 효과가 남을 수 있으니 결과에 그대로 적을 것 (방격이 아니라 «부분 균형» 이다)
+
+════ 앵커 판 anc1 — 팔 B · 10세션 (시간 추세용 기준점) ════
+     팔 B 구성
+time="2026-08-17T05:04:55Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+     팔 B 버림판 (앵커 앞에서 먼저 — 첫 앵커가 워밍업을 타면 계열이 오염된다)
+
+──────── B_anc1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786943178.4 · 정상구간 1786943183.4 ~ 1786943193.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 300 (정상구간 10s) · 처리 30.2/s · 검출성공 100.0%
+  지연 p50 19ms · p95 24ms · p99 27ms · 평균 20ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_anc1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_anc1_10_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 570(19 req/s × 30s) · 실제 569 · 실측 18.9 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 라운드 r1 — 팔 순서 A B C · 레벨 순서 5 10 ════
+     팔 A 구성
+time="2026-08-17T05:07:01Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 A (캡 없음) · caps.tsv 에 기록
+     팔 A 버림판 (표에 안 들어간다)
+
+──────── A_r1_5 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개 (prefix=cores)
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786943290.7 · 정상구간 1786943295.7 ~ 1786943305.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 150 (정상구간 10s) · 처리 15.1/s · 검출성공 100.0%
+  지연 p50 19ms · p95 20ms · p99 24ms · 평균 19ms
+  분류 {'ok': 150}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_A_r1_5.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_A_r1_5_summary.tsv
+
+──────── A_r1_10 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786943334.8 · 정상구간 1786943339.8 ~ 1786943349.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 300 (정상구간 10s) · 처리 30.2/s · 검출성공 100.0%
+  지연 p50 19ms · p95 27ms · p99 27ms · 평균 19ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_A_r1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_A_r1_10_summary.tsv
+     팔 B 구성
+time="2026-08-17T05:09:34Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_r1_5 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개 (prefix=cores)
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786943405.0 · 정상구간 1786943410.2 ~ 1786943420.0  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 150 (정상구간 10s) · 처리 15.3/s · 검출성공 100.0%
+  지연 p50 18ms · p95 19ms · p99 19ms · 평균 18ms
+  분류 {'ok': 150}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_r1_5.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_r1_5_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 570(19 req/s × 30s) · 실제 569 · 실측 18.9 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786943457.4 · 정상구간 1786943462.5 ~ 1786943472.4  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 298 (정상구간 10s) · 처리 29.9/s · 검출성공 100.0%
+  지연 p50 19ms · p95 22ms · p99 26ms · 평균 19ms
+  분류 {'ok': 298}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_r1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_r1_10_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 570(19 req/s × 30s) · 실제 569 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+     팔 C 구성
+time="2026-08-17T05:11:41Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 C (캡 있음) · caps.tsv 에 기록
+     팔 C 버림판 (표에 안 들어간다)
+
+──────── C_r1_5 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개 (prefix=cores)
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786943610.8 · 정상구간 1786943615.9 ~ 1786943625.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 150 (정상구간 10s) · 처리 15.3/s · 검출성공 100.0%
+  지연 p50 18ms · p95 19ms · p99 19ms · 평균 18ms
+  분류 {'ok': 150}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_C_r1_5.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_C_r1_5_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 570(19 req/s × 30s) · 실제 569 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786943663.5 · 정상구간 1786943668.5 ~ 1786943678.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 299 (정상구간 10s) · 처리 30.1/s · 검출성공 100.0%
+  지연 p50 19ms · p95 26ms · p99 31ms · 평균 20ms
+  분류 {'ok': 299}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_C_r1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_C_r1_10_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 570(19 req/s × 30s) · 실제 569 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 앵커 판 anc2 — 팔 B · 10세션 (시간 추세용 기준점) ════
+     팔 B 구성
+time="2026-08-17T05:15:07Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_anc2_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786943764.3 · 정상구간 1786943769.3 ~ 1786943779.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 300 (정상구간 10s) · 처리 30.1/s · 검출성공 100.0%
+  지연 p50 19ms · p95 26ms · p99 28ms · 평균 19ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_anc2_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_anc2_10_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 570(19 req/s × 30s) · 실제 569 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ §T 부하기 코어 팔 — 팔 B · 레벨 '10' · 1쌍 (2코어 ↔ 전체 4코어) ════
+     팔 B 구성
+time="2026-08-17T05:16:48Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_lc2_t1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786943838.8 · 정상구간 1786943843.8 ~ 1786943853.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 300 (정상구간 10s) · 처리 30.1/s · 검출성공 100.0%
+  지연 p50 19ms · p95 24ms · p99 27ms · 평균 19ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_lc2_t1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_lc2_t1_10_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 570(19 req/s × 30s) · 실제 569 · 실측 18.9 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lcF_t1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786943891.2 · 정상구간 1786943896.3 ~ 1786943906.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 300 (정상구간 10s) · 처리 30.1/s · 검출성공 100.0%
+  지연 p50 19ms · p95 20ms · p99 26ms · 평균 19ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_lcF_t1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency_rehearsal/req_B_lcF_t1_10_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 570(19 req/s × 30s) · 실제 569 · 실측 18.9 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 요약 ════
+arm	round	sessions	req	rps	detect_pct	p50	p95	p99	nolease	nopose	setup_fail	warm_lo	warm_hi	loader_cpus
+B	discard	10	300	30.07	100.00	18.5	19.8	25.4	0	0	0	1786943131.860	1786943141.837	full
+B	anc1	10	300	30.19	100.00	19.0	23.8	27.3	0	0	0	1786943183.412	1786943193.348	full
+A	discard	5	150	15.21	100.00	18.3	19.2	19.2	0	0	0	1786943252.013	1786943261.876	full
+A	r1	5	150	15.15	100.00	18.6	20.5	23.8	0	0	0	1786943295.687	1786943305.588	full
+A	r1	10	300	30.24	100.00	18.7	26.5	27.4	0	0	0	1786943339.813	1786943349.734	full
+B	r1	5	150	15.30	100.00	18.2	18.9	19.3	0	0	0	1786943410.222	1786943420.029	full
+B	r1	10	298	29.91	100.00	18.6	21.9	25.9	0	0	0	1786943462.463	1786943472.427	full
+C	discard	5	150	15.16	100.00	18.2	19.1	19.4	0	0	0	1786943562.909	1786943572.806	full
+C	r1	5	150	15.31	100.00	18.3	19.1	19.4	0	0	0	1786943615.942	1786943625.737	full
+C	r1	10	299	30.07	100.00	18.9	25.7	31.2	0	0	0	1786943668.543	1786943678.487	full
+B	anc2	10	300	30.12	100.00	18.7	25.7	28.3	0	0	0	1786943769.277	1786943779.236	full
+B	lc2_t1	10	300	30.12	100.00	18.8	23.8	27.2	0	0	0	1786943843.759	1786943853.720	2
+B	lcF_t1	10	300	30.06	100.00	18.5	20.1	25.6	0	0	0	1786943896.254	1786943906.233	full
+
+🔴 판정은 사람이 한다. 특히 볼 것:
+   · nolease > 0  → 풀 자리 없음(용량). detect_pct 하락과 **다른 축**이다
+   · nopose  > 0  → 검출이 깨짐(품질). #164 가 고친 지표가 다시 무너진 것일 수 있다
+   · setup_fail>0 → 그 판의 «동시 세션 수» 는 목표값이 아니다. 값을 그대로 쓰지 말 것
+   · ghz.tsv 의 p50/p95/p99 → **H3 의 판정 열**(#254). 팔 B↔C 를 여기서 대조한다 —
+     캡을 걸었더니 옆(Spring 적재)의 지연이 «안 나빠졌다» 면 캡이 옆을 지킨 것이다
+   · side.tsv 의 phase=mid → 포화 순간의 옆 상태(Threads_running·Hikari pending).
+     pre/post 는 카운터의 양 끝이다 — 게이지를 거기서 읽으면 «유휴» 를 읽게 된다
+   · round=anc1..N → **앵커 판**. 본 격자가 아니라 «시간 축» 이다 — warm_lo 로 정렬해
+     처리량이 라운드 내내 평평한지 본다. 흐르면 팔 간 대조에 그 추세가 섞여 있는 것이다
+   · 레벨 순서는 라운드마다 치환된다(#252) — 같은 레벨이 블록 안 다른 자리에서 돈다
+   · probe_rtt.tsv 의 p50 ↔ coresidency.tsv 의 p50 → **두 시계**(설계 §4-2).
+     부하기 413ms 인데 로컬 50ms 면 큐는 «부하기 쪽», 둘 다 413ms 면 «서버» 다.
+     window 칸이 warm 이 아니면 두 값을 같은 창에서 읽은 것이 아니다 — 비교 금지
+   · caps.tsv → 팔 C 의 캡이 실제로 물렸는지(#253). verdict 가 OK 가 아닌 판은 조건이 다르다
+   · round=lc2_t*/lcF_t* → **부하기 코어 팔**(§T). 같은 레벨의 두 판을 짝으로 읽는다:
+     차이가 나면 «부하기 구성», 없으면 라운드 간 +17.7% 는 «호스트 개체차» 였다는 뜻이다
+     🔴 볼 것은 rps 만이 아니라 **AI CPU ÷ rps**(프레임당 비용)다 — 기아는 이미 기각됐다
+     B discard 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+     B anc1 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+     A discard 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     A r1 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     A r1 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+     B r1 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     B r1 10세션 → req=298 setup_fail=0 nolease=0 nopose=0
+     C discard 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     C r1 5세션 → req=150 setup_fail=0 nolease=0 nopose=0
+     C r1 10세션 → req=299 setup_fail=0 nolease=0 nopose=0
+     B anc2 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+     B lc2_t1 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+     B lcF_t1 10세션 → req=300 setup_fail=0 nolease=0 nopose=0
+  ✅ 13판 전부 성립 (setup_fail 0)
+  ✅ 從 부하 8판 전부 성립 (성공 응답 > 0)
+     spring: 17085행 (FAIL 0)
+     mysql: 390행 (FAIL 0)
+  ✅ 옆 지표 수집 성립 (mid 게이지 13점)
+     표본 72행 · load_ai 가 보인 표본 52 · 못 잰 구간(-1) 10
+     부하기 최대 CPU 18.2% (100% = 1 vCPU) · 최대 송신 0.01 Mbps
+  ✅ 부하기 계측 성립
+     판 13 — warm 13 · full 0 · no_overlap 0 · empty 0 · FAIL 0
+     서버 시계 최대 p50 19.7 ms
+  ✅ 두 시계 성립 (13판)
+     §T 2판 (제한 1 · 전체 1 · 성립 안 함 0)
+  ✅ §T 성립 — 제한 30.1 fps ↔ 전체 30.1 fps (차 +0.2%)
+     차이가 크면 «부하기 구성 탓», 없으면 라운드 간 +17.7% 는 «호스트 개체차» 쪽이다
+  → coresidency_rehearsal : OK (842초)
+
+════════ coresidency ════════
+  정판 — 팔 'A B C' × 레벨 '20 40 60 80 90 100 120 160' × 3반복 (+팔당 버림 1)
+  從 부하 19 req/s 고정 — 실측치는 ghz.tsv 의 achieved_rps 로 확인할 것
+════════ 동거 용량 rig — 승격 게이트 ════════
+
+──── G0. 합성 인체 사본 ↔ 원본 대조 ────
+  ✅ 사본이 원본과 글자 단위로 같다
+
+──── G1. 프레임 자산 — 검출이 되는가 ────
+  ✅ 30프레임 · 검출 30/30 · 무릎 85.23~124.3°
+     ⚠️ rep 문턱(155°)은 안 넘는다 — 그래서 Spring 부하는 ghz 로 따로 건다(README §2)
+
+──── G2. 세션 개설 → 프레임 수락 ────
+  ✅ 세션 생성 — sessionId=2020
+  ✅ 프레임 수락 + 검출 성공 (분석기 부착까지 0.1s 대기)
+
+──── G3. 컨테이너 자원 한도 — 팔이 실제로 갈리는가 ────
+  ✅ 메모리 한도 20000MB
+     CPU 한도: 없음  (팔 A·B 조건)
+
+✅ 전 게이트 통과 — EC2 로 올려도 된다
+     자기 프로브 준비 — /usr/bin/python3 · /tmp/p6probe · 프레임 418135 B · 계정 prefix 'probe'
+     從 부하 세션 시드 1000/1000 확인 (id 901~1900)
+     從 부하: 19 req/s 고정 · c=50 · 172.31.43.202:6565 · batch_multi.json
+
+════ 앵커 판 anc1 — 팔 B · 80세션 (시간 추세용 기준점) ════
+     팔 B 구성
+time="2026-08-17T05:18:58Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+     팔 B 버림판 (앵커 앞에서 먼저 — 첫 앵커가 워밍업을 타면 계열이 오염된다)
+
+──────── B_anc1_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786944105.1 · 정상구간 1786944110.1 ~ 1786944190.1  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19179 (정상구간 80s) · 처리 239.8/s · 검출성공 100.0%
+  지연 p50 26ms · p95 41ms · p99 76ms · 평균 28ms
+  분류 {'ok': 19179}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_anc1_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_anc1_80_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 라운드 r1 — 팔 순서 A B C · 레벨 순서 20 40 60 80 90 100 120 160 ════
+     팔 A 구성
+time="2026-08-17T05:23:36Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 A (캡 없음) · caps.tsv 에 기록
+     팔 A 버림판 (표에 안 들어간다)
+
+──────── A_r1_20 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개 (prefix=cores)
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786944357.0 · 정상구간 1786944362.0 ~ 1786944441.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 4800 (정상구간 80s) · 처리 60.1/s · 검출성공 100.0%
+  지연 p50 19ms · p95 29ms · p99 32ms · 평균 21ms
+  분류 {'ok': 4800}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_20.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_20_summary.tsv
+
+──────── A_r1_40 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개 (prefix=cores)
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786944473.5 · 정상구간 1786944478.5 ~ 1786944558.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 9595 (정상구간 80s) · 처리 120.0/s · 검출성공 100.0%
+  지연 p50 20ms · p95 30ms · p99 33ms · 평균 21ms
+  분류 {'ok': 9595}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_40.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_40_summary.tsv
+
+──────── A_r1_60 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 60개 (prefix=cores)
+측정 — 동시 세션 60 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786944591.9 · 정상구간 1786944596.9 ~ 1786944676.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 14393 (정상구간 80s) · 처리 179.9/s · 검출성공 100.0%
+  지연 p50 23ms · p95 37ms · p99 62ms · 평균 25ms
+  분류 {'ok': 14393}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_60.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_60_summary.tsv
+
+──────── A_r1_80 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786944711.8 · 정상구간 1786944716.8 ~ 1786944796.8  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19175 (정상구간 80s) · 처리 239.7/s · 검출성공 100.0%
+  지연 p50 29ms · p95 53ms · p99 86ms · 평균 32ms
+  분류 {'ok': 19175}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_80_summary.tsv
+
+──────── A_r1_90 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 90개 (prefix=cores)
+측정 — 동시 세션 90 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786944833.1 · 정상구간 1786944838.1 ~ 1786944918.1  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 21580 (정상구간 80s) · 처리 269.8/s · 검출성공 100.0%
+  지연 p50 28ms · p95 58ms · p99 92ms · 평균 33ms
+  분류 {'ok': 21580}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_90.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_90_summary.tsv
+
+──────── A_r1_100 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 100개 (prefix=cores)
+측정 — 동시 세션 100 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786944955.6 · 정상구간 1786944960.6 ~ 1786945040.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 23972 (정상구간 80s) · 처리 299.7/s · 검출성공 100.0%
+  지연 p50 34ms · p95 85ms · p99 104ms · 평균 39ms
+  분류 {'ok': 23972}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_100.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_100_summary.tsv
+
+──────── A_r1_120 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786945080.1 · 정상구간 1786945085.1 ~ 1786945165.1  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27872 (정상구간 80s) · 처리 348.4/s · 검출성공 100.0%
+  지연 p50 332ms · p95 384ms · p99 422ms · 평균 332ms
+  분류 {'ok': 27872}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_120_summary.tsv
+
+──────── A_r1_160 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786945209.6 · 정상구간 1786945214.6 ~ 1786945294.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27851 (정상구간 80s) · 처리 348.2/s · 검출성공 100.0%
+  지연 p50 451ms · p95 519ms · p99 570ms · 평균 459ms
+  분류 {'ok': 27851}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r1_160_summary.tsv
+     팔 B 구성
+time="2026-08-17T05:42:00Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_r1_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개 (prefix=cores)
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786945352.0 · 정상구간 1786945357.1 ~ 1786945437.0  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 4800 (정상구간 80s) · 처리 60.1/s · 검출성공 100.0%
+  지연 p50 20ms · p95 30ms · p99 33ms · 평균 21ms
+  분류 {'ok': 4800}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_20.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_20_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r1_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개 (prefix=cores)
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786945475.5 · 정상구간 1786945480.5 ~ 1786945560.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 9596 (정상구간 80s) · 처리 120.0/s · 검출성공 100.0%
+  지연 p50 20ms · p95 31ms · p99 36ms · 평균 22ms
+  분류 {'ok': 9596}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_40.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_40_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r1_60 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 60개 (prefix=cores)
+측정 — 동시 세션 60 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786945600.4 · 정상구간 1786945605.4 ~ 1786945685.4  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 14389 (정상구간 80s) · 처리 179.9/s · 검출성공 100.0%
+  지연 p50 21ms · p95 33ms · p99 42ms · 평균 23ms
+  분류 {'ok': 14389}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_60.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_60_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r1_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786945725.6 · 정상구간 1786945730.6 ~ 1786945810.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19181 (정상구간 80s) · 처리 239.8/s · 검출성공 100.0%
+  지연 p50 28ms · p95 51ms · p99 83ms · 평균 31ms
+  분류 {'ok': 19181}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_80_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r1_90 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 90개 (prefix=cores)
+측정 — 동시 세션 90 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786945851.4 · 정상구간 1786945856.4 ~ 1786945936.4  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 21586 (정상구간 80s) · 처리 269.8/s · 검출성공 100.0%
+  지연 p50 28ms · p95 62ms · p99 100ms · 평균 33ms
+  분류 {'ok': 21586}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_90.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_90_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r1_100 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 100개 (prefix=cores)
+측정 — 동시 세션 100 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786945978.3 · 정상구간 1786945983.3 ~ 1786946063.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 23983 (정상구간 80s) · 처리 299.8/s · 검출성공 100.0%
+  지연 p50 33ms · p95 74ms · p99 102ms · 평균 37ms
+  분류 {'ok': 23983}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_100.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_100_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r1_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786946107.0 · 정상구간 1786946112.0 ~ 1786946192.0  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27791 (정상구간 80s) · 처리 347.4/s · 검출성공 100.0%
+  지연 p50 337ms · p95 385ms · p99 401ms · 평균 341ms
+  분류 {'ok': 27791}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r1_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786946238.9 · 정상구간 1786946243.9 ~ 1786946323.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27688 (정상구간 80s) · 처리 346.1/s · 검출성공 100.0%
+  지연 p50 456ms · p95 513ms · p99 539ms · 평균 462ms
+  분류 {'ok': 27688}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r1_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+     팔 C 구성
+time="2026-08-17T05:59:10Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 C (캡 있음) · caps.tsv 에 기록
+     팔 C 버림판 (표에 안 들어간다)
+
+──────── C_r1_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개 (prefix=cores)
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786946532.3 · 정상구간 1786946537.3 ~ 1786946617.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 4794 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 19ms · p95 26ms · p99 31ms · 평균 20ms
+  분류 {'ok': 4794}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_20.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_20_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r1_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개 (prefix=cores)
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786946656.7 · 정상구간 1786946661.7 ~ 1786946741.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 9591 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 19ms · p95 28ms · p99 33ms · 평균 21ms
+  분류 {'ok': 9591}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_40.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_40_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r1_60 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 60개 (prefix=cores)
+측정 — 동시 세션 60 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786946780.6 · 정상구간 1786946785.6 ~ 1786946865.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 14393 (정상구간 80s) · 처리 179.9/s · 검출성공 100.0%
+  지연 p50 24ms · p95 36ms · p99 56ms · 평균 25ms
+  분류 {'ok': 14393}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_60.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_60_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r1_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786946905.9 · 정상구간 1786946910.9 ~ 1786946990.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19176 (정상구간 80s) · 처리 239.7/s · 검출성공 100.0%
+  지연 p50 28ms · p95 45ms · p99 79ms · 평균 30ms
+  분류 {'ok': 19176}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_80_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r1_90 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 90개 (prefix=cores)
+측정 — 동시 세션 90 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786947032.5 · 정상구간 1786947037.5 ~ 1786947117.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 21592 (정상구간 80s) · 처리 269.9/s · 검출성공 100.0%
+  지연 p50 33ms · p95 70ms · p99 93ms · 평균 37ms
+  분류 {'ok': 21592}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_90.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_90_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r1_100 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 100개 (prefix=cores)
+측정 — 동시 세션 100 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786947159.9 · 정상구간 1786947165.0 ~ 1786947244.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 23979 (정상구간 80s) · 처리 300.0/s · 검출성공 100.0%
+  지연 p50 114ms · p95 175ms · p99 233ms · 평균 114ms
+  분류 {'ok': 23979}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_100.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_100_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r1_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786947289.0 · 정상구간 1786947294.0 ~ 1786947374.0  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 24986 (정상구간 80s) · 처리 312.4/s · 검출성공 100.0%
+  지연 p50 382ms · p95 440ms · p99 470ms · 평균 383ms
+  분류 {'ok': 24986}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r1_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786947421.5 · 정상구간 1786947426.5 ~ 1786947506.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 25087 (정상구간 80s) · 처리 313.7/s · 검출성공 100.0%
+  지연 p50 505ms · p95 579ms · p99 621ms · 평균 510ms
+  분류 {'ok': 25087}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r1_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 앵커 판 anc2 — 팔 B · 80세션 (시간 추세용 기준점) ════
+     팔 B 구성
+time="2026-08-17T06:18:53Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_anc2_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786947597.5 · 정상구간 1786947602.5 ~ 1786947682.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19170 (정상구간 80s) · 처리 239.7/s · 검출성공 100.0%
+  지연 p50 29ms · p95 56ms · p99 96ms · 평균 32ms
+  분류 {'ok': 19170}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_anc2_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_anc2_80_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 라운드 r2 — 팔 순서 B C A · 레벨 순서 60 80 90 100 120 160 20 40 ════
+     팔 B 구성
+time="2026-08-17T06:21:48Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_r2_60 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 60개 (prefix=cores)
+측정 — 동시 세션 60 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786947743.1 · 정상구간 1786947748.1 ~ 1786947828.1  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 14387 (정상구간 80s) · 처리 179.9/s · 검출성공 100.0%
+  지연 p50 22ms · p95 34ms · p99 52ms · 평균 24ms
+  분류 {'ok': 14387}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_60.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_60_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r2_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786947868.2 · 정상구간 1786947873.2 ~ 1786947953.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19179 (정상구간 80s) · 처리 239.8/s · 검출성공 100.0%
+  지연 p50 29ms · p95 53ms · p99 84ms · 평균 32ms
+  분류 {'ok': 19179}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_80_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r2_90 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 90개 (prefix=cores)
+측정 — 동시 세션 90 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786947994.5 · 정상구간 1786947999.5 ~ 1786948079.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 21585 (정상구간 80s) · 처리 269.9/s · 검출성공 100.0%
+  지연 p50 30ms · p95 70ms · p99 102ms · 평균 34ms
+  분류 {'ok': 21585}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_90.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_90_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r2_100 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 100개 (prefix=cores)
+측정 — 동시 세션 100 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786948121.6 · 정상구간 1786948126.6 ~ 1786948206.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 23970 (정상구간 80s) · 처리 299.6/s · 검출성공 100.0%
+  지연 p50 37ms · p95 83ms · p99 109ms · 평균 41ms
+  분류 {'ok': 23970}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_100.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_100_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r2_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786948250.4 · 정상구간 1786948255.4 ~ 1786948335.4  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27512 (정상구간 80s) · 처리 343.9/s · 검출성공 100.0%
+  지연 p50 340ms · p95 394ms · p99 416ms · 평균 346ms
+  분류 {'ok': 27512}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r2_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786948382.2 · 정상구간 1786948387.2 ~ 1786948467.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27660 (정상구간 80s) · 처리 345.8/s · 검출성공 100.0%
+  지연 p50 457ms · p95 510ms · p99 528ms · 평균 463ms
+  분류 {'ok': 27660}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r2_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개 (prefix=cores)
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786948503.7 · 정상구간 1786948508.7 ~ 1786948588.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 4794 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 20ms · p95 28ms · p99 32ms · 평균 21ms
+  분류 {'ok': 4794}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_20.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_20_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r2_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개 (prefix=cores)
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786948628.1 · 정상구간 1786948633.1 ~ 1786948713.1  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 9596 (정상구간 80s) · 처리 120.0/s · 검출성공 100.0%
+  지연 p50 22ms · p95 33ms · p99 38ms · 평균 24ms
+  분류 {'ok': 9596}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_40.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r2_40_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+     팔 C 구성
+time="2026-08-17T06:38:59Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Recreate 
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 C (캡 있음) · caps.tsv 에 기록
+
+──────── C_r2_60 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 60개 (prefix=cores)
+측정 — 동시 세션 60 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786948801.5 · 정상구간 1786948806.5 ~ 1786948886.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 14388 (정상구간 80s) · 처리 179.9/s · 검출성공 100.0%
+  지연 p50 24ms · p95 39ms · p99 71ms · 평균 27ms
+  분류 {'ok': 14388}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_60.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_60_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r2_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786948927.2 · 정상구간 1786948932.2 ~ 1786949012.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19179 (정상구간 80s) · 처리 239.8/s · 검출성공 100.0%
+  지연 p50 34ms · p95 55ms · p99 84ms · 평균 36ms
+  분류 {'ok': 19179}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_80_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r2_90 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 90개 (prefix=cores)
+측정 — 동시 세션 90 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786949053.9 · 정상구간 1786949058.9 ~ 1786949138.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 21585 (정상구간 80s) · 처리 269.8/s · 검출성공 100.0%
+  지연 p50 33ms · p95 68ms · p99 96ms · 평균 36ms
+  분류 {'ok': 21585}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_90.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_90_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r2_100 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 100개 (prefix=cores)
+측정 — 동시 세션 100 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786949181.0 · 정상구간 1786949186.0 ~ 1786949266.0  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 23982 (정상구간 80s) · 처리 299.8/s · 검출성공 100.0%
+  지연 p50 98ms · p95 157ms · p99 232ms · 평균 102ms
+  분류 {'ok': 23982}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_100.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_100_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r2_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786949309.8 · 정상구간 1786949314.8 ~ 1786949394.8  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 24931 (정상구간 80s) · 처리 311.7/s · 검출성공 100.0%
+  지연 p50 381ms · p95 440ms · p99 482ms · 평균 384ms
+  분류 {'ok': 24931}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r2_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786949441.8 · 정상구간 1786949446.8 ~ 1786949526.8  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 25002 (정상구간 80s) · 처리 312.6/s · 검출성공 100.0%
+  지연 p50 508ms · p95 574ms · p99 615ms · 평균 512ms
+  분류 {'ok': 25002}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r2_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개 (prefix=cores)
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786949563.2 · 정상구간 1786949568.2 ~ 1786949648.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 4797 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 19ms · p95 26ms · p99 31ms · 평균 20ms
+  분류 {'ok': 4797}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_20.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_20_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r2_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개 (prefix=cores)
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786949686.9 · 정상구간 1786949691.9 ~ 1786949771.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 9594 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 20ms · p95 28ms · p99 32ms · 평균 21ms
+  분류 {'ok': 9594}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_40.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r2_40_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+     팔 A 구성
+time="2026-08-17T06:56:38Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Recreate 
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 A (캡 없음) · caps.tsv 에 기록
+
+──────── A_r2_60 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 60개 (prefix=cores)
+측정 — 동시 세션 60 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786949855.5 · 정상구간 1786949860.5 ~ 1786949940.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 14382 (정상구간 80s) · 처리 179.8/s · 검출성공 100.0%
+  지연 p50 22ms · p95 34ms · p99 48ms · 평균 24ms
+  분류 {'ok': 14382}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_60.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_60_summary.tsv
+
+──────── A_r2_80 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786949975.4 · 정상구간 1786949980.4 ~ 1786950060.4  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19183 (정상구간 80s) · 처리 239.8/s · 검출성공 100.0%
+  지연 p50 33ms · p95 55ms · p99 91ms · 평균 35ms
+  분류 {'ok': 19183}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_80_summary.tsv
+
+──────── A_r2_90 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 90개 (prefix=cores)
+측정 — 동시 세션 90 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786950096.3 · 정상구간 1786950101.3 ~ 1786950181.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 21589 (정상구간 80s) · 처리 269.9/s · 검출성공 100.0%
+  지연 p50 29ms · p95 58ms · p99 93ms · 평균 32ms
+  분류 {'ok': 21589}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_90.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_90_summary.tsv
+
+──────── A_r2_100 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 100개 (prefix=cores)
+측정 — 동시 세션 100 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786950218.0 · 정상구간 1786950223.0 ~ 1786950303.0  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 23978 (정상구간 80s) · 처리 299.7/s · 검출성공 100.0%
+  지연 p50 32ms · p95 84ms · p99 119ms · 평균 38ms
+  분류 {'ok': 23978}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_100.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_100_summary.tsv
+
+──────── A_r2_120 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786950341.3 · 정상구간 1786950346.3 ~ 1786950426.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27482 (정상구간 80s) · 처리 343.6/s · 검출성공 100.0%
+  지연 p50 340ms · p95 397ms · p99 425ms · 평균 343ms
+  분류 {'ok': 27482}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_120_summary.tsv
+
+──────── A_r2_160 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786950468.4 · 정상구간 1786950473.4 ~ 1786950553.4  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27699 (정상구간 80s) · 처리 346.3/s · 검출성공 100.0%
+  지연 p50 455ms · p95 519ms · p99 565ms · 평균 462ms
+  분류 {'ok': 27699}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_160_summary.tsv
+
+──────── A_r2_20 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개 (prefix=cores)
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786950584.7 · 정상구간 1786950589.7 ~ 1786950669.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 4796 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 19ms · p95 27ms · p99 31ms · 평균 20ms
+  분류 {'ok': 4796}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_20.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_20_summary.tsv
+
+──────── A_r2_40 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개 (prefix=cores)
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786950701.3 · 정상구간 1786950706.4 ~ 1786950786.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 9596 (정상구간 80s) · 처리 120.0/s · 검출성공 100.0%
+  지연 p50 20ms · p95 30ms · p99 38ms · 평균 22ms
+  분류 {'ok': 9596}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_40.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r2_40_summary.tsv
+
+════ 앵커 판 anc3 — 팔 B · 80세션 (시간 추세용 기준점) ════
+     팔 B 구성
+time="2026-08-17T07:13:32Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_anc3_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786950847.9 · 정상구간 1786950852.9 ~ 1786950932.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19176 (정상구간 80s) · 처리 239.7/s · 검출성공 100.0%
+  지연 p50 28ms · p95 56ms · p99 93ms · 평균 31ms
+  분류 {'ok': 19176}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_anc3_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_anc3_80_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 라운드 r3 — 팔 순서 C A B · 레벨 순서 90 100 120 160 20 40 60 80 ════
+     팔 C 구성
+time="2026-08-17T07:15:59Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 C (캡 있음) · caps.tsv 에 기록
+
+──────── C_r3_90 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 90개 (prefix=cores)
+측정 — 동시 세션 90 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786951023.5 · 정상구간 1786951028.5 ~ 1786951108.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 21570 (정상구간 80s) · 처리 269.7/s · 검출성공 100.0%
+  지연 p50 30ms · p95 61ms · p99 96ms · 평균 33ms
+  분류 {'ok': 21570}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_90.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_90_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r3_100 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 100개 (prefix=cores)
+측정 — 동시 세션 100 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786951151.1 · 정상구간 1786951156.1 ~ 1786951236.1  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 22667 (정상구간 80s) · 처리 283.4/s · 검출성공 100.0%
+  지연 p50 346ms · p95 396ms · p99 417ms · 평균 348ms
+  분류 {'ok': 22667}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_100.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_100_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r3_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786951280.4 · 정상구간 1786951285.4 ~ 1786951365.4  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 22649 (정상구간 80s) · 처리 283.2/s · 검출성공 100.0%
+  지연 p50 421ms · p95 479ms · p99 512ms · 평균 424ms
+  분류 {'ok': 22649}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r3_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786951413.3 · 정상구간 1786951418.3 ~ 1786951498.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 22745 (정상구간 80s) · 처리 284.3/s · 검출성공 100.0%
+  지연 p50 561ms · p95 619ms · p99 645ms · 평균 563ms
+  분류 {'ok': 22745}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r3_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개 (prefix=cores)
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786951534.7 · 정상구간 1786951539.7 ~ 1786951619.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 4798 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 21ms · p95 29ms · p99 33ms · 평균 22ms
+  분류 {'ok': 4798}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_20.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_20_summary.tsv
+  ⚠️ 從 부하 실패 1/1900 — 사유를 /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/ghz_C_r3_20.json 에서 볼 것
+
+──────── C_r3_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개 (prefix=cores)
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786951658.9 · 정상구간 1786951663.9 ~ 1786951743.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 9592 (정상구간 80s) · 처리 119.9/s · 검출성공 100.0%
+  지연 p50 22ms · p95 32ms · p99 36ms · 평균 23ms
+  분류 {'ok': 9592}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_40.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_40_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r3_60 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 60개 (prefix=cores)
+측정 — 동시 세션 60 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786951784.2 · 정상구간 1786951789.2 ~ 1786951869.1  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 14387 (정상구간 80s) · 처리 179.9/s · 검출성공 100.0%
+  지연 p50 25ms · p95 44ms · p99 76ms · 평균 29ms
+  분류 {'ok': 14387}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_60.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_60_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── C_r3_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786951909.9 · 정상구간 1786951914.9 ~ 1786951994.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19190 (정상구간 80s) · 처리 239.9/s · 검출성공 100.0%
+  지연 p50 36ms · p95 63ms · p99 100ms · 평균 39ms
+  분류 {'ok': 19190}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_C_r3_80_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+     팔 A 구성
+time="2026-08-17T07:33:41Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 A (캡 없음) · caps.tsv 에 기록
+
+──────── A_r3_90 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 90개 (prefix=cores)
+측정 — 동시 세션 90 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786952080.3 · 정상구간 1786952085.3 ~ 1786952165.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 21581 (정상구간 80s) · 처리 269.8/s · 검출성공 100.0%
+  지연 p50 31ms · p95 65ms · p99 94ms · 평균 35ms
+  분류 {'ok': 21581}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_90.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_90_summary.tsv
+
+──────── A_r3_100 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 100개 (prefix=cores)
+측정 — 동시 세션 100 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786952202.5 · 정상구간 1786952207.5 ~ 1786952287.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 23977 (정상구간 80s) · 처리 299.7/s · 검출성공 100.0%
+  지연 p50 30ms · p95 70ms · p99 98ms · 평균 34ms
+  분류 {'ok': 23977}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_100.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_100_summary.tsv
+
+──────── A_r3_120 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786952326.3 · 정상구간 1786952331.3 ~ 1786952411.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27557 (정상구간 80s) · 처리 344.5/s · 검출성공 100.0%
+  지연 p50 337ms · p95 394ms · p99 429ms · 평균 338ms
+  분류 {'ok': 27557}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_120_summary.tsv
+
+──────── A_r3_160 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786952453.4 · 정상구간 1786952458.4 ~ 1786952538.4  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27927 (정상구간 80s) · 처리 349.1/s · 검출성공 100.0%
+  지연 p50 451ms · p95 510ms · p99 534ms · 평균 458ms
+  분류 {'ok': 27927}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_160_summary.tsv
+
+──────── A_r3_20 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개 (prefix=cores)
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786952569.5 · 정상구간 1786952574.6 ~ 1786952654.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 4800 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 22ms · p95 33ms · p99 37ms · 평균 23ms
+  분류 {'ok': 4800}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_20.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_20_summary.tsv
+
+──────── A_r3_40 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개 (prefix=cores)
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786952686.4 · 정상구간 1786952691.4 ~ 1786952771.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 9592 (정상구간 80s) · 처리 120.0/s · 검출성공 100.0%
+  지연 p50 21ms · p95 33ms · p99 38ms · 평균 23ms
+  분류 {'ok': 9592}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_40.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_40_summary.tsv
+
+──────── A_r3_60 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 60개 (prefix=cores)
+측정 — 동시 세션 60 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786952804.6 · 정상구간 1786952809.6 ~ 1786952889.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 14390 (정상구간 80s) · 처리 179.9/s · 검출성공 100.0%
+  지연 p50 26ms · p95 48ms · p99 79ms · 평균 29ms
+  분류 {'ok': 14390}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_60.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_60_summary.tsv
+
+──────── A_r3_80 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786952924.7 · 정상구간 1786952929.7 ~ 1786953009.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19170 (정상구간 80s) · 처리 239.6/s · 검출성공 100.0%
+  지연 p50 31ms · p95 60ms · p99 95ms · 평균 34ms
+  분류 {'ok': 19170}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_A_r3_80_summary.tsv
+     팔 B 구성
+time="2026-08-17T07:50:35Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_r3_90 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 90개 (prefix=cores)
+측정 — 동시 세션 90 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786953072.5 · 정상구간 1786953077.5 ~ 1786953157.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 21583 (정상구간 80s) · 처리 269.8/s · 검출성공 100.0%
+  지연 p50 30ms · p95 63ms · p99 99ms · 평균 34ms
+  분류 {'ok': 21583}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_90.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_90_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r3_100 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 100개 (prefix=cores)
+측정 — 동시 세션 100 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786953200.0 · 정상구간 1786953205.0 ~ 1786953284.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 23966 (정상구간 80s) · 처리 299.8/s · 검출성공 100.0%
+  지연 p50 40ms · p95 97ms · p99 118ms · 평균 46ms
+  분류 {'ok': 23966}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_100.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_100_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r3_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786953328.9 · 정상구간 1786953333.9 ~ 1786953413.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27637 (정상구간 80s) · 처리 345.5/s · 검출성공 100.0%
+  지연 p50 338ms · p95 391ms · p99 420ms · 평균 343ms
+  분류 {'ok': 27637}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r3_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786953461.3 · 정상구간 1786953466.3 ~ 1786953546.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27768 (정상구간 80s) · 처리 347.1/s · 검출성공 100.0%
+  지연 p50 454ms · p95 514ms · p99 539ms · 평균 461ms
+  분류 {'ok': 27768}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 18.9 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r3_20 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 20개 (prefix=cores)
+측정 — 동시 세션 20 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786953582.8 · 정상구간 1786953587.8 ~ 1786953667.8  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 4799 (정상구간 80s) · 처리 60.0/s · 검출성공 100.0%
+  지연 p50 20ms · p95 30ms · p99 34ms · 평균 21ms
+  분류 {'ok': 4799}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_20.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_20_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r3_40 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 40개 (prefix=cores)
+측정 — 동시 세션 40 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786953707.7 · 정상구간 1786953712.7 ~ 1786953792.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 9595 (정상구간 80s) · 처리 120.0/s · 검출성공 100.0%
+  지연 p50 21ms · p95 31ms · p99 34ms · 평균 22ms
+  분류 {'ok': 9595}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_40.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_40_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r3_60 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 60개 (prefix=cores)
+측정 — 동시 세션 60 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786953832.7 · 정상구간 1786953837.7 ~ 1786953917.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 14394 (정상구간 80s) · 처리 180.0/s · 검출성공 100.0%
+  지연 p50 27ms · p95 44ms · p99 70ms · 평균 29ms
+  분류 {'ok': 14394}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_60.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_60_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_r3_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786953958.2 · 정상구간 1786953963.2 ~ 1786954043.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19178 (정상구간 80s) · 처리 239.7/s · 검출성공 100.0%
+  지연 p50 34ms · p95 69ms · p99 103ms · 평균 37ms
+  분류 {'ok': 19178}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_r3_80_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 앵커 판 anc4 — 팔 B · 80세션 (시간 추세용 기준점) ════
+     팔 B 구성
+time="2026-08-17T08:07:49Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_anc4_80 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 80개 (prefix=cores)
+측정 — 동시 세션 80 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786954105.5 · 정상구간 1786954110.5 ~ 1786954190.4  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 19169 (정상구간 80s) · 처리 239.7/s · 검출성공 100.0%
+  지연 p50 28ms · p95 56ms · p99 95ms · 평균 33ms
+  분류 {'ok': 19169}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_anc4_80.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_anc4_80_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ §T 부하기 코어 팔 — 팔 B · 레벨 '120 160' · 3쌍 (2코어 ↔ 전체 4코어) ════
+     팔 B 구성
+time="2026-08-17T08:10:16Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_lc2_t1_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786954255.7 · 정상구간 1786954260.7 ~ 1786954340.7  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27686 (정상구간 80s) · 처리 346.1/s · 검출성공 100.0%
+  지연 p50 337ms · p95 387ms · p99 412ms · 평균 341ms
+  분류 {'ok': 27686}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t1_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t1_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lcF_t1_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786954384.8 · 정상구간 1786954389.8 ~ 1786954469.8  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27757 (정상구간 80s) · 처리 347.0/s · 검출성공 100.0%
+  지연 p50 334ms · p95 389ms · p99 415ms · 평균 336ms
+  분류 {'ok': 27757}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t1_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t1_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lc2_t1_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786954516.8 · 정상구간 1786954521.8 ~ 1786954601.8  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27620 (정상구간 80s) · 처리 345.3/s · 검출성공 100.0%
+  지연 p50 457ms · p95 514ms · p99 539ms · 평균 464ms
+  분류 {'ok': 27620}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t1_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t1_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lcF_t1_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786954649.8 · 정상구간 1786954654.8 ~ 1786954734.8  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27556 (정상구간 80s) · 처리 344.5/s · 검출성공 100.0%
+  지연 p50 457ms · p95 521ms · p99 551ms · 평균 465ms
+  분류 {'ok': 27556}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t1_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t1_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lcF_t2_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786954779.6 · 정상구간 1786954784.6 ~ 1786954864.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27742 (정상구간 80s) · 처리 346.8/s · 검출성공 100.0%
+  지연 p50 336ms · p95 388ms · p99 404ms · 평균 341ms
+  분류 {'ok': 27742}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t2_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t2_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lc2_t2_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786954908.5 · 정상구간 1786954913.5 ~ 1786954993.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27645 (정상구간 80s) · 처리 345.6/s · 검출성공 100.0%
+  지연 p50 337ms · p95 390ms · p99 416ms · 평균 341ms
+  분류 {'ok': 27645}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t2_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t2_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lcF_t2_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786955040.3 · 정상구간 1786955045.4 ~ 1786955125.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27686 (정상구간 80s) · 처리 346.2/s · 검출성공 100.0%
+  지연 p50 456ms · p95 515ms · p99 548ms · 평균 462ms
+  분류 {'ok': 27686}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t2_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t2_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lc2_t2_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786955173.5 · 정상구간 1786955178.5 ~ 1786955258.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27503 (정상구간 80s) · 처리 343.8/s · 검출성공 100.0%
+  지연 p50 458ms · p95 522ms · p99 571ms · 평균 465ms
+  분류 {'ok': 27503}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t2_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t2_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lc2_t3_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786955303.2 · 정상구간 1786955308.2 ~ 1786955388.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27630 (정상구간 80s) · 처리 345.4/s · 검출성공 100.0%
+  지연 p50 338ms · p95 390ms · p99 410ms · 평균 344ms
+  분류 {'ok': 27630}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t3_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t3_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lcF_t3_120 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 120개 (prefix=cores)
+측정 — 동시 세션 120 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786955432.1 · 정상구간 1786955437.1 ~ 1786955517.1  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27690 (정상구간 80s) · 처리 346.2/s · 검출성공 100.0%
+  지연 p50 337ms · p95 391ms · p99 407ms · 평균 342ms
+  분류 {'ok': 27690}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t3_120.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t3_120_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lc2_t3_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786955564.2 · 정상구간 1786955569.2 ~ 1786955649.2  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27463 (정상구간 80s) · 처리 343.3/s · 검출성공 100.0%
+  지연 p50 458ms · p95 529ms · p99 570ms · 평균 466ms
+  분류 {'ok': 27463}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t3_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lc2_t3_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+──────── B_lcF_t3_160 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 100s (AI 창 90s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 160개 (prefix=cores)
+측정 — 동시 세션 160 · 3.0fps · 90초
+
+  측정창(epoch) 시작 1786955696.5 · 정상구간 1786955701.6 ~ 1786955781.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 27688 (정상구간 80s) · 처리 346.1/s · 검출성공 100.0%
+  지연 p50 455ms · p95 512ms · p99 540ms · 평균 462ms
+  분류 {'ok': 27688}
+  → /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t3_160.tsv · /root/init/loadtest/results/online-ddl-ec2-20260817-050448/coresidency/req_B_lcF_t3_160_summary.tsv
+  ⚠️ 요청 1개 모자람 — 기대 1900(19 req/s × 100s) · 실제 1899 · 실측 19.0 req/s
+     (-c 가 상한이거나 서버가 느리다. ⚠️ 모자람 «1개» 는 정수 양자화일 수 있다 — #259)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+
+════ 요약 ════
+arm	round	sessions	req	rps	detect_pct	p50	p95	p99	nolease	nopose	setup_fail	warm_lo	warm_hi	loader_cpus
+B	discard	80	19173	239.67	100.00	28.7	58.6	95.6	0	0	0	1786943984.720	1786944064.716	full
+B	anc1	80	19179	239.75	100.00	25.9	41.3	75.5	0	0	0	1786944110.130	1786944190.125	full
+A	discard	20	4796	59.99	100.00	19.1	25.7	30.8	0	0	0	1786944247.039	1786944326.989	full
+A	r1	20	4800	60.09	100.00	19.5	29.1	32.3	0	0	0	1786944362.027	1786944441.912	full
+A	r1	40	9595	119.98	100.00	20.0	29.6	33.5	0	0	0	1786944478.546	1786944558.519	full
+A	r1	60	14393	179.92	100.00	22.8	37.1	61.8	0	0	0	1786944596.871	1786944676.867	full
+A	r1	80	19175	239.71	100.00	29.3	52.9	86.2	0	0	0	1786944716.833	1786944796.825	full
+A	r1	90	21580	269.79	100.00	28.2	57.9	92.3	0	0	0	1786944838.122	1786944918.109	full
+A	r1	100	23972	299.69	100.00	33.6	84.6	103.6	0	0	0	1786944960.599	1786945040.588	full
+A	r1	120	27872	348.45	100.00	331.6	384.4	422.4	0	0	0	1786945085.089	1786945165.078	full
+A	r1	160	27851	348.15	100.00	450.7	519.5	570.2	0	0	0	1786945214.622	1786945294.619	full
+B	r1	20	4800	60.06	100.00	20.1	29.5	32.5	0	0	0	1786945357.082	1786945437.001	full
+B	r1	40	9596	119.96	100.00	20.2	30.8	35.8	0	0	0	1786945480.472	1786945560.464	full
+B	r1	60	14389	179.90	100.00	21.4	32.9	42.0	0	0	0	1786945605.445	1786945685.427	full
+B	r1	80	19181	239.80	100.00	27.9	51.0	83.0	0	0	0	1786945730.649	1786945810.637	full
+B	r1	90	21586	269.83	100.00	28.4	62.2	100.1	0	0	0	1786945856.420	1786945936.418	full
+B	r1	100	23983	299.80	100.00	33.4	74.2	102.0	0	0	0	1786945983.341	1786946063.337	full
+B	r1	120	27791	347.40	100.00	336.6	384.8	400.6	0	0	0	1786946112.021	1786946192.017	full
+B	r1	160	27688	346.10	100.00	455.9	512.6	539.2	0	0	0	1786946243.883	1786946323.882	full
+C	discard	20	4796	60.01	100.00	19.4	28.4	31.4	0	0	0	1786946414.714	1786946494.633	full
+C	r1	20	4794	59.97	100.00	18.9	26.4	31.0	0	0	0	1786946537.287	1786946617.230	full
+C	r1	40	9591	119.90	100.00	19.4	28.2	33.1	0	0	0	1786946661.710	1786946741.699	full
+C	r1	60	14393	179.94	100.00	23.6	35.5	55.9	0	0	0	1786946785.622	1786946865.611	full
+C	r1	80	19176	239.75	100.00	27.9	45.5	78.5	0	0	0	1786946910.930	1786946990.914	full
+C	r1	90	21592	269.90	100.00	33.3	69.9	92.7	0	0	0	1786947037.548	1786947117.547	full
+C	r1	100	23979	299.98	100.00	114.5	175.0	233.3	0	0	0	1786947164.994	1786947244.930	full
+C	r1	120	24986	312.36	100.00	381.7	439.8	469.9	0	0	0	1786947294.027	1786947374.018	full
+C	r1	160	25087	313.68	100.00	504.6	579.5	621.2	0	0	0	1786947426.477	1786947506.453	full
+B	anc2	80	19170	239.68	100.00	28.6	55.8	95.8	0	0	0	1786947602.484	1786947682.465	full
+B	r2	60	14387	179.87	100.00	22.4	34.2	51.6	0	0	0	1786947748.134	1786947828.118	full
+B	r2	80	19179	239.75	100.00	29.2	52.8	83.8	0	0	0	1786947873.234	1786947953.229	full
+B	r2	90	21585	269.87	100.00	29.6	69.6	101.6	0	0	0	1786947999.550	1786948079.532	full
+B	r2	100	23970	299.63	100.00	36.6	83.2	109.1	0	0	0	1786948126.632	1786948206.630	full
+B	r2	120	27512	343.90	100.00	340.3	394.1	416.2	0	0	0	1786948255.361	1786948335.360	full
+B	r2	160	27660	345.83	100.00	456.7	509.6	528.0	0	0	0	1786948387.177	1786948467.158	full
+B	r2	20	4794	60.02	100.00	19.6	27.8	31.9	0	0	0	1786948508.735	1786948588.610	full
+B	r2	40	9596	119.97	100.00	21.7	32.8	38.1	0	0	0	1786948633.080	1786948713.069	full
+C	r2	60	14388	179.87	100.00	24.1	39.2	71.0	0	0	0	1786948806.486	1786948886.479	full
+C	r2	80	19179	239.83	100.00	33.6	54.6	84.0	0	0	0	1786948932.206	1786949012.174	full
+C	r2	90	21585	269.85	100.00	32.9	68.2	96.0	0	0	0	1786949058.916	1786949138.906	full
+C	r2	100	23982	299.78	100.00	97.6	157.2	232.1	0	0	0	1786949185.991	1786949265.989	full
+C	r2	120	24931	311.72	100.00	380.9	440.3	482.0	0	0	0	1786949314.812	1786949394.792	full
+C	r2	160	25002	312.59	100.00	507.5	574.4	614.5	0	0	0	1786949446.811	1786949526.795	full
+C	r2	20	4797	59.98	100.00	19.0	25.9	30.8	0	0	0	1786949568.200	1786949648.180	full
+C	r2	40	9594	119.93	100.00	19.7	28.4	32.5	0	0	0	1786949691.932	1786949771.930	full
+A	r2	60	14382	179.80	100.00	22.4	33.7	47.8	0	0	0	1786949860.519	1786949940.506	full
+A	r2	80	19183	239.81	100.00	33.3	55.2	90.8	0	0	0	1786949980.448	1786950060.442	full
+A	r2	90	21589	269.90	100.00	29.4	57.9	92.6	0	0	0	1786950101.262	1786950181.252	full
+A	r2	100	23978	299.74	100.00	32.3	84.2	118.8	0	0	0	1786950222.965	1786950302.960	full
+A	r2	120	27482	343.55	100.00	339.7	396.9	424.9	0	0	0	1786950346.334	1786950426.328	full
+A	r2	160	27699	346.33	100.00	454.9	518.8	564.8	0	0	0	1786950473.391	1786950553.370	full
+A	r2	20	4796	59.98	100.00	18.7	26.7	31.3	0	0	0	1786950589.698	1786950669.664	full
+A	r2	40	9596	119.96	100.00	20.4	30.0	38.2	0	0	0	1786950706.354	1786950786.348	full
+B	anc3	80	19176	239.71	100.00	27.9	55.9	93.2	0	0	0	1786950852.861	1786950932.859	full
+C	r3	90	21570	269.65	100.00	30.0	61.1	96.4	0	0	0	1786951028.467	1786951108.459	full
+C	r3	100	22667	283.37	100.00	346.3	395.6	417.5	0	0	0	1786951156.135	1786951236.127	full
+C	r3	120	22649	283.17	100.00	420.7	479.3	512.5	0	0	0	1786951285.415	1786951365.399	full
+C	r3	160	22745	284.33	100.00	560.8	618.8	645.4	0	0	0	1786951418.268	1786951498.262	full
+C	r3	20	4798	60.02	100.00	20.7	29.1	33.5	0	0	0	1786951539.744	1786951619.680	full
+C	r3	40	9592	119.93	100.00	21.7	31.6	35.9	0	0	0	1786951663.918	1786951743.900	full
+C	r3	60	14387	179.87	100.00	25.2	44.4	76.4	0	0	0	1786951789.160	1786951869.147	full
+C	r3	80	19190	239.90	100.00	36.3	63.1	100.0	0	0	0	1786951914.941	1786951994.934	full
+A	r3	90	21581	269.77	100.00	31.2	64.8	93.6	0	0	0	1786952085.335	1786952165.333	full
+A	r3	100	23977	299.72	100.00	30.3	70.3	98.2	0	0	0	1786952207.517	1786952287.515	full
+A	r3	120	27557	344.50	100.00	336.8	394.4	429.0	0	0	0	1786952331.255	1786952411.246	full
+A	r3	160	27927	349.12	100.00	450.6	509.8	533.9	0	0	0	1786952458.409	1786952538.402	full
+A	r3	20	4800	60.02	100.00	21.7	33.0	37.4	0	0	0	1786952574.552	1786952654.529	full
+A	r3	40	9592	119.96	100.00	21.3	32.5	38.3	0	0	0	1786952691.374	1786952771.335	full
+A	r3	60	14390	179.90	100.00	25.7	48.1	78.8	0	0	0	1786952809.596	1786952889.586	full
+A	r3	80	19170	239.63	100.00	30.8	60.2	94.8	0	0	0	1786952929.679	1786953009.677	full
+B	r3	90	21583	269.81	100.00	29.8	63.2	98.8	0	0	0	1786953077.478	1786953157.471	full
+B	r3	100	23966	299.84	100.00	40.3	97.2	117.9	0	0	0	1786953205.003	1786953284.932	full
+B	r3	120	27637	345.49	100.00	337.6	391.3	420.4	0	0	0	1786953333.917	1786953413.911	full
+B	r3	160	27768	347.14	100.00	454.1	514.1	539.3	0	0	0	1786953466.328	1786953546.319	full
+B	r3	20	4799	60.01	100.00	20.3	30.1	33.6	0	0	0	1786953587.792	1786953667.761	full
+B	r3	40	9595	119.97	100.00	20.7	30.6	34.0	0	0	0	1786953712.727	1786953792.706	full
+B	r3	60	14394	179.97	100.00	27.0	44.1	69.6	0	0	0	1786953837.681	1786953917.663	full
+B	r3	80	19178	239.73	100.00	33.6	68.6	103.4	0	0	0	1786953963.164	1786954043.161	full
+B	anc4	80	19169	239.71	100.00	28.0	56.0	95.1	0	0	0	1786954110.477	1786954190.445	full
+B	lc2_t1	120	27686	346.10	100.00	336.9	387.1	411.8	0	0	0	1786954260.708	1786954340.703	2
+B	lcF_t1	120	27757	346.98	100.00	334.1	388.6	415.3	0	0	0	1786954389.817	1786954469.814	full
+B	lc2_t1	160	27620	345.28	100.00	456.8	514.4	538.5	0	0	0	1786954521.770	1786954601.763	2
+B	lcF_t1	160	27556	344.46	100.00	457.1	521.3	550.8	0	0	0	1786954654.759	1786954734.757	full
+B	lcF_t2	120	27742	346.80	100.00	335.9	388.3	404.4	0	0	0	1786954784.583	1786954864.578	full
+B	lc2_t2	120	27645	345.58	100.00	336.8	390.3	415.9	0	0	0	1786954913.457	1786954993.454	2
+B	lcF_t2	160	27686	346.23	100.00	456.0	515.0	548.1	0	0	0	1786955045.352	1786955125.317	full
+B	lc2_t2	160	27503	343.81	100.00	458.2	521.8	571.3	0	0	0	1786955178.532	1786955258.526	2
+B	lc2_t3	120	27630	345.38	100.00	338.2	390.1	409.8	0	0	0	1786955308.170	1786955388.169	2
+B	lcF_t3	120	27690	346.16	100.00	337.1	390.9	406.9	0	0	0	1786955437.148	1786955517.141	full
+B	lc2_t3	160	27463	343.29	100.00	458.2	528.6	569.7	0	0	0	1786955569.164	1786955649.163	2
+B	lcF_t3	160	27688	346.12	100.00	454.9	511.6	539.5	0	0	0	1786955701.551	1786955781.547	full
+
+🔴 판정은 사람이 한다. 특히 볼 것:
+   · nolease > 0  → 풀 자리 없음(용량). detect_pct 하락과 **다른 축**이다
+   · nopose  > 0  → 검출이 깨짐(품질). #164 가 고친 지표가 다시 무너진 것일 수 있다
+   · setup_fail>0 → 그 판의 «동시 세션 수» 는 목표값이 아니다. 값을 그대로 쓰지 말 것
+   · ghz.tsv 의 p50/p95/p99 → **H3 의 판정 열**(#254). 팔 B↔C 를 여기서 대조한다 —
+     캡을 걸었더니 옆(Spring 적재)의 지연이 «안 나빠졌다» 면 캡이 옆을 지킨 것이다
+   · side.tsv 의 phase=mid → 포화 순간의 옆 상태(Threads_running·Hikari pending).
+     pre/post 는 카운터의 양 끝이다 — 게이지를 거기서 읽으면 «유휴» 를 읽게 된다
+   · round=anc1..N → **앵커 판**. 본 격자가 아니라 «시간 축» 이다 — warm_lo 로 정렬해
+     처리량이 라운드 내내 평평한지 본다. 흐르면 팔 간 대조에 그 추세가 섞여 있는 것이다
+   · 레벨 순서는 라운드마다 치환된다(#252) — 같은 레벨이 블록 안 다른 자리에서 돈다
+   · probe_rtt.tsv 의 p50 ↔ coresidency.tsv 의 p50 → **두 시계**(설계 §4-2).
+     부하기 413ms 인데 로컬 50ms 면 큐는 «부하기 쪽», 둘 다 413ms 면 «서버» 다.
+     window 칸이 warm 이 아니면 두 값을 같은 창에서 읽은 것이 아니다 — 비교 금지
+   · caps.tsv → 팔 C 의 캡이 실제로 물렸는지(#253). verdict 가 OK 가 아닌 판은 조건이 다르다
+   · round=lc2_t*/lcF_t* → **부하기 코어 팔**(§T). 같은 레벨의 두 판을 짝으로 읽는다:
+     차이가 나면 «부하기 구성», 없으면 라운드 간 +17.7% 는 «호스트 개체차» 였다는 뜻이다
+     🔴 볼 것은 rps 만이 아니라 **AI CPU ÷ rps**(프레임당 비용)다 — 기아는 이미 기각됐다
+     B discard 80세션 → req=19173 setup_fail=0 nolease=0 nopose=0
+     B anc1 80세션 → req=19179 setup_fail=0 nolease=0 nopose=0
+     A discard 20세션 → req=4796 setup_fail=0 nolease=0 nopose=0
+     A r1 20세션 → req=4800 setup_fail=0 nolease=0 nopose=0
+     A r1 40세션 → req=9595 setup_fail=0 nolease=0 nopose=0
+     A r1 60세션 → req=14393 setup_fail=0 nolease=0 nopose=0
+     A r1 80세션 → req=19175 setup_fail=0 nolease=0 nopose=0
+     A r1 90세션 → req=21580 setup_fail=0 nolease=0 nopose=0
+     A r1 100세션 → req=23972 setup_fail=0 nolease=0 nopose=0
+     A r1 120세션 → req=27872 setup_fail=0 nolease=0 nopose=0
+     A r1 160세션 → req=27851 setup_fail=0 nolease=0 nopose=0
+     B r1 20세션 → req=4800 setup_fail=0 nolease=0 nopose=0
+     B r1 40세션 → req=9596 setup_fail=0 nolease=0 nopose=0
+     B r1 60세션 → req=14389 setup_fail=0 nolease=0 nopose=0
+     B r1 80세션 → req=19181 setup_fail=0 nolease=0 nopose=0
+     B r1 90세션 → req=21586 setup_fail=0 nolease=0 nopose=0
+     B r1 100세션 → req=23983 setup_fail=0 nolease=0 nopose=0
+     B r1 120세션 → req=27791 setup_fail=0 nolease=0 nopose=0
+     B r1 160세션 → req=27688 setup_fail=0 nolease=0 nopose=0
+     C discard 20세션 → req=4796 setup_fail=0 nolease=0 nopose=0
+     C r1 20세션 → req=4794 setup_fail=0 nolease=0 nopose=0
+     C r1 40세션 → req=9591 setup_fail=0 nolease=0 nopose=0
+     C r1 60세션 → req=14393 setup_fail=0 nolease=0 nopose=0
+     C r1 80세션 → req=19176 setup_fail=0 nolease=0 nopose=0
+     C r1 90세션 → req=21592 setup_fail=0 nolease=0 nopose=0
+     C r1 100세션 → req=23979 setup_fail=0 nolease=0 nopose=0
+     C r1 120세션 → req=24986 setup_fail=0 nolease=0 nopose=0
+     C r1 160세션 → req=25087 setup_fail=0 nolease=0 nopose=0
+     B anc2 80세션 → req=19170 setup_fail=0 nolease=0 nopose=0
+     B r2 60세션 → req=14387 setup_fail=0 nolease=0 nopose=0
+     B r2 80세션 → req=19179 setup_fail=0 nolease=0 nopose=0
+     B r2 90세션 → req=21585 setup_fail=0 nolease=0 nopose=0
+     B r2 100세션 → req=23970 setup_fail=0 nolease=0 nopose=0
+     B r2 120세션 → req=27512 setup_fail=0 nolease=0 nopose=0
+     B r2 160세션 → req=27660 setup_fail=0 nolease=0 nopose=0
+     B r2 20세션 → req=4794 setup_fail=0 nolease=0 nopose=0
+     B r2 40세션 → req=9596 setup_fail=0 nolease=0 nopose=0
+     C r2 60세션 → req=14388 setup_fail=0 nolease=0 nopose=0
+     C r2 80세션 → req=19179 setup_fail=0 nolease=0 nopose=0
+     C r2 90세션 → req=21585 setup_fail=0 nolease=0 nopose=0
+     C r2 100세션 → req=23982 setup_fail=0 nolease=0 nopose=0
+     C r2 120세션 → req=24931 setup_fail=0 nolease=0 nopose=0
+     C r2 160세션 → req=25002 setup_fail=0 nolease=0 nopose=0
+     C r2 20세션 → req=4797 setup_fail=0 nolease=0 nopose=0
+     C r2 40세션 → req=9594 setup_fail=0 nolease=0 nopose=0
+     A r2 60세션 → req=14382 setup_fail=0 nolease=0 nopose=0
+     A r2 80세션 → req=19183 setup_fail=0 nolease=0 nopose=0
+     A r2 90세션 → req=21589 setup_fail=0 nolease=0 nopose=0
+     A r2 100세션 → req=23978 setup_fail=0 nolease=0 nopose=0
+     A r2 120세션 → req=27482 setup_fail=0 nolease=0 nopose=0
+     A r2 160세션 → req=27699 setup_fail=0 nolease=0 nopose=0
+     A r2 20세션 → req=4796 setup_fail=0 nolease=0 nopose=0
+     A r2 40세션 → req=9596 setup_fail=0 nolease=0 nopose=0
+     B anc3 80세션 → req=19176 setup_fail=0 nolease=0 nopose=0
+     C r3 90세션 → req=21570 setup_fail=0 nolease=0 nopose=0
+     C r3 100세션 → req=22667 setup_fail=0 nolease=0 nopose=0
+     C r3 120세션 → req=22649 setup_fail=0 nolease=0 nopose=0
+     C r3 160세션 → req=22745 setup_fail=0 nolease=0 nopose=0
+     C r3 20세션 → req=4798 setup_fail=0 nolease=0 nopose=0
+     C r3 40세션 → req=9592 setup_fail=0 nolease=0 nopose=0
+     C r3 60세션 → req=14387 setup_fail=0 nolease=0 nopose=0
+     C r3 80세션 → req=19190 setup_fail=0 nolease=0 nopose=0
+     A r3 90세션 → req=21581 setup_fail=0 nolease=0 nopose=0
+     A r3 100세션 → req=23977 setup_fail=0 nolease=0 nopose=0
+     A r3 120세션 → req=27557 setup_fail=0 nolease=0 nopose=0
+     A r3 160세션 → req=27927 setup_fail=0 nolease=0 nopose=0
+     A r3 20세션 → req=4800 setup_fail=0 nolease=0 nopose=0
+     A r3 40세션 → req=9592 setup_fail=0 nolease=0 nopose=0
+     A r3 60세션 → req=14390 setup_fail=0 nolease=0 nopose=0
+     A r3 80세션 → req=19170 setup_fail=0 nolease=0 nopose=0
+     B r3 90세션 → req=21583 setup_fail=0 nolease=0 nopose=0
+     B r3 100세션 → req=23966 setup_fail=0 nolease=0 nopose=0
+     B r3 120세션 → req=27637 setup_fail=0 nolease=0 nopose=0
+     B r3 160세션 → req=27768 setup_fail=0 nolease=0 nopose=0
+     B r3 20세션 → req=4799 setup_fail=0 nolease=0 nopose=0
+     B r3 40세션 → req=9595 setup_fail=0 nolease=0 nopose=0
+     B r3 60세션 → req=14394 setup_fail=0 nolease=0 nopose=0
+     B r3 80세션 → req=19178 setup_fail=0 nolease=0 nopose=0
+     B anc4 80세션 → req=19169 setup_fail=0 nolease=0 nopose=0
+     B lc2_t1 120세션 → req=27686 setup_fail=0 nolease=0 nopose=0
+     B lcF_t1 120세션 → req=27757 setup_fail=0 nolease=0 nopose=0
+     B lc2_t1 160세션 → req=27620 setup_fail=0 nolease=0 nopose=0
+     B lcF_t1 160세션 → req=27556 setup_fail=0 nolease=0 nopose=0
+     B lcF_t2 120세션 → req=27742 setup_fail=0 nolease=0 nopose=0
+     B lc2_t2 120세션 → req=27645 setup_fail=0 nolease=0 nopose=0
+     B lcF_t2 160세션 → req=27686 setup_fail=0 nolease=0 nopose=0
+     B lc2_t2 160세션 → req=27503 setup_fail=0 nolease=0 nopose=0
+     B lc2_t3 120세션 → req=27630 setup_fail=0 nolease=0 nopose=0
+     B lcF_t3 120세션 → req=27690 setup_fail=0 nolease=0 nopose=0
+     B lc2_t3 160세션 → req=27463 setup_fail=0 nolease=0 nopose=0
+     B lcF_t3 160세션 → req=27688 setup_fail=0 nolease=0 nopose=0
+  ✅ 91판 전부 성립 (setup_fail 0)
+     ⚠️ C_r3_20 C → 실패 1/1900
+  ✅ 從 부하 64판 전부 성립 (성공 응답 > 0)
+     spring: 111331행 (FAIL 0)
+     mysql: 2730행 (FAIL 0)
+  ✅ 옆 지표 수집 성립 (mid 게이지 91점)
+     표본 1854행 · load_ai 가 보인 표본 1754 · 못 잰 구간(-1) 55
+     부하기 최대 CPU 250.0% (100% = 1 vCPU) · 최대 송신 0.15 Mbps
+  ✅ 부하기 계측 성립
+     판 91 — warm 91 · full 0 · no_overlap 0 · empty 0 · FAIL 0
+     서버 시계 최대 p50 561.1 ms
+  ✅ 두 시계 성립 (91판)
+     §T 12판 (제한 6 · 전체 6 · 성립 안 함 0)
+  ✅ §T 성립 — 제한 344.9 fps ↔ 전체 346.1 fps (차 -0.4%)
+     차이가 크면 «부하기 구성 탓», 없으면 라운드 간 +17.7% 는 «호스트 개체차» 쪽이다
+  → coresidency : OK (11873초)
+
+════════ collect ════════
+# 측정 조건 — ec2-20260817-050448
+생성          : 2026-08-17T08:36:49+00:00
+커밋          : d05951aad7ca7c73292a0120e99be948b42d6a73 (main)
+인스턴스 타입 : c7i.xlarge
+인스턴스 ID   : i-03016312908b67357
+AZ / 리전     : ap-northeast-2c / ap-northeast-2
+vCPU / RAM    : 4 / 8GB
+커널          : 6.1.177-224.371.amzn2023.x86_64
+디스크        : 60G 여유 54G
+MySQL         : 해당 없음 — 이 박스에 shadowfit-mysql 가 없다(러너가 측정 대상이 아닌 라운드)
+WRITER_MAX_SEC: 14400
+S3 결과       : s3://shadowfit-measure-055447613012/shadowfit/ec2-20260817-050448
+
+# 대상 박스 (측정 대상 — 위 블록은 «부하기» 다)
+호스트        : 172.31.43.202
+인스턴스 타입 : c7i.4xlarge
+vCPU / RAM    : 16 31GB
+컨테이너 캡   :
+  shadowfit-backend      mem=0 cpus=0
+  shadowfit-mysql        mem=0 cpus=0
+  shadowfit-ai           mem=20971520000 cpus=0
+동거 팔       : ARMS='A B C' LEVELS='20 40 60 80 90 100 120 160' DUR=90s REPEATS=3
+동거 배열     : LEVEL_SHIFT=2 (레벨 순서 치환 #252) · ANCHOR=1 B@80세션
+자기 프로브   : PROBE=1 (대상 박스 1세션 · 계정 prefix 'probe') — 설계 §4-2
+코어 팔(§T)   : TASKSET=1 · 2코어↔전체 · 팔 B · 레벨 '120 160' × 3쌍
+⚠️ 위 «캡» 은 라운드 **종료 시점** 값이다 — 스윕이 팔마다 갈아끼우므로 마지막 팔의 상태다
+
+# 단계
+phase	status	seconds	started_at
+coresidency_preflight	OK	3	2026-08-17T05:04:48+00:00
+coresidency_rehearsal	OK	842	2026-08-17T05:04:52+00:00
+coresidency	OK	11873	2026-08-17T05:18:55+00:00
+
+⚠️ 절대 소요 시간을 «운영에서 N분» 으로 인용 금지 — 하드웨어 종속(설계 §5)
+⚠️ rehearsal/ 의 수치는 측정값이 아니다 — 경로 점검용 축소 판
+  → collect : OK (2초)
+
+════════ 최종 업로드 ════════
+  ✅ s3://shadowfit-measure-055447613012/shadowfit/ec2-20260817-050448
+
+════════ 단계 요약 ════════
+phase	status	seconds	started_at
+coresidency_preflight	OK	3	2026-08-17T05:04:48+00:00
+coresidency_rehearsal	OK	842	2026-08-17T05:04:52+00:00
+coresidency	OK	11873	2026-08-17T05:18:55+00:00
+collect	OK	2	2026-08-17T08:36:49+00:00
+  자동 정지 꺼짐 — 회수 확인 후 직접 정지할 것. AWS-RIDE-ALONG.md §5 체크리스트를 볼 것

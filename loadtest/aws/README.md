@@ -15,7 +15,16 @@
 1. **S3 버킷** — 결과를 받을 곳. 리전은 인스턴스와 맞추는 편이 싸다
 2. **인스턴스 프로파일** — 그 버킷에 `s3:PutObject`·`s3:ListBucket`. `run_all.sh` 가
    **제일 먼저** 쓰기를 시험한다. 8시간 돌고 업로드에서 막히는 것이 최악이라서다
-3. 인스턴스 — 4차 실측 관례(c7i.2xlarge / m6i.xlarge), gp3 100GB 면 1,000만 행 스윕에 충분
+3. 인스턴스 — **라운드마다 다르다.** gp3 100GB 면 1,000만 행 스윕에 충분
+
+   | 라운드 | 인스턴스 | 대수 |
+   |---|---|---|
+   | P1(무중단 DDL)·P3(백업/복구) 등 | c7i.2xlarge / m6i.xlarge (4차 실측 관례) | 1대 (러너 = 측정 대상) |
+   | **P6(동거 용량)** | **대상 c7i.4xlarge + 부하기 c7i.large** | **2대** — 아래 「P6 — 2대 구성」 |
+
+   P6 의 대상이 c7i.4xlarge 로 고정된 이유는 값 비교다 — 08-14 의 「동시 156세션」이 나온
+   박스가 아니면 **팔 A 가 기준선 구실을 못 한다**
+   ([`../../docs/decisions/ai-coresidency-capacity.md`](../../docs/decisions/ai-coresidency-capacity.md) §10).
 4. **종료 동작 확인** — `AUTO_SHUTDOWN=1` 을 쓸 거면 인스턴스의
    `InstanceInitiatedShutdownBehavior` 가 `stop` 인지 본다. `terminate` 면 **EBS까지 날아간다**
 5. **요금 태그** — 아래
@@ -94,6 +103,13 @@ aws iam put-user-policy --user-name "$(aws sts get-caller-identity --query Arn \
 키**를 담고 있어 한참 헤맸다. 붙이기 전에 `aws sts get-caller-identity` 로 **UserId 를 직접
 확인**한다(위 명령이 그 값을 그대로 쓰는 이유).
 
+> ✅ **2026-08-17 확인 — 이 계정에는 `shadowfit-measure` 프로파일이 이미 있고, 임시 사용자
+> (`shadowfit-loadtest-temp`)로도 기동 시 붙일 수 있다.** 위 `create-role` 절차는 **처음
+> 만들 때만** 필요하다. 그냥 기동 명령에 `--iam-instance-profile Name=shadowfit-measure` 를 넣을 것.
+> 🔴 **`iam:GetInstanceProfile` 이 거절된다고 「못 붙인다」로 결론내지 말 것** — 조회 권한과
+> 사용 권한은 다르다. 2026-08-17 리허설 두 번이 그 오진으로 S3 를 통째로 건너뛰었다.
+> 확인은 `run-instances --dry-run` 을 **가짜 이름과 대조**해서 한다(가짜는 `InvalidParameterValue`).
+
 인스턴스 시작 시 이 인스턴스 프로파일을 붙이거나, 이미 떠 있으면
 `aws ec2 associate-iam-instance-profile --instance-id i-xxx --iam-instance-profile Name=shadowfit-measure`.
 
@@ -132,6 +148,62 @@ S3_BASE=s3://내버킷/shadowfit nohup bash loadtest/aws/run_all.sh > /root/run_
 `nohup` 없이 `&` 만 붙이면 **SSH 가 끊길 때 같이 죽는다.** 그러면 컴퓨터를 못 끈다.
 
 진행은 SSH 로 `tail -f /root/run_all.log`, 또는 S3 의 `phases.tsv` 를 본다.
+
+### P6 — 2대 구성 (동거 용량)
+
+🔴 **P6 는 위 절차가 그대로 안 통한다.** 다른 라운드는 「러너 = 측정 대상」인데,
+P6 의 rig 은 **부하기에서 돌며 대상 박스를 SSH 로 몬다**(`../results/coresidency-2026-08-15/coresidency_sweep.sh:39`).
+그래서 `run_all.sh` 가 도는 자리도 **부하기**다.
+
+🔴 **`coresidency` 를 `ddl`·`backup` 과 같은 `PHASES` 에 넣지 말 것** — 러너의 자리 자체가
+다르다(`run_all.sh:62`). 섞으면 다른 단계가 「측정 대상」으로 삼는 박스가 부하기가 된다.
+
+**사람이 먼저 해야 하는 것** (부트스트랩보다 앞이다)
+
+1. 인스턴스 **2대** — 대상 `c7i.4xlarge`, 부하기 `c7i.large`. 같은 VPC·서브넷(사설 IP 로 붙는다)
+2. 보안그룹 인바운드 — 부하기 → 대상 **22**(SSH), **8000**(AI HTTP), **8080**(Spring), **6565**(gRPC)
+3. **SSH 키를 부하기에 둔다** — `/root/.ssh/measure.pem`, `chmod 600`. 부하기가 대상을 몬다
+4. **양쪽 토큰 일치** — `AI_PUBLIC_TOKEN`(프레임 경로)·`INTERNAL_API_TOKEN`(gRPC 메타데이터).
+   다르면 preflight 가 막는다
+
+**부트스트랩 — `ROLE` 로 갈라 돌린다**
+
+```bash
+# 대상 박스 (AI + Spring + MySQL 세 컨테이너가 다 떠야 한다)
+ROLE=p6-target bash bootstrap.sh
+
+# 부하기 박스 (ghz·페이로드·프레임 자산. 끝에 실행 명령을 그대로 뱉는다)
+ROLE=p6-loader bash bootstrap.sh
+```
+
+**실행 — 부하기에서**
+
+```bash
+cd /root/init
+S3_BASE=s3://내버킷/shadowfit TARGET_HOST=<대상 사설 IP> \
+TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>" \
+AI_PUBLIC_TOKEN=<대상과 같은 값> GHZ_TOKEN=<대상과 같은 값> \
+GHZ_RPS=19 GHZ_DATA=/root/batch_multi.json GHZ_BIN=/usr/local/bin/ghz \
+PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
+  nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+```
+
+팔(`A B C`)·레벨(`20 40 60 80 120 160`)·`DUR`·`REPEATS` 는 **기본값이 확정값**이라 안 적어도 된다.
+안 적으면 안 되는 것이 둘이다:
+
+- `GHZ_RPS` — **기본값이 없다.** 「정한 값」이라 근거가 결과의 조건 칸에 같이 가야 해서다
+  ([`../../docs/decisions/ai-coresidency-capacity.md`](../../docs/decisions/ai-coresidency-capacity.md) §5-2·결정 로그)
+- ~~`GHZ_BIN`~~ → ✅ **고쳤다 (#249, 2026-08-17)** — 기본값이 `/usr/local/bin/ghz` 라 이제 안 적어도 된다.
+  아래는 왜 그 함정이 있었는지의 기록이다. 🔴 **기본값이 부트스트랩 설치 경로와 다르다.** `bootstrap.sh` 는 릴리스 바이너리를
+  `/usr/local/bin/ghz` 에 깔지만(`bootstrap.sh:179`) 러너 기본값은 `/home/ec2-user/go/bin/ghz`
+  다(`run_all.sh:118`, 옛 라운드의 go install 경로). 안 적으면 preflight 가 `GHZ_BIN(실행권한)`
+  으로 막는다 — 막히긴 하니 라운드를 버리진 않는다
+
+라운드는 **12판 ≈ 2시간**, 부트스트랩·preflight·리허설까지 **3.5시간 안팎**이다.
+`coresidency_rehearsal` 이 실패하면 **정판을 안 돈다** — 리허설 판정은 종료 코드가 아니라
+결과 표(`setup_fail`·`req`)로 한다.
+
+⚠️ **여기 적힌 절차로 2대를 실제로 띄워 본 적은 없다.** 포트·키 경로는 rig 코드에서 읽은 것이다.
 
 ## 설정
 
