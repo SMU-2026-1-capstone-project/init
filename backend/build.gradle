@@ -140,10 +140,14 @@ sourceSets {
 	tasks.named('test') {
 		useJUnitPlatform()
 
-		// 아래 둘은 같은 문제의 서로 다른 사례다 — gradlew 에 준 -D 는 Gradle 자신의 JVM 에만
+		// 아래 셋은 같은 문제의 서로 다른 사례다 — gradlew 에 준 -D 는 Gradle 자신의 JVM 에만
 		// 붙고 포크된 테스트 JVM 으로 자동 전달되지 않아, 그대로 두면 @EnabledIfSystemProperty 가
-		// 테스트 쪽에서 못 보고 **조용히 스킵**된다. 둘 다 기본값이 없으므로 평소에는 프로퍼티
+		// 테스트 쪽에서 못 보고 **조용히 스킵**된다. 셋 다 기본값이 없으므로 평소에는 프로퍼티
 		// 자체가 없고 해당 테스트만 건너뛴다.
+		//
+		// 📌 이 주석이 이미 있는데도 #207 리그를 붙이며 그대로 한 번 밟았다(2026-08-17).
+		//    스킵은 BUILD SUCCESSFUL 로 나오므로, 켰다고 생각한 리그가 안 돈 것을 출력으로는
+		//    알 수 없다 — 리포트의 skipped 수를 봐야 한다.
 
 		// 레이스 재현 테스트(PoseDataOrphanRaceTest)는 실제 MySQL(3307)이 필요하다.
 		if (System.getProperty('race.mysql') != null) {
@@ -153,5 +157,15 @@ sourceSets {
 		// AdminMemberExplainCaptureTest — loadtest/measure_admin_filter_explain.sh 전용.
 		if (System.getProperty('explain.capture') != null) {
 			systemProperty 'explain.capture', System.getProperty('explain.capture')
+		}
+
+		// SessionTimeoutSweepLoadTest(#207) — 실제 MySQL(3308)이 필요하다.
+		// 이 리그는 결과를 stdout 으로 낸다(측정 표). 위 둘과 달리 **출력을 봐야 의미가 있으므로**
+		// 표준 스트림도 같이 연다 — 평소에는 프로퍼티가 없어 안 열린다.
+		if (System.getProperty('sweep.load') != null) {
+			systemProperty 'sweep.load', System.getProperty('sweep.load')
+			testLogging {
+				showStandardStreams = true
+			}
 		}
 	}
