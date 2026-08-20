@@ -32,7 +32,7 @@
 |---|---|
 | InnoDB 클러스터드 인덱스가 시계열 append 에 유리 | 절반만 맞음. `pose_data.id` AUTO_INCREMENT(단조 PK)로 InnoDB 특유의 함정을 피한 것뿐. PostgreSQL 힙 테이블은 PK 값과 무관하게 자연 append 라 애초에 이 함정이 없다 → 무승부 |
 | 파티션 `DROP` TTL 패턴이 MySQL 에 맞음 | 자체 실측([`realmysql-experiments.md:116`](../portfolio/realmysql-experiments.md))이 이미 반증 — `session_id=` 조회는 pruning 이득 **0**. 파티셔닝의 값은 보존정책(`DROP PARTITION` O(1))인데 PG 선언적 파티셔닝의 `DETACH`+`DROP` 도 동일하게 O(1) |
-| JSON 오프페이지 회피(projection −98.7%)가 MySQL 강점 | InnoDB off-page 저장과 PostgreSQL **TOAST** 가 원리상 동일. 큰 가변길이 컬럼을 다루는 RDBMS 의 일반 원리지 엔진 차별점이 아니다 |
+| JSON 오프페이지 회피(projection −98.7%, [조건](../portfolio/realmysql-experiments.md#projection-98-7))가 MySQL 강점 | InnoDB off-page 저장과 PostgreSQL **TOAST** 가 원리상 동일. 큰 가변길이 컬럼을 다루는 RDBMS 의 일반 원리지 엔진 차별점이 아니다 |
 
 **면접에서 엔진 자체의 기술적 필연성을 주장하지 말 것.**
 

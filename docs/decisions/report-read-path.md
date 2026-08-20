@@ -89,7 +89,7 @@ GET /reports/sessions/{id}
 
 | # | 문제 | 상태 | 코드 근거 |
 |---|------|------|-----------|
-| ① | ~~**fat 컬럼 over-fetch** — 풀엔티티 로드, worst 계산은 당시 `syncRate`·`timestampSec`·`feedbackMessage` 3개만 씀. `joint_coordinates`는 **한 번도 안 씀**~~ | **✅ 해결(2026-07-15)** | `findFramesBySessionId`(적용 당시 3컬럼 → **현재 4컬럼**, §7)로 교체. 실측(§②b): payload −98.7%, warm 쿼리 **8x**(로컬 412만 행) → **29~41x**(AWS 1억 행, 2026-07-15 재검증) |
+| ① ([조건](../portfolio/realmysql-experiments.md#projection-98-7)) | ~~**fat 컬럼 over-fetch** — 풀엔티티 로드, worst 계산은 당시 `syncRate`·`timestampSec`·`feedbackMessage` 3개만 씀. `joint_coordinates`는 **한 번도 안 씀**~~ | **✅ 해결(2026-07-15)** | `findFramesBySessionId`(적용 당시 3컬럼 → **현재 4컬럼**, §7)로 교체. 실측(§②b): payload −98.7%, warm 쿼리 **8x**(로컬 412만 행) → **29~41x**(AWS 1억 행, 2026-07-15 재검증) |
 | ② | **재계산-on-read** — precompute 없이 매 GET마다 worst 구간 재계산 | ✅ 실재 | `selectWorstSection` 매 호출 |
 | ③ | **REPORT_NOT_FOUND 갭** — `completeAnalysis`가 `session`만 UPDATE, `reports`엔 안 씀 → 실제 세션은 Report 행 없음 → 404 | ✅ 실재(기능 끊김) | `applyCompleteFromApp`([`ExerciseAnalysisService.java:217`](../../backend/src/main/java/com/shadowfit/service/Exercise/ExerciseAnalysisService.java)) session만 UPDATE / `reports`는 [`data.sql:168`](../../mysql/data.sql) 시드뿐 |
 | ④ | ~~**exercise_sessions 인덱스 갭** — `(member_id, start_time)` 등 복합 인덱스 없음(FK 단일뿐) → 캘린더·이전세션 쿼리 filesort~~ | **✅ 해결(2026-07-11)** | `idx_session_member_starttime` 추가([`schema.sql:71`](../../mysql/schema.sql)), 실측: 월간 조회 1675행 Filter → 143행 Index range scan(cost 91.4→64.6), 연간 조회는 Covering index scan으로 전환. 커밋 `dbb0fec`<br>🔀 **2026-08-07**: 이 인덱스는 `idx_session_member_status_start (member_id, status, start_time)` 로 통합돼 이름이 사라졌다([#110](https://github.com/Shadowfit/init/issues/110), [`session-index-composition.md`](./session-index-composition.md)). 갭 자체는 여전히 해결 상태 — 다만 `status` 를 건너뛰어야 해 읽는 행이 14 → 20 으로 늘었다(절대 0.03ms) |
@@ -125,7 +125,7 @@ GET /reports/sessions/{id}
 | 행 특성 | 작고 균일 | **행마다 fat JSON(off-page)** |
 | 주 문제 | N+1, 인덱스 부재→풀스캔, 깊은 offset | **fat 헛로드·재계산·버퍼풀 오염·raw-in-OLTP** |
 | 인덱스 추가 효과 | 극적(헤드라인) | 이미 최적(조연) |
-| projection 효과 | 작음(행 작음) | **큼(−98.7%)** |
+| projection 효과 | 작음(행 작음) | **큼(−98.7%)** ([조건](../portfolio/realmysql-experiments.md#projection-98-7)) |
 | 해결 성격 | textbook=평준화 | **판단 필요**(denormalization·티어링) |
 
 → 같은 "읽기"여도 **병목이 어느 단계냐**가 달라, 인덱스가 헤드라인(CRUD)이냐 조연(시계열)이냐가 갈린다. 유사 프로젝트도 *제대로 측정하면* 같은 문제를 만나지만 대부분 측정 안 해 모름 → **차별점은 "문제를 가진 것"이 아니라 "측정해 발견한 것"**([`db-deep-dive.md`](../portfolio/db-deep-dive.md) §0.3).
@@ -136,7 +136,7 @@ GET /reports/sessions/{id}
 
 | 등급 | 항목 | 의미 |
 |---|---|---|
-| 🟢 **실재 + 측정** | ① over-fetch (projection −98.7% 측정) | 코드에 있고 합성 볼륨으로 측정 |
+| 🟢 **실재 + 측정** | ① over-fetch (projection −98.7% 측정, [조건](../portfolio/realmysql-experiments.md#projection-98-7)) | 코드에 있고 합성 볼륨으로 측정 |
 | 🟢 **실재 (코드)** | ② 재계산, ③ REPORT_NOT_FOUND | 코드/스키마에 실재 |
 | ✅ **해결됨(2026-07-11)** | ④ 인덱스 갭 | `idx_session_member_starttime` 추가, 실측 확인 — 커밋 `dbb0fec` |
 | 🟡 **잠재 (규모 미발동)** | ⑤ 버퍼풀 오염, ⑥ 무제한 프레임 | 메커니즘 실재하나 DAU 작아 안 터짐 |

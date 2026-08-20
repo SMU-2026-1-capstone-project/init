@@ -68,6 +68,21 @@ DBA 축 추가([[user_career_target]], 2026-08-09). 전부 «데모에 좋은 �
   같은 종류가 최소 하나 더 열려 있다 — projection `−98.7%` 의 인용처
   6곳([`./projection-end-to-end-remeasure.md`](./projection-end-to-end-remeasure.md) 참조).
   **E2 는 새 측정이 아니라 기존 문서 정리다.**
+
+  > 🔴 **2026-08-20 정정 — «6곳» 은 이 문서를 쓴 날의 포폴 문서 범위였다.** 전수로 세니
+  > 저장소 전체에서 **19개 파일**이 이 수를 인용한다. 그 뒤 `one-pager.md`·`mysql-vs-postgresql.md`
+  > 등이 인용을 더 늘렸다 — **정리 대상이 스스로 자라는 종류**라는 것이 이 정정의 요지다.
+  >
+  > **처리 (2026-08-20)**: 조건의 **단일 출처**를 [`../portfolio/realmysql-experiments.md#projection-98-7`](../portfolio/realmysql-experiments.md#projection-98-7)
+  > 에 세우고(무엇의 −98.7% 인가 · 언제·어디서 · 무슨 조건 · 누가 부르는 쿼리 · 인용 금지 항목 ·
+  > 아직 안 잰 것), 나머지가 그것을 가리키게 했다. **13개 파일 처리 · 3개 보류 · 3개 제외**:
+  >
+  > | | 파일 | 왜 |
+  > |---|---|---|
+  > | **보류** | `portfolio/application-hf-it.md` · `application-smilegate-dba.md` · `career-statement-dba.md`(+`.print.html`) | **아직 커밋 안 된 지원서 초안.** 손대면 초안을 저장소에 올리는 셈이라 건드리지 않았다. 제출용 축약 문서라 조건을 다 못 싣는 것도 사실이고, **그 조건은 뒤에 붙는 포폴 문서가 진다**는 정리가 따로 필요하다 |
+  > | **제외** | `handoff/work-log-2026-08-09.md` · `decisions/architecture-review-2026-08-11.md` | **날짜가 박힌 기록**이다. 그날의 서술을 소급해 고치면 드리프트를 반대 방향으로 만든다 |
+  >
+  > 그래서 **E2 는 아직 안 닫혔다.** 남은 것은 위 보류 3개(지원서)와 −98.7% 외의 다른 수들이다.
 - **E3 의 «근거» 는 실측일 필요가 없다.** 복제/HA 는 «규모상 실수요 0» 이라는 판정이 이미 있고
   ([`../portfolio/realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §2), 그 판정을
   유지하는 것도 닫힌 것이다. **안 한 이유가 적혀 있으면 닫혔다.**

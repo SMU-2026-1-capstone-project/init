@@ -183,6 +183,8 @@
 | payload (AWS 1억 행) | 1,740.1 KB | 22.6 KB | **−98.7%** |
 | warm 쿼리 (AWS 1억 행) | 40.6 ms | 1.4 ms | **29~41x** |
 
+→ **측정 조건**: warm(같은 쿼리 cold 721ms → warm 12ms), 750행/세션, 측정 시점 3컬럼 프로젝션. **−98.7% 는 DB→앱 payload** 지 앱→클라이언트 응답 바이트가 아니다. 절대 ms 는 하드웨어 종속이라 배수까지만 인용한다 — 조건 전체는 [`realmysql-experiments.md` §②b](./portfolio/realmysql-experiments.md#projection-98-7).
+
 → 인덱스는 동일. 차이는 JSON이 off-page overflow로 저장돼 SELECT 시 추가 random I/O가 발생하는데, projection이 이를 회피한 것.
 
 → **1억 행 재검증(2026-07-15, AWS EC2 m6i.xlarge)에서 배수가 오히려 커졌다.** 버퍼풀은 2GB로 동일한데 테이블이 25배(~230GB) 커지며 작업셋 대비 버퍼풀 비율이 나빠져, 풀엔티티 로드의 off-page 랜덤 I/O가 캐시에 덜 걸리고 실제 디스크를 더 탄 탓. 결론이 뒤집힌 게 아니라 스케일에 비례해 강화된 것이다. payload 감소율은 두 환경에서 동일(세션당 바이트 비율이라 행수 무관).
@@ -262,7 +264,7 @@ MediaPipe가 뱉는 **33개 landmark 전부**를 `joint_coordinates`에 저장�
 | 영역 | 개선 | 수치 |
 |---|---|---|
 | 쓰기 | 배치 INSERT | 처리량 +99%, p99 −37% |
-| 읽기 | JSON projection | payload −98.7%, warm 쿼리 8x(로컬 412만 행) → 29~41x(AWS 1억 행)<br>⚠️ precompute 잡의 자원 절감이지 사용자 체감 지연 아님 |
+| 읽기 | JSON projection | **DB→앱** payload −98.7%, warm 쿼리 8x(로컬 412만 행, 2026-06-02) → 29~41x(AWS 1억 행, 2026-07-15). warm·750행/세션·3컬럼 시절<br>⚠️ precompute 잡의 자원 절감이지 사용자 체감 지연 아님 · [조건](./portfolio/realmysql-experiments.md#projection-98-7) |
 | 인덱스 | 풀스캔 대조 | 인덱스 부재 시 85초 |
 | 페이지네이션 | offset→keyset | 최대 489,868x |
 | 보존 | DROP PARTITION | DELETE 대비 625x |

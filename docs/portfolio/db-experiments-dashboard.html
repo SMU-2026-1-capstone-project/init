@@ -226,7 +226,7 @@ const cardsRoot = document.getElementById("cards");
     ],
     ariaLabel: "projection 전후 payload 크기 비교"
   });
-  addFootnote(card, "쿼리 시간도 12.1ms → 1.5ms(8x). AWS 1억 행 real-JSON 재검증: 40.6ms → 1.4ms(29~41x) — 스케일 커질수록 개선폭 더 큼.");
+  addFootnote(card, "조건 — 2026-06-02 로컬(물리 2코어) 412만 행, warm, 750행/세션, 3컬럼 시절. 이 −98.7%는 DB→앱 payload지 앱→클라이언트 응답 바이트가 아니다. 쿼리 시간도 12.1ms → 1.5ms(8x). AWS 1억 행 real-JSON 재검증(2026-07-15): 40.6ms → 1.4ms(29~41x) — 스케일 커질수록 개선폭 더 큼. 절대 ms는 하드웨어 종속이라 배수까지만. ⚠️ 세션 종료 시 precompute가 세션당 1회 도는 비동기 잡이라, 사용자 체감 지연이 아니라 그 잡의 자원 절감이다.");
   cardsRoot.appendChild(card);
 }
 

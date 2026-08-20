@@ -96,7 +96,7 @@
 ### ② Ch.11 + Ch.13 — 쿼리 최적화 & 파티션 🟢⭐
 - **개념**: bulk INSERT, 페이지네이션(offset→cursor), projection / Range 파티션·프루닝.
 - **이 프로젝트 (a) 쓰기**: ✅ batch insert 완료 — JdbcTemplate `batchUpdate`, throughput **+99%**, p99 −37% (§7.6). Ch.11 bulk insert 그 자체.
-- **이 프로젝트 (b) projection**: ✅ `ReportService` JSON blob 헛로드(~3MB) → projection DTO(측정 시점 3컬럼, **현재 4컬럼**).
+- **이 프로젝트 (b) projection**: ✅ `ReportService` JSON blob 헛로드(~3MB) → projection DTO(측정 시점 3컬럼, **현재 4컬럼**). 수치와 그 [인용 조건](#projection-98-7)은 아래 «결과 (b)».
 - **이 프로젝트 (c) 페이지네이션**: ✅ 전체 테이블 시간순 페이지네이션 offset → keyset(cursor). 1억 행 합성 rig로 실측 — offset O(N) 선형 저하 vs keyset 평탄 입증.
 - **이 프로젝트 (d) 파티션**: `pose_data` 날짜 Range 파티션 → **버퍼 TTL의 DROP PARTITION**(주용도, [`db-deep-dive §2-0`](./db-deep-dive.md) raw=버퍼) + cross-session 집계 pruning(부차). ⚠️ PK를 `(id, created_at)`로 변경 선결. 샤딩은 미적용(과설계).
   - **언제 파티셔닝하나? — "행 수"가 아니라 "용도"** ⭐: 업계 감각치(단일 테이블이 버퍼풀 초과 / 수천만~1억 행 / 수십~100GB↑)는 **필요조건일 뿐 충분조건 아님**. RealMySQL도 "몇 행"으로 안 박고 "감당·관리(특히 오래된 데이터 삭제)가 부담일 때"로 설명. 정당화 트리거 3: ①TTL/보존(대량 DELETE 부담→DROP PARTITION) ②쿼리가 항상 파티션 키로 범위 좁힘(pruning) ③파티션 단위 백업·아카이빙.
@@ -121,6 +121,19 @@
     - ⚠️ **위 로컬 96분(1억 행)과 다른 규모·다른 기계다.** 배수는 **같은 라운드 안에서만** 유효하고 절대 시간은 하드웨어 종속이라 인용하지 않는다. 트리거 오버헤드를 환경에서 분리하지도 못했다(팔 B 가 CPU 를 더 쓰는데 writer 를 동시에 돌린다).
 - **설계**: (b) projection before/after payload·응답 / (c) offset N=10만 vs cursor 응답 곡선 / (d) 파티션 후 `EXPLAIN`의 `partitions` 컬럼 pruning 확인 + **DROP PARTITION vs DELETE WHERE 실측 시간**(O(1) vs 락·undo).
 - **결과 (b) projection ✅ (2026-06-02, warm, 세션 750행, 412만 행 테이블)**:
+
+  > <a id="projection-98-7"></a>
+  > 📌 **«−98.7%» 를 인용할 때 같이 가야 하는 것 — 이 표가 단일 출처다.** 다른 문서는 여기를 가리킨다([E2](../decisions/project-destination-and-exit-criteria.md) §3).
+  >
+  > | | |
+  > |---|---|
+  > | **무엇의 −98.7% 인가** | **DB→앱 payload.** 앱→클라이언트 응답 바이트가 아니다 — API 응답 크기는 안 변하는 게 정상이고, 그걸 «효과 없음» 으로 읽으면 틀린다 |
+  > | **언제·어디서** | 2026-06-02 로컬(물리 2코어) 412만 행 · 2026-07-15 AWS EC2 m6i.xlarge 1억 행 real-JSON 재검증(둘 다 −98.7%) |
+  > | **무슨 조건에서** | **warm**(같은 쿼리 cold 721ms → warm 12ms) · 750행/세션 · **측정 시점 3컬럼 프로젝션**(현재 4컬럼) |
+  > | **누가 부르는 쿼리인가** | 세션 종료 시 precompute 가 **세션당 1회** 도는 **비동기 잡**. 「리포트가 빨라졌다」가 아니라 **「반복되는 잡의 I/O·버퍼풀 점유를 낮췄다」** 가 정직한 프레임 |
+  > | **같이 인용되는 쿼리 시간** | 8배(로컬 412만) → 29~41배(AWS 1억). **절대 ms 는 하드웨어 종속이라 인용 금지**, 배수까지만 |
+  > | **아직 안 잰 것** | ① 4컬럼에서의 절감률 ② API 응답시간 기여분(정상 경로에선 0) — [`projection-end-to-end-remeasure.md`](../decisions/projection-end-to-end-remeasure.md) Q5·§3 |
+
   - payload **1,716.8 KB → 22.4 KB (−98.7%)**, warm 쿼리 **12.1ms → 1.5ms (8x, −87%)**. **인덱스는 동일** — 차이는 `joint_coordinates`(2.3KB JSON)가 InnoDB **off-page(overflow) 저장**이라 SELECT 시 추가 random I/O, projection이 회피(Ch.15).
   - ⚠️ cold 721ms → warm 12ms(같은 쿼리) — 워밍업 통제 필수 재확인(§7.6). 절대 ms는 로컬 기준, 상대 delta는 신뢰 가능.
   - **✅ AWS 1억 행 real-JSON 재검증(2026-07-15)**: 면접 준비 중 로컬 하드웨어 제약(~230GB 문제, §3)을 실제로 AWS EC2(m6i.xlarge)+EBS 700GB로 우회해 **진짜 1억 행 × 실제 2.3KB JSON**(`pose_data_real_scale`, 133,334세션×750행 정확히 1억)으로 재현. payload **1,740.1 KB → 22.6 KB (−98.7%)** — 412만 행 때와 거의 동일(행수와 무관, 세션당 바이트 비율이라 예상대로). **warm 쿼리는 오히려 훨씬 크게 개선**: 40.6ms → 1.4ms(**약 29배**, 반복 측정 시 최대 41배까지 관찰) — 412만 행 때의 8배보다 큼. 이유: 버퍼풀(2GB)은 동일한데 테이블이 25배 커져서(~230GB) **작업셋 대비 버퍼풀 비율이 더 나빠짐** → 풀엔티티 로드의 off-page 랜덤 I/O가 캐시에 덜 걸리고 실제 디스크 I/O를 더 많이 탐 → projection이 그 I/O를 회피하는 효과가 스케일이 커질수록 더 커짐. **결론이 뒤집힌 게 아니라 강화됨**: "이미 최적 인덱스, projection이 진짜 병목 해결" 결론은 동일, 배수만 스케일에 비례해 커짐.
@@ -167,7 +180,7 @@
   - **~625배** (행당 정규화 ~570배). DELETE는 8.3M행 행단위 삭제(undo·인덱스 유지·락) + **빈 952MB 파일 잔존**(OPTIMIZE 없인 공간 안 돌아옴), DROP은 **파티션 `.ibd` 파일째 unlink** = 행단위 작업 0. ⚠️ DROP 1.8초도 진짜 O(1)이 아니라 ~910MB 파일 삭제 I/O(로컬 디스크 느림) — 빠른 스토리지면 sub-100ms. "O(1)"은 *행단위 비용 없음*을 뜻함.
   - rig: `loadtest/measure_partition.sh`(재현). 측정 후 p2026_01(DELETE로 빈 채 잔존)·p2026_02(DROP) 제거됨 → rig 재현은 `seed_pose_scale.sh`.
   - **✅ AWS real-JSON 서브셋 재검증(2026-07-15)**: 전체 1억 행(~230GB) 테이블을 통째로 파티션 변환하는 건 시간·비용 리스크가 커서(로컬 96분의 최대 20배 이상까지 갈 수 있어 예측 불가), 대신 별도 소규모 real-JSON 테이블(2파티션, old 52.5만 행/~1.2GB 실제 JSON)로 축소 재현. `DELETE WHERE` = **66.552초**, `DROP PARTITION` = **0.158초** → **약 421배**. 원본(더미, 830만 행, 625배)보다 배수는 작지만(스케일 축소 영향) 행당 DELETE 비용은 오히려 비슷(원본 0.135ms/행 vs 이번 0.127ms/행) — **DELETE 비용이 payload 크기가 아니라 행당 오버헤드(undo·인덱스·락)에 지배된다**는 걸 확인. 메커니즘(O(1) vs O(n))은 real JSON에서도 동일하게 재현됨.
-- **면접**: "세션 리포트는 안 느려지지만(§4.3), payload는 JSON off-page 페치라 projection이 −98.7%. **파티션은 pruning(세션 쿼리엔 이득 0)이 아니라 TTL이 핵심 — 8M행 만료가 DELETE 18.6분 vs DROP PARTITION 1.8초(625x), DELETE는 빈 파일까지 남는다.**"
+- **면접**([조건](#projection-98-7)): "세션 리포트는 안 느려지지만(§4.3), payload는 JSON off-page 페치라 **DB→앱** projection이 −98.7%(2026-06-02 로컬 412만 행 warm, 3컬럼 시절 · AWS 1억 행 재검증 동일). **precompute 잡이 부르는 쿼리**라 체감 지연이 아니라 잡 자원 절감이다. **파티션은 pruning(세션 쿼리엔 이득 0)이 아니라 TTL이 핵심 — 8M행 만료가 DELETE 18.6분 vs DROP PARTITION 1.8초(625x), DELETE는 빈 파일까지 남는다.**"
 
 ### ③ Ch.5 — 트랜잭션·잠금·격리수준 🟢
 - **개념**: 격리수준(RC/RR), 레코드/갭/넥스트키 락, 낙관적 vs 비관적.

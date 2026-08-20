@@ -31,7 +31,7 @@
 
 | 무엇을 고쳤나 | 결과 | **조건** | 근거 |
 |---|---|---|---|
-| **JSON over-fetch** — 리포트 계산에 안 쓰는 2.3KB JSON까지 로드 | payload **−98.7%**, warm 쿼리 **8배** | 2026-06-02, warm, 750행/세션, 로컬 412만 행, **3컬럼 시절 프로젝션**. AWS 1억 행 재검증 29~41배. ⚠️ **precompute 잡이 부르는 쿼리**라 사용자 체감 지연이 아니라 잡 자원 절감 | [§②b](./realmysql-experiments.md) |
+| **JSON over-fetch** — 리포트 계산에 안 쓰는 2.3KB JSON까지 로드 | payload **−98.7%**, warm 쿼리 **8배** | 2026-06-02, warm, 750행/세션, 로컬 412만 행, **3컬럼 시절 프로젝션**. AWS 1억 행 재검증 29~41배. ⚠️ **precompute 잡이 부르는 쿼리**라 사용자 체감 지연이 아니라 잡 자원 절감 | [§②b · 조건](./realmysql-experiments.md#projection-98-7) |
 | **TTL 삭제** — 만료 데이터를 DELETE로 지움 | `DROP PARTITION`이 DELETE 대비 **625배** | 8.3M행 만료 기준(18.6분 → 1.8초). DELETE는 빈 952MB 파일도 남긴다. **조회 pruning 이득은 0**(별도 실측으로 반증) | [§②d](./realmysql-experiments.md) |
 | **쓰기 천장** — 「커넥션 풀이 병목」 가설 | 다세션 천장 **649 RPS**(⚠️ **«100세션» 조건 · `uk_pose_event` 이전 스키마**), `pool=5`는 plateau의 **69%**, 10부터 평탄 | 2026-08-09 EC2 4차. **단일 핫세션 페이로드에선 이 절벽이 안 보인다** — 그 조건에선 천장이 fsync였고(231.6→803.1, 3.47배) 풀이 가려졌다. ✅ **2026-08-18 P5**: 그 «100세션» 은 잰 값이 아니었고, 실제 **plateau 는 10세션에서 붙는다**(266→1,013 RPS, 그 위로 평탄). 기제는 락 대기 **29,999 → 40** | [§5-1(9)](../decisions/pose-ingest-downsampling.md) |
 
@@ -83,7 +83,7 @@
 
 | DBA 업무 | 이 프로젝트에서 | 결과 | 근거 |
 |---|---|---|---|
-| **쿼리 튜닝** | JSON off-page over-fetch 제거 | payload −98.7% (조건: ①표) | [§②b](./realmysql-experiments.md) |
+| **쿼리 튜닝** | JSON off-page over-fetch 제거 | payload −98.7% (조건: ①표) | [§②b · 조건](./realmysql-experiments.md#projection-98-7) |
 | **인덱스 설계·검증** | `EXPLAIN`으로 이미 최적임을 확인 후 **가설 폐기**, `IGNORE INDEX` 강제 풀스캔과 직접 대조 | 약 9,000배 (조건: ①표) | [`realmysql-experiments.md`](./realmysql-experiments.md) · rig [`measure_admin_index.sh`](../../loadtest/measure_admin_index.sh) |
 | **보존정책 운영** | 월별 RANGE 파티션 + 자동 DROP/선확보 스케줄러 | DELETE 대비 625배 (조건: ①표) | [§②d](./realmysql-experiments.md) |
 | **용량 산정** | 커넥션 풀 사이징 EC2 4차 실측 · **자원 상한을 실측 상수에서 유도**(메모리 한도 ÷ 98.7MB) | plateau 시작점 = 10 · 코어당 16.4세션 (조건: ①표) | [§5-1(9)](../decisions/pose-ingest-downsampling.md) · [`ai-recalibrate`](../../loadtest/results/ai-recalibrate-2026-08-11/) |
