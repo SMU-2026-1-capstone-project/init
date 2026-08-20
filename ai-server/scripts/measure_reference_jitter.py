@@ -73,15 +73,17 @@ def main() -> int:
     print(f"고정한 사용자 rep : {user_desc}")
     print(f"정답지 {len(references)}벌 각각으로 같은 사용자 rep 을 채점한다")
     print()
-    print(f"  {'run':<5}{'ref score':>10}{'ref frames':>12}{'DTW 거리':>12}{'sync_rate':>12}")
+    print(f"  {'run':<5}{'ref score':>10}{'ref frames':>12}{'ref min_knee':>14}"
+          f"{'DTW 거리':>12}{'sync_rate':>12}")
 
-    rates, dists = [], []
-    for run, score, fc, _mk, ref_angles in references:
+    rates, dists, min_knees = [], [], []
+    for run, score, fc, mk, ref_angles in references:
         d = compute_dtw_distance(ref_angles, user_seq)
         s = compute_sync_rate(ref_angles, user_seq)
         rates.append(s)
         dists.append(d)
-        print(f"  {run:<5}{score:>10}{fc:>12}{d:>12.4f}{s:>12.2f}")
+        min_knees.append(mk)
+        print(f"  {run:<5}{score:>10}{fc:>12}{mk:>14.2f}{d:>12.4f}{s:>12.2f}")
 
     print()
     ref_scores = [r[1] for r in references]
@@ -94,6 +96,29 @@ def main() -> int:
           f"(폭 {max(rates) - min(rates):.2f}점)")
     if len(rates) > 1:
         print(f"     sd             : {statistics.stdev(rates):.3f}")
+
+    # ── #256: 판별 정답지의 min_knee 변동폭 ──
+    #
+    # feedback-type-detector.md ① 은 「깊이 축(HIP_HIGH) 을 버린다」 를
+    # 「세어진 rep ≤ 100°, 정답지 96.5° → 겹치는 폭 3.5° 이고 그건 지터와
+    # 구분이 안 된다」 로 세웠는데, 그 「지터 3.5°」 가 미측정이었다.
+    # 여기서 나오는 폭이 그 수치의 진위를 정한다 (#256).
+    #
+    # ⚠️ 재는 것은 「랜드마크 지터」 자체가 아니라 **판별 정답지의
+    #    min_knee 변동**이다. 같은 영상을 다시 추출하면 (ㄱ) 랜드마크가 흔들리고
+    #    (ㄴ) 그 때문에 「최고 점수 rep」 자체가 다른 rep 으로 바뀌기도 한다.
+    #    둘이 섞인 값이다 — 그러나 깊이 판정이 실제로 마주하는 것도 그 섞인
+    #    값이라 이쪽이 맞는 질문이다.
+    if len(min_knees) > 1:
+        mk_span = max(min_knees) - min(min_knees)
+        print()
+        print(f"  🔴 정답지 min_knee : {min(min_knees):.2f}° ~ {max(min_knees):.2f}° "
+              f"(폭 {mk_span:.2f}°)")
+        print(f"     sd             : {statistics.stdev(min_knees):.3f}°")
+        print("     문서의 3.5° 대조 : "
+              + ("폭 ≥ 3.5° — ① 유지 (깊이 축 판정 불가)"
+                 if mk_span >= 3.5 else
+                 "폭 < 3.5° — 🔴 ① 의 결론이 뒤집힌다 (깊이 축이 살아난다)"))
     return 0
 
 
