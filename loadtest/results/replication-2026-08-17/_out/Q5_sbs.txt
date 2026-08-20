@@ -1,0 +1,19 @@
+# Q5 — SBS 가 «따라잡았다» 고 말할 때 실제로 따라잡았는가
+
+## 시나리오: IO 스레드만 끊는다
+# 릴레이 로그를 다 적용한 뒤라 SQL 스레드는 할 일이 없다. SBS 는 그 상태를
+# «안 밀렸다» 로 볼 수 있는데, 소스에는 새 쓰기가 계속 쌓인다.
+
+t_s      real_lag_s   Seconds_Behind_Source  IO        
+3.7      85.12        NULL                   No        
+6.8      88.54        NULL                   No        
+10.3     91.86        NULL                   No        
+14.1     95.25        NULL                   No        
+18.3     99.75        NULL                   No        
+23.6     104.06       NULL                   No        
+31.4     112.13       NULL                   No        
+37.1     117.63       NULL                   No        
+40.9     122.33       NULL                   No        
+44.6     126.00       NULL                   No        
+
+IO 복구 후 SBS=0

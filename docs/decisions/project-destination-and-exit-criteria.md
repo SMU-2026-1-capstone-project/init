@@ -111,7 +111,7 @@ DBA 축 추가([[user_career_target]], 2026-08-09). 전부 «데모에 좋은 �
 
 - [x] **착수 순서** — **한 장 먼저**(2026-08-10 확정). 근거는 §6
 - [x] **«한 장» 의 형식** — **[`../portfolio/one-pager.md`](../portfolio/one-pager.md) 신규 생성, 한 문서에 백엔드·DBA 두 섹션**(2026-08-10 확정). 기존 6개 포폴 문서(1,080줄)는 «근거» 로만 링크한다 — 문서 수는 1개 늘지만 **읽는 문서는 1개로 줄어든다**
-- [ ] **E3 의 복제 축 처리** — 기존 «substrate 없음, 안 함» 판정 유지 vs 측정으로 재정의
+- [x] **E3 의 복제 축 처리** — **로컬 이진 사실만 측정, Q1·Q2 는 «EC2 필요, 안 함»**(2026-08-17 확정). 유지도 정당했지만(§3 주석), 앞의 두 결손을 실측으로 닫아놓고 이것만 문서로 닫으면 비대칭이 남고 설계 문서 §0 이 «이 축은 말로 때우기가 쉬워서 오히려 위험하다» 고 스스로 경고한 자리였다. → [`./replication-lag-and-semisync.md` §0-2](./replication-lag-and-semisync.md) · 원본 [`../../loadtest/results/replication-2026-08-17/`](../../loadtest/results/replication-2026-08-17/)
 - [ ] **E4 의 «예상 질문» 목록을 어디에 둘지** — [`../portfolio/interview-qa-kandl.md`](../portfolio/interview-qa-kandl.md) 확장이 자연스럽지만, 그 문서 자체가 E2 대상이기도 하다
 - [ ] **기한** — 2학기 일정과 채용 일정 중 무엇을 기준선으로 둘지
 
