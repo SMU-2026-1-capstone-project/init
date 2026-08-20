@@ -91,7 +91,7 @@
 | **스키마** | `org.flywaydb:flyway-core`, `flyway-mysql` | 부팅 시 마이그레이션 적용 |
 | **쿼리** | `com.querydsl:querydsl-jpa::jakarta` | 🔴 **`jakarta` 분류자가 필수** — 빠뜨리면 `javax` 기반 아티팩트가 딸려온다(build.gradle 주석에 박혀 있다) |
 | **캐시** | `spring-boot-starter-cache`, `caffeine:3.2.4` | 로컬 캐시. ❌ **Redis 는 아직 없다**(도입 미결정) |
-| 기타 | `spring-boot-starter-webflux`(WebClient), `modelmapper:3.2.6`, `commons-lang3:3.20.0`, `dotenv-java:3.2.0`, `jackson-databind:2.22.1` | |
+| 기타 | `modelmapper:3.2.6`, `commons-lang3:3.20.0`, `dotenv-java:3.2.0`, `jackson-databind:2.22.1` | |
 
 > ⚠️ **버전을 이 문서로 확인하지 말 것.** 위 표도 2026-08-08 스냅샷이라 곧 낡는다. **정본은 `backend/build.gradle`** 이고, 이 표는 *"무엇이 왜 들어와 있나"* 를 보는 용도다. 실제로 이 문서가 5개월간 `jjwt 0.12.5` 로 남아 있었다(실제 0.13.0).
 

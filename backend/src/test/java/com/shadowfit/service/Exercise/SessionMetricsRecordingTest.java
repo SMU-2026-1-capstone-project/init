@@ -29,7 +29,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -96,7 +95,6 @@ SessionMetricsRecordingTest {
     @DisplayName("ExerciseAnalysisService")
     class AnalysisService {
 
-        @Mock private WebClient webClient;
         @Mock private SessionRepository sessionRepository;
         @Mock private ExercisesRepository exercisesRepository;
         @Mock private MemberRepository memberRepository;
@@ -123,7 +121,7 @@ SessionMetricsRecordingTest {
             when(blockingStub.withInterceptors(any())).thenReturn(blockingStub);
             when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
 
-            service = new ExerciseAnalysisService(webClient, sessionRepository, exercisesRepository,
+            service = new ExerciseAnalysisService(sessionRepository, exercisesRepository,
                     memberRepository, sessionService, referenceRepository, poseDataRepository,
                     circuitBreakerRegistry, metrics);
             ReflectionTestUtils.setField(service, "internalToken", "test-token");
