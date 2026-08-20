@@ -21,7 +21,8 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 set -a; . ./.env; set +a
 
-LEVELS=(2 4 8 16)
+# shellcheck disable=SC2206 — LEVELS="2 3 4" 처럼 넘겨 구간을 좁힐 수 있게 한다
+LEVELS=(${LEVELS:-2 4 8 16})
 ITER=${ITER:-40}
 ROWS=${ROWS:-25}
 BLOCKS=${BLOCKS:-4}        # 첫 블록은 버린다 → 레벨당 유효 3판
