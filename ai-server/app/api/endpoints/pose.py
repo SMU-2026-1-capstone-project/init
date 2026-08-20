@@ -141,6 +141,11 @@ def detect_pose(req: PoseRequest):
         # 이 자리가 #196 통주행이 속은 바로 그 자리다 — landmarks 는 들어 있어서 «검출 30/31» 로
         # 세면 정상으로 보이는데, 판정에 들어간 프레임은 0 이었다. 하체가 프레임 밖이면 계속
         # 이 갈래로 떨어지고 리포트가 전 필드 0 으로 끝난다.
+        # ⚠️ 원자적이지 않다. 같은 세션 프레임이 겹치면(위 :67 주석) 둘이 같은 값을 읽어 증가
+        #    하나가 사라진다 — 그러면 요약의 `judged` 가 과대평가되고 «판정 0» 표시가 묻힐 수
+        #    있다. 형제인 `accepted_frame_count`·`dropped_frame_count` 도 같은 결함이고,
+        #    뿌리(세션 상태의 비원자적 read-modify-write)는 #162 다. 여기서 락을 하나 더
+        #    만들면 그 이슈가 정할 «어디에 락을 둘 것인가» 를 앞질러 정하게 된다.
         state.visibility_skip_count += 1
         return PoseResponse(
             success=False,

@@ -359,15 +359,26 @@ class ExerciseServicer(exercise_pb2_grpc.ExerciseServiceServicer):
         # 답하고, 상한을 통과한 뒤 가시성에서 떨어진 프레임은 «수락» 으로 세어져 보이지 않는다.
         # 판정에 들어간 프레임이 하나도 없으면 리포트는 전 필드 0 으로 끝나는데, 그때 원인이
         # 「사람이 안 왔다」가 아니라 「하체가 프레임 밖이었다」라는 것을 여기서만 알 수 있다.
-        if state.visibility_skip_count:
-            judged = state.accepted_frame_count - state.visibility_skip_count
+        #
+        # 🔴 **판정 0 이면 무조건 찍는다.** 「가시성 스킵이 있을 때만」으로 걸면 정작 제일 나쁜
+        #    경우를 놓친다 — 사람을 아예 못 찾은 세션은 `pose.py:80`(NO_POSE)이 `accept_frame`
+        #    **앞에서** 반환하므로 세 카운터가 전부 0 이고, 그러면 위 #143 로그도 이 로그도
+        #    안 찍혀 **StopAnalysis 가 프레임 유입에 대해 아무 말도 안 한다.** 리포트만 전 필드
+        #    0 으로 나오고 왜인지는 어디에도 안 남는다 — #196 이 겪은 것이 정확히 그 상태다.
+        if state.needs_intake_warning:
             logger.warning(
-                "[#267] 가시성 부족으로 판정에서 빠진 프레임 (session=%s): %d/%d — 판정에 들어간 것 %d개%s",
+                "[#267] 판정에 들어간 프레임 %d개 (session=%s) — 수락 %d · 가시성 스킵 %d · 상한 드롭 %d%s",
+                state.judged_frame_count,
                 session_id,
-                state.visibility_skip_count,
                 state.accepted_frame_count,
-                judged,
-                " 🔴 한 프레임도 판정되지 않았다" if judged <= 0 else "",
+                state.visibility_skip_count,
+                state.dropped_frame_count,
+                (
+                    " 🔴 한 프레임도 판정되지 않았다"
+                    " (수락까지 0 이면 사람을 못 찾은 것이다 — NO_POSE 는 이 숫자에 안 잡힌다)"
+                    if judged <= 0
+                    else ""
+                ),
             )
 
         # 누적된 rep들로 최종 통계 산출 → 별도 스레드에서 Spring 콜백.

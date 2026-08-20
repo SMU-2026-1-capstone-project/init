@@ -46,6 +46,20 @@ import time
 import cv2
 import httpx
 
+# 🔴 사유는 **enum 에서 가져온다.** 바로 아래 재시도 게이트가 문자열 리터럴이었는데, 그건 이
+#    스크립트 머리(#267 항목)가 「문자열 계약은 다음 사람이 또 걸린다」고 적어둔 것과 정면으로
+#    어긋난다. 리터럴이면 서버에서 멤버 이름이 바뀌어도 비교가 조용히 «항상 거짓» 이 되고,
+#    그러면 배정 대기 루프가 통째로 사라져 #196 의 경쟁이 다시 열린다 — 그것도 테스트 없이.
+#    이 import 는 사용법(위 §)이 요구하는 `PYTHONPATH=.` 아래에서 그대로 동작한다.
+from app.models.pose import PoseSkipReason
+
+# 배정이 아직 안 끝났다는 신호. 이 둘일 때만 재시도한다 — 나머지 사유는 배정이 끝난 뒤에야
+# 나올 수 있어서, 재시도해도 같은 답이 온다.
+_NOT_ASSIGNED_YET = {
+    PoseSkipReason.NO_LEASE.value,
+    PoseSkipReason.SESSION_NOT_FOUND.value,
+}
+
 
 def log(step: str, detail: str = "") -> None:
     print(f"[E1] {step:<34} {detail}")
@@ -160,7 +174,7 @@ def main() -> int:
             # 🔴 재시도 조건은 «성공했나» 가 아니라 «아직 배정 안 됐나» 다 (#267).
             #    success 로 판단하면 가시성 미달·속도 상한 프레임까지 «배정 대기» 로 오해해
             #    12초를 헛기다린다 — 그 둘은 배정이 끝난 뒤에야 나올 수 있는 사유다.
-            if body.get("skip_reason") not in ("NO_LEASE", "SESSION_NOT_FOUND"):
+            if body.get("skip_reason") not in _NOT_ASSIGNED_YET:
                 break
             if attempt == 0:
                 log("AI 배정 대기", str(body.get("message"))[:90])

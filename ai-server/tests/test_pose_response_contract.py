@@ -17,7 +17,7 @@ from unittest import mock
 import numpy as np
 
 from app.api.endpoints import pose as pose_endpoint
-from app.grpc.session_state import get_registry
+from app.grpc.session_state import SessionState, get_registry
 from app.models.pose import PoseRequest, PoseSkipReason
 
 from tests.test_squat_analyzer import _frame
@@ -136,19 +136,82 @@ class PoseResponseContractTest(unittest.TestCase):
     # ── 계약 자체 ──────────────────────────────────────────────────────────
 
     def test_success_와_skip_reason_은_같이_움직인다(self) -> None:
-        """둘이 어긋나면 축을 둘로 나눈 의미가 없다."""
+        """둘이 어긋나면 축을 둘로 나눈 의미가 없다.
+
+        🔴 **세션을 갈라 쓴다.** 처음에는 한 세션에 연달아 두 번 넣었는데, 두 번째가 유입
+        상한(300ms)에 걸려 `LOW_VISIBILITY` 가 아니라 `RATE_LIMITED` 를 받고 있었다 —
+        단언은 그대로 통과해서 **가시성 갈래가 조용히 안 덮였다**(2026-08-20 리뷰 지적).
+        """
         self._session(9208)
+        self._session(9210)
         cases = [
-            self._run(9208, lambda _img: _frame(_STANDING_ANGLE)),
-            self._run(9208, lambda _img: _INVISIBLE),
+            self._run(9208, lambda _img: _frame(_STANDING_ANGLE)),  # 판정됨
+            self._run(9210, lambda _img: _INVISIBLE),               # 가시성 부족
             self._run(9209, lambda _img: _frame(_STANDING_ANGLE)),  # 세션 없음
         ]
+        # 의도한 갈래를 실제로 밟았는지부터 고정한다 — 이게 없으면 위 사고가 또 조용히 난다.
+        self.assertEqual(
+            [c.skip_reason for c in cases],
+            [None, PoseSkipReason.LOW_VISIBILITY, PoseSkipReason.SESSION_NOT_FOUND],
+            "케이스가 의도한 갈래를 안 밟았다",
+        )
         for res in cases:
             self.assertEqual(
                 res.success,
                 res.skip_reason is None,
                 f"success={res.success} 인데 skip_reason={res.skip_reason} 이다",
             )
+
+
+class FrameIntakeDiagnosticTest(unittest.TestCase):
+    """세션 종료 때 「판정 0」을 알아보는가 (#267 곁가지).
+
+    StopAnalysis 자체는 gRPC 스텁이 필요해 이 저장소가 단위 테스트하지 않는다
+    (`test_stop_idempotency` 머리말). 그래서 **판단만** 상태 속성으로 빼서 여기서 고정한다 —
+    로그 문구는 servicer 에 남고, 「무엇을 경고할 것인가」는 이 테스트가 지킨다.
+    """
+
+    def _state(self, *, accepted=0, dropped=0, visibility=0):
+        state = SessionState(session_id=1, exercise_id=1)
+        state.accepted_frame_count = accepted
+        state.dropped_frame_count = dropped
+        state.visibility_skip_count = visibility
+        return state
+
+    def test_사람을_아예_못_찾은_세션도_경고한다(self) -> None:
+        """🔴 리뷰가 잡은 자리 (2026-08-20).
+
+        NO_POSE 는 `accept_frame` **앞에서** 반환하므로 카운터가 전부 0 이다. 처음 판에서는
+        경고를 `visibility_skip_count` 로 걸어서, 정작 이 경우 — 리포트가 전 필드 0 으로
+        끝나는 #196 그 상태 — 에 StopAnalysis 가 아무 말도 안 했다.
+        """
+        state = self._state()  # 수락 0 · 드롭 0 · 가시성 0
+
+        self.assertEqual(state.judged_frame_count, 0)
+        self.assertTrue(
+            state.needs_intake_warning,
+            "카운터가 전부 0 인 세션이 조용히 끝난다 — 이게 제일 나쁜 경우다",
+        )
+
+    def test_가시성으로_전부_떨어진_세션을_경고한다(self) -> None:
+        state = self._state(accepted=30, visibility=30)
+
+        self.assertEqual(state.judged_frame_count, 0)
+        self.assertTrue(state.needs_intake_warning)
+
+    def test_일부만_떨어져도_경고한다(self) -> None:
+        """판정이 살아 있어도 스킵이 있으면 알려준다 — 조용한 손실을 막는 쪽이다."""
+        state = self._state(accepted=30, visibility=10)
+
+        self.assertEqual(state.judged_frame_count, 20)
+        self.assertTrue(state.needs_intake_warning)
+
+    def test_건강한_세션은_조용하다(self) -> None:
+        """상한 드롭만 있는 것은 정상 동작이라 이 경고의 대상이 아니다(#143 로그가 따로 있다)."""
+        state = self._state(accepted=30, dropped=12)
+
+        self.assertEqual(state.judged_frame_count, 30)
+        self.assertFalse(state.needs_intake_warning)
 
 
 if __name__ == "__main__":

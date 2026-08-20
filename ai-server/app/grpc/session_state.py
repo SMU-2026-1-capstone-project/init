@@ -166,6 +166,33 @@ class SessionState:
     # 시간 축에서 하는 값이다.
     elapsed_offset_sec: float = 0.0
 
+    # ── 프레임 유입 진단 (#267) ────────────────────────────────────────────
+    #
+    # 계산을 StopAnalysis 안에 두지 않고 여기로 뺀 이유는 **시험 가능성**이다. servicer 메서드는
+    # gRPC 스텁이 필요해 이 저장소가 단위 테스트하지 않는 자리인데(`test_stop_idempotency` 머리말),
+    # 「판정 0 인 세션을 알아보는가」는 정확히 회귀가 나기 쉬운 판단이다. 값만 여기서 내면
+    # 로그 문구는 servicer 에 남기면서 판단은 테스트로 고정할 수 있다.
+
+    @property
+    def judged_frame_count(self) -> int:
+        """상태기계까지 실제로 들어간 프레임 수.
+
+        가시성 스킵은 `accept_frame` 을 **통과한 뒤** 떨어지므로 `accepted_frame_count` 에
+        들어가 있다. 그래서 «수락» 만 보면 판정된 것으로 오해한다 — 그 차이가 이 값이다.
+        """
+        return self.accepted_frame_count - self.visibility_skip_count
+
+    @property
+    def needs_intake_warning(self) -> bool:
+        """세션 종료 때 프레임 유입을 경고해야 하는가.
+
+        🔴 **판정 0 이면 카운터가 전부 0 이어도 경고한다.** 사람을 아예 못 찾은 세션은
+        `pose.py` 의 NO_POSE 갈래가 `accept_frame` 앞에서 반환해 세 카운터가 모두 0 이 되는데,
+        그때가 바로 리포트가 전 필드 0 으로 끝나는 경우다(#196). 「가시성 스킵이 있을 때만」
+        으로 걸면 제일 나쁜 경우를 정확히 놓친다.
+        """
+        return self.judged_frame_count <= 0 or self.visibility_skip_count > 0
+
 
 def elapsed_sec(state: SessionState, now: float) -> float:
     """이 프레임의 «세션 시작 기준 경과 초» (이슈 #156).
