@@ -513,7 +513,8 @@ H1 은 *「동거하면 내려간다」* 이므로, 내려간 천장이 **40~80 
 | 2 | ~~🔴 **`TARGET_SSH` 에서 `-n` 을 뺀다**~~ → ✅ **완료** (빼고 돌렸고 프로브가 8판 전부 걷혔다) | ~~붙이면 프로브 자산이 0바이트로 간다(rig 이 크기 대조로 잡아 프로브를 끈다)~~ |
 | 3 | ~~🔴 **S3 를 풀 것**~~ → ✅ **풀렸다 (2026-08-17). 관리자도 IAM 수정도 필요 없었다** — 기동 명령에 **`--iam-instance-profile Name=shadowfit-measure`** 한 줄이면 된다. 실증: `t3.micro` 로 EC2→버킷 쓰기 성공(`put_ok.txt`). **`PHASES` 에 `coresidency_preflight`·`collect` 를 다시 넣는다** | 🔴 **1·2차의 「못 붙인다」가 오진이었다.** `iam:GetInstanceProfile` **거절 하나**를 보고 결론냈는데, **조회 권한과 사용 권한은 다른 것**이다. 판별법: `run-instances --dry-run` 을 **진짜 이름과 가짜 이름으로 대조**한다 — 진짜는 `DryRunOperation`(성공했을 요청), 가짜는 `InvalidParameterValue: Invalid IAM Instance Profile name`. 가짜가 거절되므로 AWS 가 존재를 **실제로 검증**한다는 뜻이고, 따라서 진짜 쪽 성공은 신뢰할 수 있다 |
 | 4 | ~~부하기는 **`c7i.xlarge` 이상**으로 띄운다~~ → ✅ **완료** (2차도 `c7i.xlarge`, `ncpu=4`) | ~~2 vCPU 면 §T 가 성립하지 않는다(제한 = 전체)~~ |
-| 5 | ✅ **완료** — CRLF 는 `sed` 가 답이 아니었다: repo 블롭은 LF 이고 바꾸는 건 작업 트리의 `core.autocrlf=true` 다. `git show HEAD:<path>` 로 뽑으면 애초에 안 생긴다. ~~대상 박스 **root SSH 열기** · scp 후 **CRLF 제거** | AL2023 은 root 로그인 차단이 기본 · Windows 작업 트리는 CRLF 라 `$''` 로 죽는다 |
+| 5 | ✅ **완료** — CRLF 는 `sed` 가 답이 아니었다: repo 블롭은 LF 이고 바꾸는 건 작업 트리의 `core.autocrlf=true` 다. `git show HEAD:<path>` 로 뽑으면 애초에 안 생긴다. ~~대상 박스 **root SSH 열기** · scp 후 **CRLF 제거** | AL2023 은 root 로그인 차단이 기본 · Windows 작업 트리는 CRLF 라 `$'
+'` 로 죽는다 |
 
 **2차 리허설 명령** (부하기에서, `-n` 없이) — 🔴 **아래 명령에 결함 둘이 있다. 그대로 쓰지 말 것.** `CORES_ARMS="C A"` 로는 **§T 가 안 돈다**(`TASKSET_ARM=B` 가 `ARMS` 에 없어 조용히 건너뛴다, [#260](https://github.com/Shadowfit/init/issues/260)) — 2차는 `"C A B"` 로 고쳐서 태웠다. `GHZ_TOKEN=<같음>` 은 **`INTERNAL_API_TOKEN`** 을 뜻하며, `AI_PUBLIC_TOKEN` 과 **같으면 AI 가 아예 안 뜬다**([#261](https://github.com/Shadowfit/init/issues/261) · #230 단언).
 

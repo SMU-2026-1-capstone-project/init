@@ -4,7 +4,6 @@ import com.shadowfit.dto.report.record.DailyLogRequestDto;
 import com.shadowfit.dto.report.record.DailyLogResponseDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
-import com.shadowfit.model.member.Member;
 import com.shadowfit.model.report.DailyLog;
 import com.shadowfit.repository.report.DailyLogRepository;
 import com.shadowfit.repository.member.MemberRepository;
@@ -15,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -24,28 +22,32 @@ public class DailyLogService {
     private final DailyLogRepository dailyLogRepository;
     private final MemberRepository memberRepository;
 
+    /**
+     * 그날의 메모·기분을 저장한다 (있으면 덮어쓰기).
+     *
+     * <p><b>«찾아보고 없으면 save» 를 그만뒀다</b>(이슈 #215 ①). 검사와 INSERT 사이에 같은
+     * {@code (member_id, log_date)} 가 들어오면 {@code uk_member_date} 위반이
+     * {@code GlobalExceptionHandler} 의 {@code Exception} 핸들러로 떨어져 <b>500</b> 이 나갔다.
+     * 경합 상대가 «남» 이 아니라 <b>자기 자신</b>이라(같은 회원·같은 날짜) 더블탭 한 번이면
+     * 두 요청이 겹친다 — 드문 조건이 아니다.
+     *
+     * <p>판단과 쓰기를 DB 한 문장으로 합친다. 바로 아래 {@code accumulateStats} 가 같은 테이블에서
+     * 같은 이유로 이미 그렇게 하고 있고, <b>그 주석이 catch 방식이 왜 안 되는지까지 적어뒀다.</b>
+     *
+     * <p>회원 존재 확인은 남긴다 — 없는 회원이면 FK 위반(500)이 아니라 404 로 답해야 한다.
+     * 예전에는 이 확인이 INSERT 분기에만 있었다.
+     */
     @Transactional
     public void saveOrUpdateLog(Long memberId, DailyLogRequestDto dto) {
         log.info("일지 저장 요청 - 사용자: {}, 날짜: {}", memberId, dto.getLogDate());
 
-        Optional<DailyLog> existing = dailyLogRepository.findByMemberIdAndLogDate(memberId, dto.getLogDate());
-
-        if (existing.isPresent()) {
-            // 영속성 컨텍스트가 관리 중인 엔티티 — 필드 수정만 하면 트랜잭션 커밋 시 더티체킹으로 자동 UPDATE
-            DailyLog log = existing.get();
-            log.setMemo(dto.getMemo());
-            log.setMood(dto.getMood());
-        } else {
-            // 새 엔티티는 영속성 컨텍스트에 없으므로 save()로 등록해야 INSERT
-            Member member = memberRepository.findById(memberId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-            dailyLogRepository.save(DailyLog.builder()
-                    .member(member)
-                    .logDate(dto.getLogDate())
-                    .memo(dto.getMemo())
-                    .mood(dto.getMood())
-                    .build());
+        if (!memberRepository.existsById(memberId)) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
+
+        // mood 는 네이티브 쿼리라 @Enumerated(STRING) 변환이 안 걸린다 — 여기서 문자열로 넘긴다.
+        dailyLogRepository.upsertMemoAndMood(memberId, dto.getLogDate(), dto.getMemo(),
+                dto.getMood() == null ? null : dto.getMood().name());
     }
     /**
      * 세션 종료(완료) 시 그날의 누적 운동시간·칼로리에 반영. INSERT-또는-누적 판단과 실제 누적을

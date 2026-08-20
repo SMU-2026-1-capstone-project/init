@@ -125,7 +125,7 @@
 
 | 카드 | 성격 | 상태 · 코드 위치 |
 |---|---|---|
-| **읽기 최적화 (projection)** | 🔴 헤드라인 | ✅ `PoseDataRepository:29` `PoseFrameProjection`(**현재 4컬럼**, 측정은 3컬럼 시점). 실측 payload **−98.7%**, warm 쿼리 **8x**(로컬 412만 행) → **29~41x**(AWS 1억 행, 2026-07-15) ([`report-read-path.md`](../decisions/report-read-path.md) ① · [인용 조건](./realmysql-experiments.md#projection-98-7))<br>⚠️ precompute가 세션당 1회 도는 비동기 잡 — "리포트가 빨라졌다"가 아니라 **잡의 I/O·버퍼풀 점유 절감** |
+| **읽기 최적화 (projection)** | 🔴 헤드라인 | ✅ `PoseDataRepository:29` `PoseFrameProjection`(**현재 4컬럼**, 측정은 3컬럼 시점). 실측 payload **−98.7%**, warm 쿼리 **8x**(로컬 412만 행) → **29~41x**(AWS 1억 행, 2026-07-15) ([`report-read-path.md`](../decisions/report-read-path.md) ① · [인용 조건](./realmysql-experiments.md#projection-98-7))<br>⚠️ precompute가 세션당 1회 도는 비동기 잡 — "리포트가 빨라졌다"가 아니라 **잡의 I/O·버퍼풀 점유 절감**<br>🔴 **정상 조회는 이 쿼리를 안 부른다**(precompute·폴백 전용, 코드 판독·미측정) |
 | **일일 집계 lost-update** | 🟠 동시성 | ✅ `DailyLogRepository:30` `ON DUPLICATE KEY UPDATE` 원자 upsert. 재현·비교는 `loadtest/measure_lock.sh`(scratch `lock_lab`) |
 | **report 생성 멱등성** | 🟠 정합성 | ✅ `mysql/schema.sql:204` `UNIQUE KEY uk_report_session (session_id)` |
 | **파티셔닝 + TTL** | 시계열 운영 | ✅ `mysql/schema.sql:148` `PARTITION BY RANGE(UNIX_TIMESTAMP(created_at))` + 자동 운영 스케줄러. **DROP PARTITION 625배** 실측([조건](./realmysql-experiments.md#drop-partition-625x) — 2026-06-03 로컬 1억 행 더미 JSON, 두 팔의 행수가 달라 행당 정규화는 570배) |

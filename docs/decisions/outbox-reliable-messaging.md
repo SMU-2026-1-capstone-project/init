@@ -38,7 +38,9 @@ endSession  @Transactional
 
 ### 1-1. ⚠️ 정정 — endSession은 상태를 COMPLETED로 바꾸지 않는다
 
-이 문서의 이전 판은 갭을 *"MySQL은 COMPLETED인데 FastAPI는 orphan IN_PROGRESS"* 로 적었다. **실코드와 다르다.** `endSession`은 `end_time`만 찍고 `status`는 **`IN_PROGRESS` 그대로 둔다**(:206-207). `COMPLETED`로의 전이는 오직 AI의 `CompleteAnalysis` 콜백이 한다(`SessionService.applyComplete:139`, `ExerciseAnalysisService.applyCompleteFromApp:319`).
+이 문서의 이전 판은 갭을 *"MySQL은 COMPLETED인데 FastAPI는 orphan IN_PROGRESS"* 로 적었다. **실코드와 다르다.** `endSession`은 `end_time`만 찍고 `status`는 **`IN_PROGRESS` 그대로 둔다**(:206-207). `COMPLETED`로의 전이는 오직 AI의 `CompleteAnalysis` 콜백이 한다(`SessionService.applyComplete`).
+
+> 이 문서를 쓸 당시엔 앱이 직접 완료를 보고하던 두 번째 경로(`ExerciseAnalysisService.applyCompleteFromApp`)도 있었으나, 호출자가 없는 채로 낡아 있어 이슈 #179 에서 제거했다. 아래 논지는 그대로다 — 오히려 전이 경로가 하나로 줄었다.
 
 그리고 AI 쪽을 보면 **`CompleteAnalysis`를 촉발하는 유일한 트리거가 `StopAnalysis`다**(`ai-server/app/grpc/exercise_servicer.py:102-129` — Stop 수신 → 누적 rep으로 통계 산출 → 별도 스레드로 Spring 콜백). AI에는 자체 타임아웃도, 세션 상태 TTL도 없다(`session_state.py` — `remove()`는 Stop 경로에서만 불린다).
 
@@ -87,7 +89,7 @@ getAuthenticatedStub().stopAnalysis(request, CorrelationIds.preserving(new Strea
 
 ### 1-3. 이미 가진 절반
 
-수신측 멱등성 — `SessionService.applyComplete:135`, `ExerciseAnalysisService.applyCompleteFromApp:313` 둘 다 `if (status == COMPLETED) return`(first-write-wins). **중복 통보는 안전하다. 그래서 송신만 보강하면 완결된다.**
+수신측 멱등성 — `SessionService.applyComplete` 가 `if (status == COMPLETED) return`(first-write-wins). **중복 통보는 안전하다. 그래서 송신만 보강하면 완결된다.**
 
 > `afterCommit`을 쓴 건 **정답**이다(커밋 전 송신 시 "통보는 갔는데 DB 롤백"이 더 나쁨). 순서는 맞췄고, **두 번째 write의 실패를 메꾸지 못하는 것**만 남았다.
 
@@ -301,7 +303,7 @@ FAILED 가 무한 누적되는 건 아니다 — 정상 운영에서 이 상태�
 | 신규 `OutboxPublisher` | — | `@Scheduled(fixedDelayString=...)` → PENDING 조회 → `stopAnalysis` 송신 → SENT / retry++ |
 | `ExerciseAnalysisService.stopAnalysis:248-278` | 비동기 스텁 + 콜백, 서킷 스킵 `return`(:259), onError 로그만(:272) | **동기(blocking stub + deadline)로 교체** — 결과를 발행기에 반환값으로 돌려준다(§4-2-1) |
 
-> 멱등 수신(`applyComplete:135` / `applyCompleteFromApp:313`)은 **그대로** — at-least-once 중복을 흡수. 손 안 댐.
+> 멱등 수신(`applyComplete`)은 **그대로** — at-least-once 중복을 흡수. 손 안 댐.
 
 #### 4-2-1. `stopAnalysis` 동기 전환 (확정) 및 결과 3분류
 

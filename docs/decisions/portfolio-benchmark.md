@@ -33,7 +33,7 @@
 
 | 내 강점 | 리서치 판정 |
 |---|---|
-| **projection / fat 컬럼 over-fetch −98.7%** ([조건](../portfolio/realmysql-experiments.md#projection-98-7)) | 🟢 **진짜 희소.** 피트니스/신입 포폴 DB는 basic CRUD에서 멈춤(복잡 쿼리 NativeQuery로 때움), fat JSON over-fetch 측정 사례 거의 없음 |
+| **projection / fat 컬럼 over-fetch −98.7%** ([조건](../portfolio/realmysql-experiments.md#projection-98-7)) | 🟢 **진짜 희소.** 피트니스/신입 포폴 DB는 basic CRUD에서 멈춤(복잡 쿼리 NativeQuery로 때움), fat JSON over-fetch 측정 사례 거의 없음<br>⚠️ 말할 때는 조건과 같이 — **정상 조회는 이 쿼리를 안 탄다**(precompute·폴백 전용), 3컬럼 시절 값 |
 | **정직한 실재/잠재 분류 + 절대TPS 아닌 델타** | 🟢 **희소.** 고급 Redis 글조차 부하검증 없이 메커니즘에서 멈춤(TODO) → "정직하게 측정·분류"가 실제로 드뭄 |
 | **시계열 적재 깊이(도메인 내)** | 🟢 도메인 내 희소 ⚠️ **단 스케일 천장 주의**(§2.2) |
 | **MVCC/lost-update 동시성** | 🔶 **정정**(§2.1) — 토픽 자체가 단골이라 토픽으론 차별 안 됨 |

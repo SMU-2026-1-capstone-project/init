@@ -41,7 +41,7 @@
 
 **두 축** (DAU 1,000 가정, 1억 행 합성 시딩):
 - **쓰기 축**: 배치 INSERT(처리량 +99%, p99 −37% — [조건](../decisions/load-test-strategy.md#batch-insert-99)), 파티션 **DROP PARTITION**(TTL, DELETE 대비 625x — [조건](./realmysql-experiments.md#drop-partition-625x)), **다운샘플 R=5**(요청 처리량 **4.11배**·p99 **9.5배**, 저장행 5배↓ — 2026-08-18 EC2 2대 다세션 재측정(P2, 레벨 20세션 ABBA 8판). 🔴 **옛 값 「1.7배·4.9배」는 단일 핫세션 조건**이었고 다세션에서 2.4배 더 크다. ⚠️ 저장 처리량(rows/s)으로 보면 방향이 뒤집힌다 — R=1 은 느린 게 아니라 행을 5배 많이 넣는 것), **커넥션 풀 사이징 — 병목을 세 번 다른 곳에서 찾은 과정**(아래)
-- **읽기 축**: 인덱스(부재 시 85초 대조 · 인덱스 유무 약 9,000배, [조건](./realmysql-experiments.md#index-9000x)), **keyset 페이지네이션**(offset 대비 최대 489,868x — **깊이 5,000만 한 점의 값**, [조건](./realmysql-experiments.md#keyset-489868x)), JSON **projection**(**DB→앱** payload −98.7%, warm 쿼리 8x→**29~41x** — 2026-06-02 로컬 412만 행 warm → 2026-07-15 AWS 1억 행 재검증에서 강화, 단 precompute 잡의 자원 절감이지 사용자 체감 지연 아님 · [조건](./realmysql-experiments.md#projection-98-7)), **버퍼풀**(작업셋 vs 풀)
+- **읽기 축**: 인덱스(부재 시 85초 대조 · 인덱스 유무 약 9,000배, [조건](./realmysql-experiments.md#index-9000x)), **keyset 페이지네이션**(offset 대비 최대 489,868x — **깊이 5,000만 한 점의 값**, [조건](./realmysql-experiments.md#keyset-489868x)), JSON **projection**(**DB→앱** payload −98.7%, warm 쿼리 8x→**29~41x** — 2026-06-02 로컬 412만 행 warm → 2026-07-15 AWS 1억 행 재검증에서 강화, 단 precompute 잡의 자원 절감이지 사용자 체감 지연 아님 — **정상 조회는 이 쿼리를 안 부른다**(precompute·폴백 전용) · [조건](./realmysql-experiments.md#projection-98-7)), **버퍼풀**(작업셋 vs 풀)
 - **저장**: JSON **트림 33→13**(−60.9%)
 - **동시성**: lost-update 방지(③), MVCC(④) — §1과 공유
 

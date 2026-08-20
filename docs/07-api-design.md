@@ -133,28 +133,16 @@ PATCH /sessions/42/end
 >
 > 📌 `143a2e4` 를 기록한 문서들([`architecture/ai-backend-changelog.md`](./architecture/ai-backend-changelog.md)·`commit-details`·`monthly-log`)은 **그 시점 사실**이라 그대로 둔다.
 내부 흐름:
-1. Spring → gRPC `StopAnalysis(session_id=42)` 송신, 즉시 202 반환
-2. AI 가 누적 통계 정리 후 gRPC `CompleteAnalysis` 로 콜백 (3회 재시도)
-3. Spring 콜백 수신 시점에 `status=COMPLETED`, `total_reps`, `avg_sync_rate` 등 DB에 영속화
-4. 프론트는 별도 조회 API 로 결과 폴링
+1. Spring 이 `endTime` 을 기록하고 **아웃박스에 AI 통보를 적재**한 뒤 `200` 반환 (gRPC 직접 호출 아님)
+2. 아웃박스 publisher 가 커밋 확정 후 gRPC `StopAnalysis(session_id=42)` 를 AI 에 송신
+3. AI 가 누적 통계 정리 후 gRPC `CompleteAnalysis` 로 콜백 (3회 재시도)
+4. Spring 콜백 수신 시점에 `status=COMPLETED`, `total_reps`, `avg_sync_rate` 등 DB에 영속화
+5. 프론트는 별도 조회 API 로 결과 폴링
 
 AI = 운동 통계의 단일 진실 원천 원칙. (커밋 143a2e4)
 
-### [Deprecated] PUT /exercises/sessions/{sessionId}/complete
-프론트가 자체 카운트한 통계로 DB를 직접 갱신하던 옛 경로. AI 분석 결과와 권위가 충돌해 디프리케이트. `/stop` 으로 마이그레이션 후 제거 예정.
-```json
-// Request
-{
-  "totalReps": 15,
-  "avgSyncRate": 78.5,
-  "maxSyncRate": 92.0,
-  "minSyncRate": 55.3,
-  "caloriesBurned": 120.5,
-  "difficultyLevel": 2
-}
-// Response 200
-{ "sessionId": 42, "status": "COMPLETED", "endTime": "2026-03-30T14:30:00" }
-```
+### ~~PUT /exercises/sessions/{sessionId}/complete~~ — 제거됨
+프론트가 자체 카운트한 통계로 DB를 직접 갱신하던 옛 경로. AI 분석 결과와 권위가 충돌해 디프리케이트됐고, 엔드포인트는 `23c8953`(2026-07-11, 인증 없이 임의 세션을 강제 완료할 수 있던 결함)에서, 뒤에 남아 있던 서비스 계층·DTO 는 이슈 #179 에서 제거했다. 종료는 `PATCH /sessions/{sessionId}/end` 하나이고 완료 값의 출처는 AI gRPC 콜백이다.
 
 ### GET /exercises/{exerciseId}/feedback-templates - 운동별 TTS 멘트 목록
 ```json

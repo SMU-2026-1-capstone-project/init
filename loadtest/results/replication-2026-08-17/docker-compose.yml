@@ -1,0 +1,58 @@
+# 복제 rig — 소스 1 + 리플리카 1 (로컬 전용)
+#
+# 🔴 이 무대로는 Q1(몇 초 뒤처지나)·Q2(반동기 대가)를 «측정» 이라 부를 수 없다.
+#    같은 디스크·같은 커널·RTT ≈ 0 이라 반동기의 대가가 구조적으로 과소평가된다
+#    (설계 문서 §5). 여기서 답하는 것은 이진 사실·메커니즘인 Q3·Q4·Q5 뿐이다.
+#
+# server_id 는 인스턴스별로 부여한다 — 프로젝트 기본값이 1 이라 두 대가 그대로면 안 붙는다(§3).
+
+services:
+  source:
+    image: mysql:8.0
+    container_name: repl_source
+    command:
+      - --server-id=1
+      - --log-bin=binlog
+      - --binlog-format=ROW
+      - --gtid-mode=OFF                      # D0 확인값 그대로 — 포지션 기반 복제
+      - --log-replica-updates=ON
+      - --enforce-gtid-consistency=OFF
+      # 하트비트 지연을 ms 단위로 보려면 커밋이 실제로 내려가야 한다. 프로젝트 기본 내구성 유지.
+      - --innodb-flush-log-at-trx-commit=1
+      - --sync-binlog=1
+    environment:
+      MYSQL_ROOT_PASSWORD: repl
+      MYSQL_DATABASE: replprobe
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prepl"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    networks: [repl]
+
+  replica:
+    image: mysql:8.0
+    container_name: repl_replica
+    command:
+      - --server-id=2
+      - --log-bin=binlog
+      - --binlog-format=ROW
+      - --gtid-mode=OFF
+      - --log-replica-updates=ON
+      - --enforce-gtid-consistency=OFF
+      - --innodb-flush-log-at-trx-commit=1
+      - --sync-binlog=1
+      # 읽기 전용은 실무 기본이자, 이 실험에서 «리플리카에 잘못 쓰는» 사고를 막는다.
+      - --read-only=ON
+    environment:
+      MYSQL_ROOT_PASSWORD: repl
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prepl"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    networks: [repl]
+
+networks:
+  repl:
+    name: repl_net

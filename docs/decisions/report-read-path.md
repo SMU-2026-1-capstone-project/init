@@ -125,7 +125,7 @@ GET /reports/sessions/{id}
 | 행 특성 | 작고 균일 | **행마다 fat JSON(off-page)** |
 | 주 문제 | N+1, 인덱스 부재→풀스캔, 깊은 offset | **fat 헛로드·재계산·버퍼풀 오염·raw-in-OLTP** |
 | 인덱스 추가 효과 | 극적(헤드라인) | 이미 최적(조연) |
-| projection 효과 | 작음(행 작음) | **큼(−98.7%)** ([조건](../portfolio/realmysql-experiments.md#projection-98-7)) |
+| projection 효과 | 작음(행 작음) | **큼(−98.7%)** — 단 precompute·폴백 경로 한정(§7 아래 📌) ([조건](../portfolio/realmysql-experiments.md#projection-98-7)) |
 | 해결 성격 | textbook=평준화 | **판단 필요**(denormalization·티어링) |
 
 → 같은 "읽기"여도 **병목이 어느 단계냐**가 달라, 인덱스가 헤드라인(CRUD)이냐 조연(시계열)이냐가 갈린다. 유사 프로젝트도 *제대로 측정하면* 같은 문제를 만나지만 대부분 측정 안 해 모름 → **차별점은 "문제를 가진 것"이 아니라 "측정해 발견한 것"**([`db-deep-dive.md`](../portfolio/db-deep-dive.md) §0.3).
@@ -136,7 +136,7 @@ GET /reports/sessions/{id}
 
 | 등급 | 항목 | 의미 |
 |---|---|---|
-| 🟢 **실재 + 측정** | ① over-fetch (projection −98.7% 측정, [조건](../portfolio/realmysql-experiments.md#projection-98-7)) | 코드에 있고 합성 볼륨으로 측정 |
+| 🟢 **실재 + 측정** | ① over-fetch (projection −98.7% 측정, [조건](../portfolio/realmysql-experiments.md#projection-98-7)) | 코드에 있고 합성 볼륨으로 측정. 단 **그 쿼리가 사는 경로는 precompute·폴백뿐**이다 |
 | 🟢 **실재 (코드)** | ② 재계산, ③ REPORT_NOT_FOUND | 코드/스키마에 실재 |
 | ✅ **해결됨(2026-07-11)** | ④ 인덱스 갭 | `idx_session_member_starttime` 추가, 실측 확인 — 커밋 `dbb0fec` |
 | 🟡 **잠재 (규모 미발동)** | ⑤ 버퍼풀 오염, ⑥ 무제한 프레임 | 메커니즘 실재하나 DAU 작아 안 터짐 |
@@ -210,6 +210,8 @@ List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long session
 
 **AWS 1억 행 재검증(2026-07-15)**: payload 1,740.1KB→22.6KB(−98.7%, 동일), warm 쿼리 **40.6ms→1.4ms(29~41x)**. 412만 행 때의 8x보다 배수가 커진 것은 버퍼풀(2GB) 대비 테이블이 25배(~230GB) 커지며 작업셋 비율이 나빠져 off-page 랜덤 I/O가 캐시에 덜 걸린 탓 — 결론이 강화된 방향이다. ⚠️ 이 쿼리는 precompute가 세션당 1회 도는 비동기 잡이라 **사용자 체감 지연이 아니라 잡의 자원 소모 절감**으로 읽어야 한다.
 
+> 📌 **조건 (2026-08-17)** — 🔴 **정상 리포트 조회는 이 쿼리를 안 부른다.** `ReportService.resolveDetailedAnalysis` 가 저장된 `detailed_analysis` 를 파싱하고 끝내므로, projection 이 도는 곳은 **precompute** 와 **폴백**(그 컬럼이 비었거나 구버전일 때) 둘뿐이다 → 정상 경로 응답시간 기여는 **0**. 단 이건 **코드 판독이고 아직 측정이 아니다**([`./projection-end-to-end-remeasure.md`](./projection-end-to-end-remeasure.md) Q1 이 «0 임을 재는 것» 을 1차 산출물로 세워뒀다). 또한 위 수는 **3컬럼 시절** 값이고 현재 4컬럼 형상으로는 재검증하지 않았다. 조건 전체는 [`realmysql-experiments.md §②b` 조건표](../portfolio/realmysql-experiments.md#projection-98-7).
+
 **⚠️ 향후 컬럼 추가 예정 (BE-09 세트 도입, 현재 보류)**: `pose_data`에 `set_index` 컬럼이 추가되면([`22-backend-tasks-detail.md#BE-09`](../tasks/22-backend-tasks-detail.md)) `PoseFrameProjection`도 `setIndex`를 포함하도록 확장 필요 — worst 구간 계산이 세션 전체가 아니라 세트 단위로 바뀔 수 있음. BE-09는 스쿼트 외 운동 추가 시점까지 보류라 지금 미리 넣지 않음(YAGNI) — 확장 시점에 이 DTO부터 손대야 함을 기록. **(2026-08-20 주: 이 DTO 는 그 사이 이미 두 번 손댔다 — #78·#80·§4-ㄹ. 현재 4컬럼이고, `setIndex` 는 다섯 번째가 된다.)**
 
 ---
@@ -262,7 +264,7 @@ precompute 도입 이전에 이미 `COMPLETED`된 세션들은 `reports` row가 
 |---|---|---|---|
 | ① | 버퍼 vs 영속 구분 | `pose_data`(raw, 단기) vs `reports`(집계, 영속) | ✅ 판단 완료(`db-deep-dive.md` §2-0) |
 | ② | 삭제 근거 | raw를 지워도 되는 건 precompute로 요약이 `reports`에 이미 박제됐을 때뿐 | ✅ precompute-on-write 완료(2026-07-24, §9) — 삭제 근거 확보 |
-| ③ | 삭제 메커니즘 | DROP PARTITION vs DELETE — DROP 채택(625배, 디스크 즉시 회수 · [조건](../portfolio/realmysql-experiments.md#drop-partition-625x)) | ✅ 실측 완료 |
+| ③ | 삭제 메커니즘 | DROP PARTITION vs DELETE — DROP 채택(625배[행당 570배], 디스크 즉시 회수 · [조건](../portfolio/realmysql-experiments.md#drop-partition-625x)) | ✅ 실측 완료 |
 | ④ | 파티션 단위 | 월별 — 너무 잘게(일별) 관리부담, 너무 크게(연별) 만료 단위가 거칠어짐 | ✅ 월별 14파티션 + `pfuture`, 실스키마 반영(`mysql/schema.sql`, PR #43) |
 | ⑤ | 실행 트리거 | 스케줄러가 주기적으로 DROP/ADD PARTITION 실행 | ✅ `PoseDataPartitionScheduler` 신설, 매일 새벽 4시(`@Scheduled(cron=...)`), `SessionTimeoutScheduler`와 동일 패턴 |
 | ⑥ | 파티션 유지보수 | 미래 파티션(`pfuture`)이 계속 커지지 않도록, 다다음 달 파티션을 미리 만들어둬야 함 | ✅ 이번 달 기준 +2개월(`lookahead-months`)까지 항상 실명 파티션 유지, 부족하면 `REORGANIZE PARTITION pfuture INTO (...)`로 확장 |

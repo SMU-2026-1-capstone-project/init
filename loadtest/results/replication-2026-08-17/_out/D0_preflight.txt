@@ -1,0 +1,25 @@
+# D0 — 무엇이 켜져 있나 (설계 §2 사전확인)
+# 생성: 2026-08-16T16:41:25Z UTC
+
+source   log_bin                          1
+source   binlog_format                    ROW
+source   gtid_mode                        OFF
+source   server_id                        1
+source   log_replica_updates              1
+source   replica_parallel_workers         4
+source   replica_parallel_type            LOGICAL_CLOCK
+source   innodb_flush_log_at_trx_commit   1
+source   sync_binlog                      1
+source   version                          8.0.46
+
+replica  server_id                        2
+replica  read_only                        1
+replica  log_replica_updates              1
+replica  version                          8.0.46
+
+# 반동기 플러그인 파일 (D1 — 08-13 에 확인된 것을 이 이미지에서 재확인)
+# plugin_dir 를 서버에 물어본다 — 경로를 하드코딩하면 이미지가 바뀔 때 조용히 빈 목록이 된다.
+semisync_master.so
+semisync_replica.so
+semisync_slave.so
+semisync_source.so

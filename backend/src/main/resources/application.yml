@@ -123,7 +123,13 @@ grpc:
     reflection-enabled: true
   client:
     fastapi-client: # @GrpcClient("fastapi-client")와 일치
-      address: 'static://shadowfit-ai:8585' # 컨테이너명:AI서버gRPC포트
+      # 주소는 compose 가 주는 환경변수에서 온다 (#285). 이 줄이 하드코딩이던 동안
+      # compose 의 AI_SERVER_HOST·AI_SERVER_GRPC_PORT 는 **아무도 안 읽는 죽은 키**였고,
+      # 값이 우연히 같아서 증상이 없었다. 컨테이너명이나 포트를 바꾸면 옛 주소로 계속
+      # 붙어 UNAVAILABLE → 서킷브레이커(aiServer) 열림 → 「AI 장애」로 오독됐을 자리다.
+      # 기본값은 도커 네트워크 기준이라 로컬 bootRun 은 AI_SERVER_HOST=localhost 를 준다
+      # (위 datasource url 의 ${DB_HOST:shadowfit-mysql} 과 같은 방식).
+      address: 'static://${AI_SERVER_HOST:shadowfit-ai}:${AI_SERVER_GRPC_PORT:8585}'
       negotiation-type: plaintext
 
 # [3] Swagger 및 기타 설정 (최상단 레벨)

@@ -84,9 +84,22 @@ class SessionReattachTest {
     }
 
     private Session session(Member member, LocalDateTime startTime, Status status, LocalDateTime endTime) {
+        return session(member, startTime, status, endTime, null);
+    }
+
+    /**
+     * {@code lastActiveAt} 은 빌더로만 넣는다 — 엔티티에 setter 가 없다.
+     *
+     * <p>없는 게 맞다. 프로덕션에서 이 컬럼은 {@code PoseDataService} 의 JdbcTemplate 이 직접
+     * 갱신하고, 엔티티로 쓰면 {@code @Version} 이 따라 올라가 낙관적 락 경쟁이 상시화된다
+     * ({@code Session} 의 필드 주석). 즉 정상 호출자 수가 설계상 0인 setter 였다.
+     */
+    private Session session(Member member, LocalDateTime startTime, Status status,
+                            LocalDateTime endTime, LocalDateTime lastActiveAt) {
         return sessionRepository.saveAndFlush(Session.builder()
                 .member(member).exercise(exercise)
                 .startTime(startTime).status(status).endTime(endTime)
+                .lastActiveAt(lastActiveAt)
                 .totalReps(0).difficultyLevel(1).build());
     }
 
@@ -199,9 +212,8 @@ class SessionReattachTest {
         @Test
         @DisplayName("활동이 있으면 마지막 활동 + 유휴 임계로 넘어간다")
         void 활동_있으면_유휴기준() {
-            Session s = inProgressSession();
             LocalDateTime lastActive = LocalDateTime.now().minusMinutes(3);
-            s.setLastActiveAt(lastActive);
+            Session s = session(owner, LocalDateTime.now(), Status.IN_PROGRESS, null, lastActive);
 
             LocalDateTime threshold = s.timeoutThreshold(idleMinutes, bufferMinutes);
 
@@ -216,8 +228,8 @@ class SessionReattachTest {
         @DisplayName("운동 중이면 45분이 지나도 걷히지 않는다")
         void 장시간_운동은_안걷힌다() {
             // 종전 식의 조기 종료 회귀 — 프레임이 들어오는 중에도 start_time + 45분이면 죽였다.
-            Session s = session(owner, LocalDateTime.now().minusMinutes(80), Status.IN_PROGRESS, null);
-            s.setLastActiveAt(LocalDateTime.now().minusMinutes(1));
+            Session s = session(owner, LocalDateTime.now().minusMinutes(80), Status.IN_PROGRESS, null,
+                    LocalDateTime.now().minusMinutes(1));
 
             assertThat(s.isTimedOutAt(LocalDateTime.now(), idleMinutes, bufferMinutes))
                     .as("80분째지만 1분 전까지 활동했다면 살아있는 세션이다")
@@ -228,8 +240,8 @@ class SessionReattachTest {
         @DisplayName("그만둔 세션은 45분을 기다리지 않고 유휴 임계에서 걷힌다")
         void 이탈_세션은_빨리_걷힌다() {
             // 종전 식의 방치 회귀 — 3분 만에 나가도 45분간 IN_PROGRESS 라 새 운동이 409 로 막혔다.
-            Session s = session(owner, LocalDateTime.now().minusMinutes(20), Status.IN_PROGRESS, null);
-            s.setLastActiveAt(LocalDateTime.now().minusMinutes(17));
+            Session s = session(owner, LocalDateTime.now().minusMinutes(20), Status.IN_PROGRESS, null,
+                    LocalDateTime.now().minusMinutes(17));
 
             assertThat(s.isTimedOutAt(LocalDateTime.now(), idleMinutes, bufferMinutes))
                     .as("시작 후 20분(종전 기준 45분 미달)이지만 17분간 활동이 없었다")

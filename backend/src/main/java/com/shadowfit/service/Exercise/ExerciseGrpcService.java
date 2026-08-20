@@ -6,7 +6,9 @@ import com.shadowfit.grpc.ExerciseServiceGrpc;
 import com.shadowfit.grpc.PoseDataBatchRequest;
 import com.shadowfit.grpc.PoseDataRequest;
 import com.shadowfit.grpc.PoseDataResponse;
+import com.shadowfit.global.observability.SessionMetrics;
 import io.grpc.stub.StreamObserver;
+import org.springframework.dao.DeadlockLoserDataAccessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.shadowfit.grpc.*;
@@ -21,6 +23,7 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
     private final PoseDataService poseDataService;
     private final SessionService sessionService;
     private final FeedbackLogService feedbackLogService;
+    private final SessionMetrics sessionMetrics;
 
     // correlation id 자체는 전역 인터셉터(GrpcObservabilityConfig)가 metadata에서 꺼내 MDC에 올려두지만,
     // 세션 id는 metadata가 아니라 메시지 payload 안에 있어 인터셉터가 볼 수 없다. 메서드마다 여기서
@@ -39,7 +42,7 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                 log.info("세션 {} : 실시간 데이터 {}개 수신 및 저장 시작",
                         request.getSessionId(), request.getPoseDataCount());
 
-                poseDataService.savePoseDataBatch(request.getSessionId(), request.getPoseDataList());
+                savePoseDataBatchWithDeadlockRetry(request);
 
                 com.shadowfit.grpc.PoseDataResponse response = com.shadowfit.grpc.PoseDataResponse.newBuilder()
                         .setSuccess(true)
@@ -52,6 +55,67 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
             } catch (Exception e) {
                 log.error("저장 실패: {}", e.getMessage());
                 responseObserver.onError(io.grpc.Status.INTERNAL.asRuntimeException());
+            }
+        }
+    }
+
+    /**
+     * 데드락 재시도 상한. <b>고른 값이 아니라 실측값이다</b> —
+     * {@code loadtest/results/r276-retry-2026-08-20/} 이 최대 재시도 0·1·2·3 을 라틴 방격 16판으로
+     * 대조해 <b>0회 37.8% · 1회 3.8% · 2회 0.0% · 3회 0.0%</b> 를 얻었다. 3회는 이 조건에서
+     * 얻는 것이 없어 2 로 둔다. 비용도 같이 쟀다 — 요청당 실제 시도가 1.20~1.30 이라 DB 일이
+     * 20~30% 는다.
+     *
+     * <p>유도식({@code p^(n+1)})은 1회에 14.3% 를 예측해 <b>실측의 약 4배로 비관</b>이었다.
+     * 두 번째 시도쯤이면 상대 트랜잭션이 이미 커밋돼 있어 그 행이 {@code ON DUPLICATE KEY UPDATE}
+     * 로 접히고, 접히는 경로는 데드락이 0% 이기 때문이다(#276).
+     *
+     * <p>🔴 <b>이 값이 기대는 조건</b>: 실측은 <b>워커 8 한 점</b>이고, 같은 라운드가 데드락 확률이
+     * 동시성의 함수임을 보였다(워커 2 에서 1.2%, 16 에서 59.5%). 더 높은 동시성에서도 2회로
+     * 0% 인지는 <b>안 쟀다</b>. 그래서 {@code shadowfit.pose.batch.deadlock.retries} 로 관측한다.
+     */
+    private static final int DEADLOCK_MAX_RETRIES = 2;
+
+    /**
+     * pose_data 배치 저장을 데드락에 한해 다시 던진다.
+     *
+     * <p><b>왜 여기인가</b>: 데드락은 트랜잭션을 통째로 되감으므로 {@code @Transactional} 안에서는
+     * 다시 던질 수 없다. 이 gRPC 핸들러는 트랜잭션 밖이라 매 시도가 새 트랜잭션이 된다.
+     * 자기주입(@Lazy self)으로 서비스 안에서 푸는 길도 있으나 그 함정은 이미 등록돼 있다(#175).
+     *
+     * <p><b>왜 안전한가</b>: 재시도가 중복 행을 만들지 않는 것은 이 PR 이 세운 {@code uk_pose_event}
+     * + {@code ON DUPLICATE KEY UPDATE} 때문이다(#188). 멱등이 먼저 서지 않았다면 재시도는
+     * 유실을 중복으로 바꾸는 일이었다.
+     *
+     * <p>🔴 <b>실측과 다른 점</b>: 실측은 저장 프로시저 안에서 재시도했고 여기는 앱이라
+     * <b>시도마다 왕복이 하나 더</b> 붙는다. 데드락 비율에는 영향이 없겠지만 지연 프로필은 다르다.
+     * 간격도 실측 그대로 <b>0(즉시)</b> 이다 — 백오프는 재보지 않았고, 넣으면 좋아질 수도
+     * 나빠질 수도 있다(상대에게 커밋할 시간을 주지만, 요청이 오래 살아 동시성을 올린다).
+     *
+     * <p>상한을 다 써도 실패하면 그대로 던진다. 그 위에 AI 쪽 재전송(3회 · 1s→3s)이 한 겹 더 있다.
+     */
+    private void savePoseDataBatchWithDeadlockRetry(PoseDataBatchRequest request) {
+        int retries = 0;
+        while (true) {
+            try {
+                poseDataService.savePoseDataBatch(request.getSessionId(), request.getPoseDataList());
+                if (retries > 0) {
+                    sessionMetrics.poseBatchDeadlockRetry("recovered");
+                    log.info("세션 {} : 데드락 재시도 {}회 만에 저장 성공 (#276)",
+                            request.getSessionId(), retries);
+                }
+                return;
+            } catch (DeadlockLoserDataAccessException e) {
+                if (retries >= DEADLOCK_MAX_RETRIES) {
+                    sessionMetrics.poseBatchDeadlockRetry("exhausted");
+                    log.warn("세션 {} : 데드락 재시도 {}회를 다 썼다 — AI 재전송으로 넘긴다 (#276)",
+                            request.getSessionId(), DEADLOCK_MAX_RETRIES);
+                    throw e;
+                }
+                retries++;
+                sessionMetrics.poseBatchDeadlockRetry("retried");
+                log.warn("세션 {} : 배치 INSERT 데드락 — {}/{}회째 다시 던진다 (#276)",
+                        request.getSessionId(), retries, DEADLOCK_MAX_RETRIES);
             }
         }
     }
@@ -131,8 +195,22 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                 responseObserver.onNext(response);
                 responseObserver.onCompleted();
             } catch (com.shadowfit.global.error.BusinessException e) {
-                log.warn("피드백 batch 거부 - session={}, code={}", request.getSessionId(), e.getErrorCode().name());
-                responseObserver.onError(io.grpc.Status.INVALID_ARGUMENT
+                // 🔴 세션 소멸과 입력 오류를 <b>상태코드로</b> 가른다 (#238 리뷰 A-2).
+                //
+                // 재전송 설계(feedback-batch-retransmission.md 축 C)는 이 둘을 다른 행으로 두고
+                // 처리를 가른다 — 세션 소멸이면 버퍼를 버리고, 입력 오류면 그 건만 격리한다.
+                // 그런데 둘 다 INVALID_ARGUMENT 로 나가면 AI 가 구분할 방법이 description
+                // 문자열 파싱뿐이다. 그건 계약이 아니라 관습이고 문구가 바뀌면 조용히 깨진다.
+                //
+                // SESSION_NOT_FOUND 는 NOT_FOUND 가 맞기도 하다 — INVALID_ARGUMENT 는
+                // 「클라이언트가 잘못된 인자를 보냈다」는 뜻인데, 세션이 사라진 것은 AI 잘못이 아니다.
+                io.grpc.Status status =
+                        e.getErrorCode() == com.shadowfit.global.error.ErrorCode.SESSION_NOT_FOUND
+                                ? io.grpc.Status.NOT_FOUND
+                                : io.grpc.Status.INVALID_ARGUMENT;
+                log.warn("피드백 batch 거부 - session={}, code={}, grpcStatus={}",
+                        request.getSessionId(), e.getErrorCode().name(), status.getCode());
+                responseObserver.onError(status
                         .withDescription(e.getErrorCode().name() + ": " + e.getErrorCode().getMessage())
                         .asRuntimeException());
             } catch (Exception e) {
