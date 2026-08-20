@@ -355,6 +355,21 @@ class ExerciseServicer(exercise_pb2_grpc.ExerciseServiceServicer):
                 state.dropped_frame_count * 100.0 / total_frames,
             )
 
+        # 「되고 있는데 0」을 운영 중에 잡는 자리다 (#267 곁가지). 위 로그는 «상한에 걸렸나» 만
+        # 답하고, 상한을 통과한 뒤 가시성에서 떨어진 프레임은 «수락» 으로 세어져 보이지 않는다.
+        # 판정에 들어간 프레임이 하나도 없으면 리포트는 전 필드 0 으로 끝나는데, 그때 원인이
+        # 「사람이 안 왔다」가 아니라 「하체가 프레임 밖이었다」라는 것을 여기서만 알 수 있다.
+        if state.visibility_skip_count:
+            judged = state.accepted_frame_count - state.visibility_skip_count
+            logger.warning(
+                "[#267] 가시성 부족으로 판정에서 빠진 프레임 (session=%s): %d/%d — 판정에 들어간 것 %d개%s",
+                session_id,
+                state.visibility_skip_count,
+                state.accepted_frame_count,
+                judged,
+                " 🔴 한 프레임도 판정되지 않았다" if judged <= 0 else "",
+            )
+
         # 누적된 rep들로 최종 통계 산출 → 별도 스레드에서 Spring 콜백.
         # correlation_wrap 필수 — 새 스레드는 이 핸들러의 ContextVar 를 상속하지 않아서,
         # 감싸지 않으면 CompleteAnalysis 콜백이 자기를 촉발한 StopAnalysis 와 안 이어진다.

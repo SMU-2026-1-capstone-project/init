@@ -143,6 +143,13 @@ class SessionState:
     accepted_frame_count: int = 0
     dropped_frame_count: int = 0
 
+    # 상한을 통과하고도 **판정에 못 들어간** 프레임 (#267). 위 둘로는 안 잡히는 구멍이다 —
+    # 가시성 부족은 accept_frame 을 통과하므로 `accepted_frame_count` 에 들어가는데, 정작
+    # 상태기계에는 안 들어간다. 즉 「수락 30 · 드롭 0」이면서 판정은 0 일 수 있고, #196 통주행이
+    # 정확히 그 모양을 「되고 있다」로 읽었다. 이 값이 accepted 와 같으면 그 세션은 **한 프레임도
+    # 판정되지 않았다**는 뜻이다.
+    visibility_skip_count: int = 0
+
     # --- 프레임 시각의 기준점 (#156) ---
     #
     # timestamp_sec 은 «세션 시작 기준 경과 초» 여야 한다 — 계약서·엔티티 주석·리포트 포맷이
