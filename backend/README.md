@@ -159,7 +159,7 @@ sequenceDiagram
 
 | 실험 | 발견 | 수치 |
 | :--- | :--- | :--- |
-| **인덱스 검증** | "인덱스 추가하면 빨라진다"는 가설을 세웠으나 `EXPLAIN ANALYZE`로 이미 최적(covering index, filesort 없음)임을 확인해 폐기. `IGNORE INDEX`로 강제 풀스캔과 직접 대조(`SET profiling`, wall-clock 오염 배제) | 실제 2.1KB payload 기준 인덱스 있음 vs 강제 풀스캔 **약 9,000배**(412만 행). 1억 행 재검증 시 풀스캔 **2,120.9초**까지 O(N) 선형 확인 |
+| **인덱스 검증** | "인덱스 추가하면 빨라진다"는 가설을 세웠으나 `EXPLAIN ANALYZE`로 이미 최적(covering index, filesort 없음)임을 확인해 폐기. `IGNORE INDEX`로 강제 풀스캔과 직접 대조(`SET profiling`, wall-clock 오염 배제) | 실제 2.1KB payload 기준 인덱스 있음 vs 강제 풀스캔 **약 9,000배**(412만 행, 2026-07-20 — 더미 JSON 이면 660배로 과소평가된다. [조건](../docs/portfolio/realmysql-experiments.md#index-9000x)). 1억 행 재검증 시 풀스캔 **2,120.9초**까지 O(N) 선형 확인 |
 | **배치 INSERT** | `JdbcTemplate.batchUpdate`로 전환(JPA `saveAll`은 `IDENTITY` PK 때문에 Hibernate batch가 원천 차단되는 걸 확인 후 우회) | throughput **+99%**, p99 **−37%**. 2026-05-31 로컬, warmup 60초 폐기 후 ramp 5→100 — 절대 RPS 는 인용하지 않는다 ([조건](../docs/decisions/load-test-strategy.md#batch-insert-99)) |
 | **Projection (JSON off-page)** | 리포트 조회가 안 쓰는 JSON 컬럼(2.3KB)까지 로드하고 있었음. off-page(오버플로우 페이지) 랜덤 I/O를 projection으로 회피(측정 시점 3컬럼, 현재 4컬럼). AWS(m6i.xlarge)에서 실제 1억 행 × 실제 2.3KB JSON으로 재검증 | payload **1,740.1KB → 22.6KB (−98.7%)**, warm 쿼리 **40.6ms → 1.4ms**(최대 41배). 세션 종료 시 1회 도는 비동기 precompute라, 개선 의미는 체감 지연 감소가 아니라 배치 잡 자원 소모 감소. **−98.7% 는 DB→앱 payload**(warm, 750행/세션, 3컬럼 시절) — [조건 전체](../docs/portfolio/realmysql-experiments.md#projection-98-7) |
 | **페이지네이션 (offset vs keyset)** | 1억 행에서 offset은 깊이에 비례해 선형으로 느려지고(O(N)), keyset(cursor)은 깊이와 무관하게 평탄함을 실측. 실제 JSON(2.3KB)으로 재검증하면 페이지당 행 수가 줄어 저하폭이 더 커짐 | 더미 데이터 offset 5,000만 지점 **26초** vs 실제 JSON 동일 지점 **941초**(약 36배 악화). keyset은 두 경우 모두 0.05ms대 평탄 |
