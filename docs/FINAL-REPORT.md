@@ -172,6 +172,7 @@
 ### 5.1 쓰기 — 배치 INSERT
 건별 INSERT → JdbcTemplate `batchUpdate` 적용:
 - **처리량 +99%**, **p99 지연 −37%**.
+- **조건**: 2026-05-31 로컬(2물리코어에 MySQL·백엔드·부하기 동거), 빌드마다 cold 기동 → warmup 60초 폐기 → ramp 5→100 step 210초. **절대 RPS(23.5 → 46.7)는 머신 부하에 흔들려 인용하지 않고 델타만 쓴다** — [조건 전체](./decisions/load-test-strategy.md#batch-insert-99).
 
 ### 5.2 읽기 — JSON projection
 세션 리포트 조회 시 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장) 전체를 헛로드하던 경로를 DTO projection으로 교체(측정 시점 3컬럼, **현재 4컬럼** — `joint_coordinates` 를 안 싣는 방침은 유지):
@@ -198,6 +199,8 @@
 
 → "인덱스를 추가해 빨라졌다"가 아니라 **"이미 최적임을 측정으로 확인"** 한 것이 정직한 결론(인덱스 부재 시 85초가 lookup으로 바뀌는 역할은 대조로 입증).
 
+→ **조건**: 인덱스 유무 배수 **약 9,000배** 는 2026-07-20 로컬 재측정(412.5만 행, **실제 2.1KB JSON**, `SET profiling`). **더미 JSON 이면 660배**로 과소평가된다. 과거의 «7,000배» 는 짜깁기 추정이라 폐기된 값이다 — [조건 전체](./portfolio/realmysql-experiments.md#index-9000x).
+
 ### 5.4 페이지네이션 — offset → keyset (1억 행 rig)
 전체 테이블 시간순 페이지네이션을 OFFSET 방식과 keyset(cursor) 방식으로 비교(`EXPLAIN ANALYZE`, warm):
 
@@ -211,6 +214,8 @@
 
 → OFFSET은 **O(N) 선형**(깊이 10배 → 시간 ~10배, 스캔 후 폐기). keyset은 PK 범위 점프라 **깊이 무관(≈O(log n))**. 캐시돼도 선형이 유지되므로 병목은 디스크 I/O가 아니라 **행 스캔·폐기(CPU)** 자체.
 
+→ **조건**: 2026-06-03 로컬, 1억 행 더미 JSON(측정 시점 9,750만), warm 3회째. **489,868배는 깊이 5,000만 한 점의 값**이고 얕은 깊이에서는 급격히 작아진다(10만 → 798배). AWS 1억 행 real-JSON 재검증(2026-07-16)에서는 같은 깊이 offset 이 941.2초로 **더미보다 36배 악화**됐고, 그 판의 keyset 절대값(54~56ms)은 SSH 왕복 오버헤드가 바닥이라 액면가로 쓰지 않는다 — [조건 전체](./portfolio/realmysql-experiments.md#keyset-489868x).
+
 ### 5.5 파티션 — DROP PARTITION vs DELETE (TTL)
 `pose_data`를 `created_at` 월별 14파티션으로 전환한 뒤, 만료 데이터(~8M 행) 제거를 두 방식으로 비교:
 
@@ -220,6 +225,8 @@
 | `ALTER … DROP PARTITION` | 7,560,000 | **1,790 ms (1.8초)** | 파일 삭제 → ~910MB 즉시 회수 |
 
 → **약 625배**. DELETE는 행단위 삭제(undo·인덱스 유지·락) + 빈 파일 잔존, DROP은 파티션 `.ibd` 파일째 unlink.
+
+→ **조건**: 2026-06-03 로컬, 1억 행 더미 JSON, 월별 14파티션. ⚠️ **두 팔의 행수가 다르다**(8,301,450 ↔ 7,560,000) — 행당 정규화하면 **570배**. ⚠️ DROP 1.8초의 대부분도 ~910MB 파일 삭제 I/O 다. AWS real-JSON 축소 재검증 **421배** — [조건 전체](./portfolio/realmysql-experiments.md#drop-partition-625x).
 
 핵심 판단은 *"1억 행이니까 파티션"이 아니라* **"크기는 충분조건이 아니고, raw 데이터를 단기 버퍼로 보는 TTL 용도가 있어서 DROP이 정답"** 이라는 점이다. 세션 리포트 쿼리는 인덱스로 이미 빠르고 pruning 이득이 없다(오히려 파티션-로컬 인덱스로 미세 손해).
 
@@ -263,11 +270,11 @@ MediaPipe가 뱉는 **33개 landmark 전부**를 `joint_coordinates`에 저장�
 ### 5.10 측정 요약
 | 영역 | 개선 | 수치 |
 |---|---|---|
-| 쓰기 | 배치 INSERT | 처리량 +99%, p99 −37% |
+| 쓰기 | 배치 INSERT | 처리량 +99%, p99 −37% ([조건](./decisions/load-test-strategy.md#batch-insert-99) — 절대 RPS 인용 금지) |
 | 읽기 | JSON projection | **DB→앱** payload −98.7%, warm 쿼리 8x(로컬 412만 행, 2026-06-02) → 29~41x(AWS 1억 행, 2026-07-15). warm·750행/세션·3컬럼 시절<br>⚠️ precompute 잡의 자원 절감이지 사용자 체감 지연 아님 · [조건](./portfolio/realmysql-experiments.md#projection-98-7) |
 | 인덱스 | 풀스캔 대조 | 인덱스 부재 시 85초 |
-| 페이지네이션 | offset→keyset | 최대 489,868x |
-| 보존 | DROP PARTITION | DELETE 대비 625x |
+| 페이지네이션 | offset→keyset | 최대 489,868x ([조건](./portfolio/realmysql-experiments.md#keyset-489868x) — **깊이 5,000만 한 점**의 값, 얕으면 급격히 작아진다) |
+| 보존 | DROP PARTITION | DELETE 대비 625x ([조건](./portfolio/realmysql-experiments.md#drop-partition-625x) — 행당 정규화 570배) |
 | 동시성 | lost-update 방지 | RC 재현 → 원자 UPDATE·낙관락 |
 | JSON 저장 | 트림 33→13 | `joint_coordinates` −60.9% |
 | 동시성 읽기 | MVCC 스냅샷 | RR 일관읽기·읽기쓰기 비블로킹 |

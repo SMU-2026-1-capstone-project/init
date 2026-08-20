@@ -83,6 +83,35 @@ DBA 축 추가([[user_career_target]], 2026-08-09). 전부 «데모에 좋은 �
   > | **제외** | `handoff/work-log-2026-08-09.md` · `decisions/architecture-review-2026-08-11.md` | **날짜가 박힌 기록**이다. 그날의 서술을 소급해 고치면 드리프트를 반대 방향으로 만든다 |
   >
   > 그래서 **E2 는 아직 안 닫혔다.** 남은 것은 위 보류 3개(지원서)와 −98.7% 외의 다른 수들이다.
+
+  > 🔵 **2026-08-20 (2차) — 나머지 수치도 같은 방식으로 처리했다.** E2 의 문구가
+  > 「**한 장짜리의** 모든 수치」이므로 [`../portfolio/one-pager.md`](../portfolio/one-pager.md)
+  > 를 전수로 훑었다. **값은 다 있는데 «언제·어디서» 가 빠진 행이 6개**였다 —
+  > 625배 · +99% · 9,000배 · 489,868배 · 96분 · 48분→16분.
+  >
+  > 조건 카드를 **수치마다 하나씩** 세우고(총 6개, `#projection-98-7` 포함) 인용처가 가리키게 했다:
+  >
+  > | 앵커 | 수 | 카드가 잡아 주는 오독 |
+  > |---|---|---|
+  > | `realmysql#index-9000x` | 약 9,000배 | 「인덱스를 **추가해서**」가 아니다 — 원래 있었고 없었다면 어땠을지를 대조로 만든 값 |
+  > | `realmysql#keyset-489868x` | 489,868배 | **깊이 5,000만 한 점**의 값. 10만 깊이면 798배다 |
+  > | `realmysql#drop-partition-625x` | 625배 · 96분 | **두 팔의 행수가 다르다**(8.30M ↔ 7.56M) → 행당 정규화 **570배** |
+  > | `realmysql#seed-48-16` | 48분→16분 | **청크 병렬 레버 하나**의 몫. 버퍼풀·인덱스 후행 빌드는 안 들어 있다 |
+  > | `load-test-strategy#batch-insert-99` | +99% | 절대 RPS 인용 금지 — 같은 코드의 1차 before 가 50 RPS 였다 |
+  >
+  > **정정 2건이 같이 나왔다.**
+  > - `one-pager` 의 keyset 행에 **캐비엇이 잘못 붙어 있었다** — 「SSH 왕복 ~50ms」는
+  >   AWS 재검증판(2026-07-16, keyset 54~56ms)의 한계인데, 489,868배는 로컬
+  >   `EXPLAIN ANALYZE` 판(keyset **0.053ms**)이라 그 오염이 없다. 조건이 **다른 판의 것**이었다.
+  > - `portfolio-narrative` 의 다운샘플이 **옛 값 1.7배**로 남아 있었다(2026-08-18 P2 에서
+  >   다세션 **4.11배**로 갱신됨). 4.11 로 고치고 「1.7 은 단일 핫세션 조건」을 같이 적었다.
+  >
+  > **여전히 안 한 것** — 위 여섯 수의 인용처는 −98.7% 보다 넓다(625배만 19개 파일). 이번에
+  > 건 것은 **읽는 사람이 실제로 여는 자산**(one-pager · FINAL-REPORT · portfolio-narrative ·
+  > problem-solving-log · db-deep-dive · backend/README)까지다. 남은 것은 **설계 판단용으로
+  > 수를 인용하는 decisions/ 문서들**(`db-portfolio-roadmap` · `pose-data-partition-fk-tradeoff`
+  > · `pose-batch-idempotency-vs-partition` 등)과 rig 스크립트 주석이고, 날짜 박힌 기록과
+  > 미커밋 지원서 초안은 1차와 같은 이유로 계속 제외한다.
 - **E3 의 «근거» 는 실측일 필요가 없다.** 복제/HA 는 «규모상 실수요 0» 이라는 판정이 이미 있고
   ([`../portfolio/realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §2), 그 판정을
   유지하는 것도 닫힌 것이다. **안 한 이유가 적혀 있으면 닫혔다.**

@@ -109,7 +109,7 @@
 - **문제**: `PoseDataService.savePoseDataBatch`의 JPA `saveAll`이 `@GeneratedValue(IDENTITY)` 때문에 Hibernate batch가 원천 차단 → 개별 INSERT N방.
 - **해결**: `JdbcTemplate.batchUpdate` multi-row INSERT로 전환 (`FeedbackLogService` 패턴). IDENTITY 우회, INSERT 25방→1방.
 - **결과** (공정 측정, 워밍업 통제, [`load-test-strategy §7.6`](../decisions/load-test-strategy.md)):
-  - throughput **23.5 → 46.7 RPS (+99%)**, p50 −64%, p99 7,549→4,784ms (**−37%**)
+  - throughput **23.5 → 46.7 RPS (+99%)**, p50 −64%, p99 7,549→4,784ms (**−37%**) — [조건](../decisions/load-test-strategy.md#batch-insert-99): 2026-05-31 로컬, warmup 60초 폐기 후 ramp 5→100. **절대 RPS 는 인용하지 않는다**
 - 면접: "왜 config(`hibernate.jdbc.batch_size`)로 안 풀고 JdbcTemplate? → IDENTITY라 Hibernate batch 미발동, 드라이버 레벨 batch가 정석."
 - **면접(꼬리질문 대비)**: "왜 ID 전략을 SEQUENCE로 안 바꿨나? → SEQUENCE는 INSERT 전에 미리 ID를 확보할 수 있어 이론상 Hibernate batch가 가능하지만, MySQL엔 네이티브 SEQUENCE가 없어 별도 ID발급 테이블로 흉내내야 함(추가 오버헤드) + 엔티티 전체의 PK 생성 전략을 바꾸는 더 큰 변경. `JdbcTemplate.batchUpdate`는 이 저장 경로 하나만 국소적으로 우회해 같은 효과를 더 작은 변경으로 냄."
 
