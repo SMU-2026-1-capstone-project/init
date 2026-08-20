@@ -112,6 +112,24 @@ DBA 축 추가([[user_career_target]], 2026-08-09). 전부 «데모에 좋은 �
   > 수를 인용하는 decisions/ 문서들**(`db-portfolio-roadmap` · `pose-data-partition-fk-tradeoff`
   > · `pose-batch-idempotency-vs-partition` 등)과 rig 스크립트 주석이고, 날짜 박힌 기록과
   > 미커밋 지원서 초안은 1차와 같은 이유로 계속 제외한다.
+
+  > 🔵 **2026-08-20 (3차) — `decisions/` 도 걸었다.** 위에서 「남은 것」으로 적은 설계 문서
+  > **11개에 포인터 18개**를 달았다: `backup-restore-rto-rpo` · `db-portfolio-roadmap` ·
+  > `load-test-strategy` · `mysql-vs-postgresql` · `online-ddl-vs-blocking-alter` ·
+  > `pose-batch-idempotency-vs-partition` · `pose-data-partition-fk-tradeoff` ·
+  > `pose-ingest-downsampling` · `projection-end-to-end-remeasure` ·
+  > `replication-lag-and-semisync` · `report-read-path`.
+  >
+  > **밀도 규칙: 문서당 한 곳**(그 수가 판단의 전제로 쓰이는 자리)에만 단다. 예를 들어
+  > `online-ddl-vs-blocking-alter` 는 96분을 10번 부르지만 baseline 인용 블록 하나에만 걸었다 —
+  > 같은 문서 안에서 열 번 반복하면 포인터가 본문을 읽는 걸 방해한다.
+  >
+  > **판단의 전제로 쓰이던 자리 둘**에는 포인터와 함께 «행당 정규화 570배» 를 같이 적었다 —
+  > `pose-data-partition-fk-tradeoff` 의 A2 확정 근거와 `db-portfolio-roadmap` 의 실측 근거 칸이다.
+  > 파티셔닝을 채택한 근거가 **정규화 전 값**이었다는 사실이 그 자리에 없었다.
+  >
+  > 링크는 56건 전부 «파일 존재 + 앵커 존재» 로 기계 검증했다. **남은 것은 rig 스크립트
+  > 주석**(`loadtest/*.sh`)뿐이고, 그건 읽는 자산이 아니라 코드다.
 - **E3 의 «근거» 는 실측일 필요가 없다.** 복제/HA 는 «규모상 실수요 0» 이라는 판정이 이미 있고
   ([`../portfolio/realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §2), 그 판정을
   유지하는 것도 닫힌 것이다. **안 한 이유가 적혀 있으면 닫혔다.**

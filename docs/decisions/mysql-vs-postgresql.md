@@ -56,7 +56,7 @@
 **PG 쪽 세 칸이 이름만 해당하고 실질이 비어 있다:**
 
 - **JSON 칸** — 코드베이스 전체에 JSON path 질의가 **0건**(`JSON_EXTRACT`/`JSON_TABLE`/`->>` 없음, 2026-08-11 확인).
-  `joint_coordinates` 는 통째 저장·통째 조회이고, projection −98.7% 의 승리 방식은 **아예 안 읽는 것**이었다.
+  `joint_coordinates` 는 통째 저장·통째 조회이고, projection −98.7%([조건](../portfolio/realmysql-experiments.md#projection-98-7)) 의 승리 방식은 **아예 안 읽는 것**이었다.
   즉 이 프로젝트의 JSON 컬럼은 구조화 데이터가 아니라 사실상 **BLOB** 이라 jsonb/GIN 이 이길 표면이 없다.
 - **분석쿼리 칸** — 실제 집계는 [`SessionFeedbackLogRepository.java:30`](../../backend/src/main/java/com/shadowfit/repository/exercise/SessionFeedbackLogRepository.java) ·
   [`PoseDataRepository.java:58`](../../backend/src/main/java/com/shadowfit/repository/exercise/PoseDataRepository.java) 처럼
@@ -75,7 +75,7 @@
 |---|---|---|
 | 볼륨 | `pose_data` 는 **프레임당 1행**, rep 당 5~30행 | [`pose-ingest-downsampling.md:30`](./pose-ingest-downsampling.md) |
 | 읽기 | 그걸 읽는 건 리포트 조회 **세션당 1회**, `GROUP BY` 집계 한 방 | 위 리포지터리 |
-| 실측 병목 | **DB INSERT** (batch 로 throughput +99%) | `realmysql-experiments` ②a |
+| 실측 병목 | **DB INSERT** (batch 로 throughput +99%, [조건](./load-test-strategy.md#batch-insert-99)) | `realmysql-experiments` ②a |
 | 핫 행 | `exercise_sessions` 가 rep 마다 `totalReps`·`avgSyncRate`·`version`·`lastActiveAt` 갱신 | [`Session.java`](../../backend/src/main/java/com/shadowfit/model/exercise/Session.java) |
 
 > **가장 많이 쓴 데이터가 가장 적게 읽힌다** — 이 한 줄이 이 제품의 모양이다.
@@ -102,7 +102,7 @@ MySQL 이 이기는 자리(핫 UPDATE·vacuum 없음)는 **큰 테이블·실제
 | 인덱스 표현력 | **PostgreSQL** | 큼 | partial · expression · `INCLUDE` 커버링 · **BRIN**(1억 행 시계열 컬럼에 쓰면 인덱스가 GB→KB). 대안 없음 |
 | 백업 / PITR | **PostgreSQL** | 큼 | `pg_basebackup` + WAL 아카이빙이 **내장·1급**. MySQL 은 XtraBackup(서드파티) 또는 `mysqldump`(느림) |
 | 스키마 마이그레이션 | **PostgreSQL** | 중 | `CREATE INDEX CONCURRENTLY` 내장, `ADD COLUMN` 기본값이 메타데이터 연산, **트랜잭셔널 DDL** |
-| 파티션 전환 DDL | **MySQL** | 중 | PG 에는 `ALTER TABLE ... PARTITION BY` 가 **아예 없다** — 96분짜리 그 변환이 «손으로 짠 이전 절차» 가 된다 |
+| 파티션 전환 DDL | **MySQL** | 중 | PG 에는 `ALTER TABLE ... PARTITION BY` 가 **아예 없다** — 96분([조건](../portfolio/realmysql-experiments.md#drop-partition-625x))짜리 그 변환이 «손으로 짠 이전 절차» 가 된다 |
 | 메모리 발자국(idle) | **PostgreSQL** | 중 | MySQL 8 은 `performance_schema` 때문에 컨테이너 idle 이 무겁다. PG 의 커넥션당 프로세스 약점은 풀 5~9 에서 안 걸린다 |
 | 배포·비용 생태계 | **PostgreSQL** | **큼** | Neon·Supabase 등 무료/서버리스 티어. **DB 를 박스 밖으로 뺄 싼 경로** |
 

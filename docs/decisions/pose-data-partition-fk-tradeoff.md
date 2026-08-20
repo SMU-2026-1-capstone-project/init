@@ -9,7 +9,7 @@
 
 ## 1. 배경 / 문제
 
-`pose_data` 파티셔닝(Range by `created_at`, TTL 만료 시 `DROP PARTITION`이 `DELETE WHERE`보다 ~625배 빠름)은 `loadtest/measure_partition.sh`로 스크래치 테이블에서 실측 완료했으나, 실제 `mysql/schema.sql`에는 아직 반영 안 됨.
+`pose_data` 파티셔닝(Range by `created_at`, TTL 만료 시 `DROP PARTITION`이 `DELETE WHERE`보다 ~625배 빠름 — [조건](../portfolio/realmysql-experiments.md#drop-partition-625x))은 `loadtest/measure_partition.sh`로 스크래치 테이블에서 실측 완료했으나, 실제 `mysql/schema.sql`에는 아직 반영 안 됨.
 
 실스키마에 반영 시도 중 로컬 MySQL 8.0에서 다음 에러로 막힘:
 
@@ -140,7 +140,7 @@ exercise_sessions(id) ──ON DELETE CASCADE──▶ pose_data.session_id  (+ 
 
 ## 7. 결정 로그
 
-- **2026-07-20**: **분기 A → A2(파티셔닝 진행) 확정**. TTL 만료 비용 차이(625배)가 장기적으로 누적되는 이득이라 판단.
+- **2026-07-20**: **분기 A → A2(파티셔닝 진행) 확정**. TTL 만료 비용 차이(625배 — [조건](../portfolio/realmysql-experiments.md#drop-partition-625x), 행당 정규화하면 570배)가 장기적으로 누적되는 이득이라 판단.
 - **2026-07-20**: 분기 B 1차 확정 시도 → B2(정기 배치 정리) 채택, 단 개인정보 즉시성 미결 질문은 "학생 프로젝트라 리스크 낮음"으로 보류하고 진행하려 함.
 - **2026-07-20**: **정정 — 법무(개인정보보호법 제21조) 확인 결과 B2 원안 폐기, B5(이벤트 트리거 즉시 비동기)로 변경.** 제21조는 회원 탈퇴 시 개인정보를 "지체 없이" 파기하도록 명시(위반 시 3천만원 이하 과태료). "정기 배치를 기다린다"는 이 요건을 충족 못 할 소지가 커서, "탈퇴 이벤트 발생 즉시 비동기 트리거"로 응답 지연 없이 지체없이 요건도 만족시키는 방향으로 전환. 앞선 "리스크 낮으니 보류" 판단은 실제로 관련 법 조문을 확인하기 전의 성급한 결론이었음 — 확인 후 정정.
 - **2026-07-20**: §5-1 반영 — 개별 세션 삭제(당시 미구현)는 소규모(세션당 ~750행)라 동기 삭제로 충분, 별도 배치 불필요. 회원 탈퇴(대량)만 B5 적용 대상.

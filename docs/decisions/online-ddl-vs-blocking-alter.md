@@ -12,7 +12,7 @@
 
 `realmysql-experiments.md:140` 에 **답이 반쯤 적힌 채 실행되지 않은 문장**이 있다:
 
-> `ALTER TABLE ... PARTITION BY RANGE(...)` = **5,767초(96분)** copy-to-tmp 풀 리빌드. → 운영이면 처음부터 파티션 테이블 or **`pt-osc`/`INPLACE` 무중단**
+> `ALTER TABLE ... PARTITION BY RANGE(...)` = **5,767초(96분)** copy-to-tmp 풀 리빌드([조건](../portfolio/realmysql-experiments.md#drop-partition-625x) — 2026-06-03 로컬 1억 행 더미 JSON. ⚠️ 이 문서가 만드는 2026-08-12 pt-osc 대조판은 **1,000만 행·EC2** 라 다른 라운드다). → 운영이면 처음부터 파티션 테이블 or **`pt-osc`/`INPLACE` 무중단**
 
 앞의 96분은 실측이고, 뒤의 「무중단」은 **권고**다. 이 문서는 뒷문장을 실측으로 바꾼다.
 
