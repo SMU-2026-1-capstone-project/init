@@ -83,7 +83,7 @@ DB마다 MVCC 구현과 기본 격리수준이 다릅니다 — 예를 들어 Or
 
 ### Q. 조회 성능 문제, 어떻게 찾고 고치셨어요?
 
-운동 세션마다 관절 좌표가 쌓이는 구조라 데이터가 늘수록 조회가 느려질 거라 예상하고, 인덱스 문제로 가정했습니다. 그런데 `EXPLAIN`으로 실측해보니 `idx_session_timestamp(session_id, timestamp_sec)`가 이미 `type=ref, Extra=NULL`(filesort 없음)로 최적이었습니다. `IGNORE INDEX`로 강제 풀스캔 시켜봤더니 412만 행 스캔+filesort로 85초가 걸려서, 인덱스가 없었다면 어떻게 됐을지 대조로 확인했습니다. 진짜 원인은 쿼리가 안 쓰는 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장)까지 매번 로드하는 거였고, 3컬럼 projection DTO로 바꿔서 해결했습니다.
+운동 세션마다 관절 좌표가 쌓이는 구조라 데이터가 늘수록 조회가 느려질 거라 예상하고, 인덱스 문제로 가정했습니다. 그런데 `EXPLAIN`으로 실측해보니 `idx_session_timestamp(session_id, timestamp_sec)`가 이미 `type=ref, Extra=NULL`(filesort 없음)로 최적이었습니다. `IGNORE INDEX`로 강제 풀스캔 시켜봤더니 412만 행 스캔+filesort로 85초가 걸려서, 인덱스가 없었다면 어떻게 됐을지 대조로 확인했습니다. 진짜 원인은 쿼리가 안 쓰는 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장)까지 매번 로드하는 거였고, 3컬럼 projection DTO로 바꿔서 해결했습니다(아래 수치는 이 3컬럼 시점 기준이고, 이후 rep 단위 계산이 들어오면서 지금은 4컬럼입니다 — `feedbackMessage` 를 빼고 `repNumber`·`smoothedKneeAngle` 을 넣었습니다. 둘 다 숫자 하나씩이라 `joint_coordinates` 를 안 싣는다는 핵심은 그대로입니다).
 
 ```
 근거:

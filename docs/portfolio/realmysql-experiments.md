@@ -96,7 +96,7 @@
 ### ② Ch.11 + Ch.13 — 쿼리 최적화 & 파티션 🟢⭐
 - **개념**: bulk INSERT, 페이지네이션(offset→cursor), projection / Range 파티션·프루닝.
 - **이 프로젝트 (a) 쓰기**: ✅ batch insert 완료 — JdbcTemplate `batchUpdate`, throughput **+99%**, p99 −37% (§7.6). Ch.11 bulk insert 그 자체.
-- **이 프로젝트 (b) projection**: ✅ `ReportService` JSON blob 헛로드(~3MB) → 3컬럼 DTO.
+- **이 프로젝트 (b) projection**: ✅ `ReportService` JSON blob 헛로드(~3MB) → projection DTO(측정 시점 3컬럼, **현재 4컬럼**).
 - **이 프로젝트 (c) 페이지네이션**: ✅ 전체 테이블 시간순 페이지네이션 offset → keyset(cursor). 1억 행 합성 rig로 실측 — offset O(N) 선형 저하 vs keyset 평탄 입증.
 - **이 프로젝트 (d) 파티션**: `pose_data` 날짜 Range 파티션 → **버퍼 TTL의 DROP PARTITION**(주용도, [`db-deep-dive §2-0`](./db-deep-dive.md) raw=버퍼) + cross-session 집계 pruning(부차). ⚠️ PK를 `(id, created_at)`로 변경 선결. 샤딩은 미적용(과설계).
   - **언제 파티셔닝하나? — "행 수"가 아니라 "용도"** ⭐: 업계 감각치(단일 테이블이 버퍼풀 초과 / 수천만~1억 행 / 수십~100GB↑)는 **필요조건일 뿐 충분조건 아님**. RealMySQL도 "몇 행"으로 안 박고 "감당·관리(특히 오래된 데이터 삭제)가 부담일 때"로 설명. 정당화 트리거 3: ①TTL/보존(대량 DELETE 부담→DROP PARTITION) ②쿼리가 항상 파티션 키로 범위 좁힘(pruning) ③파티션 단위 백업·아카이빙.

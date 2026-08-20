@@ -217,7 +217,7 @@ const cardsRoot = document.getElementById("cards");
 
 // 1. Projection
 {
-  const card = makeCard("② Ch.11", "Projection — JSON off-page 회피", "리포트 조회가 안 쓰는 JSON 컬럼(2.3KB)까지 통째로 로드하고 있었음. joint_coordinates가 InnoDB off-page 저장이라 추가 랜덤 I/O 발생 — 3컬럼 projection으로 회피.");
+  const card = makeCard("② Ch.11", "Projection — JSON off-page 회피", "리포트 조회가 안 쓰는 JSON 컬럼(2.3KB)까지 통째로 로드하고 있었음. joint_coordinates가 InnoDB off-page 저장이라 추가 랜덤 I/O 발생 — projection으로 회피(측정 시점 3컬럼, 현재 4컬럼).");
   renderBarCard(card, {
     scale: "log", domainMax: 2000, domainMin: 10,
     bars: [

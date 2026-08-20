@@ -174,7 +174,7 @@
 - **처리량 +99%**, **p99 지연 −37%**.
 
 ### 5.2 읽기 — JSON projection
-세션 리포트 조회 시 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장) 전체를 헛로드하던 경로를 3컬럼 DTO projection으로 교체:
+세션 리포트 조회 시 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장) 전체를 헛로드하던 경로를 DTO projection으로 교체(측정 시점 3컬럼, **현재 4컬럼** — `joint_coordinates` 를 안 싣는 방침은 유지):
 
 | 지표 | before | after | 효과 |
 |---|---|---|---|
