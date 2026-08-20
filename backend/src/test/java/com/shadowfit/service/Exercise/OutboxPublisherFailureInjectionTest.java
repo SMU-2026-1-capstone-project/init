@@ -61,6 +61,11 @@ import static org.mockito.Mockito.when;
         //    으로 남는다). 아래 scheduling=false 는 우리 컨텍스트만 끄므로 그것만으로는 부족하다.
         "spring.datasource.url=jdbc:h2:mem:outbox_failure_injection;MODE=MySQL;IGNORECASE=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
         "scheduling.enabled=false",
+        // 이 테스트는 gRPC 를 안 쓴다. 서버를 띄우면 컨텍스트가 무거워지고, 같은 JVM 에서
+        // 도는 «타이밍으로 판정하는» 테스트(GrpcServerDeadlineProbeTest 는 클라이언트가
+        // 포기한 뒤 저장이 완주하는지를 잰다)의 여유를 갉아먹는다. 실제로 그 판정이
+        // 흔들렸다 — 필요 없는 것은 안 띄운다.
+        "grpc.server.port=-1",
         "outbox.publisher.max-retry=3",
         "outbox.publisher.lock-timeout-seconds=60",
         "outbox.publisher.batch-size=20"
