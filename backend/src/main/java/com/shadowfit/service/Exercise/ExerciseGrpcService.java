@@ -1,12 +1,15 @@
 package com.shadowfit.service.Exercise;
 import com.google.protobuf.Empty;
 import com.shadowfit.global.config.InternalAuthInterceptor;
+import com.shadowfit.global.observability.CallAbandonedException;
+import com.shadowfit.global.observability.CallCancellation;
 import com.shadowfit.global.observability.CorrelationIds;
 import com.shadowfit.grpc.ExerciseServiceGrpc;
 import com.shadowfit.grpc.PoseDataBatchRequest;
 import com.shadowfit.grpc.PoseDataRequest;
 import com.shadowfit.grpc.PoseDataResponse;
 import com.shadowfit.global.observability.SessionMetrics;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import org.springframework.dao.DeadlockLoserDataAccessException;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +28,35 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
     private final FeedbackLogService feedbackLogService;
     private final SessionMetrics sessionMetrics;
 
+    /**
+     * 클라이언트가 <b>이미 포기한</b> 요청인가 (#206 결함 B).
+     *
+     * <p>gRPC 의 deadline 은 호출 사슬을 따라 {@code Context} 로 전파된다. 클라이언트가 포기하면
+     * 서버 쪽 {@code Context} 가 취소되는데, 이 저장소의 핸들러는 그것을 <b>한 번도 보지 않았다</b> —
+     * 그래서 아무도 안 받을 응답을 만들려고 커넥션·트랜잭션·CPU 를 계속 썼다. 부하가 걸릴수록
+     * 손해가 커지는 방향이다(느려서 포기당했는데, 포기당한 작업이 자원을 더 먹는다).
+     *
+     * <p>여기서 막는 것은 <b>«도착했을 때 이미 죽어 있던» 요청</b>이다 — 큐에 밀렸거나 전송 중에
+     * deadline 이 만료된 경우. 이슈의 조치 후보 B-1 이고 가장 싸다.
+     *
+     * <p><b>핸들러 «안에서» 만료되는 경우는 이 가드로 안 잡힌다</b> — 진입 시점에는 아직 살아
+     * 있었기 때문이다. 그쪽은 서비스가 쓰기 직전에 한 번 더 본다
+     * ({@link com.shadowfit.global.observability.CallCancellation}). 둘이 서로 다른 절반을 막는다:
+     * 여기가 «도착했을 때 이미 죽어 있던» 요청, 저기가 «일하는 동안 죽은» 요청이다.
+     *
+     * @return 포기당한 요청이라 시작하지 않았으면 {@code true}
+     */
+    private boolean abortIfClientGaveUp(String rpc, StreamObserver<?> responseObserver) {
+        if (!CallCancellation.isAbandoned()) {
+            return false;
+        }
+        log.warn("{} — 클라이언트가 이미 포기한 요청이라 시작하지 않는다 (#206-B)", rpc);
+        responseObserver.onError(Status.CANCELLED
+                .withDescription("client already gave up before the handler started")
+                .asRuntimeException());
+        return true;
+    }
+
     // correlation id 자체는 전역 인터셉터(GrpcObservabilityConfig)가 metadata에서 꺼내 MDC에 올려두지만,
     // 세션 id는 metadata가 아니라 메시지 payload 안에 있어 인터셉터가 볼 수 없다. 메서드마다 여기서
     // 얹어줘야 아래 서비스 계층(PoseDataService/SessionService)의 로그까지 세션이 따라붙는다.
@@ -37,6 +69,9 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
     public void savePoseDataBatch(PoseDataBatchRequest request, StreamObserver<PoseDataResponse> responseObserver) {
         // try-with-resources 를 바깥에 두고 try/catch 를 안에 둔 이유: 자원은 catch 보다 먼저 닫히므로
         // 한 겹으로 합치면 정작 실패 로그에서 세션 id 가 빠진다.
+        if (abortIfClientGaveUp("SavePoseDataBatch", responseObserver)) {
+            return;
+        }
         try (CorrelationIds.Scope ignored = CorrelationIds.withSession(request.getSessionId())) {
             try {
                 log.info("세션 {} : 실시간 데이터 {}개 수신 및 저장 시작",
@@ -52,6 +87,14 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                 responseObserver.onNext(response);
                 responseObserver.onCompleted();
 
+            } catch (CallAbandonedException e) {
+                // 서비스가 «시작 안 함» 을 알려온 것이다 (#206-B). 우리가 아픈 게 아니라 상대가
+                // 안 기다리기로 한 것이므로 INTERNAL 이 아니라 CANCELLED 로 답한다 — 어차피 받을
+                // 사람은 없지만, 이 구분이 로그·지표에서 «장애» 와 «취소» 를 가른다.
+                log.warn("세션 {} : 호출자가 포기해 {}", request.getSessionId(), e.getMessage());
+                responseObserver.onError(io.grpc.Status.CANCELLED
+                        .withDescription(e.getMessage())
+                        .asRuntimeException());
             } catch (Exception e) {
                 log.error("저장 실패: {}", e.getMessage());
                 responseObserver.onError(io.grpc.Status.INTERNAL.asRuntimeException());
@@ -127,6 +170,9 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
     @Override
     public void extractReferenceData(com.shadowfit.grpc.ExtractRequest request,
                                      io.grpc.stub.StreamObserver<com.shadowfit.grpc.ExtractResponse> responseObserver) {
+        if (abortIfClientGaveUp("ExtractReferenceData", responseObserver)) {
+            return;
+        }
         try {
             log.info("기준 좌표 추출 데이터 수신 시작 - 운동 ID: {}", request.getExerciseId());
 
@@ -155,6 +201,9 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
     @Override
     public void completeAnalysis(com.shadowfit.grpc.SessionCompleteRequest request,
                                  io.grpc.stub.StreamObserver<com.shadowfit.grpc.SessionCompleteResponse> responseObserver) {
+        if (abortIfClientGaveUp("CompleteAnalysis", responseObserver)) {
+            return;
+        }
         try (CorrelationIds.Scope ignored = CorrelationIds.withSession(request.getSessionId())) {
             try {
                 // AI 서버가 보내온 gRPC 데이터를 SessionService를 통해 DB에 반영
@@ -169,6 +218,14 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                 responseObserver.onNext(response);
                 responseObserver.onCompleted();
                 log.info("AI 서버 gRPC에 의한 세션 종료 성공 - 세션 ID: {}", request.getSessionId());
+            } catch (CallAbandonedException e) {
+                // 서비스가 «시작 안 함» 을 알려온 것이다 (#206-B). 우리가 아픈 게 아니라 상대가
+                // 안 기다리기로 한 것이므로 INTERNAL 이 아니라 CANCELLED 로 답한다 — 어차피 받을
+                // 사람은 없지만, 이 구분이 로그·지표에서 «장애» 와 «취소» 를 가른다.
+                log.warn("세션 {} : 호출자가 포기해 {}", request.getSessionId(), e.getMessage());
+                responseObserver.onError(io.grpc.Status.CANCELLED
+                        .withDescription(e.getMessage())
+                        .asRuntimeException());
             } catch (Exception e) {
                 log.error("세션 종료 gRPC 처리 중 에러: {}", e.getMessage());
                 responseObserver.onError(io.grpc.Status.INTERNAL.asRuntimeException());
@@ -183,6 +240,9 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
     @Override
     public void reportFeedbackBatch(FeedbackBatchRequest request,
                                     StreamObserver<FeedbackBatchResponse> responseObserver) {
+        if (abortIfClientGaveUp("ReportFeedbackBatch", responseObserver)) {
+            return;
+        }
         try (CorrelationIds.Scope ignored = CorrelationIds.withSession(request.getSessionId())) {
             try {
                 int saved = feedbackLogService.saveBatch(request);

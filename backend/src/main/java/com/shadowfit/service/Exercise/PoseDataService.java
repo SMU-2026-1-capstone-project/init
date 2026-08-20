@@ -1,6 +1,7 @@
 package com.shadowfit.service.Exercise;
 
 import com.shadowfit.global.error.BusinessException;
+import com.shadowfit.global.observability.CallCancellation;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.grpc.PoseDataRequest;
@@ -91,6 +92,12 @@ public class PoseDataService {
         // INSERT 가 정리 뒤에 착지해 아무도 다시 훑지 않는 행으로 남는다. 창의 폭을 알아야
         // 발생 빈도의 상한을 잡고 수정안을 저울질할 수 있어 여기서 잰다.
         recordOrphanWindow(System.nanoTime());
+
+        // 되돌릴 수 없는 쓰기를 시작하기 직전이다. 여기까지 오는 동안 호출자가 포기했을 수 있다
+        // (#206 결함 B — GrpcServerDeadlineProbeTest 가 재현한 것이 정확히 이 순서다: 핸들러는
+        // 진입했고, 그 뒤에 deadline 이 만료됐다). 위 존재검사는 읽기라 되돌릴 게 없지만 아래
+        // batchUpdate 부터는 아니다. gRPC 밖 호출에서는 이 검사가 아무 일도 하지 않는다.
+        CallCancellation.abortIfAbandoned("pose 배치 저장 (session=" + sessionId + ")");
 
         List<PoseDataRequest> downsampled = downsample(grpcList, DOWNSAMPLE_WINDOW);
 
