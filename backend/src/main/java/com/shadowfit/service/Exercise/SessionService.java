@@ -19,6 +19,7 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.observability.CorrelationIds;
 import com.shadowfit.global.observability.SessionMetrics;
+import com.shadowfit.global.security.SessionNonceGenerator;
 import com.shadowfit.global.util.SetSummaryFormatter;
 import com.shadowfit.model.outbox.OutboxEvent;
 import com.shadowfit.repository.outbox.OutboxEventRepository;
@@ -67,6 +68,7 @@ public class SessionService {
     private final ReportRepository reportRepository;
     private final SessionMetrics sessionMetrics;
     private final OutboxEventRepository outboxRepository;
+    private final SessionNonceGenerator sessionNonceGenerator;
 
     // 자기 주입: completeSession → applyComplete 호출이 Spring 프록시를 통과해 @Transactional이 적용되도록 함.
     @Lazy
@@ -116,12 +118,19 @@ public class SessionService {
             throw new BusinessException(ErrorCode.EXERCISE_NOT_SUPPORTED);
         }
 
+        // 소유권 비밀값은 **여기서, 이 트랜잭션 안에서** 만든다 (#187 안 (d)).
+        //
+        // 세션을 AI 에 알리는 StartAnalysis 는 afterCommit 에서 비동기로 나가고
+        // (ExerciseAnalysisService 의 registerSynchronization), REST 응답도 커밋 뒤에 나간다.
+        // 즉 커밋된 이 값 하나를 두 경로가 나중에 같이 읽는 모양이라야 세 곳(클라·AI·DB)이
+        // 어긋나지 않는다. 나중 단계에서 만들면 «클라가 받은 값» 과 «AI 가 받은 값» 이 갈릴 수 있다.
         Session session = Session.builder()
                 .member(member)
                 .exercise(exercise)
                 .referenceSource(finalUrl)
                 .startTime(LocalDateTime.now())
                 .status(Status.IN_PROGRESS)
+                .sessionNonce(sessionNonceGenerator.generate())
                 .build();
 
         return sessionRepository.save(session);
