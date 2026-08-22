@@ -8,7 +8,9 @@
     1. 값이 다르면 프레임이 판정에 못 들어간다
     2. 그 거절이 **«세션 없음» 과 구분되지 않는다** — 구분되면 공격자가 session_id 를 훑어
        살아있는 세션을 열거할 수 있다. 막으려던 것의 절반을 응답으로 되돌려주는 셈이다
-    3. 1단계는 compat 다 — 세션에 보관값이 없거나(배포 전 세션) 요청이 값을 안 보내면 통과
+    3. **값을 안 보내면 막힌다**(2단계 강제). 1단계에서는 이것도 통과였고, 그 창이 곧
+       방어의 부재였다
+    4. 세션에 보관값이 없으면(배포 전 세션) 여전히 통과 — 스스로 닫히는 창이다
 
 ⚠️ **여기서 재는 것은 대조이지 검출 품질이 아니다.** MediaPipe 는 mock 으로 갈음한다.
 """
@@ -98,24 +100,38 @@ class SessionNonceOwnershipTest(unittest.TestCase):
             rejected.message.replace("9003", "N"), missing.message.replace("9999", "N")
         )
 
-    def test_요청이_값을_안_보내면_통과한다_1단계_compat(self):
-        """강제는 2단계다. 지금 켜면 아직 동봉하지 않는 프론트가 통째로 끊긴다."""
+    def test_값을_안_보내면_막힌다_2단계_강제(self):
+        """1단계에서는 통과였다. 그 창을 닫는 것이 2단계의 전부다.
+
+        «안 보냄» 과 «틀림» 이 같은 응답이어야 한다 — 다르면 «이 세션은 nonce 를 요구한다»
+        는 사실이 새어 나가고, 그것만으로도 살아있는 세션을 가려낼 수 있다.
+        """
         self._session(9004, _OWNER_NONCE)
 
-        res = self._post(9004, None)
+        missing = self._post(9004, None)
+        wrong = self._post(9004, _ATTACKER_NONCE)
 
-        self.assertTrue(res.success)
+        self.assertFalse(missing.success)
+        self.assertEqual(missing.skip_reason, PoseSkipReason.SESSION_NOT_FOUND)
+        self.assertEqual(missing.skip_reason, wrong.skip_reason)
+        self.assertEqual(missing.message, wrong.message)
 
-    def test_배포_전_세션은_값을_보내도_통과한다(self):
-        """보관값이 없는 세션(V8 이 NULL 을 허용하는 이유)에 값을 들이밀어도 막지 않는다.
+    def test_배포_전_세션은_무엇을_보내도_통과한다(self):
+        """보관값이 없는 세션은 강제를 켠 뒤에도 통과한다.
 
-        막으면 배포 순간 진행 중이던 세션이 전부 끊긴다 — 그 손해가 이 창을 여는 이유다.
+        🔴 이건 남겨둔 구멍이 아니라 **스스로 닫히는 창**이다. 보관값이 없는 세션은 이 기능
+        배포 «전» 에 시작된 것뿐이고, 세션 타임아웃(최대 45분)이 그것들을 걷어간다. 여기서
+        같이 막으면 배포 순간 운동 중이던 사람이 끊기는데, 그 대가로 얻는 것이 45분짜리
+        창 하나뿐이다.
         """
+        # ⚠️ 세션을 둘로 나눈다. 같은 세션에 연속으로 쏘면 **유입 상한(#143, 300ms)** 에 걸려
+        #    두 번째가 RATE_LIMITED 로 떨어지고, 그러면 이 테스트가 nonce 가 아니라 리미터를
+        #    재게 된다(실제로 한 번 그렇게 실패했다).
         self._session(9005, None)
+        self._session(9006, None)
 
-        res = self._post(9005, _ATTACKER_NONCE)
-
-        self.assertTrue(res.success)
+        self.assertTrue(self._post(9005, _ATTACKER_NONCE).success)
+        self.assertTrue(self._post(9006, None).success)
 
 
 class SessionNonceRegistryTest(unittest.TestCase):
