@@ -24,7 +24,8 @@ REPL_RIG=$ROOT/loadtest/results/replication-2026-08-17
 # ── 설정 ─────────────────────────────────────────────────────────────────
 S3_BASE=${S3_BASE:?S3_BASE 가 필요하다 — 예: s3://my-bucket/shadowfit}
 RUN_ID=${RUN_ID:-ec2-$(date +%Y%m%d-%H%M%S)}
-OUTDIR=${OUTDIR:-$ROOT/loadtest/results/online-ddl-$RUN_ID}
+# 🔴 기본값은 여기서 안 정한다 — `PHASES` 를 읽어야 정할 수 있고, 그건 아래에 있다(#358).
+OUTDIR=${OUTDIR:-}
 S3_DEST="${S3_BASE%/}/$RUN_ID"
 
 # 라운드마다 갈아끼운다. 기본값은 무중단 DDL(P1) 라운드이고 **그건 2026-08-12 에 끝났다.**
@@ -66,6 +67,47 @@ S3_DEST="${S3_BASE%/}/$RUN_ID"
 # 🔴 `ddl` 과 `backup` 을 **같이 넣지 말 것.** 둘 다 디스크가 지배해서 한 라운드에 섞으면
 #    서로 오염된다(AWS-RIDE-ALONG §7 이 P1↔P2 에 건 경고와 같다). 라운드를 나눈다.
 PHASES=${PHASES:-"preflight rehearsal ddl ridealong collect"}
+
+# ── 결과 디렉터리 이름 — PHASES 에서 라운드를 읽는다 (#358) ───────────────
+# 예전 기본값은 무조건 `online-ddl-` 이었다. 라운드가 넷이 된 지금 그 값은 넷 중 하나만
+# 맞는데, **틀려도 실패하지 않는다** — 복제 라운드가 «online-ddl» 이름으로 저장소에 박히고,
+# 산출물 자체는 멀쩡해서 결과를 커밋할 때가 되어서야 눈에 띈다. 무인 라운드면 그때는
+# 이미 인스턴스를 내린 뒤다.
+#
+# 🔴 `OUTDIR` 을 명시하면 이 블록은 통째로 안 돈다. 추론은 **안 줬을 때만** 한다 —
+#    그래서 아래 «섞였다» 판정도 명시한 사람은 안 건드린다.
+# ⚠️ `S3_DEST` 는 `RUN_ID` 에서 따로 나온다(위). 즉 **여기서 고쳐도 S3 키는 안 바뀐다** —
+#    S3 는 예전부터 라운드 이름을 안 달았고, 이 변경의 범위 밖이다.
+if [ -z "$OUTDIR" ]; then
+  _rounds=""
+  for _p in $PHASES; do
+    case "$_p" in
+      ddl|rehearsal)                       _r=online-ddl ;;
+      backup|backup_rehearsal|backup_real) _r=backup-restore ;;
+      repl|repl_gate|repl_preflight)       _r=replication ;;
+      coresidency*)                        _r=coresidency ;;
+      *)                                   continue ;;   # preflight·ridealong·collect 는 라운드를 안 정한다
+    esac
+    case " $_rounds " in *" $_r "*) ;; *) _rounds="${_rounds:+$_rounds }$_r" ;; esac
+  done
+
+  case "$_rounds" in
+    "")
+      # 측정 단계가 없다(preflight·collect 만 같은 경우). 라운드 이름을 붙일 근거가 없다.
+      echo "⚠️  PHASES 에 측정 단계가 없다 — 결과 디렉터리를 'run-' 으로 만든다: $PHASES" >&2
+      OUTDIR=$ROOT/loadtest/results/run-$RUN_ID ;;
+    *" "*)
+      # 🔴 여러 라운드가 섞였다. 이 조합은 이 파일 위쪽 주석이 이미 금지한 것이고
+      #    (ddl↔backup 은 디스크가 지배해서, coresidency 는 러너의 자리가 달라서),
+      #    이름을 하나 고르면 나머지가 틀린 이름으로 박힌다. 고르지 않고 멈춘다.
+      echo "🔴 PHASES 에 라운드가 둘 이상 섞였다 ($_rounds) — 라운드를 나누거나 OUTDIR 을 직접 줄 것." >&2
+      echo "   PHASES=$PHASES" >&2
+      exit 1 ;;
+    *)
+      OUTDIR=$ROOT/loadtest/results/$_rounds-aws-$RUN_ID ;;
+  esac
+fi
+
 SYNC_SEC=${SYNC_SEC:-300}
 AUTO_SHUTDOWN=${AUTO_SHUTDOWN:-0}
 
