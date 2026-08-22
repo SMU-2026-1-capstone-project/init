@@ -43,7 +43,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 
 /**
- * 이슈 #206 결함 B 재현 — <b>클라이언트가 deadline 으로 포기한 뒤에도 서버가 계속 일하는가.</b>
+ * 이슈 #206 결함 B <b>회귀 감시</b> — 클라이언트가 deadline 으로 포기하면 서버가 쓰기를 멈추는가.
+ *
+ * <p>⚠️ <b>이 테스트는 원래 반대를 단언했다.</b> 결함을 재현해 «서버가 계속 일한다»(rows &gt; 0)를
+ * 고정하는 것이 처음 역할이었고, {@code CallCancellation} 도입으로 고쳐지면서 기대값을 뒤집었다.
+ * 아래 옛 서술은 그 재현이 무엇을 갈랐는지 남겨두려고 그대로 둔다.
  *
  * <p>#206 은 «핸들러 4개 어디에도 {@code Context.current().getDeadline()} 확인이 없다» 를 코드
  * 독해로 적어두고 <b>미검증</b>으로 남겼다. 이 테스트가 그 판정을 실행으로 바꾼다. 이슈 §5 가
@@ -202,21 +206,33 @@ class GrpcServerDeadlineProbeTest {
         System.out.printf("  서버 예외    : %s%n",
                 t == null ? "없음" : t.getClass().getName() + " / msg=" + t.getMessage());
         System.out.printf("  판정        : %s%n",
-                rows > 0 ? "서버가 포기를 무시하고 끝까지 저장했다 (#206-B 확인)"
-                         : "저장이 남지 않았다 — 반증 조건(§5) 쪽");
+                rows > 0 ? "🔴 서버가 포기를 무시하고 끝까지 저장했다 (#206-B 회귀)"
+                         : "상한까지 기다려도 행이 없다 — 서버가 쓰기를 시작하지 않았다 (기대값)");
 
+        // 지연이 끝난 뒤 서비스 호출 자체는 «반환» 된다 — 다만 CallAbandonedException 을 던지고
+        // 나오므로 쓰기는 안 일어난다. 스파이의 finally 가 이 래치를 내리므로 여전히 true 다.
         assertThat(finishedOnItsOwn)
-                .as("핸들러가 지연 뒤 완주했는가 (취소로 중단됐다면 false)")
+                .as("스파이가 지연 뒤 실제 메서드까지 갔는가 — false 면 이 실험이 다른 것을 잰 것이다")
                 .isTrue();
         assertThat(rowsAfterWarmup)
                 .as("워밍업 호출이 행을 남겼어야 한다 — 아니면 이 실험의 측정 수단 자체가 고장난 것")
                 .isPositive();
 
-        // 🔴 이 단언은 «결함이 있다» 를 고정한다. #206 을 고쳐 서버가 취소를 보게 되면 여기서
-        //    깨지고, 그때 기대값을 뒤집는 것이 이 테스트의 다음 역할이다.
+        // 🔴 기대값이 뒤집힌 자리다. 이 테스트는 원래 «결함이 있다»(rows > 0)를 고정했고,
+        //    #206-B 를 고치면서 «없다»(rows == 0)로 바꿨다. 이제 회귀 감시가 이 테스트의 역할이다.
+        //
+        // 📌 이 0 은 «아직 안 보인다» 가 아니다. awaitRowsSince 가 상한(5초)까지 기다린 뒤의
+        //    값이라, #302 가 고친 그 함정(커밋 전에 세기)에는 다시 안 걸린다. 수정 전이라면
+        //    같은 자리에서 2 가 나온다 — 그게 #302 가 되살린 판정이다.
         assertThat(rows)
-                .as("클라이언트가 포기한 배치의 행이 남아 있는가 — 남으면 서버가 계속 일한 것 (#206-B)")
-                .isPositive();
+                .as("상한까지 기다려도 포기당한 배치의 행이 안 나타나는가 — 나타나면 서버가 또 계속 일한 것 (#206-B 회귀)")
+                .isZero();
+
+        // 왜 안 남았는지까지 못박는다. 행이 0 인 이유가 «취소를 봤다» 가 아니라 «저장이 그냥
+        // 실패했다» 일 수도 있는데, 그러면 같은 0 이어도 전혀 다른 사건이다.
+        assertThat(thrown.get())
+                .as("쓰기를 안 한 이유가 «호출자가 포기했다» 여야 한다 — 다른 예외면 이 판은 무효다")
+                .isInstanceOf(com.shadowfit.global.observability.CallAbandonedException.class);
     }
 
     /**

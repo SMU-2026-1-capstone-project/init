@@ -3,6 +3,7 @@ package com.shadowfit.service.Exercise;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shadowfit.dto.exercises.VideoRequestDto;
+import com.shadowfit.global.observability.CallCancellation;
 import com.shadowfit.dto.report.PoseFrameProjection;
 import com.shadowfit.dto.report.detailreport.ExerciseSessionDto;
 import com.shadowfit.dto.report.detailreport.RepSyncRateDto;
@@ -205,6 +206,15 @@ public class SessionService {
      * @param request AI 서버(gRPC)에서 넘어온 최종 분석 데이터
      */
     public void completeSession(SessionCompleteRequest request) {
+        // 상태 전이 + 리포트 선계산을 시작하기 직전이다. 여기서부터가 되돌릴 수 없는 쓰기라
+        // 호출자가 이미 포기했으면 시작하지 않는다 (#206 결함 B). gRPC 밖 호출(앱 콜백 경로 등)
+        // 에서는 이 검사가 아무 일도 하지 않는다.
+        //
+        // ⚠️ 아래 낙관적 락 재시도 루프 «밖» 이다. 안에 넣으면 재시도마다 다시 보게 되는데,
+        //    한 번 시작한 전이는 끝내는 편이 맞다 — 중간에 그만두면 세션이 어중간한 상태로 남고,
+        //    그건 이 검사가 아끼려던 자원보다 비싸다.
+        CallCancellation.abortIfAbandoned("세션 종료 (session=" + request.getSessionId() + ")");
+
         int maxAttempts = 3;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
