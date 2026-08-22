@@ -138,6 +138,7 @@ bash loadtest/results/replication-2026-08-17/repl2_probe.sh
 ### 러너로 돌린다면 — 🔴 변수 이름이 다르다
 
 ```bash
+OUTDIR=/root/_repl_smoke-$(date +%F) \
 REPL_SESSIONS=134 PHASES="repl_preflight repl_gate" \
 S3_BASE=s3://버킷/shadowfit REPLICA_HOST=… REPLICA_SSH="…" REPL_AZ_MODE="smoke" \
   bash loadtest/aws/run_all.sh
@@ -145,6 +146,9 @@ S3_BASE=s3://버킷/shadowfit REPLICA_HOST=… REPLICA_SSH="…" REPL_AZ_MODE="s
 
 - 러너가 읽는 것은 `SESSIONS` 가 아니라 **`REPL_SESSIONS`** 다(`aws/run_all.sh:168`).
   `SESSIONS=134` 만 주면 **조용히 13334(1,000만)로 돈다** — 스모크가 아니라 본 무대를 세운다
+- `OUTDIR` 을 **`results/` 밖으로** 뺀다. 스모크 산출물은 표에 안 올라가므로 결과 디렉터리에
+  남을 이유가 없고, 안 주면 기본값이 `results/online-ddl-$RUN_ID` 라 **이름까지 틀린다**
+  ([#358](https://github.com/Shadowfit/init/issues/358))
 - `PHASES` 에 `repl` 을 넣지 않는다. 그건 본 측정이다
 - `repl_preflight` 가 `S3_BASE` 를 요구한다. 스모크에 S3 가 필요 없으면 손으로 돌리는 쪽이 짧다
 
