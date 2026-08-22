@@ -92,6 +92,115 @@ REPL_AZ_MODE="same-az" PHASES="repl_preflight repl_gate repl collect" \
 
 ---
 
+## 2-1. 첫 실행 — 스모크 판 (`SESSIONS=134`)
+
+이 rig 은 EC2 에서 한 번도 안 돌았다(§6). 그래서 첫 실행은 **표를 만드는 판이 아니라
+절차가 도는지 보는 판**이다. 무대를 1/100 로 줄여 밟는다.
+
+```
+SESSIONS=134  →  (134-1) × 750 + 250 = 100,000 행      (본 라운드 13334 = 1,000만)
+```
+
+시더는 이 값을 견딘다 — `_seq` 는 `SESSIONS` 와 무관하게 5자리(10만)를 만들고,
+청크 루프는 INSERT 2회로 끝난다(`SEED_CHUNKS = (134-2)/1000 = 0`).
+
+### 스모크가 답하는 것 / 못 답하는 것
+
+| | |
+|---|---|
+| **답한다** | 2대 절차가 끝까지 도는가 — 특히 **XtraBackup 원격 경로**(실행 이력 0). G1·G2 는 이진 사실이라 무대 크기와 무관하다 |
+| **절반만** | G3(계측 바닥). 인위 5초를 `lag_net` 이 초 단위로 잡는지는 여기서도 보인다. 단 **쓰기 부하가 없는 조건**이라 본판보다 유리하다 |
+| **못 답한다** | Q1·Q2 전부. 무대가 100배 작다. 🔴 **스모크 산출물을 결과 표에 올리지 말 것** |
+
+### 준비 — §1 에서 빠지는 것
+
+§1 그대로다. 단 **인스턴스 타입 동일·AZ 확정은 스모크의 조건이 아니다** — 그 둘은
+«수치를 해석하려고» 거는 조건이고, 이 판은 수치를 안 쓴다. `REPL_AZ_MODE` 는 비우지 말고
+스모크라고 적는다(비면 preflight 가 경고한다).
+
+### 절차 — 소스 박스에서 손으로 (권장)
+
+```bash
+# ① 양쪽 박스에서 MySQL 이 떠 있어야 한다
+cd /root/init && docker compose up -d mysql
+
+# ② 소스 박스에서
+export REPLICA_HOST=10.0.0.6
+export REPLICA_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@10.0.0.6"
+export REPL_AZ_MODE="smoke(라벨만 — 이 판은 표에 안 간다)"
+export SESSIONS=134
+
+bash loadtest/results/replication-2026-08-17/repl2_probe.sh
+```
+
+산출물은 `_out2/` 아래에 떨어진다(러너를 안 썼으므로 §3 의 `repl/` 이 아니다).
+
+### 러너로 돌린다면 — 🔴 변수 이름이 다르다
+
+```bash
+REPL_SESSIONS=134 PHASES="repl_preflight repl_gate" \
+S3_BASE=s3://버킷/shadowfit REPLICA_HOST=… REPLICA_SSH="…" REPL_AZ_MODE="smoke" \
+  bash loadtest/aws/run_all.sh
+```
+
+- 러너가 읽는 것은 `SESSIONS` 가 아니라 **`REPL_SESSIONS`** 다(`aws/run_all.sh:168`).
+  `SESSIONS=134` 만 주면 **조용히 13334(1,000만)로 돈다** — 스모크가 아니라 본 무대를 세운다
+- `PHASES` 에 `repl` 을 넣지 않는다. 그건 본 측정이다
+- `repl_preflight` 가 `S3_BASE` 를 요구한다. 스모크에 S3 가 필요 없으면 손으로 돌리는 쪽이 짧다
+
+### 더 잘게 끊고 싶으면
+
+`repl2_probe.sh` 는 끝에서 `main` 을 부르므로 **source 해서 게이트만 따로 못 부른다.**
+제일 비싸고 제일 안 밟아본 구간(리플리카 세우기)만 떼려면 **공통부만** source 한다:
+
+```bash
+export REPLICA_HOST=… REPLICA_SSH="…" SESSIONS=134
+source loadtest/results/replication-2026-08-17/repl2_rig.sh
+require_stage && d0_preflight && assert_durability
+set_server_ids && enable_gtid_both && ensure_repl_user && create_load_objects
+rebuild_replica          # ← XtraBackup 원격 경로. 여기가 첫 실행의 급소다
+wait_caught_up
+```
+
+`start_heartbeat` 은 **사본을 뜨기 전에** 불러야 한다(표가 사본에 들어가 있어야 리플리카에서
+읽힌다). 위 순서로 손으로 밟았다면 `rebuild_replica` 앞에 넣을 것.
+
+### 확인 순서 — 막히면 여기서 갈린다
+
+| 보는 것 | 무엇이 갈리나 |
+|---|---|
+| `replica_build.txt` 의 `초기화 경로` | 🔴 **`xtrabackup` 인가 `dump(xtrabackup 실패 후)` 인가.** 실패하면 자동으로 되돌아가므로 **스모크가 «통과» 해도 XtraBackup 경로는 안 밟혔을 수 있다.** 사유는 `_xb.log` |
+| `gates.tsv` | G1·G2·G3 판정. 하나라도 FAIL 이면 본 측정을 안 돈다 |
+| `rtt.txt` | 리플리카 왕복. `docker exec` 가 포함된 값이다 — 순수 네트워크 RTT 가 아니다 |
+| `G3_positive_control.tsv` | 원시 표. 5초를 몇으로 찍었는지는 **사람이 본다**(§0 — 기준을 숫자로 안 박는다) |
+| `mysql_stderr.log` | 접속·인증이 먼저 깨졌을 때 |
+
+### 두 번 돌릴 때
+
+- **시딩은 건너뛴다** — `stage_up` 이 행 수가 맞으면 넘어간다
+- 🔴 **리플리카는 매번 다시 세운다** — `build_replica` 에 「이미 서 있으면 건너뛰기」가 없다.
+  스모크를 반복하면 그 비싼 경로를 매번 밟는다(그게 목적이면 맞는 동작이다)
+
+### 스모크를 끝내고 남는 것
+
+probe 는 정리를 안 한다 — 본 측정이 그 무대를 그대로 쓰기 때문이다. 여기서 멈출 거면 확인한다:
+
+```bash
+docker exec -i shadowfit-mysql mysql -h "$REPLICA_HOST" --get-server-public-key -uroot -p1234 \
+  -e "SHOW REPLICA STATUS\G" | grep -E 'SQL_Delay|Replica_(IO|SQL)_Running:'
+docker exec -i shadowfit-mysql mysql -uroot -p1234 -e "DROP EVENT IF EXISTS replprobe.beat;"
+```
+
+- 🔴 **`SQL_Delay` 가 0 인지 본다.** G3 는 정상 종료 시 스스로 `SOURCE_DELAY=0` 으로 되돌리지만,
+  `Ctrl-C`·`timeout` 으로 끊기면 **5 가 남는다.** 남은 채로 본 측정을 돌리면 그 판의 Q1 은
+  통째로 인위 지연이다
+- 반동기는 G2 가 끝에서 끈다(`semisync_off`). `server_id` 는 `SET PERSIST` 라 재기동해도 남고,
+  GTID 는 `SET GLOBAL` 이라 재기동하면 원복된다
+- 무대는 지울 필요가 없다 — `pose_data_scale` 은 시더가 `DROP` 후 다시 만들고,
+  `replprobe` 객체는 전부 `IF NOT EXISTS` 라 본 라운드가 그대로 쓴다. 남는 것은 디스크뿐이다
+
+---
+
 ## 3. 무엇이 나오나
 
 러너(`run_all.sh`)로 돌리면 `OUT` 을 `<결과>/repl/` 로 넘기므로 산출물이 **`repl/` 바로 아래**
@@ -160,7 +269,7 @@ GTID 면 `WAIT_FOR_EXECUTED_GTID_SET`, 아니면 파일·오프셋 일치 — **
 ## 6. 아직 안 밟아본 것
 
 - **이 rig 은 EC2 에서 한 번도 안 돌았다.** 첫 실행은 `SESSIONS` 를 줄여
-  (예: `SESSIONS=134`) `repl2_probe.sh` 만 끊어 돌리는 편이 싸다
+  (예: `SESSIONS=134`) `repl2_probe.sh` 만 끊어 돌리는 편이 싸다 — **절차는 [§2-1](#2-1-첫-실행--스모크-판-sessions134)**
 - `_rebuild_xtrabackup` 의 원격 절차(사본 전송 → 볼륨 교체 → compose 기동)는 **코드로만
   있고 실행 이력이 없다.** 논리 덤프 되돌림이 그 대비다
 - Q3(read-after-write)은 이 rig 의 범위가 아니다. 로컬 라운드가 「이 계측으로는 못 잰다」로
