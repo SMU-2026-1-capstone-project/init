@@ -1,0 +1,65 @@
+# CodeRabbit 은 이 저장소에서 자동 리뷰를 하지 않는다.
+#
+#   "This repository does not receive automatic reviews because it has fewer than 10 stars."
+#
+# `.coderabbit.yaml` 의 `auto_review.enabled: true` 는 그 정책 앞에서 무력하다. 봇이 PR 마다
+# 체크를 초록으로 찍기는 하지만 그것은 «리뷰 통과» 가 아니라 «스킵했다» 는 표시다.
+# 리뷰를 받으려면 PR 에 `@coderabbitai review` 를 코멘트로 달아야 한다 — 그 한 줄을 사람이
+# 기억하는 대신 여기서 건다.
+#
+# ⚠️ 아직 확인 안 된 것: CodeRabbit 이 «봇이 단 코멘트» 를 명령으로 받아 주는지.
+#    받아 주지 않으면 리포지토리 시크릿에 개인 토큰 `CODERABBIT_TRIGGER_TOKEN`(scope: repo)
+#    을 넣으면 된다 — 아래에서 있으면 그것을, 없으면 GITHUB_TOKEN 을 쓴다.
+name: Request CodeRabbit review
+
+# pull_request 가 아니라 pull_request_target 인 이유:
+# 포크에서 온 PR 과 dependabot 이 연 PR 은 GITHUB_TOKEN 이 읽기 전용이라 코멘트를 못 단다.
+# 이 잡은 PR 코드를 체크아웃하지 않으므로(=신뢰 못 할 코드를 실행하지 않으므로)
+# pull_request_target 의 쓰기 토큰을 써도 안전하다.
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  pull-requests: write
+
+concurrency:
+  group: coderabbit-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  request-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment @coderabbitai review
+        env:
+          GH_TOKEN: ${{ secrets.CODERABBIT_TRIGGER_TOKEN || secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+          CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
+        run: |
+          set -euo pipefail
+
+          # ① draft 에는 걸지 않는다. ready_for_review 로 바뀔 때 다시 이 잡이 돈다.
+          if [ "$DRAFT" = "true" ]; then
+            echo "draft PR 이라 건너뛴다 — ready 로 바꾸면 그때 건다."
+            exit 0
+          fi
+
+          # ② 봇이 연 PR(dependabot 등)에는 걸지 않는다. 리뷰가 필요하면 손으로 코멘트를 단다.
+          if [ "$AUTHOR_TYPE" = "Bot" ]; then
+            echo "봇이 연 PR 이라 건너뛴다."
+            exit 0
+          fi
+
+          # ③ CodeRabbit 은 변경 파일 100 개를 넘으면 명령을 받고도 스킵한다(#298 이 140 파일이라 스킵됐다).
+          #    조용히 스킵당하면 «리뷰받았다» 고 오해하므로, 코멘트를 달지 않고 경고를 남긴다.
+          if [ "${CHANGED_FILES:-0}" -gt 100 ]; then
+            echo "::warning::변경 파일 ${CHANGED_FILES} 개 — CodeRabbit 은 100 개 초과 PR 을 스킵한다. 리뷰가 필요하면 PR 을 쪼개라."
+            exit 0
+          fi
+
+          gh pr comment "$PR" --repo "$REPO" --body "@coderabbitai review"
+          echo "PR #${PR} 에 리뷰 요청을 달았다 (변경 파일 ${CHANGED_FILES} 개)."
