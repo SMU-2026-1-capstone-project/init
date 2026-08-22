@@ -11,7 +11,6 @@ import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.RefreshToken;
 import com.shadowfit.model.member.Sex;
 import com.shadowfit.model.member.UserRole;
-import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.member.RefreshTokenRepository;
@@ -62,7 +61,6 @@ class MemberServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private SessionRepository sessionRepository;
-    @Mock private PoseDataRepository poseDataRepository;
     @Mock private PoseDataCleanupService poseDataCleanupService;
     @Mock private PasswordEncoder passwordEncoder;
 
@@ -81,7 +79,7 @@ class MemberServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         memberService = new MemberService(jwtUtil, memberRepository, refreshTokenRepository,
-                sessionRepository, poseDataRepository, poseDataCleanupService, passwordEncoder,
+                sessionRepository, poseDataCleanupService, passwordEncoder,
                 new com.shadowfit.global.security.jwt.RefreshTokenHasher());
     }
 
