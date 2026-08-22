@@ -75,6 +75,7 @@ import static org.mockito.Mockito.doAnswer;
  * <b>OS 가 고르게 둔다</b>({@code grpc.server.port=0}) — 고정 포트는 같은 박스에서 테스트 JVM 이
  * 둘 이상 뜰 때 뒤에 온 쪽을 통째로 무너뜨렸다(#306).
  */
+@org.junit.jupiter.api.Disabled("#318 CI 시간 측정 B팔 — 임시. 머지 금지")
 @SpringBootTest(properties = "grpc.server.port=0")
 @DisplayName("#206-B gRPC 서버가 클라이언트의 포기를 보는가")
 class GrpcServerDeadlineProbeTest {
