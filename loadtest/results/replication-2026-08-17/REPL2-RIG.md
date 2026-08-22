@@ -70,11 +70,15 @@ bash loadtest/results/replication-2026-08-17/repl2_sweep.sh   # 본 측정
 필요 없는 percona-toolkit 이미지를 묻고, 정작 물어야 할 리플리카 도달성은 안 묻는다:
 
 ```bash
-S3_BASE=s3://버킷/shadowfit REPLICA_HOST=10.0.0.6 \
+OUTDIR=$PWD/loadtest/results/replication-aws-$(date +%F) S3_BASE=s3://버킷/shadowfit REPLICA_HOST=10.0.0.6 \
 REPLICA_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@10.0.0.6" \
 REPL_AZ_MODE="same-az" PHASES="repl_preflight repl_gate repl collect" \
   nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
+
+💡 `OUTDIR` 은 안 줘도 [#366](https://github.com/Shadowfit/init/pull/366) 이 `PHASES` 에서 라운드를 추론한다.
+다만 이름이 **`replication-aws-ec2-<타임스탬프>`** 가 되므로, 기존 관례(`<라운드>-aws-<날짜>`)에
+맞추려면 위처럼 날짜로 준다.
 
 ### 손잡이
 
