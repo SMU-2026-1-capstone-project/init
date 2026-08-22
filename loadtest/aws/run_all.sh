@@ -77,6 +77,9 @@ PHASES=${PHASES:-"preflight rehearsal ddl ridealong collect"}
 # 🔴 `OUTDIR` 을 명시하면 이 블록은 통째로 안 돈다. 추론은 **안 줬을 때만** 한다 —
 #    그래서 아래 «섞였다» 판정도 명시한 사람은 안 건드린다.
 # ⚠️ `S3_DEST` 는 `RUN_ID` 에서 따로 나온다(위). 즉 **여기서 고쳐도 S3 키는 안 바뀐다** —
+#    로컬은 `<라운드>-aws-<날짜>`, S3 는 `ec2-<타임스탬프>` 로 **이름이 아예 다르다.**
+#    둘을 잇는 것은 `MANIFEST.txt` 다 — 머리에 `RUN_ID` 를, 본문에 `S3 결과` 경로를 적는다.
+#    유일성 요구가 서로 다르기 때문이다: 로컬은 «사람이 읽고 커밋하는 이름», S3 는 «겹치면 안 되는 키».
 #    S3 는 예전부터 라운드 이름을 안 달았고, 이 변경의 범위 밖이다.
 if [ -z "$OUTDIR" ]; then
   _rounds=""
@@ -104,7 +107,26 @@ if [ -z "$OUTDIR" ]; then
       echo "   PHASES=$PHASES" >&2
       exit 1 ;;
     *)
-      OUTDIR=$ROOT/loadtest/results/$_rounds-aws-$RUN_ID ;;
+      # 이름은 **커밋되는 물건**이라 저장소 관례를 그대로 따른다 — `<라운드>-aws-<날짜>`
+      # (`backup-restore-aws-2026-08-13` · `coresidency-aws-2026-08-16` …).
+      # RUN_ID(`ec2-<타임스탬프>`)를 쓰면 라운드마다 손으로 고쳐 커밋하게 된다.
+      _today=$(date +%F)
+      OUTDIR=$ROOT/loadtest/results/$_rounds-aws-$_today
+      # 🔴 같은 날 두 번째 라운드면 **같은 디렉터리에 섞지 않는다.** 두 라운드의 산출물이
+      #    한 폴더에 겹치면 나중에 못 가른다. 관례가 이미 «-b-» 를 쓴다
+      #    (`backup-restore-aws-b-2026-08-13` · `coresidency-aws-b-2026-08-16`).
+      if [ -e "$OUTDIR" ]; then
+        OUTDIR=""
+        for _sfx in b c d e f g h i j; do
+          _try=$ROOT/loadtest/results/$_rounds-aws-$_sfx-$_today
+          [ -e "$_try" ] && continue
+          OUTDIR=$_try
+          echo "⚠️  같은 날 이미 라운드가 있다 — '$_sfx' 판으로 만든다: $OUTDIR" >&2
+          break
+        done
+        [ -n "$OUTDIR" ] || { echo "🔴 같은 날 라운드가 열 판을 넘었다 — OUTDIR 을 직접 줄 것." >&2; exit 1; }
+      fi
+      ;;
   esac
 fi
 
