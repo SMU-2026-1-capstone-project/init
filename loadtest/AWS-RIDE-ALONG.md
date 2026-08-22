@@ -119,10 +119,12 @@
 
 **P6 전용 — 이 라운드만 2대다** (다른 라운드는 위까지로 끝난다)
 
-- [ ] 인스턴스 **2대** — 대상 `c7i.4xlarge` · 부하기 `c7i.large`, 같은 VPC·서브넷
+- [ ] 인스턴스 **2대** — 대상 `c7i.4xlarge` · 부하기 **`c7i.xlarge` 이상**, 같은 VPC·서브넷
+      🔴 2 vCPU(`c7i.large`)면 §T(⑩)가 «제한 = 전체» 라 **한 판도 안 도는데 게이트는 통과한다** (#312)
 - [ ] 보안그룹 인바운드 — 부하기 → 대상 **22 · 8000 · 8080 · 6565**
 - [ ] **SSH 키를 부하기에** 둔다(`/root/.ssh/measure.pem`, `chmod 600`). 러너가 부하기에서 돌며 대상을 몬다
-- [ ] **양쪽 토큰 일치** — `AI_PUBLIC_TOKEN`·`INTERNAL_API_TOKEN`. 다르면 preflight 가 막는다
+- [ ] **두 박스가 같은 토큰을 든다** — `AI_PUBLIC_TOKEN`·`INTERNAL_API_TOKEN` 을 대상·부하기에서 각각 같은 값으로.
+      어긋나면 preflight 가 막는다. ⚠️ **두 변수끼리는 달라야** 한다 — 같으면 AI 가 안 뜬다(#230 단언 · #261)
 - [ ] `ROLE=p6-target` / `ROLE=p6-loader` 로 부트스트랩을 **갈라 돌린다**. 기본 `ROLE=db` 는 MySQL 만 띄운다
 - [ ] 🔴 `PHASES` 에 `coresidency*` 를 `ddl`·`backup` 과 **섞지 않는다** — 러너의 자리가 다르다
 - [ ] `GHZ_BIN=/usr/local/bin/ghz` 를 실행 명령에 적는다 — 러너 기본값이 옛 경로다

@@ -21,10 +21,9 @@
 > 팔 C 캡은 **깎은 만큼 그대로 깎는다**(CPU 90.8% → 처리량 92.9%, 3판 전부 같은 방향) →
 > **예비의 「팔 C 교락」이 닫혔다** · 從 R5 실측식 `708 + 106.74×N` 이 **오차 ±0.7% 로 재현**.
 > 🔴 단 **팔 A 가 2시간에 걸쳐 +16% 흐른다** — 「동거 비용(A−B)」이 라운드마다 −0.8%/−6.2%/−13.3% 라
-> **H1 은 지지도 반증도 안 됐다.** ~~🔴 **부하기 지표는 이번에도 안 걷혔다**(§4-2 · [#250](https://github.com/Shadowfit/init/issues/250)).~~
-> → ✅ **그 뒤 걷혔다 (정정 2026-08-20)**. 이 줄은 **08-16 라운드 시점의 사실**이다. 08-17 부터
-> `start_loader_stats`(`coresidency_sweep.sh:660`)가 부하기 CPU·프로세스별·load1·메모리·대역을 남기고,
-> 게이트 `cores_assert_loader`(`run_all.sh:626`)가 「걷은 줄 알았는데 안 걷혔다」를 막는다. §12-1 정정 참조.
+> **H1 은 지지도 반증도 안 됐다.** 🔴 **부하기 지표는 이번에도 안 걷혔다**(§4-2 · [#250](https://github.com/Shadowfit/init/issues/250))
+> — ✅ **이후 닫혔다**: 08-17 라운드가 부하기 자신을 걷었고, **346 RPS 는 서버 천장**으로 갈렸다
+> ([08-17 결과 §2-3](../../loadtest/results/coresidency-aws-2026-08-17/README.md) · 아래 §12-1).
 >
 > 이전: [예비 라운드 (2026-08-15, #245 이전 코드)](../../loadtest/results/coresidency-aws-2026-08-15/README.md)
 > — 동거 천장 ≈ 97세션. 정식값과 약 8% 다르고 **원인은 못 가른다**(격자·코드·판 수가 전부 다르다).
@@ -466,25 +465,9 @@ H1 은 *「동거하면 내려간다」* 이므로, 내려간 천장이 **40~80 
 (`load_ai.py:37,209` — 스레드 160개 + 전역 `LOCK`), GIL 때문에 **1 vCPU 부근에서 먼저**
 막힌다. 총 CPU 200% 가 아니라 **`load_ai_pct` 가 ~100%** 에 붙는지를 본다.
 
-🔴 **⑦의 게이트가 핵심이다.** ~~`run_all.sh` 의 판정은 `cores_assert_usable`·`cores_assert_ghz`
-둘뿐이고 **`loader_*.tsv` 를 안 본다.** 샘플러가 빈 파일을 남겨도 라운드는 성공으로 끝난다~~ —
+🔴 **⑦의 게이트가 핵심이다.** `run_all.sh` 의 판정은 `cores_assert_usable`·`cores_assert_ghz`
+둘뿐이고 **`loader_*.tsv` 를 안 본다.** 샘플러가 빈 파일을 남겨도 라운드는 성공으로 끝난다 —
 「걷은 줄 알았는데 안 걷혔다」가 #250 의 실패 모드 그 자체다.
-
-✅ **정정 (2026-08-20, [#262](https://github.com/Shadowfit/init/issues/262)).** 위 취소선은 **2026-08-17 이전**
-서술이다. 지금 게이트는 **6종**이고 `loader_*.tsv` 를 보는 것이 그중 하나다:
-
-| 게이트 | 자리 | 무엇을 막나 |
-|---|---|---|
-| `cores_assert_usable` | `run_all.sh:505` | 판이 성립했나(`setup_fail`) |
-| `cores_assert_ghz` | `:538` | 從 부하가 실제로 갔나 |
-| `cores_assert_probe` | `:570` | 두 시계(자기 프로브)가 있나 |
-| `cores_assert_taskset` | `:598` | §T 가 돌았나 |
-| **`cores_assert_loader`** | **`:626`** | **부하기 계측이 걷혔나 — 「없다」고 적었던 그 게이트** |
-| `cores_assert_side` | `:655` | 옆(Spring·MySQL) 지표가 걷혔나 |
-
-여섯 개 다 `phase_coresidency_rehearsal`(`:718~728`)과 `phase_coresidency`(`:764~`)에서 호출되고,
-**2026-08-17 2차 리허설에서 6종 전부 실행·통과**했다. 판정은 「행이 있는가」가 아니라
-「정상 · 전부 0 · 헤더만 · 파일 없음」 4가지로 대조한다(커밋 `ee9927b`).
 
 ### 🍚 점심때 할 일 (2026-08-17 기록 · **2차 리허설 후 갱신**)
 
@@ -513,16 +496,16 @@ H1 은 *「동거하면 내려간다」* 이므로, 내려간 천장이 **40~80 
 | 2 | ~~🔴 **`TARGET_SSH` 에서 `-n` 을 뺀다**~~ → ✅ **완료** (빼고 돌렸고 프로브가 8판 전부 걷혔다) | ~~붙이면 프로브 자산이 0바이트로 간다(rig 이 크기 대조로 잡아 프로브를 끈다)~~ |
 | 3 | ~~🔴 **S3 를 풀 것**~~ → ✅ **풀렸다 (2026-08-17). 관리자도 IAM 수정도 필요 없었다** — 기동 명령에 **`--iam-instance-profile Name=shadowfit-measure`** 한 줄이면 된다. 실증: `t3.micro` 로 EC2→버킷 쓰기 성공(`put_ok.txt`). **`PHASES` 에 `coresidency_preflight`·`collect` 를 다시 넣는다** | 🔴 **1·2차의 「못 붙인다」가 오진이었다.** `iam:GetInstanceProfile` **거절 하나**를 보고 결론냈는데, **조회 권한과 사용 권한은 다른 것**이다. 판별법: `run-instances --dry-run` 을 **진짜 이름과 가짜 이름으로 대조**한다 — 진짜는 `DryRunOperation`(성공했을 요청), 가짜는 `InvalidParameterValue: Invalid IAM Instance Profile name`. 가짜가 거절되므로 AWS 가 존재를 **실제로 검증**한다는 뜻이고, 따라서 진짜 쪽 성공은 신뢰할 수 있다 |
 | 4 | ~~부하기는 **`c7i.xlarge` 이상**으로 띄운다~~ → ✅ **완료** (2차도 `c7i.xlarge`, `ncpu=4`) | ~~2 vCPU 면 §T 가 성립하지 않는다(제한 = 전체)~~ |
-| 5 | ✅ **완료** — CRLF 는 `sed` 가 답이 아니었다: repo 블롭은 LF 이고 바꾸는 건 작업 트리의 `core.autocrlf=true` 다. `git show HEAD:<path>` 로 뽑으면 애초에 안 생긴다. ~~대상 박스 **root SSH 열기** · scp 후 **CRLF 제거** | AL2023 은 root 로그인 차단이 기본 · Windows 작업 트리는 CRLF 라 `$'
-'` 로 죽는다 |
+| 5 | ✅ **완료** — CRLF 는 `sed` 가 답이 아니었다: repo 블롭은 LF 이고 바꾸는 건 작업 트리의 `core.autocrlf=true` 다. `git show HEAD:<path>` 로 뽑으면 애초에 안 생긴다. ~~대상 박스 **root SSH 열기** · scp 후 **CRLF 제거** | AL2023 은 root 로그인 차단이 기본 · Windows 작업 트리는 CRLF 라 `$''` 로 죽는다 |
 
-**2차 리허설 명령** (부하기에서, `-n` 없이) — 🔴 **아래 명령에 결함 둘이 있다. 그대로 쓰지 말 것.** `CORES_ARMS="C A"` 로는 **§T 가 안 돈다**(`TASKSET_ARM=B` 가 `ARMS` 에 없어 조용히 건너뛴다, [#260](https://github.com/Shadowfit/init/issues/260)) — 2차는 `"C A B"` 로 고쳐서 태웠다. `GHZ_TOKEN=<같음>` 은 **`INTERNAL_API_TOKEN`** 을 뜻하며, `AI_PUBLIC_TOKEN` 과 **같으면 AI 가 아예 안 뜬다**([#261](https://github.com/Shadowfit/init/issues/261) · #230 단언).
+**2차 리허설 명령** (부하기에서, `-n` 없이) — 아래는 **2차에서 실제로 태운 형태로 고쳐 둔 것**이다([#260](https://github.com/Shadowfit/init/issues/260) · [#261](https://github.com/Shadowfit/init/issues/261)). 물렸던 자리 둘을 남겨 둔다. ⑴ `CORES_ARMS` 에 **`B` 가 없으면 §T 가 안 돈다** — `TASKSET_ARM=B` 가 `ARMS` 에 없으면 실패가 아니라 `note` 경고 한 줄로 조용히 건너뛴다(#260). ⑵ `GHZ_TOKEN` 이 받는 것은 **`INTERNAL_API_TOKEN`** 이고, `AI_PUBLIC_TOKEN` 과 **같은 값을 넣으면 AI 가 아예 안 뜬다**(#230 단언 · #261).
 
 ```bash
-cd /root/init && sudo env   S3_BASE=s3://shadowfit-measure-055447613012/shadowfit TARGET_HOST=<대상 사설 IP>   TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>"   AI_PUBLIC_TOKEN=<대상 .env 와 같은 값> GHZ_TOKEN=<같음>   GHZ_RPS=19 GHZ_DATA=/root/batch_multi.json GHZ_BIN=/usr/local/bin/ghz   CORES_ARMS="C A" CORES_REH_LEVELS="5" CORES_ANCHOR=0   PHASES=coresidency_rehearsal nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+cd /root/init && sudo env   S3_BASE=s3://shadowfit-measure-055447613012/shadowfit TARGET_HOST=<대상 사설 IP>   TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>"   AI_PUBLIC_TOKEN=<대상 .env 의 AI_PUBLIC_TOKEN> GHZ_TOKEN=<대상 .env 의 INTERNAL_API_TOKEN>   GHZ_RPS=19 GHZ_DATA=/root/batch_multi.json GHZ_BIN=/usr/local/bin/ghz   CORES_ARMS="C A B" CORES_REH_LEVELS="5" CORES_ANCHOR=0   PHASES=coresidency_rehearsal nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
 
-팔을 `C A` 로 두는 이유는 **캡이 걸린 뒤 풀리는 전이**를 보기 위해서다(`STALE` 판정 경로).
+팔에 `C A` 가 들어가는 이유는 **캡이 걸린 뒤 풀리는 전이**를 보기 위해서고(`STALE` 판정 경로),
+`B` 는 ⑩(§T)가 돌게 하려고 붙인다([#260](https://github.com/Shadowfit/init/issues/260)).
 ⚠️ 이 명령은 **S3 없이** 도는 형태다 — 3번을 풀면 `PHASES` 에 `coresidency_preflight` 와
 `collect` 를 다시 넣는다.
 
@@ -595,27 +578,18 @@ cd /root/init && sudo env   S3_BASE=s3://shadowfit-measure-055447613012/shadowfi
 ② 라운드 사이 정지→시작으로 인한 **대상 박스의 물리 호스트 변경**. 상세·약한 갈림은
 [2라운드 결과 §5](../../loadtest/results/coresidency-aws-b-2026-08-16/README.md).
 
-📌 ~~**그래서 [#250](https://github.com/Shadowfit/init/issues/250) 은 «계측 축» 만 닫혔다** —
-부하기 CPU 는 천장이 아니었다는 것까지가 사실이고, **무엇이 +17.7% 를 만들었는지는 열려 있다.**~~
+📌 **이때까지 [#250](https://github.com/Shadowfit/init/issues/250) 은 «계측 축» 만 닫혀 있었다** —
+부하기 CPU 는 천장이 아니었다는 것까지가 사실이고, **무엇이 +17.7% 를 만들었는지는 열려 있었다.**
 
-✅ **정정 (2026-08-20).** 위 취소선은 **§T 이전** 판단이다. 08-17 §T 12판(커밋 `5991cfb` ·
-[결과 §2-3](../../loadtest/results/coresidency-aws-2026-08-17/README.md))이 부하기 코어를
-**2 ↔ 전체(4)** 로 흔들었고, 처리량이 안 움직였다:
+✅ **갱신 (2026-08-17 · §T) — 귀속 축도 닫혔다.** 부하기 코어를 **2 ↔ 전체(4)** 로 흔든 12판에서
+처리량 차가 **0.3~0.4%** 이고(120세션 345.4~346.1 ↔ 346.2~347.0), 지연도 같다(160세션 p50
+456.8 ↔ 457.1). 부하기 자신의 CPU 는 2코어 팔에서 평균 **47.0%**(상한 200%) — 포화 근처도
+아니다. → **346 RPS 는 대상 박스(서버)의 천장이고, 08-16 의 「부하기가 천장」 판정은 뒤집혔다**
+([08-17 결과 §2-3](../../loadtest/results/coresidency-aws-2026-08-17/README.md)).
 
-```
-세션   2코어                    전체                     차이
- 120   345.4 / 345.6 / 346.1    346.2 / 346.8 / 347.0    0.3%
- 160   343.3 / 343.8 / 345.3    344.5 / 346.1 / 346.2    0.4%
-```
-
-지연도 같다(160세션 p50 456.8 ↔ 457.1). 부하기 CPU 는 2코어 판에서 평균 **47.0%** · 피크
-**102.5%**(상한 200%) — 조여도 상한의 절반이다. → **346 RPS 는 서버 천장이고, 「부하기가 천장」은
-반증됐다.** 즉 #250 은 **계측 축과 귀속 축이 둘 다 닫혔다**(이슈 종료 2026-08-20).
-
-🔴 **다만 아래 ⭐ 의 지적은 살아 있고, 오히려 날카로워진다** — §T 는 같은 박스에서 코어만 조여
-**0.3~0.4%**, 08-16 은 박스를 `c7i.large`→`xlarge` 로 바꿔 **+17.7%**. 둘 다 「부하기를 흔들었다」인데
-폭이 두 자릿수 다르다. 이 어긋남은 #250 이 아니라 **재고표의 «라운드 간 절대값 비재현(+17.7%)»**
-행이 들고 있다 — 후보는 여전히 ① 송신 패턴 ② 물리 호스트 변경 둘이다.
+🔴 **남은 몫은 하나다 — §T 와 08-16 스케일업의 폭이 안 맞는다.** 같은 「부하기를 흔든다」인데
+§T(`taskset` 으로 코어만 조임)는 **0.3~0.4%**, 08-16(박스 자체를 `c7i.large`→`xlarge`)은
+**+17.7%** 였다. 두 자릿수 차이라 위 후보 ①② 가 그대로 남는다.
 
 ⭐ **그리고 이것이 §4-2 를 강화한다.** 부하기 CPU 가 «안 붙었다» 는 관측만으로는
 **「부하기 구성이 결과를 안 움직인다」를 못 말한다** — 실제로 안 붙었는데 움직였다.
@@ -785,7 +759,10 @@ cd /root/init && sudo env   S3_BASE=s3://shadowfit-measure-055447613012/shadowfi
   - 🔴 **부하기 천장은 이번에도 못 배제했다** ([#250](https://github.com/Shadowfit/init/issues/250)). `stats_*.tsv` 는 전부 대상 박스의 `docker stats`
     이고 **부하기(c7i.large 2 vCPU) 지표는 이번 라운드도 안 걷혔다.** 팔 B↔C 는 이 문제에서
     자유롭지만(부하기 조건 동일), **팔 A↔B 는 ghz 프로세스가 부하기에서 도는 만큼 교락**이다.
-    위 H1 판정 불가와 **같은 뿌리일 수 있다** — 다음 라운드는 부하기 샘플러가 선행 조건이다
+    위 H1 판정 불가와 **같은 뿌리일 수 있다** — 다음 라운드는 부하기 샘플러가 선행 조건이다.
+    ✅ **그 선행 조건은 충족됐다** — `coresidency_sweep.sh:660 start_loader_stats()` 가 부하기
+    자신을 걷고 `run_all.sh:626 cores_assert_loader()` 가 「걷혔나」를 판정한다. 08-17 라운드에서
+    실제로 걷혔고, 그 값이 위 §12-1 의 귀속 판정을 만들었다
   - **예비값과 8% 다르다.** 예비 97세션(291 fps) vs 정식 팔 B 89.2세션(267.6 fps). 격자·코드·
     반복 수가 전부 달라 **원인을 못 가른다.** 정식 격자 값을 쓰되 차이는 남긴다
 

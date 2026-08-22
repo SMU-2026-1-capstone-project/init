@@ -45,6 +45,14 @@ reviews:
         정책이 실제 삭제 흐름과 맞는지, 그리고 **기존 데이터가 있는 DB 에 적용해도 안전한지**
         (파괴적 DDL·TRUNCATE·DELETE, NOT NULL 컬럼을 기본값 없이 추가 등)를 중점적으로 본다.
         버전 번호가 기존 파일과 겹치지 않는지도 확인한다.
+    - path: "mysql/migrations/*.sql"
+      instructions: >
+        Flyway 도입(#118) 이전에 손으로 적용하던 레거시 마이그레이션. 새 변경은
+        backend/src/main/resources/db/migration/ 으로 가야 하므로, 여기에 파일이
+        새로 추가되면 경로가 맞는지부터 지적한다. 기존 파일을 고치는 경우에는 이미
+        적용된 DB 와 어긋나지 않는지, 그리고 **기존 데이터가 있는 DB 에 적용해도
+        안전한지**(파괴적 DDL·TRUNCATE·DELETE, NOT NULL 컬럼을 기본값 없이 추가 등)를
+        중점적으로 본다.
     - path: "mysql/*.sql"
       instructions: >
         dev 전용 스크립트(픽스처 등). 마이그레이션이 아니므로 배포 환경에 영향은 없지만,
