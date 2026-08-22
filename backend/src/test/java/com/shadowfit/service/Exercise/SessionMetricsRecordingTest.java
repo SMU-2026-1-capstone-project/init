@@ -29,7 +29,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -96,7 +95,6 @@ SessionMetricsRecordingTest {
     @DisplayName("ExerciseAnalysisService")
     class AnalysisService {
 
-        @Mock private WebClient webClient;
         @Mock private SessionRepository sessionRepository;
         @Mock private ExercisesRepository exercisesRepository;
         @Mock private MemberRepository memberRepository;
@@ -123,7 +121,7 @@ SessionMetricsRecordingTest {
             when(blockingStub.withInterceptors(any())).thenReturn(blockingStub);
             when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
 
-            service = new ExerciseAnalysisService(webClient, sessionRepository, exercisesRepository,
+            service = new ExerciseAnalysisService(sessionRepository, exercisesRepository,
                     memberRepository, sessionService, referenceRepository, poseDataRepository,
                     circuitBreakerRegistry, metrics);
             ReflectionTestUtils.setField(service, "internalToken", "test-token");
@@ -143,7 +141,7 @@ SessionMetricsRecordingTest {
             circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
             when(sessionService.markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class))).thenReturn(true);
 
-            service.sendAnalysisRequestToFastApi(1L, dto(), "https://youtu.be/dummy", "BEGINNER");
+            service.sendAnalysisRequestToFastApi(1L, dto(), "https://youtu.be/dummy", "BEGINNER", "test-nonce");
 
             assertThat(transitions(Status.FAILED, "circuit-open")).isEqualTo(1.0);
             // 원인이 다른 FAILED와 섞이면 안 된다 — source 태그가 존재 이유이므로
@@ -156,7 +154,7 @@ SessionMetricsRecordingTest {
             circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
             when(sessionService.markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class))).thenReturn(false);
 
-            service.sendAnalysisRequestToFastApi(1L, dto(), "https://youtu.be/dummy", "BEGINNER");
+            service.sendAnalysisRequestToFastApi(1L, dto(), "https://youtu.be/dummy", "BEGINNER", "test-nonce");
 
             assertThat(transitions(Status.FAILED, "circuit-open")).isZero();
         }
@@ -176,7 +174,7 @@ SessionMetricsRecordingTest {
                 return null;
             }).when(stub).startAnalysis(any(AnalyzeRequest.class), any());
 
-            service.sendAnalysisRequestToFastApi(2L, dto(), "https://youtu.be/dummy", "BEGINNER");
+            service.sendAnalysisRequestToFastApi(2L, dto(), "https://youtu.be/dummy", "BEGINNER", "test-nonce");
 
             assertThat(transitions(Status.FAILED, "grpc-error")).isEqualTo(1.0);
             assertThat(transitions(Status.FAILED, "circuit-open")).isZero();
@@ -342,7 +340,8 @@ SessionMetricsRecordingTest {
                     mock(com.shadowfit.service.Report.SessionAnalysisCalculator.class),
                     mock(com.shadowfit.repository.report.ReportRepository.class),
                     metrics,
-                    mock(com.shadowfit.repository.outbox.OutboxEventRepository.class));
+                    mock(com.shadowfit.repository.outbox.OutboxEventRepository.class),
+                    new com.shadowfit.global.security.SessionNonceGenerator());
             self = mock(SessionService.class);
             ReflectionTestUtils.setField(service, "self", self);
         }

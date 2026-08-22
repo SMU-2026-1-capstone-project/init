@@ -6,6 +6,7 @@ rep 1회가 완성될 때마다 Spring에 PoseData 묶음을 콜백한다.
 
 import json
 import logging
+import secrets
 import time
 
 import cv2
@@ -24,7 +25,7 @@ from app.grpc.session_state import (
     elapsed_sec,
     get_registry,
 )
-from app.models.pose import Landmark, PoseRequest, PoseResponse
+from app.models.pose import Landmark, PoseRequest, PoseResponse, PoseSkipReason
 from app.utils.image_utils import base64_to_image
 
 logger = logging.getLogger(__name__)
@@ -71,13 +72,18 @@ def detect_pose(req: PoseRequest):
         # 풀에 자리가 없다 = 세션이 시작되지 않았거나 상한에 걸렸다.
         return PoseResponse(
             success=False,
+            skip_reason=PoseSkipReason.NO_LEASE,
             message=f"세션 {req.session_id}에 배정된 분석기가 없습니다 (StartAnalysis 먼저 호출 필요)",
         )
     with lease as detector:
         landmarks = detector.detect(image_rgb)
 
     if not landmarks:
-        return PoseResponse(success=False, message="포즈를 감지할 수 없습니다")
+        return PoseResponse(
+            success=False,
+            skip_reason=PoseSkipReason.NO_POSE,
+            message="포즈를 감지할 수 없습니다",
+        )
 
     # 세션 미지정 — 기존 stateless 동작 (각도만 반환)
     if req.session_id is None:
@@ -88,13 +94,58 @@ def detect_pose(req: PoseRequest):
     if state is None:
         return PoseResponse(
             success=False,
+            skip_reason=PoseSkipReason.SESSION_NOT_FOUND,
             message=f"세션 {req.session_id}가 시작되지 않았습니다 (StartAnalysis 먼저 호출 필요)",
         )
+
+    # 세션 소유권 대조 (이슈 #187 안 (d)).
+    #
+    # 여기까지 온 요청은 «토큰이 맞다» 까지만 증명됐다. 그 토큰은 앱 번들에 들어가므로 사실상
+    # 공개값이고, session_id 는 AUTO_INCREMENT 순차 정수라 추측된다 — 즉 이 대조가 없으면
+    # 토큰을 뽑은 누구나 남의 세션에 프레임을 꽂을 수 있다(그리고 그 데이터는 Spring DB 까지 간다).
+    #
+    # 🔴 **거절 응답이 «세션 없음» 과 같은 모양이어야 한다.** 여기서 «세션은 있는데 네 것이
+    #    아니다» 라고 답하면, 공격자가 session_id 를 훑어 **살아있는 세션을 열거**할 수 있다 —
+    #    막으려던 것의 절반을 응답으로 되돌려주는 셈이다. 구분은 서버 로그에만 남긴다.
+    #
+    # 🟢 **2단계 — 강제.** 세션이 값을 갖고 있으면 요청도 맞는 값을 내야 한다. 1단계에서는
+    #    «요청이 값을 안 보냄» 도 통과였는데, 그 창이 곧 이 방어의 부재였다.
+    #
+    # ⚠️ **세션에 보관값이 없으면(state.session_nonce is None) 여전히 통과한다.** 구멍처럼
+    #    보이지만 **여기에 도달할 수 있는 세션이 사실상 없다.**
+    #
+    #    ① 배포 «후» 만들어진 세션은 항상 값을 갖는다(SessionService 가 무조건 발급한다).
+    #    ② 배포 «전» 세션의 상태는 이 registry 가 프로세스 메모리라 **재배포로 통째로 날아간다**
+    #       — 그런 요청은 이 검사에 닿기도 전에 위쪽 `state is None` 에서 떨어진다.
+    #    ③ 그래서 실제로 이 분기가 열리는 경로는 **재부착 하나**다: Spring 이 session_nonce 가
+    #       NULL 인 옛 행(V8 이전 세션)으로 ReattachAnalysis 를 보낼 때. 그 행들도 세션
+    #       타임아웃이 걷어간다.
+    #
+    #    즉 막아서 얻을 것이 없고(공격자가 NULL 보관값 상태를 만들 수단이 없다), 막으면 옛
+    #    세션을 되살리는 경로만 끊긴다.
+    if state.session_nonce is not None:
+        # compare_digest 는 str 을 받으므로 None 을 먼저 가른다. «안 보냄» 과 «틀림» 은
+        # 아래에서 같은 응답으로 합쳐진다 — 클라 입장에서 구분할 이유가 없고, 구분하면
+        # «이 세션은 nonce 를 요구한다» 는 사실이 새어 나간다.
+        presented = req.session_nonce
+        if presented is None or not secrets.compare_digest(presented, state.session_nonce):
+            # 값은 절대 로그에 남기지 않는다 — 남기면 로그를 읽는 사람이 그 세션의 소유자가 된다.
+            logger.warning(
+                "세션 %s 소유권 대조 실패 — 프레임을 버린다 (#187). 응답은 «세션 없음» 과 같다",
+                req.session_id,
+            )
+            return PoseResponse(
+                success=False,
+                skip_reason=PoseSkipReason.SESSION_NOT_FOUND,
+                message=f"세션 {req.session_id}가 시작되지 않았습니다 (StartAnalysis 먼저 호출 필요)",
+            )
 
     analyzer = get_analyzer(state.exercise_type)
     if analyzer is None:
         return PoseResponse(
-            success=False, message=f"미지원 운동: {state.exercise_type}"
+            success=False,
+            skip_reason=PoseSkipReason.UNSUPPORTED_EXERCISE,
+            message=f"미지원 운동: {state.exercise_type}",
         )
 
     # 유입 속도 상한 (#143 ㄱ-2). 상태머신에 넣기 **전** 에 자른다 — 판정 상수가 전부 프레임
@@ -114,8 +165,12 @@ def detect_pose(req: PoseRequest):
                 MIN_FRAME_INTERVAL_SEC * 1000,
                 req.session_id,
             )
+        # 🔴 success=False 다 (이슈 #267). 이건 서버가 «의도적으로» 자른 것이라 세션이 건강해도
+        # 나오지만, 그래도 **판정에는 안 들어갔다.** «정상 동작인가» 는 skip_reason 이 답한다.
+        # landmarks 는 그대로 채운다 — 막는 것은 판정이지 클라의 스켈레톤 오버레이가 아니다.
         return PoseResponse(
-            success=True,
+            success=False,
+            skip_reason=PoseSkipReason.RATE_LIMITED,
             landmarks=landmarks,
             message="유입 속도 상한 초과 — 분석 스킵",
             rep_count=state.rep_count,
@@ -124,9 +179,20 @@ def detect_pose(req: PoseRequest):
     angles, smoothed_knee_angle, rep_event = analyzer.process_frame(state, landmarks)
 
     if angles is None:
-        # visibility 부족 — 프레임 스킵
+        # visibility 부족 — 프레임 스킵. 🔴 success=False 다 (이슈 #267).
+        #
+        # 이 자리가 #196 통주행이 속은 바로 그 자리다 — landmarks 는 들어 있어서 «검출 30/31» 로
+        # 세면 정상으로 보이는데, 판정에 들어간 프레임은 0 이었다. 하체가 프레임 밖이면 계속
+        # 이 갈래로 떨어지고 리포트가 전 필드 0 으로 끝난다.
+        # ⚠️ 원자적이지 않다. 같은 세션 프레임이 겹치면(위 :67 주석) 둘이 같은 값을 읽어 증가
+        #    하나가 사라진다 — 그러면 요약의 `judged` 가 과대평가되고 «판정 0» 표시가 묻힐 수
+        #    있다. 형제인 `accepted_frame_count`·`dropped_frame_count` 도 같은 결함이고,
+        #    뿌리(세션 상태의 비원자적 read-modify-write)는 #162 다. 여기서 락을 하나 더
+        #    만들면 그 이슈가 정할 «어디에 락을 둘 것인가» 를 앞질러 정하게 된다.
+        state.visibility_skip_count += 1
         return PoseResponse(
-            success=True,
+            success=False,
+            skip_reason=PoseSkipReason.LOW_VISIBILITY,
             landmarks=landmarks,
             message="가시성 부족으로 분석 스킵",
             rep_count=state.rep_count,

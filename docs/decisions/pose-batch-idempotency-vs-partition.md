@@ -2,6 +2,12 @@
 
 작성일: 2026-08-12
 상태: **결정됨 — ㄴ 채택 (2026-08-12)**. 근거와 번복 경위는 §4-0. 구현 미착수
+      ▶ **구현 분기 6건은 [`pose-batch-idempotency-implementation.md`](./pose-batch-idempotency-implementation.md) 로 분리**(2026-08-17).
+      🔴 거기서 **§3-ㄴ 의 «proto 계약 변경이 선행될 수 있다» 가 뒤집혔다** — `session.start_time` 이 불변이므로
+      **Spring 이 그 값을 그대로 쓰면 되고, proto·AI 는 안 건드린다**(2026-08-17 사용자 confirm: **세션 앵커**).
+      **2026-08-17 구현 완료** — Spring·마이그레이션(V5)·AI 재시도·테스트. 남은 것은 rig 페이로드뿐이다.
+      ⚠️ §4-3 의 «9행 중 1행만 살아남는다» 는 **원인을 잘못 짚었다** — 배치 내부는 시각이 전부 다르고,
+      진짜 원인은 ghz 가 메시지 1,000개를 2,000요청에 순환시키는 것이라 결과는 **«저장 행수 절반»** 이다
 연관: [GitHub #188](https://github.com/Shadowfit/init/issues/188), [`./pose-data-partition-fk-tradeoff.md`](./pose-data-partition-fk-tradeoff.md), [`./outbox-reliable-messaging.md`](./outbox-reliable-messaging.md), [`./pose-ingest-downsampling.md`](./pose-ingest-downsampling.md), [`./grpc-integration-checklist.md`](./grpc-integration-checklist.md) §2-2
 
 ---
@@ -158,7 +164,7 @@ CREATE TABLE processed_pose_batch (
 ### 이 결정이 되돌리는 것 / 되돌리지 않는 것
 
 - 되돌리지 않는다: 파티셔닝 자체, 월별 RANGE 스킴, `DROP PARTITION` TTL. **키의 의미만 바꾼다.**
-- 기존 파티션 실험(ALTER 96분 / DROP PARTITION vs DELETE 625배 / pruning)은 전부 **구조**에 대한
+- 기존 파티션 실험(ALTER 96분 / DROP PARTITION vs DELETE 625배 — [조건](../portfolio/realmysql-experiments.md#drop-partition-625x) / pruning)은 전부 **구조**에 대한
   측정이라 **무효화되지 않는다.** 오히려 `realmysql-experiments.md` 의 「유일한 정당화 = TTL」 서사에
   *"그 TTL 의 기준이 적재일이라 틀려 있었고 이벤트 시각으로 맞췄다"* 는 정정이 얹힌다.
 

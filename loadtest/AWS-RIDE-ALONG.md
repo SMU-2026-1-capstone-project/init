@@ -1,14 +1,21 @@
 # EC2 탑승 목록 — 인프라를 띄울 때 같이 돌릴 것
 
 작성일: 2026-08-12
-상태: **4회 탑승 완료 (P1 2026-08-12 · P3 2026-08-13 · P3-b 2026-08-13~14 · P6 2026-08-16) + 팔 B 교정 1판 (2026-08-14)**
-      — 남은 主 는 **P2·P4·P5**.
-      🔴 **P6-b(동거 용량 2라운드)는 「설계 확정」이 아니라 이미 돌았다** — 2026-08-16
-      09:04~11:08 UTC 에 완주했고, repo 가 그 사실을 몰라 **회수가 하루 늦었다**(인스턴스
-      정리 중 러너 로그와 S3 프리픽스에서 발견). 1라운드가 남긴 셋 중 **H1 과 부하기 천장은
-      2라운드가 닫았고**([결과](results/coresidency-aws-b-2026-08-16/README.md)),
-      **H3 는 여전히 열려 있다.** 대신 「라운드 간 절대값 비재현(+17.7%)」이 새로 열렸다.
+상태: **5회 탑승 완료 (P1 2026-08-12 · P3 2026-08-13 · P3-b 2026-08-13~14 · P6 2026-08-16 · P6 2라운드 2026-08-17) + 팔 B 교정 1판 (2026-08-14)**
+      — 남은 主 는 **P2·P4·P5**. 그중 **rig 까지 다 돼 있고 한 판도 안 돌린 것은 P5 하나**다.
+      ✅ **2026-08-17 라운드에서 H3 이 닫혔다(반증)** — [결과](results/coresidency-aws-2026-08-17/README.md).
+      #254 의 판정 열이 처음으로 생겨 판정이 났고, 옆은 애초에 안 아팠다.
+      같은 박스 terminate 전 15분에 **從 R6·R7 도 회수했다**([결과](results/ai-scaling-aws-2026-08-17/README.md)) —
+      **GIL 반증**, c7i 배수는 로컬과 달랐다.
+      🔴 **열린 채로 남은 것 둘**: 「라운드 간 절대값 비재현(+17.7%)」과
+      **「346 RPS 천장에서 서버가 9.5 vCPU 만 쓰는 이유」**(후보 일곱이 지워지고 둘 남음 ·
+      [분석](../docs/decisions/ai-receive-path-scaling.md)).
       나머지는 착수·채택 모두 사용자 confirm 후 박제
+      · 재고 전체: [`../docs/decisions/experiment-inventory.md`](../docs/decisions/experiment-inventory.md)
+      🔴 **2026-08-17 게이트 라운드 추가**(1대 `c7i.xlarge`, [결과](results/payload-uniqueness-gate-aws-2026-08-17/README.md)) —
+      P5 를 태우기 전에 rig 을 시험한 판이다. **rig 이 네 번 막혔고**(컨테이너 이름 · 자격증명 ·
+      ghz 경로 · MySQL 헬스 대기 경쟁) 전부 «진짜 원인과 다른 곳» 을 가리켰다. §4 준비 목록이
+      **환경만** 보고 있었다는 뜻이라, 「보낸 요청이 실제로 행을 만드는가」를 목록에 넣었다.
 연관: [`../docs/decisions/online-ddl-vs-blocking-alter.md`](../docs/decisions/online-ddl-vs-blocking-alter.md), [`../docs/portfolio/one-pager.md`](../docs/portfolio/one-pager.md), [`results/`](results/)
 
 ---
@@ -40,11 +47,11 @@
 | # | 항목 | 왜 AWS 여야 하나 | 준비 상태 | 소요 |
 |---|---|---|---|---|
 | ~~**P1**~~ | ~~**무중단 DDL 본 측정**~~ | 로컬은 MySQL·writer·도구가 2코어를 공유해 팔 간 차이가 잡음에 묻힐 수 있다. 설계 §9 «AWS 로 올릴지» 미결정 항목 | ✅ **완료 (2026-08-12)** — [결과](results/online-ddl-aws-2026-08-12/README.md) | **실측 29분** (예상 ~5.9시간은 `WRITER_MAX_SEC` 상한 기준이었고, 1,000만 행에선 판당 1~2분) |
-| **P2** | **다운샘플 «1.7배» 다세션 재측정** | 🔴 [`one-pager.md:43`](../docs/portfolio/one-pager.md) 의 정본 수치인데 조건이 **단일 핫세션**(`batch.json`, session 801)이다. **fsync 3.47배를 1.03배로 무너뜨린 바로 그 조건**이고, 문서에 «다세션에서 재측정한 적 없다» 가 그대로 붙어 있다 | 🟡 rig 있음 · 페이로드는 재생성 필요(§4) | 2~3시간 |
+| ~~**P2**~~ | ~~**다운샘플 «1.7배» 다세션 재측정**~~ | 🔴 [`one-pager.md:43`](../docs/portfolio/one-pager.md) 의 정본 수치인데 조건이 **단일 핫세션**(`batch.json`, session 801)이다. **fsync 3.47배를 1.03배로 무너뜨린 바로 그 조건**이고, 문서에 «다세션에서 재측정한 적 없다» 가 그대로 붙어 있다 | ✅ **완료 (2026-08-18)** — [결과](results/session-spread-aws-2026-08-17/P2-downsample-multisession.md). **1.7배가 아니라 4.11배** · p99 9.5배. 🔴 저장 처리량으로 보면 방향이 **뒤집힌다**(0.82배). 막던 것이 풀린 경위 — `DOWNSAMPLE_WINDOW` 가 `private static final` 이라 팔을 바꾸려면 재빌드가 필요했고 **그 재빌드가 실험을 막고 있었다.** 설정으로 뺐다(`pose-data.downsample-window`, 기본 5라 동작 불변). rig `downsample_multisession.sh` — 팔 `w5`↔`w1`, ABBA 8판. 🔴 팔마다 **저장 행수가 다른 것이 조작 변수**라 `rows/s` 계산값을 팔별로 바꿔주지 않으면 결론이 통째로 뒤집힌다 | P5 라운드에 얹어 돌았다 · 재빌드 ~5분 + 스윕 ~25분 **(예상치)** — ⚠️ 실소요는 기록이 없다 |
 | ~~**P3**~~ | ~~**백업/복구 RTO·RPO**~~ | 「몇 분인가」는 디스크 성능이 지배한다. 단 「PITR 이 되는가」는 이진 사실이라 **로컬에서 먼저** 확인하고 올린다 | ✅ **완료 (2026-08-13)** — [결과](results/backup-restore-aws-2026-08-13/README.md). 미검증 2건은 §6 결정 로그 | **실측 3.11시간**(러너 2.97h — 본 측정만 2h54m) |
 | ~~**P3-b**~~ | ~~**백업 재측정 — 내구성·행 크기**~~ | 🔴 08-13 라운드가 두 곳에서 다른 것을 쟀다. ① 팔 B 복구가 **페이지 캐시**를 쟀고([#201](https://github.com/Shadowfit/init/issues/201)), ② 설계에서 확정됐던 **real-JSON 대조**가 rig 에 없었다([#202](https://github.com/Shadowfit/init/issues/202)). 둘 다 **디스크가 지배**해서 로컬로는 못 닫는다 | ✅ **완료 (2026-08-13~14)** — [b 라운드](results/backup-restore-aws-b-2026-08-13/README.md) · [팔 B 교정](results/restore-reflink-2026-08-14/README.md). #201 은 원인이 캐시가 **아니라 xfs reflink** 였고([#210](https://github.com/Shadowfit/init/issues/210)), #202 는 돌았는데 **예상과 방향이 반대**였다 | **실측 3.32시간**(러너 3.06h) + 교정 1판 |
 | **P4** | **복제 지연 · 반동기 대가** | 인스턴스 2대가 전제. ⭐ **반동기 대가는 AZ 간 RTT 에 지배**되므로 로컬에선 구조적으로 과소평가된다 | 🟡 **설계 완료 (2026-08-13)** · rig 없음 — [`../docs/decisions/replication-lag-and-semisync.md`](../docs/decisions/replication-lag-and-semisync.md) | 게이트 2~3h + 측정 2~3h |
-| **P5** | **세션 분산도 스윕** (1·2·5·20·100) | 🔴 정본 baseline **649.4 RPS 가 «100세션» 에서 나온 값**인데 그 100 은 잰 값이 아니다. 이 앱은 회원당 활성 세션이 1개라 **동시 세션 수 = 동시에 운동 중인 사람 수**다 — baseline 이 가정한 부하보다 분산된 조건일 수 있다. 4대 구성이라 로컬 불가 | 🟢 **설계·rig 완료 (2026-08-14)** — [`../docs/decisions/session-spread-sweep.md`](../docs/decisions/session-spread-sweep.md) · [rig](results/session-spread-2026-08-13/README.md) | 主 25판 + 從 6판 · **지켜보는 1~2h**(무인 아님) |
+| **P5** ⭐ | **세션 분산도 스윕** (1·2·5·20·100) — ✅ **다음 라운드 主 로 확정 (2026-08-17 사용자 결정)** · ✅ **막던 것은 풀렸다**: 멱등 키가 rig 의 쓰기를 삼키던 문제([#271](https://github.com/Shadowfit/init/issues/271))를 고치고 **게이트 라운드로 실증했다**([결과](results/payload-uniqueness-gate-aws-2026-08-17/README.md) — 요청 3,000 → 행 15,000, 실패 0). 🔴 **부하기는 4 vCPU 로 간다**(템플릿 파싱이 요청당 CPU 를 2.2배로 올린다 — 2 vCPU 면 85%) | 🔴 정본 baseline **649.4 RPS 가 «100세션» 에서 나온 값**인데 그 100 은 잰 값이 아니다. 이 앱은 회원당 활성 세션이 1개라 **동시 세션 수 = 동시에 운동 중인 사람 수**다 — baseline 이 가정한 부하보다 분산된 조건일 수 있다. 4대 구성이라 로컬 불가 | 🟢 **설계·rig 완료 (2026-08-14)** — [`../docs/decisions/session-spread-sweep.md`](../docs/decisions/session-spread-sweep.md) · [rig](results/session-spread-2026-08-13/README.md) | 主 25판 + 從 6판 · **지켜보는 1~2h**(무인 아님) |
 | ~~**P6**~~ ②차 | **동거 용량 — 2라운드 (부하기 4 vCPU)** | 1라운드가 남긴 셋 중 둘을 닫는다 — 부하기 계측([#250](https://github.com/Shadowfit/init/issues/250))과 팔 A 드리프트. 부하기를 `c7i.large`→`c7i.xlarge` 로 올리고 샘플러 11줄을 얹어 같은 격자를 다시 돌렸다 | ✅ **완료 (2026-08-16, 09:04~11:08 UTC)** — [결과](results/coresidency-aws-b-2026-08-16/README.md) (본 측정 54 관측 · 결함 0 · 라틴 방격). **닫힌 것**: H1(從 부하 비용 = **−0.5%**, 잡음 크기) · #250 계측 축(**부하기 CPU 는 천장이 아니다** — 4 vCPU 중 0.68) · R5 3회차 재현 · 캡 비율 91.1%→92.4% 재현. 🔴 **새로 연 것**: **같은 구성이 라운드를 건너 안 재현된다** — AI CPU 는 869.3%→869.0% 로 같은데 처리량 +17.7%(천장 환산 89.2→105.0세션). 신규 결함 [#255](https://github.com/Shadowfit/init/issues/255) | **2.13시간**(본 측정 7,387초) · **2대**(대상 c7i.4xlarge + 부하기 **c7i.xlarge**) |
 | ~~**P6**~~ ①차 | **동거 용량** — 「156세션」은 혼자 살 때의 값 | 🔴 08-14 의 **156세션은 AI 컨테이너만 있는 박스** 값이다. 실제 배포는 MySQL·Spring 이 한 호스트에 산다. **동거하면 얼마로 내려가는지가 미측정**이고, 그 숫자가 「한 대로 되나 = 수평확장이 필요한가」를 가른다. 단독 대조군이 필요해 로컬 불가 | ✅ **완료 (2026-08-16)** — [정식 라운드 결과](results/coresidency-aws-2026-08-16/README.md) (6레벨 · 라틴 방격 · **본 측정 54 관측** · 결함 0) · [예비](results/coresidency-aws-2026-08-15/README.md) · [설계](../docs/decisions/ai-coresidency-capacity.md) · [rig](results/coresidency-2026-08-15/README.md) · [2대 구성 절차](aws/README.md). **닫힌 것**: Q2(뺏는 주체 = AI 자신) · **Q3 절반**(AI 쪽 — 캡한 만큼 깎는다, 팔 C 교락 해소) · Q4(검출률 57행 전부 100%) · 從 R5(메모리 실측식 ±0.7% 재현). **새 사실**: 16 vCPU 박스에서 천장이 ~8.9 vCPU — **HT 가 거의 안 준다**. 🔴 **남은 것 3건**: ① H1(동거 비용) — 팔 A 가 2시간에 +16% 흘러 판정 불가, ② **부하기 지표 이번에도 미수집**([#250](https://github.com/Shadowfit/init/issues/250)), ③ 천장이 「80 초과 120 미만」 구간으로만 짚힘. → **P6-b 로 간다** | **실측 2.29시간**(러너 2.22h — 본 측정만 7,408초 = 2h03m) · 12스윕 × 6레벨 · **2대**(대상 c7i.4xlarge + 부하기 c7i.large). 예상 ≈3.5시간보다 짧았다 |
 | **P6-b** | **동거 용량 2라운드** — 못 닫은 셋을 닫는다 | 🔴 1라운드가 **H1·부하기 천장·H3** 을 못 닫았고, 그 뿌리 둘이 **판 설계 자체**에 있었다: 교대 단위가 «팔» 이라 팔 간 대조점이 **13~27분** 떨어져 있고 그 사이 처리량이 **분당 0.09~0.35%** 흐른다([#251](https://github.com/Shadowfit/init/issues/251)), 레벨 순서가 아홉 블록 전부 오름차순이라 추세가 **plateau 를 정의하는 자리**에 얹힌다([#252](https://github.com/Shadowfit/init/issues/252)). 거기에 캡 적용 단언 부재([#253](https://github.com/Shadowfit/init/issues/253))와 **H3 의 판정 열이 아예 생성되지 않는 문제**([#254](https://github.com/Shadowfit/init/issues/254)) | 🟡 **설계 확정 (2026-08-16 사용자 결정 「전부」)** — [설계 §5-3 · §11](../docs/decisions/ai-coresidency-capacity.md) · [1라운드 결과 §6](results/coresidency-aws-2026-08-16/README.md). **rig 코드는 아직 안 고쳤다**. 🔴 **그런데 «부하기 스케일업» b 라운드가 이미 돌아 있었다** — ✅ **회수·분석 완료**([결과](results/coresidency-aws-b-2026-08-16/README.md), 2026-08-16): 부하기만 4 vCPU 로 올리자 **천장 +17.7% · 드리프트 소멸 · A≈B**. ⚠️ **단 「부하기가 천장이었다」는 실측이 지지하지 않는다** — 부하기 CPU 는 4 vCPU 중 **0.68 만** 썼고(포화선 400%, 관측 최대 67.6%), 무엇보다 **AI CPU 가 두 라운드에서 869.3% → 869.0% 로 같았다.** 부하기 기아였다면 AI CPU 가 **낮았어야** 한다. 정확히는 **「부하기 CPU 포화는 아닌데 부하기 구성이 결과를 움직였다」**이고, 같은 라운드에 대상 박스 정지→시작(물리 호스트 이동 가능)이 겹쳐 **둘을 못 가른다**([결과 §5](results/coresidency-aws-b-2026-08-16/README.md)) | **78판 · 스윕 ≈ 3h01m · 인스턴스 ≈ 3h20m** · **2대** — 🔴 **부하기 기본을 `c7i.xlarge`(4 vCPU)로 올린다.** ⚠️ 실제 리드타임은 라운드 3시간이 아니라 **리허설 재시도 횟수**가 정한다 — 1라운드는 여기서 **세 번** 막혔다 |
@@ -60,8 +67,9 @@
 | **R2** | **MySQL 지표 수집** | pool-cliff 초판이 «병목이 백엔드 CPU 로 이동» 을 적었다 **철회**한 사유가 정확히 **MySQL 지표 미수집**이었다. 이번엔 처음부터 걷는다 (OS 샘플러와 같은 결) | [`pose-ingest-downsampling.md:387`](../docs/decisions/pose-ingest-downsampling.md) |
 | **R3** | **3-way 조인 hash join** | `reports ⋈ sessions ⋈ users`. ⑤ 옵티마이저 카드가 «AWS엔 그 테이블들이 비어 있어 범위 밖» 으로 닫아둔 미완부 | [`realmysql-experiments.md:225`](../docs/portfolio/realmysql-experiments.md) |
 | ~~**R5**~~ | ~~**AI 메모리 유도식의 «공식 밖 몫»**~~ ✅ **완료 (2026-08-15 예비 라운드)** — 실측 `708 + 106.74×N` MiB, 공식보다 고정 +612·세션당 +12.6 크다. **공식은 212세션을 허용하는데 실측은 181에서 한도**([결과 §2-4](results/coresidency-aws-2026-08-15/README.md)) | 검출기 풀 공식이 **검출기만** 센다 — 프레임 버퍼·파이썬 힙은 미측정이라 안 들어갔고, 딱 맞추면 **풀이 거절하기 전에 OOM** 이 온다. 동시 세션을 ramp 하며 RSS 를 재야 «여유분» 에 근거가 생긴다. ⚠️ **P6 라운드 전용** — 그 스윕이 이미 `docker stats` 를 걷으므로 추가 비용 거의 0 | [#229](https://github.com/Shadowfit/init/issues/229) · [`ai-coresidency-capacity.md` §4-1](../docs/decisions/ai-coresidency-capacity.md) |
-| **R6** | 🆕 **스레드 vs 프로세스 확장성 — 「왜 16 vCPU 중 8.7 만 쓰나」** | P6 2라운드에서 **40스레드가 in-flight 인데 AI CPU 는 8.69 vCPU** 였다 — 코어가 남는데 31개가 막혀 있었다. 로컬 프로파일이 **추론 밖 직렬 비용은 5% 뿐**임을 확인해([결과 §1](results/ai-path-profile-2026-08-17/README.md)) 「서비스 경로가 비싸다」가 **반증**됐고, 남은 유력 가설이 **GIL** 이다(프레임당 3.17ms 를 넣으면 처리량 315·CPU 8.69 가 **동시에** 맞는다 — [§2-1](results/ai-path-profile-2026-08-17/README.md)). ⚠️ **로컬 물리 2코어로는 구조적으로 못 잰다** — 4워커에서 스레드와 프로세스가 같은 천장에 붙는다(코어가 먼저 걸린다). **판정선**: 프로세스 2개에서 처리량 **1.7~2배** + CPU **8.7→14~16** 이면 GIL, 아니면 캐시·HT 쪽. rig 은 `profile_e2e_and_scaling.py scaling` 하나, 워커만 1·2·4·8·16 으로 넓히면 된다 | [결과 §6](results/ai-path-profile-2026-08-17/README.md) · [P6 2라운드 §4](results/coresidency-aws-b-2026-08-16/README.md) · ⚠️ **소요 ~10분** · 도커·시딩·MySQL 불필요(venv + `frames.json` 만) |
-| **R7** | 🆕 **`model_complexity` 0/1/2 배수 재측정** | 로컬에서 **lite = 0.64×(추론 −36%) · heavy = 3.83×** 가 나왔다. 지금 유일하게 «바로 쓸 수 있는» 처리량 레버인데 **c7i 는 AVX-512·XNNPACK 이 달라 배수가 다를 수 있다**(방향은 동일). ⚠️ 채택은 별건이다 — 대가가 정확도라 [#234](https://github.com/Shadowfit/init/issues/234)(정답지 흔들림 → 점수 영향)와 같은 자다 | [결과 §4](results/ai-path-profile-2026-08-17/README.md) · ⚠️ **소요 ~5분** · R6 과 같은 박스·같은 자산 |
+| ~~**R6**~~ | ~~**스레드 vs 프로세스 확장성**~~ ✅ **완료 (2026-08-17) · GIL 반증** — 프로세스/스레드 **0.96~1.06x**(판정선 1.7~2배) · 스레드도 16워커 **7.08배** · 순수 추론은 **15.2 vCPU** 까지 간다([결과](results/ai-scaling-aws-2026-08-17/README.md)) | P6 2라운드에서 **40스레드가 in-flight 인데 AI CPU 는 8.69 vCPU** 였다 — 코어가 남는데 31개가 막혀 있었다. 로컬 프로파일이 **추론 밖 직렬 비용은 5% 뿐**임을 확인해([결과 §1](results/ai-path-profile-2026-08-17/README.md)) 「서비스 경로가 비싸다」가 **반증**됐고, 남은 유력 가설이 **GIL** 이다(프레임당 3.17ms 를 넣으면 처리량 315·CPU 8.69 가 **동시에** 맞는다 — [§2-1](results/ai-path-profile-2026-08-17/README.md)). ⚠️ **로컬 물리 2코어로는 구조적으로 못 잰다** — 4워커에서 스레드와 프로세스가 같은 천장에 붙는다(코어가 먼저 걸린다). **판정선**: 프로세스 2개에서 처리량 **1.7~2배** + CPU **8.7→14~16** 이면 GIL, 아니면 캐시·HT 쪽. rig 은 `profile_e2e_and_scaling.py scaling` 하나, 워커만 1·2·4·8·16 으로 넓히면 된다 | [결과 §6](results/ai-path-profile-2026-08-17/README.md) · [P6 2라운드 §4](results/coresidency-aws-b-2026-08-16/README.md) · ⚠️ **소요 ~10분** · 도커·시딩·MySQL 불필요(venv + `frames.json` 만) |
+| ~~**R7**~~ | ~~**`model_complexity` 0/1/2 배수 재측정**~~ ✅ **완료 (2026-08-17)** — c7i 는 **lite 0.79x · heavy 2.76x**(로컬 0.64x·3.83x, 방향만 같다). 🔴 덤: **해상도 9배 축소가 추론 시간을 안 바꾼다**([결과](results/ai-scaling-aws-2026-08-17/README.md)) | 로컬에서 **lite = 0.64×(추론 −36%) · heavy = 3.83×** 가 나왔다. 지금 유일하게 «바로 쓸 수 있는» 처리량 레버인데 **c7i 는 AVX-512·XNNPACK 이 달라 배수가 다를 수 있다**(방향은 동일). ⚠️ 채택은 별건이다 — 대가가 정확도라 [#234](https://github.com/Shadowfit/init/issues/234)(정답지 흔들림 → 점수 영향)와 같은 자다 | [결과 §4](results/ai-path-profile-2026-08-17/README.md) · ⚠️ **소요 ~5분** · R6 과 같은 박스·같은 자산 |
+| ~~**R8**~~ | ~~**멱등 유니크 키의 쓰기 대가**~~ ([#272](https://github.com/Shadowfit/init/issues/272)) ✅ **완료 (2026-08-18)** — [결과](results/session-spread-aws-2026-08-17/R8-unique-index-cost.md). **처리량 −2.9% · p99 +98% · 버퍼풀 읽기 +17.5%.** 🔴 대가가 평균이 아니라 **꼬리**에 있다 — 「3% 느려진다」로 인용하면 안 된다. ⚠️ 디스크 읽기는 **양쪽 다 0** 이라 이건 «메모리 안의 대가» 다 | 마이그레이션이 **스스로** «이 스키마·이 박스에서 그 크기는 아직 측정된 적이 없다» 라고 적어둔 자리다(`V6__…:62~65`). 지금 급한 이유는 따로 있다 — 정본 baseline **649.4 RPS 는 이 키가 없던 스키마** 값이라, P5 곡선을 그려도 「4차보다 높다/낮다」를 못 말한다. 이 판이 그 단절의 **크기**를 준다. 팔은 **인덱스 존재** 하나(`ADD`↔`DROP INDEX`)이고, 페이로드가 템플릿이라 양쪽이 **같은 행을 넣는다** — 즉 «중복이 안 걸려 빨라진» 것이 아니라 **인덱스 유지 비용만** 빠진다. 기제는 `Innodb_buffer_pool_reads` 와 `Innodb_ibuf_*` 로 직접 센다(주장이 «change buffer 를 못 쓴다» 이므로). ABBA/BAAB 위치 균형 8판 + 버림 1 · rig `uk_index_ridealong.sh` | **실측 ~30분** · P5 라운드에 얹어 돌았다(2026-08-17 결정 → 2026-08-18 실행). 스키마를 만지므로 **본 스윕 뒤**에 돌렸고, `trap` 이 키를 되돌렸다 |
 | **R4** | **커넥션 수 스윕 (네트워크 축)** | 「`--connections` 1→16 이 230→211」이 **HTTP/2 멀티플렉싱 때문인지 fsync 에 가려진 것인지** 안 갈렸다. 완화 조건에서 다시 돌리면 갈린다. ⚠️ **P5 라운드 전용** — 부하기·페이로드가 그 rig 것이라 다른 라운드엔 못 얹는다 | [`four-axes-depth-experiments.md` §3-2](../docs/decisions/four-axes-depth-experiments.md) · rig `conn_ridealong.sh` |
 
 ⚠️ **R1 과 R3 은 값 분포 한계에 걸린다.** 시딩이 단일 템플릿 복제라 카디널리티가 균일하다.
@@ -95,6 +103,12 @@
 - [ ] `docker pull percona/percona-toolkit` — 없으면 팔 B 4판이 전부 «DDL실패» 로 찍힌다. **도구의 성질이 아니라 환경 결함인데 표에는 똑같이 보인다**
 - [ ] 🔴 **`batch_multi*.json` 은 `.gitignore` 되어 있다**(`ghz/.gitignore`, ~64MB). EC2 에는 없으므로 `gen_batch_multi.py` 로 재생성한다. FK 통과를 위해 **`exercise_sessions` 시드가 먼저** 있어야 한다
 - [ ] `probe.sh` 재실행 — 환경이 바뀌었으므로 로컬 통과 이력을 재사용하지 않는다
+- [ ] 🔴 **「보낸 요청이 실제로 행을 만드는가」를 한 번 확인한다** — 이 목록의 나머지는 전부
+  **환경**을 본다(시드·내구성·풀·전송·도구). 2026-08-17 에 멱등 키가 rig 의 쓰기를 통째로
+  삼키고 있었는데 **그걸 볼 확인이 하나도 없었다**([#271](https://github.com/Shadowfit/init/issues/271)).
+  `SavePoseDataBatch` 를 몇 건 쏘고 `pose_data` 가 «요청 × 5» 만큼 늘었는지 세면 끝난다
+- [ ] **빌드 대상 커밋을 명시한다** — `bootstrap.sh` 기본값은 `REF=main` 인데, 측정하려는 변경이
+  main 에 없으면 **다른 코드를 재고도 모른다**. 2026-08-17 게이트가 그 직전까지 갔다
 - [ ] **`WRITER_MAX_SEC` 상향** — 기본 5,400s(90분)인데 팔 B 로컬 실측이 2,360s 다. EBS 가 로컬 NVMe 보다 느려 2~3배 늘면 **writer 가 DDL 도중 먼저 죽어 `max_stall`·`p50` 이 통째로 구멍난다**
 - [ ] **축소 리허설** — `SESSIONS=134` 로 8판(~15분). 전 경로를 먼저 밟는다
 - [ ] 디스크 — 팔 B 는 사본을 만든다. binlog 도 B판당 ~445MB 누적
@@ -105,10 +119,12 @@
 
 **P6 전용 — 이 라운드만 2대다** (다른 라운드는 위까지로 끝난다)
 
-- [ ] 인스턴스 **2대** — 대상 `c7i.4xlarge` · 부하기 `c7i.large`, 같은 VPC·서브넷
+- [ ] 인스턴스 **2대** — 대상 `c7i.4xlarge` · 부하기 **`c7i.xlarge` 이상**, 같은 VPC·서브넷
+      🔴 2 vCPU(`c7i.large`)면 §T(⑩)가 «제한 = 전체» 라 **한 판도 안 도는데 게이트는 통과한다** (#312)
 - [ ] 보안그룹 인바운드 — 부하기 → 대상 **22 · 8000 · 8080 · 6565**
 - [ ] **SSH 키를 부하기에** 둔다(`/root/.ssh/measure.pem`, `chmod 600`). 러너가 부하기에서 돌며 대상을 몬다
-- [ ] **양쪽 토큰 일치** — `AI_PUBLIC_TOKEN`·`INTERNAL_API_TOKEN`. 다르면 preflight 가 막는다
+- [ ] **두 박스가 같은 토큰을 든다** — `AI_PUBLIC_TOKEN`·`INTERNAL_API_TOKEN` 을 대상·부하기에서 각각 같은 값으로.
+      어긋나면 preflight 가 막는다. ⚠️ **두 변수끼리는 달라야** 한다 — 같으면 AI 가 안 뜬다(#230 단언 · #261)
 - [ ] `ROLE=p6-target` / `ROLE=p6-loader` 로 부트스트랩을 **갈라 돌린다**. 기본 `ROLE=db` 는 MySQL 만 띄운다
 - [ ] 🔴 `PHASES` 에 `coresidency*` 를 `ddl`·`backup` 과 **섞지 않는다** — 러너의 자리가 다르다
 - [ ] `GHZ_BIN=/usr/local/bin/ghz` 를 실행 명령에 적는다 — 러너 기본값이 옛 경로다

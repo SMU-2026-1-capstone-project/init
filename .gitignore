@@ -18,7 +18,15 @@ Desktop.ini
 .env
 .env.*
 !.env.example
-application-prod.yml
+#
+# 🔴 application-prod.yml 은 **더 이상 무시하지 않는다** (2026-08-22).
+#
+# 초기 커밋부터 여기 있었는데, 그건 «prod 설정 파일에는 비밀이 들어간다» 는 일반적 관성이지
+# 이 저장소를 보고 내린 판단이 아니었다. 이 저장소는 비밀을 전부 환경변수로 받는다
+# (application.yml 의 ${JWT_SECRET}·${DB_USERNAME} …). 그리고 무시된 파일은 이미지에도
+# 안 들어가므로, 무시한 채로는 **배포된 앱이 그 설정을 영영 못 본다.**
+#
+# ⚠️ 그러니 **비밀은 여기 적지 말 것.** 값이 필요하면 .env 로 받고 yml 에서는 ${...} 로 참조한다.
 
 # ==================== Frontend (React Native / Expo) ====================
 frontend/node_modules/
@@ -141,3 +149,14 @@ src/main/resources/application-local.properties
 
 # loadtest 시딩 산출물 (gen_pose_template.py 출력, ~1.3MB)
 loadtest/seed/template.sql
+
+# 개인 지원 서류 — 이 저장소는 PUBLIC 이다.
+# 지원서·경력기술서는 특정 회사에 낸 문서이고 개인 신상이 들어간다. 공개 이력에
+# 박히면 지우기 어렵고(포크·캐시), 회사명이 붙은 파일이 커밋 로그에 남는 것 자체가
+# 의도치 않은 노출이다. 로컬에는 그대로 두되 추적만 하지 않는다.
+#
+# 📌 여기 걸린 파일들은 애초에 커밋된 적이 없어 히스토리 정리가 필요 없었다.
+#    새로 쓸 때도 이 이름 규칙(application-*, career-statement-*)을 지키면 자동으로 빠진다.
+#    포트폴리오 본체(one-pager, db-deep-dive, realmysql-experiments 등)는 계속 추적한다.
+docs/portfolio/application-*
+docs/portfolio/career-statement-*

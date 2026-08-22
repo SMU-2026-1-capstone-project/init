@@ -4,11 +4,11 @@ import com.shadowfit.dto.login.*;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.security.jwt.JwtUtil;
+import com.shadowfit.global.security.jwt.RefreshTokenHasher;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.RefreshToken;
 import com.shadowfit.model.member.UserRole;
-import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.member.RefreshTokenRepository;
@@ -37,9 +37,9 @@ public class MemberService{
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final SessionRepository sessionRepository;
-    private final PoseDataRepository poseDataRepository;
     private final PoseDataCleanupService poseDataCleanupService;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenHasher refreshTokenHasher;
 
     /**
      * 이 시간 동안 프레임 유입이 없으면 그 세션은 죽은 것으로 본다(탈퇴 가드 판정 기준).
@@ -101,7 +101,8 @@ public class MemberService{
         // 토큰 안의 ver 과 행의 token_version 이 **같아야** 한다. 그래서 다음 세대 번호를 먼저
         // 계산해 토큰에 싣고, 엔티티가 행을 그 값으로 올린다.
         String refreshToken = jwtUtil.createRefreshToken(info, entity.getTokenVersion() + 1);
-        entity.replaceForNewLogin(refreshToken);
+        // 원문이 아니라 해시를 저장한다 (#185). 원문은 이 응답으로만 나간다.
+        entity.replaceForNewLogin(refreshTokenHasher.hash(refreshToken));
         refreshTokenRepository.save(entity);
 
         String accessToken = jwtUtil.createAccessToken(info);
@@ -118,9 +119,10 @@ public class MemberService{
      *
      * <p><b>세 갈래로 갈린다:</b>
      * <ol>
-     *   <li>저장된 토큰과 같다 → 정상 회전</li>
-     *   <li>직전 세대 + 유예 안 → <b>응답을 못 받은 클라의 재시도</b>로 본다. 회전하지 않고 현재
-     *       토큰을 다시 준다 (§ {@code REISSUE_RETRY_GRACE_SECONDS})</li>
+     *   <li>저장된 해시와 같다 → 정상 회전</li>
+     *   <li>직전 세대 + 유예 안 → <b>응답을 못 받은 클라의 재시도</b>로 본다. <b>새 토큰을 회전
+     *       발급</b>한다 (#185 ㄱ — 해시 저장이라 저장값을 되돌려줄 수 없다.
+     *       § {@code REISSUE_RETRY_GRACE_SECONDS})</li>
      *   <li>그 외 → 폐기된 구본이 왔다 → 세션을 끊는다</li>
      * </ol>
      *
@@ -153,22 +155,36 @@ public class MemberService{
                 .build();
         LocalDateTime now = LocalDateTime.now();
 
-        // (2) 재시도 — 회전하지 않는다. 여기서 또 회전하면 «응답 유실 → 재시도» 가 반복될 때
-        //     세대만 계속 올라가고, 정작 클라는 어느 토큰이 유효한지 영영 못 맞춘다.
-        if (!entity.getToken().equals(presented)
+        // 저장값은 이제 해시라(#185) 원문 대조 대신 해시 대조를 한다. presented 는 클라가 보낸
+        // 원문 JWT 이므로 같은 함수로 해싱해 맞춘다.
+        String presentedHash = refreshTokenHasher.hash(presented);
+
+        // (2) 재시도 유예 — 응답을 못 받은 클라가 직전 토큰으로 다시 온 경우 (#135).
+        //
+        // 🔴 예전엔 «회전하지 않고 저장된 토큰을 그대로 돌려줬다». 해시 저장(#185)으로는 저장값을
+        //    돌려줄 수 없어(원문이 없다), 여기서 **새 토큰을 회전 발급**한다(안 ㄱ). 그 대가로
+        //    유예의 성질이 바뀐다 — 응답이 **한 번** 유실되면 흡수하지만, 그 재발급 응답까지
+        //    **연달아** 유실되면 다음 재시도는 이미 두 세대 전이 되어 유예 밖(=아래 (3) revoke)이
+        //    된다. 예전(원문 반환)은 반복 유실도 견뎠다. 실사용자·재시도 로직이 없는 현재 이 꼬리는
+        //    체감 0 이고, 실사용자가 생기면 가역 암호화(안 ㄷ)로 승격을 재검토한다
+        //    (docs/decisions/ai-session-ownership-verification.md 와 무관, 토큰 문서 참조).
+        if (!entity.getToken().equals(presentedHash)
                 && entity.isWithinRetryGrace(jwtUtil.getTokenVersion(presented), now, REISSUE_RETRY_GRACE_SECONDS)) {
-            return new LoginResponseDto(jwtUtil.createAccessToken(info), entity.getToken(), member.getRole());
+            String reissued = jwtUtil.createRefreshToken(info, entity.getTokenVersion() + 1);
+            entity.rotate(refreshTokenHasher.hash(reissued), now);
+            refreshTokenRepository.save(entity);
+            return new LoginResponseDto(jwtUtil.createAccessToken(info), reissued, member.getRole());
         }
 
         // (3) 폐기된 구본 — 세션을 끊는다.
-        if (!entity.getToken().equals(presented)) {
+        if (!entity.getToken().equals(presentedHash)) {
             refreshTokenRepository.deleteByMemberId(member.getId());
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_REUSED);
         }
 
-        // (1) 정상 회전
+        // (1) 정상 회전 — 해시를 저장한다.
         String rotated = jwtUtil.createRefreshToken(info, entity.getTokenVersion() + 1);
-        entity.rotate(rotated, now);
+        entity.rotate(refreshTokenHasher.hash(rotated), now);
         refreshTokenRepository.save(entity);
 
         return new LoginResponseDto(jwtUtil.createAccessToken(info), rotated, member.getRole());
@@ -332,6 +348,12 @@ public class MemberService{
      * <p>임계값의 기준은 배치 간격(~3~4초)이 아니라 <b>세트 간 휴식(최대 90초)</b>이다. 짧게 잡으면
      * 쉬는 중인 사용자를 죽은 것으로 오판해 <b>정말 운동 중인데 탈퇴가 통과</b>한다 — 그건 막으려던
      * 결함 그 자체라, 반대 방향 오판(죽은 세션 때문에 몇 분 더 기다림)보다 훨씬 나쁘다.
+     *
+     * <p>🔴 <b>"유입"을 세는 자리가 pose_data 가 아니다</b> (#317). 원안은 {@code pose_data.created_at}
+     * 하한을 셌는데, #188 멱등이 들어오면서 그 컬럼이 <b>세션 시작 시각으로 고정</b>됐다 — 한 세션의
+     * 모든 행이 같은 값을 갖는다. 그래서 가드가 묻던 질문이 "최근 180초 안에 프레임이 들어왔나"에서
+     * <b>"세션이 최근 180초 안에 시작됐나"</b>로 바뀌었고, 4분째 운동 중인 사용자가 그냥 통과했다
+     * (거짓 음성). 지금은 배치마다 갱신되는 {@code exercise_sessions.last_active_at} 을 본다.
      */
     private void requireNoActiveWorkout(Long memberId) {
         List<Long> inProgressIds =
@@ -341,7 +363,7 @@ public class MemberService{
         }
 
         LocalDateTime since = LocalDateTime.now().minusSeconds(activeWorkoutIdleSeconds);
-        if (poseDataRepository.countSince(inProgressIds, since) > 0) {
+        if (sessionRepository.countActiveSince(inProgressIds, since) > 0) {
             throw new BusinessException(ErrorCode.WITHDRAWAL_BLOCKED_BY_ACTIVE_SESSION);
         }
         // 유입이 끊긴 IN_PROGRESS 세션(앱이 죽은 좀비)은 막지 않는다 — 탈퇴를 진행하고,

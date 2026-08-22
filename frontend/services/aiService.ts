@@ -4,9 +4,45 @@ import { Platform } from 'react-native';
 import type { PoseDetectRequest, PoseDetectResponse } from '@/types/pose';
 
 // AI 서버(FastAPI)는 Spring(:8080)이 아니라 별도 :8000 /api/v1 로 직결한다 (분기 H2).
-// Metro 호스트(=PC LAN IP)를 그대로 쓰되 포트만 8000. 안드로이드 에뮬레이터는 10.0.2.2 매핑.
+//
+// 🔴 **릴리스와 개발이 갈린다** (이슈 #148). 예전에는 갈리지 않았고, 그게 결함이었다 —
+// 릴리스 빌드에는 Metro 가 없어 `hostUri` 가 빈 문자열이라 아래 개발 경로가 조용히
+// `http://localhost:8000` 을 만들어냈다. 그리고 iOS ATS·Android(API 28+) 가 평문 HTTP 를
+// 차단하므로, **설정을 안 한 실수가 「연결 거부」라는 엉뚱한 증상으로** 나타났다.
+// 원인이 URL 이라는 단서가 어디에도 없었다.
+//
+// 그래서 릴리스에서는 **명시적으로 주입한 https 주소만** 받는다. 못 만들면 아래
+// `aiConfigError` 에 이유를 담고, 화면이 그것을 사용자에게 보여준다(조용히 실패하지 않는다).
+//
+// ⚠️ 프로덕션 주소를 여기 하드코딩하지 않는다. 배포 호스트도 도메인도 아직 정해지지 않았고
+//    (docs/decisions/reverse-proxy-and-tls.md §8 선행 조건이 전부 비어 있다), 지어낸 도메인을
+//    코드에 박는 것이 지금 혼란의 원인이기도 하다(api.ts 의 「추후 프로덕션 URL」).
+
+/** 릴리스에서 base URL 을 못 만든 이유. `null` 이면 정상. */
+export let aiConfigError: string | null = null;
+
 function resolveAiBaseUrl(): string {
   const override = process.env.EXPO_PUBLIC_AI_BASE_URL;
+
+  if (!__DEV__) {
+    // 릴리스: 주입된 값만 쓴다. 개발 호스트 추론으로 **떨어지지 않는다**.
+    if (!override) {
+      aiConfigError =
+        'AI 서버 주소가 설정되지 않았습니다 (EXPO_PUBLIC_AI_BASE_URL). 빌드 설정을 확인해 주세요.';
+      return '';
+    }
+    if (!override.startsWith('https://')) {
+      // http 로 주입해도 ATS·cleartext 정책이 막는다. 여기서 걸러야 「왜 안 붙지」가 아니라
+      // 「주소가 https 가 아니다」로 보인다.
+      aiConfigError =
+        'AI 서버 주소가 https 가 아닙니다 (EXPO_PUBLIC_AI_BASE_URL). 평문 HTTP 는 앱에서 차단됩니다.';
+      return '';
+    }
+    return override;
+  }
+
+  // 개발: Metro 호스트(=PC LAN IP)를 그대로 쓰되 포트만 8000.
+  // 안드로이드 에뮬레이터는 호스트 PC 를 10.0.2.2 로 봐야 한다.
   if (override) return override;
 
   const hostUri = Constants.expoConfig?.hostUri ?? '';
@@ -38,6 +74,9 @@ aiApi.interceptors.request.use((config) => {
 });
 
 export const aiService = {
+  // 이 경로를 쓸 수 있는 상태인가. false 면 aiConfigError 에 이유가 있다.
+  isConfigured: () => aiConfigError === null,
+
   // 실시간 포즈 감지 (POST {ai}:8000/api/v1/pose)
   detectPose: (data: PoseDetectRequest) =>
     aiApi.post<PoseDetectResponse>('/pose', data),

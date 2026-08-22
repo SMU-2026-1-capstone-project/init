@@ -11,6 +11,7 @@ import com.shadowfit.grpc.PoseDataResponse;
 import com.shadowfit.grpc.SessionCompleteRequest;
 import com.shadowfit.grpc.SessionCompleteResponse;
 import com.shadowfit.grpc.SessionStatus;
+import com.shadowfit.global.observability.SessionMetrics;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.dao.DeadlockLoserDataAccessException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,12 +44,13 @@ class ExerciseGrpcServiceTest {
     @Mock private PoseDataService poseDataService;
     @Mock private SessionService sessionService;
     @Mock private FeedbackLogService feedbackLogService;
+    @Mock private SessionMetrics sessionMetrics;
     private ExerciseGrpcService grpcService;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        grpcService = new ExerciseGrpcService(poseDataService, sessionService, feedbackLogService);
+        grpcService = new ExerciseGrpcService(poseDataService, sessionService, feedbackLogService, sessionMetrics);
     }
 
     @Test
@@ -82,6 +85,49 @@ class ExerciseGrpcServiceTest {
         assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
                 .isEqualTo(Status.Code.INTERNAL);
         verify(obs, never()).onNext(any());
+        // 데드락이 아닌 예외는 다시 던지지 않는다 — 재시도는 #276 의 데드락 한 종류에만 걸린다
+        verify(poseDataService, times(1)).savePoseDataBatch(anyLong(), anyList());
+    }
+
+    @Test
+    @DisplayName("savePoseDataBatch 데드락 — 2회 안에 회복하면 성공으로 응답한다 (#276)")
+    void savePoseDataBatch_deadlockThenRecovers() {
+        PoseDataBatchRequest request = PoseDataBatchRequest.newBuilder().setSessionId(1L).build();
+        @SuppressWarnings("unchecked")
+        StreamObserver<PoseDataResponse> obs = mock(StreamObserver.class);
+        // 두 번 데드락 → 세 번째 성공. 실측(0회 37.8% · 1회 3.8% · 2회 0.0%)이 고른 상한이 2 다.
+        doThrow(new DeadlockLoserDataAccessException("deadlock", null))
+                .doThrow(new DeadlockLoserDataAccessException("deadlock", null))
+                .doNothing()
+                .when(poseDataService).savePoseDataBatch(anyLong(), anyList());
+
+        grpcService.savePoseDataBatch(request, obs);
+
+        verify(poseDataService, times(3)).savePoseDataBatch(anyLong(), anyList());
+        verify(obs).onCompleted();
+        verify(obs, never()).onError(any());
+        verify(sessionMetrics, times(2)).poseBatchDeadlockRetry("retried");
+        verify(sessionMetrics).poseBatchDeadlockRetry("recovered");
+    }
+
+    @Test
+    @DisplayName("savePoseDataBatch 데드락 — 상한을 다 쓰면 INTERNAL 로 넘겨 AI 재전송에 맡긴다 (#276)")
+    void savePoseDataBatch_deadlockExhausted() {
+        PoseDataBatchRequest request = PoseDataBatchRequest.newBuilder().setSessionId(1L).build();
+        @SuppressWarnings("unchecked")
+        StreamObserver<PoseDataResponse> obs = mock(StreamObserver.class);
+        doThrow(new DeadlockLoserDataAccessException("deadlock", null))
+                .when(poseDataService).savePoseDataBatch(anyLong(), anyList());
+
+        grpcService.savePoseDataBatch(request, obs);
+
+        // 첫 시도 + 재시도 2회 = 3. 그 이상 던지지 않는다
+        verify(poseDataService, times(3)).savePoseDataBatch(anyLong(), anyList());
+        ArgumentCaptor<Throwable> deadlockCaptor = ArgumentCaptor.forClass(Throwable.class);
+        verify(obs).onError(deadlockCaptor.capture());
+        assertThat(((StatusRuntimeException) deadlockCaptor.getValue()).getStatus().getCode())
+                .isEqualTo(Status.Code.INTERNAL);
+        verify(sessionMetrics).poseBatchDeadlockRetry("exhausted");
     }
 
     @Test

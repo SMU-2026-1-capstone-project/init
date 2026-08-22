@@ -27,6 +27,13 @@
 #   - 풀 크기        : 재기동하지 않는다. pool 은 이 실험의 조작 변수가 아니라 **고정 조건**이라
 #                      값을 확인만 하고 다르면 멈춘다
 #
+# 🔴 2026-08-17 (#271): 페이로드가 **배열이 아니라 ghz 템플릿**이 됐다. 세션 라우팅은
+#    `mod .RequestNumber <레벨>` 이 하고(예전 배열 순환과 같은 일), `repNumber` 가 요청마다
+#    달라져 멱등 키를 움직인다. 안 그러면 세션당 첫 요청만 행을 만들고 나머지는 no-op 인데
+#    `fail=0` 에 RPS 도 정상으로 찍혀 **표를 봐서는 안 보인다.**
+#    부수 효과: 레벨 100 페이로드가 5.2MB → 54KB. 대신 부하기에 요청마다 템플릿·파싱이
+#    붙는다 — 리허설에서 부하기 CPU 와 달성 rate 를 볼 것(설계 문서 §3).
+#
 # 사용:
 #   PLAN_ONLY=1 bash sessions_sweep.sh          # 판 배치만 출력하고 끝낸다(EC2 불필요)
 #   PEM=... DB_PUB=... APP_PUB=... LOADER_PUB=... OBS_PUB=... DB_PRIV=... APP_PRIV=... \
@@ -37,32 +44,44 @@ cd "$(dirname "$0")"
 
 # ── 고정 조건 ────────────────────────────────────────────────────────────
 SESS_LO=901
-LEVELS=(1 2 5 20 100)
+# 🔴 2026-08-17 축소 리허설이 격자를 바꿨다. 옛 격자는 `1 2 5 20 100` 이었는데
+#    **20 과 100 이 구분되지 않았다**(RPS 798.6~823.4 ↔ 771.1~824.4, 각 5판). plateau 가
+#    이미 20 에서 붙고 전이는 **5와 20 사이**에 있다 — 락 대기가 1,437~1,492 → 31~54 로
+#    거기서 죽는다. 즉 옛 격자는 **정보가 없는 구간(20~100)에 판 10개**를 쓰고 있었다.
+#    10 을 넣어 전이 구간을 가르고, 위쪽 끝은 50 으로 내린다.
+#    ([결과 §7](../payload-uniqueness-gate-aws-2026-08-17/README.md) · 2026-08-17 사용자 결정)
+LEVELS=(1 2 5 10 20 50)
 # 🔴 `reset_rows` 가 지우는 범위다. **모든 레벨의 상위집합**이어야 한다 — 좁으면 앞 판이
 #    남긴 행이 다음 판의 테이블 크기가 되고, 그러면 «판 순서» 가 조작 변수에 섞인다.
 SESS_HI=$(( SESS_LO + ${LEVELS[-1]} - 1 ))
 
 C=${C:-100}
 N_REQ=${N_REQ:-30000}
-REPS=${REPS:-25}          # 요청당 프레임 수. 다운샘플 R=5 를 거쳐 5행이 저장된다
-ROWS_PER_REQ=5            # `_rig.sh` 의 rows/s 계산이 읽는다
+REPS=${REPS:-25}          # 요청당 프레임 수
+# 🔴 유도한다. 예전엔 `ROWS_PER_REQ=5` 상수였는데 `REPS` 는 환경변수로 덮을 수 있어서,
+#    `REPS` 를 바꾸면 `rows_s` 열이 **조용히 틀렸다**(#273 ②). 둘은 같이 움직여야 한다.
+#    창 크기 5 의 출처는 `PoseDataService.java:58` 의 `DOWNSAMPLE_WINDOW` 다 — 저기가 바뀌면
+#    여기도 바뀌어야 하고, 그 사실을 상수로 숨기지 않는다.
+DOWNSAMPLE_WINDOW=${DOWNSAMPLE_WINDOW:-5}
+ROWS_PER_REQ=$(( (REPS + DOWNSAMPLE_WINDOW - 1) / DOWNSAMPLE_WINDOW ))   # ceil
 GEN=../../ghz/gen_batch_multi.py
 PY=${PY:-python}
 
-# ── 판 배치 — 5×5 순환 라틴 방격 ─────────────────────────────────────────
+# ── 판 배치 — N×N 순환 라틴 방격 (지금은 6×6 = 36판) ────────────────────
 #
 # 🔴 **팔당 1판을 쓰지 않는다.** 4차 초판이 팔당 1판이라 «N 클수록 +32%» 를 냈는데, 순서만
 #    뒤집으니 «작을수록 +36%» 였다. 팔과 판 순서가 같은 축에 겹치면 **원리적으로 분리가
 #    안 된다** — 부호조차 못 정한다.
 #
-# 5개 레벨 × 5회 반복. 행마다 한 칸씩 회전시키면 각 레벨이 **위치 1~5 에 정확히 한 번씩**
+# 레벨 수만큼 반복한다. 행마다 한 칸씩 회전시키면 각 레벨이 **모든 위치에 정확히 한 번씩**
 # 온다. 그래서 «앞에 놓여서 빨랐다» 가 레벨 효과로 위장할 수 없다.
 #
-#   반복1: 1   2   5   20  100
-#   반복2: 2   5   20  100 1
-#   반복3: 5   20  100 1   2
-#   반복4: 20  100 1   2   5
-#   반복5: 100 1   2   5   20
+#   반복1: 1   2   5   10  20  50
+#   반복2: 2   5   10  20  50  1
+#   반복3: 5   10  20  50  1   2
+#   반복4: 10  20  50  1   2   5
+#   반복5: 20  50  1   2   5   10
+#   반복6: 50  1   2   5   10  20
 plan_rounds() {
   local n=${#LEVELS[@]} i j
   PLAN=()
@@ -91,7 +110,7 @@ print_plan() {
   echo
   echo "  레벨별 판 수: $(for e in "${PLAN[@]}"; do echo "${e%%:*}"; done | sort -n | uniq -c \
         | awk '{printf "%s=%s판 ", $2, $1}')"
-  echo "  위치별 분포 : 각 레벨이 위치 1~5 에 한 번씩 (라틴 방격)"
+  echo "  위치별 분포 : 각 레벨이 위치 1~${#LEVELS[@]} 에 한 번씩 (라틴 방격)"
   echo
   echo "  요청 수/판  : $N_REQ (c=$C) · 저장 행/판: $(( N_REQ * ROWS_PER_REQ ))"
   echo "  세션 범위   : $SESS_LO~$SESS_HI (판 사이 이 범위를 지운다)"
@@ -106,6 +125,25 @@ OUT="${OUT:?OUT 미설정}"
 LOG="$OUT/sessions.tsv"
 SPREAD_LOG="$OUT/spread.tsv"
 WRITER_LOG="$OUT/writer.tsv"
+
+# 🔴 같은 OUT 으로 두 번 도는 것을 막는다.
+#
+# 2026-08-17 리허설에서 **실제로 그 사고가 났다** — 백그라운드 러너가 명령을 재실행해
+# 스윕이 25판을 완주한 뒤 **1판부터 다시 돌기 시작했고**, 두 패스가 같은 TSV 에 이어 붙었다.
+# 표는 정상으로 보이는데 판 수가 두 배고, 뒤 절반은 **앞 패스가 만든 상태 위에서** 돈 것이다.
+# (그리고 두 스윕이 같은 DB 를 동시에 만지면 `reset_rows` 가 남의 판을 지운다.)
+#
+# 잠금은 «디렉터리 생성» 으로 한다 — 파일 존재 검사는 검사와 생성 사이가 벌어지지만
+# `mkdir` 은 원자적이다.
+LOCK="$OUT/.sweep.lock"
+mkdir -p "$OUT"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "🔴 이 OUT 에서 이미 스윕이 돌고 있다: $LOCK" >&2
+  echo "   두 패스가 같은 표에 이어 붙으면 판 수가 두 배가 되고, 뒤 절반은 앞 패스가" >&2
+  echo "   남긴 상태 위에서 돈다. 정말 죽은 판이면 이 디렉터리를 지우고 다시 돌린다." >&2
+  exit 1
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 
 source ./../commit-count-2026-08-09/_rig.sh
 
@@ -130,8 +168,28 @@ spread_counters() {  # stdout: "row_lock_waits row_lock_time dirty_pages"
 CUR_LEVEL=""; CUR_REP=""; CUR_POS=""; S0=""
 round_begin_hook() { S0=$(spread_counters); start_writer "$1"; }
 round_end_hook() {   # $1=태그 $2=t0 $3=t1
-  local tag=$1 t0=$2 t1=$3 s1 w0 w1 tm0 tm1 d0 d1
+  local tag=$1 t0=$2 t1=$3 s1 w0 w1 tm0 tm1 d0 d1 rows want
   s1=$(spread_counters)
+
+  # 🔴 «보낸 요청이 실제로 행을 만들었는가». 이 그물이 없어서 #271 을 못 봤다 —
+  #    멱등 키가 중복을 삼키면 `ON DUPLICATE KEY UPDATE` 가 **성공**이라 fail=0 에
+  #    RPS 도 정상으로 찍히고, 표를 봐서는 아무것도 안 보인다.
+  #    **`reset_rows` 보다 먼저 도는 자리**여야 한다(run_ghz 의 훅 호출 순서가 그렇다).
+  #
+  #    임계값을 두지 않는다. 「몇 % 이하면 문제」는 근거 없는 선이라 판정을 내리는 척만 한다.
+  #    멈추는 것은 **0** 하나 — 그건 기준이 아니라 «측정이 성립하지 않았다» 의 정의다.
+  #    그 밖의 어긋남은 숫자를 표에 남기고 사람이 읽는다(설계 §4-1 이 «총 행수는 판마다
+  #    같다» 를 고정 조건으로 걸어뒀으므로, want 와 다르면 그 조건이 깨진 것이다).
+  rows=$(mysql_q "SELECT COUNT(*) FROM pose_data WHERE session_id BETWEEN $SESS_LO AND $SESS_HI;")
+  want=$(( N_REQ * ROWS_PER_REQ ))
+  if [ "${rows:-0}" = "0" ]; then
+    stop_writer "$tag"
+    die "판 $tag 이 행을 하나도 안 만들었다 — 요청은 갔는데 저장이 안 됐다.
+   멱등 키가 전부 삼켰거나(#271) 페이로드가 같은 값을 반복하고 있다.
+   RPS·fail 은 정상으로 보이지만 이 판은 처리량이 아니라 «중복 감지» 를 잰 것이다"
+  fi
+  [ "${rows:-0}" = "$want" ] || echo "  ⚠️ 행수가 기대와 다르다 — $rows / $want (조작 변수 밖 조건이 흔들렸다)" >&2
+
   stop_writer "$tag"
   read -r w0 tm0 d0 <<< "$S0"
   read -r w1 tm1 d1 <<< "$s1"
@@ -139,19 +197,20 @@ round_end_hook() {   # $1=태그 $2=t0 $3=t1
   local waits="-" lock_ms="-"
   [ -n "${w0:-}" ] && [ -n "${w1:-}" ] && waits=$(( w1 - w0 ))
   [ -n "${tm0:-}" ] && [ -n "${tm1:-}" ] && lock_ms=$(( tm1 - tm0 ))
-  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
     "$tag" "$CUR_LEVEL" "$CUR_REP" "$CUR_POS" \
     "$(date -u -d "@$t0" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "-")" \
     "$(date -u -d "@$t1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "-")" \
-    "$(( t1 - t0 ))" "$waits" "$lock_ms" "${d0:--}→${d1:--}" >> "$SPREAD_LOG"
+    "$(( t1 - t0 ))" "$waits" "$lock_ms" "${d0:--}→${d1:--}" \
+    "${rows:--}" "$want" >> "$SPREAD_LOG"
 }
 
 init_spread_log() {
   [ -f "$SPREAD_LOG" ] || printf \
-    "tag\tlevel\trep\tpos\tt0_utc\tt1_utc\tsecs\trow_lock_waits\trow_lock_time_ms\tdirty_pages\n" \
+    "tag\tlevel\trep\tpos\tt0_utc\tt1_utc\tsecs\trow_lock_waits\trow_lock_time_ms\tdirty_pages\trows_inserted\trows_expected\n" \
     > "$SPREAD_LOG"
   [ -f "$WRITER_LOG" ] || printf \
-    "tag\tlevel\tattempts\terrors\tp50_ms\tp95_ms\tmax_ms\tmax_gap_ms\n" > "$WRITER_LOG"
+    "tag\tlevel\tattempts\terrors\tp50_ms\tp95_ms\tmax_ms\tmax_gap_ms\tended_early\n" > "$WRITER_LOG"
 }
 
 # ── 백그라운드 writer — «번짐 반경» 관측 채널 ────────────────────────────
@@ -168,7 +227,7 @@ WRITER_MAX_SEC=${WRITER_MAX_SEC:-900}    # 판이 끝나면 stop 으로 멈춘�
 
 install_writer() {
   ssh "${SSH_OPTS[@]}" "ec2-user@$DB_PUB" \
-    "sudo docker exec -i sf-mysql mysql -ushadowfit -pshadowfit shadowfit" < ./spread_writer.sql \
+    "sudo docker exec -i $MYSQL_CTN mysql -u$MYSQL_USER -p$MYSQL_PW shadowfit" < ./spread_writer.sql \
     || die "spread_writer.sql 적재 실패"
   mysql_q "SELECT COUNT(*) FROM information_schema.routines
            WHERE routine_schema='shadowfit' AND routine_name='spread_writer';" | grep -q '^1$' \
@@ -181,7 +240,7 @@ install_writer() {
 
 start_writer() {  # $1 = 태그
   mysql_q "DELETE FROM spread_writer_log WHERE arm='$1'; DELETE FROM spread_writer_ctl;" >/dev/null
-  rsh "$DB_PUB" "sudo docker exec -d sf-mysql mysql -ushadowfit -pshadowfit shadowfit \
+  rsh "$DB_PUB" "sudo docker exec -d $MYSQL_CTN mysql -u$MYSQL_USER -p$MYSQL_PW shadowfit \
     -e \"CALL spread_writer('$1', $WRITER_SESSION, $WRITER_MAX_SEC, $WRITER_GAP_MS);\"" >/dev/null 2>&1
   sleep 3   # 부하 전 평상시 구간을 몇 건 확보한다 — 「원래 몇 ms 인가」의 기준선
   local n
@@ -192,6 +251,22 @@ start_writer() {  # $1 = 태그
 }
 
 stop_writer() {  # $1 = 태그
+  # 🔴 **멈추라고 하기 전에** 아직 살아 있었는지 본다(#273 ④). `WRITER_MAX_SEC` 는 백스톱인데
+  #    판이 그보다 길면 writer 가 판 도중에 스스로 끝난다 — 그러면 이 판의 «번짐 반경» 은
+  #    판 후반을 못 본 값이다. 그런데 그건 **정지가 아니라 관측 종료**라 `max_gap_ms` 에
+  #    안 잡히고, `attempts` 가 조금 작을 뿐이라 표에서 안 보인다.
+  #    임계값이 아니라 **이진 사실**로 잡는다: 제어행이 이미 없거나 커넥션이 죽어 있으면 그렇다.
+  local early="no" cid0 alive0
+  cid0=$(mysql_q "SELECT conn_id FROM spread_writer_ctl WHERE id=1;" | tr -d '[:space:]')
+  if [ -z "${cid0:-}" ]; then
+    early="yes"   # 프로시저가 끝나며 제어행을 스스로 지웠다
+  else
+    alive0=$(mysql_q "SELECT COUNT(*) FROM performance_schema.processlist WHERE id=$cid0;")
+    [ "${alive0:-0}" = "0" ] && early="yes"
+  fi
+  [ "$early" = "yes" ] && echo "  ⚠️ writer 가 판보다 먼저 멈췄다 (WRITER_MAX_SEC=$WRITER_MAX_SEC 초과 또는 죽음)" \
+    "— 이 판의 번짐 반경은 판 전체를 못 봤다" >&2
+
   mysql_q "UPDATE spread_writer_ctl SET stop=1 WHERE id=1;" >/dev/null
   local cid alive i
   cid=$(mysql_q "SELECT conn_id FROM spread_writer_ctl WHERE id=1;" | tr -d '[:space:]')
@@ -209,7 +284,8 @@ stop_writer() {  # $1 = 태그
 
   # 이 판의 writer 지연을 요약해 남긴다. `max_gap_ms` 는 **시도 «시작» 시각의 최대 간격** —
   # 한 건이 오래 걸린 것과 아예 시도가 끊긴 것을 가르는 값이다.
-  mysql_q "SELECT COUNT(*), SUM(errno<>0),
+  local wsum
+  wsum=$(mysql_q "SELECT COUNT(*), SUM(errno<>0),
                   MAX(CASE WHEN rn=p50 THEN elapsed_ms END),
                   MAX(CASE WHEN rn=p95 THEN elapsed_ms END),
                   MAX(elapsed_ms), MAX(gap)
@@ -219,9 +295,22 @@ stop_writer() {  # $1 = 태그
                         CEIL(COUNT(*) OVER () * 0.95) p95,
                         TIMESTAMPDIFF(MICROSECOND,
                           LAG(started_at) OVER (ORDER BY seq), started_at)/1000 gap
-                 FROM spread_writer_log WHERE arm='$1') t;" \
-    | awk -v tag="$1" -v lvl="$CUR_LEVEL" 'BEGIN{OFS="\t"}
-        {print tag, lvl, $1, $2, $3, $4, $5, $6}' >> "$WRITER_LOG"
+                 FROM spread_writer_log WHERE arm='$1') t;")
+  printf '%s\n' "$wsum" \
+    | awk -v tag="$1" -v lvl="$CUR_LEVEL" -v early="$early" 'BEGIN{OFS="\t"}
+        {print tag, lvl, $1, $2, $3, $4, $5, $6, early}' >> "$WRITER_LOG"
+
+  # 🔴 실패를 표에만 남기지 않는다. 2026-08-17 리허설에서 판당 44건 중 34건이 1062(중복)로
+  #    죽고 있었는데 **표에 열이 있는데도 아무도 안 봤다**. 그리고 실패한 삽입은 즉시 돌아오므로
+  #    `p50` 이 0 으로 찍힌다 — 채널이 죽었는데 표는 「번지지 않는다」로 읽힌다.
+  #    임계값이 아니다: 이 채널에서 실패는 **한 건이라도 곧 오염**이다.
+  local werr
+  werr=$(printf '%s\n' "$wsum" | awk '{print $2}')
+  case "${werr:-0}" in
+    0|NULL|"") : ;;
+    *) echo "  ⚠️ writer 가 ${werr}건 실패했다 — «번짐 반경» 채널이 오염됐다." \
+            "실패한 삽입은 즉시 돌아와 p50 을 0 으로 만든다(#271)" >&2 ;;
+  esac
 
   # writer 가 넣은 행은 부하 대역 밖이라 `reset_rows` 가 안 지운다. 여기서 지운다 —
   # 안 지우면 판이 갈수록 테이블이 커져 «판 순서» 가 조작 변수에 섞인다.
@@ -232,13 +321,8 @@ stop_writer() {  # $1 = 태그
 #
 # 전부 «틀려도 표는 정상으로 보이는» 것들이다. 무인이 아니라 사람이 지켜보는 스윕이어도
 # 1시간 뒤에 알아채면 1시간을 버린다.
-assert_sessions_exist() {
-  local want=$(( SESS_HI - SESS_LO + 1 )) got
-  got=$(mysql_q "SELECT COUNT(*) FROM exercise_sessions WHERE id BETWEEN $SESS_LO AND $SESS_HI;")
-  [ "$got" = "$want" ] \
-    || die "세션 시드가 부족하다 — $SESS_LO~$SESS_HI 중 '$got'/$want 개만 있다. FK 로 전 요청이 실패한다"
-  echo "  세션 시드: $SESS_LO~$SESS_HI $want개 확인"
-}
+# `assert_sessions_exist` 는 공통부(`_rig.sh`)로 옮겼다 — 從 스크립트에도 같은 그물이
+# 필요한데 여기 있으면 복사본이 생긴다(#273 ③).
 
 assert_default_durability() {
   local got
@@ -287,6 +371,7 @@ init_spread_log
 : > "$OUT/_conditions.txt"
 
 echo "=== 사전 확인 ==="
+assert_mysql_reachable
 assert_sessions_exist
 assert_default_durability
 assert_pool_fixed
@@ -301,9 +386,13 @@ PLANS=()
 
 echo "──────── 버림판 (레벨 $DISCARD_LEVEL) ────────"
 CUR_LEVEL=$DISCARD_LEVEL; CUR_REP=0; CUR_POS=0
+# 🔴 실패해도 **집계에 안 넣는다**(#273 ①). 예전엔 행만 지우고 FAILED 에는 남아서, 본판
+#    25개가 전부 멀쩡해도 스윕이 exit 1 로 끝나고 요약이 표에 없는 태그를 지목했다.
+GHZ_DISCARD=1
 run_ghz "discard_s$DISCARD_LEVEL" "/tmp/spread_$DISCARD_LEVEL.json" "$C" "$N_REQ" || true
+GHZ_DISCARD=0
 # 🔴 버림판은 **표에서 지운다.** 남겨두면 다음 사람이 판 수를 세다가 레벨 하나만 6판이 되는
-#    것을 못 보고 평균에 넣는다. FAIL 이었어도 마찬가지다 — 버릴 판이었다.
+#    것을 못 보고 평균에 넣는다.
 sed -i "/^discard_s$DISCARD_LEVEL\t/d" "$LOG" 2>/dev/null
 echo "  (버림판은 표에서 제외했다)"
 echo

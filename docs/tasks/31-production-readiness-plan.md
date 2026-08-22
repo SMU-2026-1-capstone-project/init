@@ -119,8 +119,8 @@
 
 | | 항목 | 근거 |
 |:--:|---|---|
-| 🔴 | **아웃박스 실패 주입 테스트** | [`28-remaining-work-plan.md`](./28-remaining-work-plan.md) §2-7 가. 지금 `OutboxEventRepositoryTest` 하나뿐이라 **보장이 주석에만 있다** |
-| 🔶 | [#152](https://github.com/Shadowfit/init/issues/152) 중복 배달 시 세션 상태 흔들림 | 재현 테스트를 쓰면 심각도가 «경미/심각» 중 하나로 확정된다 |
+| ✅ | ~~**아웃박스 실패 주입 테스트**~~ | **작성 완료 (2026-08-20)** — `OutboxPublisherFailureInjectionTest` 13건([`28-remaining-work-plan.md`](./28-remaining-work-plan.md) §2-7 가). 보장이 주석이 아니라 테스트로 붙들려 있다 |
+| 🔶 | ~~[#152](https://github.com/Shadowfit/init/issues/152) 중복 배달 시 세션 상태 흔들림~~ → **회귀 테스트만 남음** | **결함 자체는 닫혔다**(2026-08-12, `40cb54e` · [#152](https://github.com/Shadowfit/init/issues/152) CLOSED — 발행기가 `possiblyRedelivered` 를 실어 보내 회수분에서는 세션을 안 걷어낸다). 남은 것은 **그 동작을 고정하는 테스트**였고, 예상대로 위 «아웃박스 실패 주입 테스트»와 **같은 자리에서 같이 나왔다**(2026-08-20) — `reclaimed_isMarkedAsPossiblyRedelivered` 가 회수분이 `possiblyRedelivered=true` 로 나가는 것을 못박는다 |
 | 🔶 | 부하 회귀 자동화 | 지금 실험은 전부 수동. 쿼리 성능 회귀를 잡는 장치가 없다 |
 | 🔶 | 발행기 다중화 테스트 | §2-7 다. `SKIP LOCKED` 준비는 됐는데 둘 이상 띄워본 적 없음 |
 

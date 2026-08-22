@@ -68,6 +68,86 @@ DBA 축 추가([[user_career_target]], 2026-08-09). 전부 «데모에 좋은 �
   같은 종류가 최소 하나 더 열려 있다 — projection `−98.7%` 의 인용처
   6곳([`./projection-end-to-end-remeasure.md`](./projection-end-to-end-remeasure.md) 참조).
   **E2 는 새 측정이 아니라 기존 문서 정리다.**
+
+  > 🔴 **2026-08-20 정정 — «6곳» 은 이 문서를 쓴 날의 포폴 문서 범위였다.** 전수로 세니
+  > 저장소 전체에서 **19개 파일**이 이 수를 인용한다. 그 뒤 `one-pager.md`·`mysql-vs-postgresql.md`
+  > 등이 인용을 더 늘렸다 — **정리 대상이 스스로 자라는 종류**라는 것이 이 정정의 요지다.
+  >
+  > **처리 (2026-08-20)**: 조건의 **단일 출처**를 [`../portfolio/realmysql-experiments.md#projection-98-7`](../portfolio/realmysql-experiments.md#projection-98-7)
+  > 에 세우고(무엇의 −98.7% 인가 · 언제·어디서 · 무슨 조건 · 누가 부르는 쿼리 · 인용 금지 항목 ·
+  > 아직 안 잰 것), 나머지가 그것을 가리키게 했다. **13개 파일 처리 · 3개 보류 · 3개 제외**:
+  >
+  > | | 파일 | 왜 |
+  > |---|---|---|
+  > | **보류** | `portfolio/application-hf-it.md` · `application-smilegate-dba.md` · `career-statement-dba.md`(+`.print.html`) | **아직 커밋 안 된 지원서 초안.** 손대면 초안을 저장소에 올리는 셈이라 건드리지 않았다. 제출용 축약 문서라 조건을 다 못 싣는 것도 사실이고, **그 조건은 뒤에 붙는 포폴 문서가 진다**는 정리가 따로 필요하다 |
+  > | **제외** | `handoff/work-log-2026-08-09.md` · `decisions/architecture-review-2026-08-11.md` | **날짜가 박힌 기록**이다. 그날의 서술을 소급해 고치면 드리프트를 반대 방향으로 만든다 |
+  >
+  > 그래서 **E2 는 아직 안 닫혔다.** 남은 것은 위 보류 3개(지원서)와 −98.7% 외의 다른 수들이다.
+
+  > 🔵 **2026-08-20 (2차) — 나머지 수치도 같은 방식으로 처리했다.** E2 의 문구가
+  > 「**한 장짜리의** 모든 수치」이므로 [`../portfolio/one-pager.md`](../portfolio/one-pager.md)
+  > 를 전수로 훑었다. **값은 다 있는데 «언제·어디서» 가 빠진 행이 6개**였다 —
+  > 625배 · +99% · 9,000배 · 489,868배 · 96분 · 48분→16분.
+  >
+  > 조건 카드를 **수치마다 하나씩** 세우고(총 6개, `#projection-98-7` 포함) 인용처가 가리키게 했다:
+  >
+  > | 앵커 | 수 | 카드가 잡아 주는 오독 |
+  > |---|---|---|
+  > | `realmysql#index-9000x` | 약 9,000배 | 「인덱스를 **추가해서**」가 아니다 — 원래 있었고 없었다면 어땠을지를 대조로 만든 값 |
+  > | `realmysql#keyset-489868x` | 489,868배 | **깊이 5,000만 한 점**의 값. 10만 깊이면 798배다 |
+  > | `realmysql#drop-partition-625x` | 625배 · 96분 | **두 팔의 행수가 다르다**(8.30M ↔ 7.56M) → 행당 정규화 **570배** |
+  > | `realmysql#seed-48-16` | 48분→16분 | **청크 병렬 레버 하나**의 몫. 버퍼풀·인덱스 후행 빌드는 안 들어 있다 |
+  > | `load-test-strategy#batch-insert-99` | +99% | 절대 RPS 인용 금지 — 같은 코드의 1차 before 가 50 RPS 였다 |
+  >
+  > **정정 2건이 같이 나왔다.**
+  > - `one-pager` 의 keyset 행에 **캐비엇이 잘못 붙어 있었다** — 「SSH 왕복 ~50ms」는
+  >   AWS 재검증판(2026-07-16, keyset 54~56ms)의 한계인데, 489,868배는 로컬
+  >   `EXPLAIN ANALYZE` 판(keyset **0.053ms**)이라 그 오염이 없다. 조건이 **다른 판의 것**이었다.
+  > - `portfolio-narrative` 의 다운샘플이 **옛 값 1.7배**로 남아 있었다(2026-08-18 P2 에서
+  >   다세션 **4.11배**로 갱신됨). 4.11 로 고치고 「1.7 은 단일 핫세션 조건」을 같이 적었다.
+  >
+  > **여전히 안 한 것** — 위 여섯 수의 인용처는 −98.7% 보다 넓다(625배만 19개 파일). 이번에
+  > 건 것은 **읽는 사람이 실제로 여는 자산**(one-pager · FINAL-REPORT · portfolio-narrative ·
+  > problem-solving-log · db-deep-dive · backend/README)까지다. 남은 것은 **설계 판단용으로
+  > 수를 인용하는 decisions/ 문서들**(`db-portfolio-roadmap` · `pose-data-partition-fk-tradeoff`
+  > · `pose-batch-idempotency-vs-partition` 등)과 rig 스크립트 주석이고, 날짜 박힌 기록과
+  > 미커밋 지원서 초안은 1차와 같은 이유로 계속 제외한다.
+
+  > 🔵 **2026-08-20 (3차) — `decisions/` 도 걸었다.** 위에서 「남은 것」으로 적은 설계 문서
+  > **11개에 포인터 18개**를 달았다: `backup-restore-rto-rpo` · `db-portfolio-roadmap` ·
+  > `load-test-strategy` · `mysql-vs-postgresql` · `online-ddl-vs-blocking-alter` ·
+  > `pose-batch-idempotency-vs-partition` · `pose-data-partition-fk-tradeoff` ·
+  > `pose-ingest-downsampling` · `projection-end-to-end-remeasure` ·
+  > `replication-lag-and-semisync` · `report-read-path`.
+  >
+  > **밀도 규칙: 문서당 한 곳**(그 수가 판단의 전제로 쓰이는 자리)에만 단다. 예를 들어
+  > `online-ddl-vs-blocking-alter` 는 96분을 10번 부르지만 baseline 인용 블록 하나에만 걸었다 —
+  > 같은 문서 안에서 열 번 반복하면 포인터가 본문을 읽는 걸 방해한다.
+  >
+  > **판단의 전제로 쓰이던 자리 둘**에는 포인터와 함께 «행당 정규화 570배» 를 같이 적었다 —
+  > `pose-data-partition-fk-tradeoff` 의 A2 확정 근거와 `db-portfolio-roadmap` 의 실측 근거 칸이다.
+  > 파티셔닝을 채택한 근거가 **정규화 전 값**이었다는 사실이 그 자리에 없었다.
+  >
+  > 링크는 56건 전부 «파일 존재 + 앵커 존재» 로 기계 검증했다. **남은 것은 rig 스크립트
+  > 주석**(`loadtest/*.sh`)뿐이고, 그건 읽는 자산이 아니라 코드다.
+
+  > 🔵 **2026-08-20 (4차) — rig 주석까지 걸고, 근거 링크 하나가 틀린 것을 찾았다.**
+  > 살아 있는 rig 은 **셋뿐**이었다(`measure_partition.sh` · `measure_pagination.sh` ·
+  > `seed/README.md`). 나머지 언급은 전부 **날짜 박힌 결과 디렉터리 안의 동결된 rig**
+  > (`results/online-ddl-2026-08-09/*`)이라 1~3차와 같은 이유로 제외했다.
+  >
+  > 🔴 **그 과정에서 «약 9,000배» 의 근거 링크가 틀린 것을 찾았다.** one-pager 가 두 곳에서
+  > rig 을 `loadtest/measure_admin_index.sh` 로 걸고 있었는데, 그건 **관리자 목록 인덱스**의
+  > rig 이고 이 수와 무관하다. 그 스크립트는 스스로 *「읽기 이득은 계획 변화(EXPLAIN)까지만,
+  > 시간 수치는 내지 않는다」* 고 못박아 둔 파일이라 **9,000배 같은 시간 배수를 낼 수가 없다.**
+  >
+  > 진짜 상태는 **rig 이 없다** 이다 — 2026-07-20 판은 ad-hoc 실행이라 저장소에 스크립트도
+  > `loadtest/results/` 산출물도 없다. 두 곳을 「⚠️ rig 없음(2026-07-20 ad-hoc)」으로 고치고,
+  > 카드에도 재현성 줄을 넣었다. **E2 가 «조건» 만이 아니라 «근거 링크» 를 요구하는 이유가
+  > 이것이다** — 값이 맞아도 가리키는 곳이 틀리면 면접에서 열어 보는 순간 무너진다.
+  >
+  > 이 항목은 [E4](#3-종료-조건-확정)로도 넘어간다: **「그 수치 어떻게 쟀는지 보여주세요」에
+  > 지금은 «재현 스크립트가 없습니다» 가 답이다.** 그게 결손인지 아닌지는 미결이다.
 - **E3 의 «근거» 는 실측일 필요가 없다.** 복제/HA 는 «규모상 실수요 0» 이라는 판정이 이미 있고
   ([`../portfolio/realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §2), 그 판정을
   유지하는 것도 닫힌 것이다. **안 한 이유가 적혀 있으면 닫혔다.**

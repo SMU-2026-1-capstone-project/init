@@ -3,6 +3,7 @@ package com.shadowfit.service.Exercise;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shadowfit.dto.exercises.VideoRequestDto;
+import com.shadowfit.global.observability.CallCancellation;
 import com.shadowfit.dto.report.PoseFrameProjection;
 import com.shadowfit.dto.report.detailreport.ExerciseSessionDto;
 import com.shadowfit.dto.report.detailreport.RepSyncRateDto;
@@ -18,6 +19,7 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.observability.CorrelationIds;
 import com.shadowfit.global.observability.SessionMetrics;
+import com.shadowfit.global.security.SessionNonceGenerator;
 import com.shadowfit.global.util.SetSummaryFormatter;
 import com.shadowfit.model.outbox.OutboxEvent;
 import com.shadowfit.repository.outbox.OutboxEventRepository;
@@ -66,6 +68,7 @@ public class SessionService {
     private final ReportRepository reportRepository;
     private final SessionMetrics sessionMetrics;
     private final OutboxEventRepository outboxRepository;
+    private final SessionNonceGenerator sessionNonceGenerator;
 
     // 자기 주입: completeSession → applyComplete 호출이 Spring 프록시를 통과해 @Transactional이 적용되도록 함.
     @Lazy
@@ -115,12 +118,19 @@ public class SessionService {
             throw new BusinessException(ErrorCode.EXERCISE_NOT_SUPPORTED);
         }
 
+        // 소유권 비밀값은 **여기서, 이 트랜잭션 안에서** 만든다 (#187 안 (d)).
+        //
+        // 세션을 AI 에 알리는 StartAnalysis 는 afterCommit 에서 비동기로 나가고
+        // (ExerciseAnalysisService 의 registerSynchronization), REST 응답도 커밋 뒤에 나간다.
+        // 즉 커밋된 이 값 하나를 두 경로가 나중에 같이 읽는 모양이라야 세 곳(클라·AI·DB)이
+        // 어긋나지 않는다. 나중 단계에서 만들면 «클라가 받은 값» 과 «AI 가 받은 값» 이 갈릴 수 있다.
         Session session = Session.builder()
                 .member(member)
                 .exercise(exercise)
                 .referenceSource(finalUrl)
                 .startTime(LocalDateTime.now())
                 .status(Status.IN_PROGRESS)
+                .sessionNonce(sessionNonceGenerator.generate())
                 .build();
 
         return sessionRepository.save(session);
@@ -205,6 +215,15 @@ public class SessionService {
      * @param request AI 서버(gRPC)에서 넘어온 최종 분석 데이터
      */
     public void completeSession(SessionCompleteRequest request) {
+        // 상태 전이 + 리포트 선계산을 시작하기 직전이다. 여기서부터가 되돌릴 수 없는 쓰기라
+        // 호출자가 이미 포기했으면 시작하지 않는다 (#206 결함 B). gRPC 밖 호출(앱 콜백 경로 등)
+        // 에서는 이 검사가 아무 일도 하지 않는다.
+        //
+        // ⚠️ 아래 낙관적 락 재시도 루프 «밖» 이다. 안에 넣으면 재시도마다 다시 보게 되는데,
+        //    한 번 시작한 전이는 끝내는 편이 맞다 — 중간에 그만두면 세션이 어중간한 상태로 남고,
+        //    그건 이 검사가 아끼려던 자원보다 비싸다.
+        CallCancellation.abortIfAbandoned("세션 종료 (session=" + request.getSessionId() + ")");
+
         int maxAttempts = 3;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {

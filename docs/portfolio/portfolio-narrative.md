@@ -25,7 +25,7 @@
 **해결**(실코드):
 - **afterCommit 외부 호출**: DB 커밋 확정 후에만 AI에 gRPC 통보(`SessionService` endSession afterCommit → StopAnalysis).
 - **`@Version` 낙관락**: 스케줄러↔콜백 충돌 감지(`Session.java`), 충돌 시 **재시도 3회**(`completeSession`), **콜백 결과 우선** 정책.
-- **멱등 수신**: 콜백 진입점은 `SessionService.applyComplete` 이고, 상태 가드는 `Session.complete` 가 소유한다 — 이미 `COMPLETED` 면 아무것도 바꾸지 않고 `false` 를 돌려준다(first-write-wins). 호출자는 그 반환값으로 완료 지표·통계 재적산을 막는다. 중복 콜백 안전.
+- **멱등 수신**: `applyCompleteFromApp`의 `if (status==COMPLETED) return` (first-write-wins) — 중복 콜백 안전.
 
 **증명(실측)**: lost-update 재현·방지 카드(③), MVCC 격리수준 카드(④ — RR/RC/SERIALIZABLE + `data_locks` 관찰). → "동시성·정합성"을 말이 아니라 실험으로.
 
@@ -40,8 +40,8 @@
 **왜 2번인가**: "기능"이라기보다 *깊이 시연*. substrate(pose_data 시계열) 위에서 production 기준으로 파고든 결과. 헤드라인을 떠받치는 "이만큼 깊다".
 
 **두 축** (DAU 1,000 가정, 1억 행 합성 시딩):
-- **쓰기 축**: 배치 INSERT(처리량 +99%, p99 −37%), 파티션 **DROP PARTITION**(TTL, DELETE 대비 625x — 행당 정규화 570x, 로컬·더미. [조건표](./realmysql-experiments.md)), **다운샘플 R=5**(처리량 1.7배·p99 4.9배, 저장행 5배↓), **커넥션 풀 사이징 — 병목을 세 번 다른 곳에서 찾은 과정**(아래)
-- **읽기 축**: 인덱스(부재 시 85초 대조), **keyset 페이지네이션**(offset 대비 최대 489,868x), JSON **projection**(payload −98.7%, warm 쿼리 8x→**29~41x** — 412만 행 로컬 → 1억 행 AWS 재검증에서 강화, 단 precompute 잡의 자원 절감이지 사용자 체감 지연 아님 — **정상 조회는 이 쿼리를 안 부른다**, 3컬럼 시절 값. [조건표](./realmysql-experiments.md)), **버퍼풀**(작업셋 vs 풀)
+- **쓰기 축**: 배치 INSERT(처리량 +99%, p99 −37% — [조건](../decisions/load-test-strategy.md#batch-insert-99)), 파티션 **DROP PARTITION**(TTL, DELETE 대비 625x — [조건](./realmysql-experiments.md#drop-partition-625x)), **다운샘플 R=5**(요청 처리량 **4.11배**·p99 **9.5배**, 저장행 5배↓ — 2026-08-18 EC2 2대 다세션 재측정(P2, 레벨 20세션 ABBA 8판). 🔴 **옛 값 「1.7배·4.9배」는 단일 핫세션 조건**이었고 다세션에서 2.4배 더 크다. ⚠️ 저장 처리량(rows/s)으로 보면 방향이 뒤집힌다 — R=1 은 느린 게 아니라 행을 5배 많이 넣는 것), **커넥션 풀 사이징 — 병목을 세 번 다른 곳에서 찾은 과정**(아래)
+- **읽기 축**: 인덱스(부재 시 85초 대조 · 인덱스 유무 약 9,000배, [조건](./realmysql-experiments.md#index-9000x)), **keyset 페이지네이션**(offset 대비 최대 489,868x — **깊이 5,000만 한 점의 값**, [조건](./realmysql-experiments.md#keyset-489868x)), JSON **projection**(**DB→앱** payload −98.7%, warm 쿼리 8x→**29~41x** — 2026-06-02 로컬 412만 행 warm → 2026-07-15 AWS 1억 행 재검증에서 강화, 단 precompute 잡의 자원 절감이지 사용자 체감 지연 아님 — **정상 조회는 이 쿼리를 안 부른다**(precompute·폴백 전용) · [조건](./realmysql-experiments.md#projection-98-7)), **버퍼풀**(작업셋 vs 풀)
 - **저장**: JSON **트림 33→13**(−60.9%)
 - **동시성**: lost-update 방지(③), MVCC(④) — §1과 공유
 

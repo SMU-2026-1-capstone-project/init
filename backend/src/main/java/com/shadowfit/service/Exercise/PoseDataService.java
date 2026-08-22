@@ -1,17 +1,21 @@
 package com.shadowfit.service.Exercise;
 
 import com.shadowfit.global.error.BusinessException;
+import com.shadowfit.global.observability.CallCancellation;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.grpc.PoseDataRequest;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.ExerciseReference;
+import com.shadowfit.model.exercise.Session;
+import com.shadowfit.model.exercise.Status;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -37,22 +41,40 @@ public class PoseDataService {
     private final JdbcTemplate jdbcTemplate;
     private final SessionMetrics sessionMetrics;
 
+    // created_at 을 **명시적으로** 쓴다. DB DEFAULT 에 맡기면 재전송마다 값이 달라져
+    // uk_pose_event 가 무력해진다 (#188, decisions/pose-batch-idempotency-implementation.md).
+    //
+    // ON DUPLICATE KEY UPDATE 무동작이 INSERT IGNORE 자리를 대신한다. IGNORE 는 중복만
+    // 삼키는 게 아니라 **NOT NULL 위반을 빈 값으로 써버린다**(#219). 이 테이블은
+    // joint_coordinates·sync_rate·smoothed_knee_angle 이 전부 NOT NULL 이라 정확히 사정권이고,
+    // 유실을 막으려는 코드가 다른 종류의 조용한 오염을 들이면 주객이 전도된다.
+    // ODKU 는 중복 키만 흡수하고 NOT NULL 위반은 그대로 터뜨린다.
     private static final String INSERT_POSE_SQL =
             "INSERT INTO pose_data " +
-            "(session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, smoothed_knee_angle, feedback_message) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            "(session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, smoothed_knee_angle, feedback_message, created_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
+            "ON DUPLICATE KEY UPDATE session_id = session_id";
 
     // 다운샘플 윈도우 크기 — R-sweep 실측(docs/decisions/pose-ingest-downsampling.md §5-1(4))에서
     // R=25→5는 처리량 +126%·저장 5배↓지만 R=5→1은 배치 고정비용 비중이 커져 행당 효율이 오히려
     // 악화되는 수확체감 지점이라 R=5를 하한으로 채택(2026-07-25, §5-1(7)(8) 분리배포 실측과 별개 결정).
-    private static final int DOWNSAMPLE_WINDOW = 5;
+    //
+    // 🔴 2026-08-18: 상수에서 설정으로 뺐다. **기본값이 5라 동작은 그대로다.**
+    //    이유는 튜닝이 아니라 측정이다 — 정본 「다운샘플 1.7배」(one-pager)가 **단일 핫세션**
+    //    조건에서 나온 값이고(fsync 3.47배를 1.03배로 무너뜨린 바로 그 조건), 다세션에서
+    //    배수가 유지되는지 아무도 모른다. 팔을 바꾸려면 재빌드가 필요했고, 그 재빌드가
+    //    실험 자체를 막고 있었다(P2, AWS-RIDE-ALONG §1).
+    //    ⚠️ 값을 바꾸는 것은 **측정 조건**이지 채택이 아니다. R=5 하한은 위 결정 그대로다.
+    @Value("${pose-data.downsample-window:5}")
+    private int downsampleWindow = 5;   // 초기값도 둔다 — Spring 밖에서 만들면 0 이 되고, 그 0 은 아래 루프에서 무한 루프다
 
     /**
      * [실시간 저장] FastAPI가 주기적으로 쏴주는 분석 좌표 데이터 묶음을 DB에 저장합니다.
      *
      * JPA saveAll 은 PoseData.id 가 IDENTITY 라 Hibernate batch insert 가 비활성(개별 INSERT N방).
      * 부하 테스트(§7.5)에서 동시성 100에 p99 4.6s·throughput 천장 확인 → JdbcTemplate.batchUpdate
-     * 로 multi-row INSERT 단일화. created_at 은 DB DEFAULT CURRENT_TIMESTAMP 에 위임.
+     * 로 multi-row INSERT 단일화. created_at 은 <b>세션 시작 시각을 명시적으로</b> 쓴다(멱등,
+     * docs/decisions/pose-batch-idempotency-implementation.md 분기 A) — 예전엔 DB DEFAULT 였다.
      *
      * 저장 전 다운샘플(위치 B: Spring, pose-ingest-downsampling.md §3-B) — 라이브 분석
      * (DTW·sync·rep 감지)은 이 저장 이전 FastAPI에서 이미 끝난 값이라 저장본을 줄여도 영향 없고,
@@ -65,9 +87,37 @@ public class PoseDataService {
         // 세션 존재 검증 — pose_data는 파티셔닝을 위해 FK(CASCADE)를 제거해서(2026-07-20,
         // docs/decisions/pose-data-partition-fk-tradeoff.md), 이 체크가 DB의 백업이 아니라
         // 참조무결성을 보장하는 유일한 장치가 됨. 기존 SESSION_NOT_FOUND 계약도 그대로 유지.
-        if (!sessionRepository.existsById(sessionId)) {
-            throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
+        //
+        // existsById 가 아니라 findById 인 이유는 start_time 이 필요해서다 — 쿼리 횟수는 같다.
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+
+        // 종료된 세션에는 더 쌓지 않는다 (#187 (b) — 콜백 층 심층방어).
+        //
+        // 위 findById 는 «세션이 있는가» 만 본다. 그런데 세션이 COMPLETED/FAILED/CANCELLED 로
+        // 끝난 뒤에도 행은 남아 있어 통과하고, 그 상태에서 배치를 받으면 **이미 리포트가 확정된
+        // 세션에 pose_data 가 더 붙는다.** 정상 경로에선 안 오는 일이다 — endSession 은 endTime
+        // 만 찍고 status 는 IN_PROGRESS 로 두므로(사용자가 종료를 눌러도), 늦게 도착하는 정상
+        // 배치는 여전히 IN_PROGRESS 를 만나 통과한다. 여기 걸리는 것은 CompleteAnalysis 이후다.
+        //
+        // 🔴 던지지 않고 조용히 버린다. #188 재시도(#280)가 붙어 있어서, 던지면 AI 가 **영영
+        // 거절될 배치를 재시도**한다. 종료 세션 배치는 — 주입이면 버리는 게 맞고(#187), 종료
+        // 직전 경합으로 늦은 정상 배치면 이미 리포트가 확정돼 무의미하므로 — 두 경우 다 드롭이 옳다.
+        //
+        // ⚠️ 이것이 #187 을 «닫지» 않는다. 공격의 본체는 **진행 중인(IN_PROGRESS)** 남의 세션에
+        // 끼어드는 것이고, 그건 이 검사를 그대로 통과한다. 채널 ① 의 신원(nonce, 안 d)이 서야
+        // 본체가 막힌다. 이 가드는 «종료 후 창» 하나만 닫는 심층방어다.
+        if (session.getStatus() != Status.IN_PROGRESS) {
+            sessionMetrics.poseBatchRejected(session.getStatus().name());
+            log.warn("세션 {} : {} 상태에 도착한 pose 배치 {}건을 버린다 (#187 (b))",
+                    sessionId, session.getStatus(), grpcList.size());
+            return;
         }
+
+        // 이 배치가 만들 모든 행의 created_at. 세션 하나가 값 하나를 공유한다.
+        // 재전송에도 같은 값이 나오는 것이 멱등의 근거이고(start_time 은 세션 생성 시 1회
+        // 세팅되고 바뀌는 곳이 없다), 세션이 파티션 경계에서 쪼개지지 않는 것이 부수 이득이다.
+        LocalDateTime sessionAnchor = session.getStartTime();
 
         // 위 검증이 통과한 순간부터 이 트랜잭션이 커밋될 때까지가 고아 행이 생길 수 있는 창이다
         // (이슈 #87). 그 사이에 회원 탈퇴가 세션을 지우고 pose_data 정리까지 끝내버리면, 아래
@@ -75,7 +125,13 @@ public class PoseDataService {
         // 발생 빈도의 상한을 잡고 수정안을 저울질할 수 있어 여기서 잰다.
         recordOrphanWindow(System.nanoTime());
 
-        List<PoseDataRequest> downsampled = downsample(grpcList, DOWNSAMPLE_WINDOW);
+        // 되돌릴 수 없는 쓰기를 시작하기 직전이다. 여기까지 오는 동안 호출자가 포기했을 수 있다
+        // (#206 결함 B — GrpcServerDeadlineProbeTest 가 재현한 것이 정확히 이 순서다: 핸들러는
+        // 진입했고, 그 뒤에 deadline 이 만료됐다). 위 존재검사는 읽기라 되돌릴 게 없지만 아래
+        // batchUpdate 부터는 아니다. gRPC 밖 호출에서는 이 검사가 아무 일도 하지 않는다.
+        CallCancellation.abortIfAbandoned("pose 배치 저장 (session=" + sessionId + ")");
+
+        List<PoseDataRequest> downsampled = downsample(grpcList, downsampleWindow);
 
         jdbcTemplate.batchUpdate(INSERT_POSE_SQL, new BatchPreparedStatementSetter() {
             @Override
@@ -93,6 +149,7 @@ public class PoseDataService {
                 // 유효값과 구분되고, 대표 프레임 선택에서 후보에서 빠진다.
                 ps.setDouble(6, grpc.getSmoothedKneeAngle());
                 ps.setString(7, grpc.getFeedbackMessage());
+                ps.setObject(8, sessionAnchor);
             }
 
             @Override
@@ -109,7 +166,7 @@ public class PoseDataService {
         // version 이 바뀌면 지금은 드물어서 지표로 관측하던 그 경쟁이 상시화된다.
         //
         // 실패해도 배치를 되돌리지 않는다 — 이 UPDATE 는 판정 보조이고, 사용자가 실제로 한 운동
-        // (위 INSERT)이 그것 때문에 유실되면 주객이 전도된다. 세션이 없으면 위 existsById 에서
+        // (위 INSERT)이 그것 때문에 유실되면 주객이 전도된다. 세션이 없으면 위 findById 에서
         // 이미 걸러졌으므로 여기서 0 행이 나오는 경우는 그 사이 삭제된 때뿐이다.
         jdbcTemplate.update("UPDATE exercise_sessions SET last_active_at = ? WHERE id = ?",
                 LocalDateTime.now(), sessionId);
@@ -171,6 +228,12 @@ public class PoseDataService {
      * 실제로 가장 깊은 프레임이 밀려나므로, 섞임을 방지하는 것이기도 하다.
      */
     private List<PoseDataRequest> downsample(List<PoseDataRequest> frames, int window) {
+        // 🔴 0 이면 아래 `start += window` 가 **무한 루프**다 — 스레드가 매달리고 힙이 찬다.
+        //    설정으로 뺀 값(#207 아님, P2 측정용)이라 오타 하나가 그 상태를 만들 수 있어
+        //    조용히 고치지 않고 즉시 터뜨린다. 잘못된 설정은 첫 요청에서 드러나야 한다.
+        if (window < 1) {
+            throw new IllegalArgumentException("pose-data.downsample-window 는 1 이상이어야 한다: " + window);
+        }
         List<PoseDataRequest> result = new java.util.ArrayList<>();
         for (int start = 0; start < frames.size(); start += window) {
             int end = Math.min(start + window, frames.size());

@@ -54,6 +54,14 @@ BEGIN
   DECLARE v_t0       DATETIME(3);
   DECLARE v_errno    INT DEFAULT 0;
   DECLARE v_stop     TINYINT DEFAULT 0;
+  -- 🔴 멱등 키를 움직이는 열 (#271). 이게 없으면 이 채널은 **자기 자신과 충돌한다**:
+  --    `uk_pose_event` 는 (session_id, rep_number, timestamp_sec, created_at) 인데
+  --    `created_at` 이 **초 단위**(`timestamp`, precision 0)다. writer 는 200ms 간격이라
+  --    초당 5건이 같은 키가 되고, 넷은 1062 로 죽는다.
+  --    2026-08-17 리허설 실측: **1062가 864건 · 정상 250건(77.6% 실패).**
+  --    그런데 이 프로시저는 에러를 삼키고 계속 돌고, 실패한 삽입은 **즉시 돌아오므로**
+  --    `p50=0ms` 가 찍힌다 — 즉 표가 「번지지 않는다」로 **거짓 안심**을 준다.
+  DECLARE v_seq      INT DEFAULT 0;
 
   -- 실패해도 루프를 멈추지 않는다 — 이 장치의 목적이 «실패를 기록하는 것» 이다.
   DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
@@ -66,6 +74,7 @@ BEGIN
 
   WHILE SYSDATE(3) < v_deadline AND v_stop = 0 DO
     SET v_errno = 0;
+    SET v_seq = v_seq + 1;
     SET v_t0 = SYSDATE(3);
 
     -- 🔴 페이로드는 `'{}'` 다. 이 행은 **부하가 아니라 관측**이라 무대 크기에 영향을
@@ -79,7 +88,10 @@ BEGIN
       (session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate,
        smoothed_knee_angle, feedback_message, created_at)
     VALUES
-      (p_session, 0, 0.0, '{}', 75.0, 0.00, 'writer', SYSDATE(3));
+      -- `rep_number` 에 판 안에서 증가하는 일련번호를 넣는다. 이 행들은 어차피 관측용이라
+      -- rep 의미가 없고(payload 는 '{}'), 유일성만 있으면 된다. 판 사이에 이 세션의 행을
+      -- 통째로 지우므로 판을 건너 겹치지도 않는다.
+      (p_session, v_seq, 0.0, '{}', 75.0, 0.00, 'writer', SYSDATE(3));
 
     INSERT INTO spread_writer_log (arm, started_at, elapsed_ms, errno)
     VALUES (p_arm, v_t0, TIMESTAMPDIFF(MICROSECOND, v_t0, SYSDATE(3)) / 1000, v_errno);

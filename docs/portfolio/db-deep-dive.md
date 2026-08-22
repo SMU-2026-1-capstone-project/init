@@ -109,7 +109,7 @@
 - **문제**: `PoseDataService.savePoseDataBatch`의 JPA `saveAll`이 `@GeneratedValue(IDENTITY)` 때문에 Hibernate batch가 원천 차단 → 개별 INSERT N방.
 - **해결**: `JdbcTemplate.batchUpdate` multi-row INSERT로 전환 (`FeedbackLogService` 패턴). IDENTITY 우회, INSERT 25방→1방.
 - **결과** (공정 측정, 워밍업 통제, [`load-test-strategy §7.6`](../decisions/load-test-strategy.md)):
-  - throughput **23.5 → 46.7 RPS (+99%)**, p50 −64%, p99 7,549→4,784ms (**−37%**)
+  - throughput **23.5 → 46.7 RPS (+99%)**, p50 −64%, p99 7,549→4,784ms (**−37%**) — [조건](../decisions/load-test-strategy.md#batch-insert-99): 2026-05-31 로컬, warmup 60초 폐기 후 ramp 5→100. **절대 RPS 는 인용하지 않는다**
 - 면접: "왜 config(`hibernate.jdbc.batch_size`)로 안 풀고 JdbcTemplate? → IDENTITY라 Hibernate batch 미발동, 드라이버 레벨 batch가 정석."
 - **면접(꼬리질문 대비)**: "왜 ID 전략을 SEQUENCE로 안 바꿨나? → SEQUENCE는 INSERT 전에 미리 ID를 확보할 수 있어 이론상 Hibernate batch가 가능하지만, MySQL엔 네이티브 SEQUENCE가 없어 별도 ID발급 테이블로 흉내내야 함(추가 오버헤드) + 엔티티 전체의 PK 생성 전략을 바꾸는 더 큰 변경. `JdbcTemplate.batchUpdate`는 이 저장 경로 하나만 국소적으로 우회해 같은 효과를 더 작은 변경으로 냄."
 
@@ -117,7 +117,7 @@
 
 목표 = `GET /reports/sessions/{id}` 응답시간 before/after.
 
-1. **projection** ✅ 측정 — `ReportService`가 엔티티 전체 로드 → worst 구간 계산은 `syncRate`·`feedbackMessage`·`timestampSec` 3개만 쓰는데 `joint_coordinates`(JSON 2.3KB)까지 끌어옴. → 3컬럼 projection DTO. **실측(2026-06-02, warm, 750행/세션, 로컬 412만 행): payload 1,716.8KB→22.4KB (−98.7%), warm 쿼리 12.1ms→1.5ms (8x)**. **AWS 1억 행 재검증(2026-07-15): payload 1,740.1KB→22.6KB (−98.7%, 동일), warm 쿼리 40.6ms→1.4ms (29~41x)** — 버퍼풀(2GB) 대비 테이블이 25배(~230GB) 커지며 작업셋 비율이 나빠져 배수가 오히려 커졌다(결론 강화). 같은 인덱스 — 차이는 JSON이 InnoDB **off-page 저장**이라 SELECT 시 overflow 페이지 random I/O, projection이 회피([`realmysql-experiments ②`](./realmysql-experiments.md)). ⚠️ 이 쿼리는 precompute가 세션당 1회 도는 비동기 잡이라 사용자 체감 지연이 아니라 **잡의 자원 소모 절감**으로 읽어야 한다. 🔴 **정상 리포트 조회는 이 쿼리를 아예 안 부른다** — `resolveDetailedAnalysis` 가 저장된 `detailed_analysis` 를 파싱하고 끝내므로, projection 이 도는 곳은 precompute 와 **폴백**(그 컬럼이 비었거나 구버전일 때)뿐이다. 즉 정상 경로 응답시간 기여는 **0**(코드 판독, 미측정 — [`../decisions/projection-end-to-end-remeasure.md`](../decisions/projection-end-to-end-remeasure.md) Q1). 그리고 위 수는 **3컬럼 시절** 값이다 — 지금은 4컬럼(`repNumber`·`smoothedKneeAngle` 추가, `feedbackMessage` 제거)이고 그 형상으로는 재검증하지 않았다. 조건 전체는 [`realmysql-experiments ②b` 의 조건표](./realmysql-experiments.md).
+1. **projection** ✅ 측정 — `ReportService`가 엔티티 전체 로드 → worst 구간 계산은 당시 `syncRate`·`feedbackMessage`·`timestampSec` 3개만 쓰는데 `joint_coordinates`(JSON 2.3KB)까지 끌어옴. → projection DTO(**측정 시점 3컬럼, 현재 4컬럼** — `feedbackMessage` 제거·`repNumber`·`smoothedKneeAngle` 추가. `joint_coordinates` 를 안 싣는 방침은 유지). **실측(2026-06-02, warm, 750행/세션, 로컬 412만 행): payload 1,716.8KB→22.4KB (−98.7%), warm 쿼리 12.1ms→1.5ms (8x)**. **AWS 1억 행 재검증(2026-07-15): payload 1,740.1KB→22.6KB (−98.7%, 동일), warm 쿼리 40.6ms→1.4ms (29~41x)** — 버퍼풀(2GB) 대비 테이블이 25배(~230GB) 커지며 작업셋 비율이 나빠져 배수가 오히려 커졌다(결론 강화). 같은 인덱스 — 차이는 JSON이 InnoDB **off-page 저장**이라 SELECT 시 overflow 페이지 random I/O, projection이 회피([`realmysql-experiments ②` · 인용 조건](./realmysql-experiments.md#projection-98-7)). ⚠️ 이 쿼리는 precompute가 세션당 1회 도는 비동기 잡이라 사용자 체감 지연이 아니라 **잡의 자원 소모 절감**으로 읽어야 한다. 🔴 **정상 리포트 조회는 이 쿼리를 아예 안 탄다** — precompute 결과(JSON)를 읽고 끝난다. 도는 자리는 precompute 잡과 그 컬럼이 비었을 때의 폴백 둘뿐이다(코드 판독, 미측정).
 2. **Redis 캐싱** ⬜ — 세션 종료 후 리포트 불변 → cache-aside, 높은 적중률. stampede 방지.
 3. **precompute-on-write** ✅ **완료(2026-07-24)** — worst 구간을 세션 종료 시 1회 계산(`WorstSectionCalculator`)해 `reports.detailed_analysis`(JSON)에 저장, `SessionService.applyComplete`와 같은 트랜잭션. `ReportService.getSessionReport`는 이제 GET 때 `pose_data` 재스캔 없이 이 값을 읽기만 함(precompute 이전 리포트만 하위호환 fallback). 세부 설계 4가지(계산 위치·트랜잭션 경계·실패정책·백필)는 [`report-read-path.md §9`](../decisions/report-read-path.md).
 
@@ -141,8 +141,7 @@
 - **완료(2026-07-24)**: `PoseDataPartitionScheduler`(`@Scheduled`, 매일 새벽 4시) 신설. 이번 달(쓰기 중) + 지난 1개월(버퍼)만 남기고 그 이전 파티션을 `DROP PARTITION` — 아카이빙 없이 완전 폐기(개인정보보호법 제21조 "지체없이 파기" 취지, S3 이전은 파기가 아니라는 판단). `pfuture`가 실데이터를 안 떠안도록 이번 달 기준 +2개월치 파티션을 `REORGANIZE`로 미리 생성. 안전마진: 파티션 이름이 `pYYYY_MM` 패턴과 정확히 일치할 때만 드롭 후보로 인정(정보스키마 조회 + 이름 파싱 이중 확인), `pfuture`는 쿼리 단계에서부터 제외. 세부 설계(보존기간·아카이빙·안전마진·실행주기)는 [`report-read-path.md §9-B`](../decisions/report-read-path.md).
 - **precompute-on-write 선행 완료(2026-07-24, §B-3)** — TTL이 안전하게 켜질 수 있었던 전제. 세션 완료 시 worst 구간이 이미 `reports`에 저장되므로, `pose_data` 원본이 드롭돼도 리포트는 영향 없음.
 - **pose_data는 중간 산출물(버퍼)** — precompute로 worst 구간을 `reports`에 옮긴 직후 cold → TTL 안전(UX 손실 0).
-- **구현 방향은 DELETE 아니라 DROP PARTITION**: 날짜 Range 파티셔닝 → 가장 오래된 파티션을 **행단위 비용 없이**(`.ibd` 파일째 unlink) 제거. 대량 DELETE는 락·undo 폭발. → **실측 확인**(1억 행 rig, [`realmysql-experiments §②(d)`](./realmysql-experiments.md)): ~8M행대 만료가 **DELETE 18.6분(빈 952MB 파일 잔존) vs DROP PARTITION 1.8초(파일째 회수) ≈ 625x**.
-  ⚠️ **«O(1) 메타데이터 연산» 이라고 말하면 부정확하다** — DROP 1.8초에는 ~910MB 파일 삭제 I/O 가 들어 있다(로컬 디스크가 느려서 1.8초이고, 빠른 스토리지면 sub-100ms). 「O(1)」은 *행단위 비용이 0* 이라는 뜻이지 상수 시간이 아니다. 또 두 작업의 행수가 같지 않아(DELETE 8,301,450 vs DROP 7,560,000) **625배는 raw 비율이고 행당 정규화하면 570배**다. 조건 전체는 [§②d 조건표](./realmysql-experiments.md).
+- **구현 방향은 DELETE 아니라 DROP PARTITION**: 날짜 Range 파티셔닝 → 가장 오래된 파티션을 **O(1) 메타데이터 연산**으로 제거(락 거의 없음). 대량 DELETE는 락·undo 폭발. → **실측 확인**(1억 행 rig, [`realmysql-experiments §②(d)`](./realmysql-experiments.md)): 같은 ~8M행 만료가 **DELETE 18.6분(빈 952MB 파일 잔존) vs DROP PARTITION 1.8초(파일째 회수) ≈ 625x**.
 - **파티셔닝의 진짜 가치 = 쿼리 pruning 아니라 "값싼 TTL"** (쿼리는 이미 인덱스로 빠름, §4.3). 이 reframe이 핵심.
 - ⚠️ **파티션 전제 = PK에 파티션 키 포함** — pose_data PK `id`만으론 created_at 파티션 불가, PK를 `(id, created_at)`로 변경 완료(위 참고).
 - **샤딩은 안 함** — 단일 MySQL로 충분. 스케일 시에도 샤딩 전에 raw를 S3 티어링이 먼저(§0).

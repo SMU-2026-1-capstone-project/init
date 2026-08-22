@@ -17,7 +17,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"member", "exercise"}) // 무한 참조 방지
+// 무한 참조 방지(member·exercise) + 비밀값 유출 방지(sessionNonce, #187 d — 엔티티를 통째로
+// 로깅하는 자리가 하나라도 생기면 로그를 읽는 사람이 그 세션의 소유자가 된다)
+@ToString(exclude = {"member", "exercise", "sessionNonce"})
 public class Session {
 
     @Id
@@ -63,6 +65,24 @@ public class Session {
     @Enumerated(EnumType.STRING) // 숫자가 아닌 문자열 이름으로 저장
     @Builder.Default
     private Status status = Status.IN_PROGRESS;
+
+    /**
+     * 세션 소유권 검증용 비밀값 (#187 안 (d)). 생성은 {@code SessionNonceGenerator} 가 한다.
+     *
+     * <p>세 곳으로 흐른다 — ① 세션 생성·재부착·진행중조회 REST 응답으로 <b>그 클라에게만</b>,
+     * ② {@code AnalyzeRequest}/{@code ReattachRequest} 로 AI 에게, 그리고 ③ 여기 DB 에.
+     * AI 가 보관값과 {@code POST /pose} 동봉값을 대조한다. {@code session_id} 는 순차 정수라
+     * 추측되지만 이 값은 안 된다는 것이 방어의 전부다.
+     *
+     * <p>{@code null} 이면 <b>이 기능 배포 전에 시작된 세션</b>이다(V8 이 컬럼을 NULL 허용으로
+     * 만든 이유). 1단계는 그런 세션을 그대로 통과시킨다 — 값을 지어내면 클라도 AI 도 모르는
+     * 값이라 검증을 켜는 순간 끊긴다.
+     *
+     * <p>🔴 로그에 찍지 말 것. 이 클래스의 {@code @ToString} 에서 이미 제외했다 — 대조 실패를
+     * 기록할 때도 값이 아니라 «불일치» 라는 사실만 남긴다.
+     */
+    @Column(length = 64)
+    private String sessionNonce;
 
     // 낙관적 락: FastAPI 완료 콜백과 스케줄러 타임아웃이 동시에 같은 세션을 갱신할 때 충돌 감지용.
     // Hibernate 가 관리하는 필드라 외부에서 쓰면 안 된다 — 이전에는 @Setter(AccessLevel.NONE) 으로

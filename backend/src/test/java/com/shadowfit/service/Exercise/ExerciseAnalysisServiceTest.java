@@ -128,7 +128,7 @@ class ExerciseAnalysisServiceTest {
     void startAnalysis_success_createsSessionSynchronously() {
         VideoRequestDto dto = VideoRequestDto.builder().exerciseId(exercise.getId()).build();
 
-        Long sessionId = analysisService.startAnalysis(dto, member.getId());
+        Long sessionId = analysisService.startAnalysis(dto, member.getId()).sessionId();
 
         // self.를 거쳐 실제로 @Async 프록시를 타면, 비동기 스레드는 이 테스트 트랜잭션이 커밋되기
         // 전이라 세션을 아예 못 봐서(findById 실패) markAsFailedIfStillInProgress가 조용히
@@ -148,6 +148,50 @@ class ExerciseAnalysisServiceTest {
     }
 
     // ---- stopAnalysis ----
+
+
+    @Test
+    @DisplayName("세션 시작 — 소유권 비밀값이 DB 에 저장되고 같은 값이 응답으로 나간다 (#187 d)")
+    void startAnalysis_issuesSessionNonce() {
+        VideoRequestDto dto = VideoRequestDto.builder().exerciseId(exercise.getId()).build();
+
+        var started = analysisService.startAnalysis(dto, member.getId());
+
+        Session saved = sessionRepository.findById(started.sessionId()).orElseThrow();
+        // 🔴 «응답으로 나간 값» 과 «DB 에 남은 값» 이 같아야 한다. 갈리면 클라가 받은 값으로는
+        //    AI 의 보관값(이것도 DB 에서 나온다)을 통과하지 못해 세션이 통째로 막힌다.
+        assertThat(started.sessionNonce())
+                .as("세션 시작 응답의 nonce")
+                .isNotBlank()
+                .isEqualTo(saved.getSessionNonce());
+    }
+
+    @Test
+    @DisplayName("세션 시작 — 두 세션이 서로 다른 값을 받는다 (같으면 서로를 통과한다)")
+    void startAnalysis_nonceDiffersPerSession() {
+        VideoRequestDto dto = VideoRequestDto.builder().exerciseId(exercise.getId()).build();
+        var first = analysisService.startAnalysis(dto, member.getId());
+
+        // 1인 1세션이라 두 번째를 만들려면 앞 세션을 끝내야 한다(SESSION_ALREADY_IN_PROGRESS).
+        Session firstSession = sessionRepository.findById(first.sessionId()).orElseThrow();
+        firstSession.fail(java.time.LocalDateTime.now());
+        sessionRepository.saveAndFlush(firstSession);
+
+        var second = analysisService.startAnalysis(dto, member.getId());
+
+        assertThat(second.sessionNonce()).isNotEqualTo(first.sessionNonce());
+    }
+
+    @Test
+    @DisplayName("세션 시작 — 비밀값이 toString 으로 새지 않는다 (엔티티를 통째로 로깅하는 자리 방어)")
+    void sessionNonce_isNotExposedInToString() {
+        VideoRequestDto dto = VideoRequestDto.builder().exerciseId(exercise.getId()).build();
+        var started = analysisService.startAnalysis(dto, member.getId());
+        Session saved = sessionRepository.findById(started.sessionId()).orElseThrow();
+
+        // 로그에 남으면 로그를 읽을 수 있는 사람이 그 세션의 소유자가 된다.
+        assertThat(saved.toString()).doesNotContain(saved.getSessionNonce());
+    }
 
     @Test
     @DisplayName("분석 중단 — 서킷브레이커 OPEN이면 예외 없이 조용히 스킵")
