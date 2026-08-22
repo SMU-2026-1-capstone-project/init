@@ -27,7 +27,25 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/repl2_rig.sh"
 
 REPS=${REPS:-3}
-ARM_ORDER=${ARM_ORDER:-"A B B A A B"}
+
+# 위치 합을 맞춘 배열을 REPS 에서 만든다 (설계 §4).
+# 🔴 예전엔 ARM_ORDER 가 문자열 상수였고 REPS 는 정의만 돼 있었다 — 문서에는 손잡이라고
+#    적혀 있는데 돌려도 판 수가 안 바뀌는, 이 rig 세 번째 «손잡이인 줄 알았다» 였다
+#    (2026-08-22 리뷰 지적, PR #348).
+# 블록마다 두 팔의 순서를 뒤집는다: 1블록 A B · 2블록 B A · 3블록 A B …
+#   REPS=3 이면 "A B B A A B" — 종전 기본값과 같은 배열이다.
+gen_arm_order() {
+  local i out=""
+  for i in $(seq 1 "$1"); do
+    if [ $(( i % 2 )) -eq 1 ]; then out="$out A B"; else out="$out B A"; fi
+  done
+  printf '%s' "${out# }"
+}
+ARM_ORDER=${ARM_ORDER:-$(gen_arm_order "$REPS")}
+
+# ARM_ORDER 를 직접 준 경우 REPS 와 어긋날 수 있다. 조용히 어긋나면 «팔당 3판» 이라고
+# 적어놓고 다른 판 수를 도는 표가 나온다 — 그래서 세어보고 다르면 말한다.
+_arm_count() { printf '%s\n' $ARM_ORDER | grep -c "^$1$"; }
 HOT_ARMS=${HOT_ARMS:-"A B"}
 DISCARD_ARMS=${DISCARD_ARMS:-"A B"}
 PER_ROUND_REINIT=${PER_ROUND_REINIT:-0}
@@ -37,11 +55,14 @@ RAW="$OUT/_raw"
 mkdir -p "$RAW"
 FAILED=()
 
+# 🔴 `status` 열을 따로 둔다. 예전엔 실패 표식 FAIL 을 `dur_s` 자리에 박았다 — 열 수는
+#    맞는데 «판당 초» 열에 문자열이 들어가서, 표를 읽는 사람이나 `awk '{print $5}'` 후처리가
+#    그것을 소요 시간으로 읽는다 (2026-08-22 리뷰 지적, PR #348).
 init_log() {
-  [ -f "$LOG" ] || printf 'round\tarm\tpayload\tkind\tdur_s\ttx_n\ttps\tc_p50_us\tc_p95_us\tc_p99_us\tc_max_us\tlag_n\tlag_p50_us\tlag_p95_us\tlag_max_us\tsbs_p50\tsbs_max\tsemi_status\tyes_tx_d\tno_tx_d\tcatchup_s\trows_before\n' > "$LOG"
+  [ -f "$LOG" ] || printf 'round\tarm\tpayload\tkind\tstatus\tdur_s\ttx_n\ttps\tc_p50_us\tc_p95_us\tc_p99_us\tc_max_us\tlag_n\tlag_p50_us\tlag_p95_us\tlag_max_us\tsbs_p50\tsbs_max\tsemi_status\tyes_tx_d\tno_tx_d\tcatchup_s\trows_before\n' > "$LOG"
 }
 fail_row() {  # $1=round $2=arm $3=payload $4=kind $5=사유
-  printf '%s\t%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n' "$1" "$2" "$3" "$4" >> "$LOG"
+  printf '%s\t%s\t%s\t%s\tFAIL\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n' "$1" "$2" "$3" "$4" >> "$LOG"
   FAILED+=("$1($2/$3): $5")
   log "🔴 판 $1 실패 — $5"
 }
@@ -114,8 +135,8 @@ round_run() {  # $1=round $2=arm $3=multi|hot $4=main|discard
     return 1
   fi
 
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$r" "$arm" "$payload" "$kind" "$DUR" \
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$r" "$arm" "$payload" "$kind" "OK" "$DUR" \
     "$tx_n" "$tps" \
     "$(echo "$cs" | awk '{print $3}')" "$(echo "$cs" | awk '{print $4}')" \
     "$(echo "$cs" | awk '{print $5}')" "$(echo "$cs" | awk '{print $6}')" \
@@ -140,6 +161,7 @@ main() {
     echo "부하            커넥션 $CONNS · 트랜잭션당 ${ROWS_PER_TX}행 INSERT + 세션행 UPDATE · 판당 ${DUR}s"
     echo "                (경로는 rig 내장 SQL — ghz→Spring 앱 경로가 아니다. repl2_rig.sh 헤더)"
     echo "팔 순서         버림 $DISCARD_ARMS → 본판 $ARM_ORDER → 핫세션 $HOT_ARMS"
+    echo "본판 반복       REPS=$REPS (팔 A $(_arm_count A)판 · 팔 B $(_arm_count B)판)"
     echo "반동기          $SRC_PREFIX · timeout=${SEMISYNC_TIMEOUT_MS}ms · wait_point=$SEMISYNC_WAIT_POINT"
     echo "GTID            $(SDBQ 'SELECT @@gtid_mode;')"
     echo "병렬 적용       replica_parallel_workers=$(RDBQ 'SELECT @@replica_parallel_workers;') (팔 아님 — §9-1 ⑥)"
@@ -147,6 +169,11 @@ main() {
     echo "AZ 구성         ${REPL_AZ_MODE:-(미기입 — 사람이 채울 것)}"
     echo "리플리카 초기화 ${REPLICA_INIT_USED:-(이 스윕에서는 안 세웠다 — probe 참조)}"
   } | tee "$OUT/conditions.txt"
+
+  # ARM_ORDER 를 손으로 준 경우 REPS 와 어긋날 수 있다. 막지는 않되 조용히 넘기지 않는다.
+  if [ "$(_arm_count A)" != "$REPS" ] || [ "$(_arm_count B)" != "$REPS" ]; then
+    log "⚠️ ARM_ORDER 가 REPS=$REPS 와 어긋난다 — 팔 A $(_arm_count A)판 · 팔 B $(_arm_count B)판으로 돈다"
+  fi
 
   local r=0 arm
   for arm in $DISCARD_ARMS; do
@@ -170,6 +197,8 @@ main() {
   echo "#  Q2 = 팔 A ↔ 팔 B 의 tps 와 c_p99_us 차이. **같은 페이로드끼리만** 비교할 것"
   echo "#  H3 = payload=multi ↔ hot 에서 그 차이의 «배수» 가 같은가"
   echo "#  discard 행은 버림판이다 — 표에 넣지 말 것"
+  echo "#  status 열이 FAIL 인 행은 «재지 못한» 판이다 — 0 으로 읽지 말 것"
+  echo "#  lag_* 는 음수가 나올 수 있다 — 실제 지연이 계측 바닥보다 작았다는 관측이고, 버리지 않는다"
 
   if [ ${#FAILED[@]} -gt 0 ]; then
     echo >&2

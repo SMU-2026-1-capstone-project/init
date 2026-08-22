@@ -539,11 +539,26 @@ _rebuild_dump() {
     $gtid_opt --databases "$DB_NAME" replprobe 2>>"$MYSQL_ERR" \
     | RDB >/dev/null || return 1
 
-  local coord file pos
+  local coord file pos gset=""
   coord=$(SDBQ "SHOW MASTER STATUS;")
   file=$(printf '%s' "$coord" | awk '{print $1}')
   pos=$(printf  '%s' "$coord" | awk '{print $2}')
-  attach_replica "$file" "$pos" "" || return 1
+
+  # 🔴 GTID 일 때 좌표를 **다시 읽어서 넘긴다.** 안 그러면 attach_replica 의 RESET MASTER 가
+  #    방금 덤프(--set-gtid-purged=ON)가 심어준 gtid_purged 를 지우고, 세 번째 인자가 비어
+  #    다시 심지도 않는다 — 그러면 SOURCE_AUTO_POSITION=1 인 리플리카가 «아무것도 적용 안 함»
+  #    상태로 붙어 **소스 binlog 를 처음부터 다시 받는다.** 되돌림 경로가 조용히 무대를
+  #    오염시키는 자리였다 (2026-08-22 리뷰 지적, PR #348).
+  if [ "$GTID" = "1" ]; then
+    gset=$(RDBQ "SELECT @@GLOBAL.gtid_executed;" | tr -d '\n\r ')
+    if [ -z "$gset" ]; then
+      log "🔴 덤프를 부었는데 리플리카의 gtid_executed 가 비었다 — 이대로 붙이면 처음부터 다시 받는다"
+      return 1
+    fi
+    log "덤프 뒤 리플리카 좌표 gtid_executed=$(printf '%s' "$gset" | cut -c1-60)…"
+  fi
+
+  attach_replica "$file" "$pos" "$gset" || return 1
   return 0
 }
 
@@ -670,12 +685,24 @@ start_sampler() {  # $1 = 결과 tsv
           -v rep="${rep:-0}" -v s1v="${src1:-0}" -v s2v="${src2:-0}" -v sbs="${sbs:-NA}" \
           -v st="${st:-NA}" -v y="${yes:-NA}" -v n="${no:-NA}" -v ms="$(( (s1 - s0) / 1000 ))" '
         BEGIN{
-          lr = (rep>0)  ? trep-rep : -1;
-          l1 = (s1v>0)  ? ts1-s1v  : -1;
-          l2 = (s2v>0)  ? ts2-s2v  : -1;
-          ls = (l1>=0 && l2>=0) ? (l1+l2)/2 : ((l1>=0)? l1 : l2);
-          ln = (lr>=0 && ls>=0) ? lr-ls : -1;
-          printf "%d\t%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\n", trep, lr, ls, ln, sbs, st, y, n, ms;
+          # 🔴 «못 읽었다» 는 NA 로 적는다. 예전엔 -1 을 썼는데, 그러면 **계측 잡음으로 생긴
+          #    진짜 음수 표본**과 구분되지 않는다. 그리고 집계 필터가 음수를 통째로 버려서
+          #    p50 이 위로 편향됐다 (2026-08-22 리뷰 지적, PR #348).
+          #    lag_net 은 두 값의 «차» 라 음수가 정상적으로 나온다 — 실제 복제 지연이 계측
+          #    잡음보다 작을 때다. 그건 버릴 값이 아니라 «지연이 계측 바닥 아래» 라는 관측이다.
+          lr = (rep>0) ? trep-rep : "NA";
+          l1 = (s1v>0) ? ts1-s1v  : "NA";
+          l2 = (s2v>0) ? ts2-s2v  : "NA";
+          if (l1 != "NA" && l2 != "NA")      ls = (l1+l2)/2;
+          else if (l1 != "NA")               ls = l1;
+          else if (l2 != "NA")               ls = l2;
+          else                               ls = "NA";
+          ln = (lr != "NA" && ls != "NA") ? lr-ls : "NA";
+          printf "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", trep,
+                 (lr=="NA")?"NA":sprintf("%d", lr),
+                 (ls=="NA")?"NA":sprintf("%d", ls),
+                 (ln=="NA")?"NA":sprintf("%d", ln),
+                 sbs, st, y, n, ms;
         }' >> "$1"
       sleep 1
     done
@@ -736,8 +763,10 @@ _pctl() {  # stdin = 숫자들 → "n p50 p95 max" (없으면 "0 - - -")
 }
 
 lag_stats() {  # $1 = lag tsv → "n p50 p95 max sbs_p50 sbs_max"
+  # 🔴 음수를 받는 정규식이다(`-?`). lag_net 은 «차» 라 음수가 정상적으로 나오고, 그것을
+  #    버리면 지연이 작은 판일수록 p50 이 위로 밀린다. 버릴 것은 NA(못 읽은 표본)뿐이다.
   local net sbs
-  net=$(awk -F'\t' 'NR>1 && $4 ~ /^[0-9]+$/ {print $4}' "$1" 2>/dev/null | _pctl)
-  sbs=$(awk -F'\t' 'NR>1 && $5 ~ /^[0-9]+$/ {print $5}' "$1" 2>/dev/null | _pctl)
+  net=$(awk -F'\t' 'NR>1 && $4 ~ /^-?[0-9]+$/ {print $4}' "$1" 2>/dev/null | _pctl)
+  sbs=$(awk -F'\t' 'NR>1 && $5 ~ /^-?[0-9]+$/ {print $5}' "$1" 2>/dev/null | _pctl)
   echo "$(echo "$net" | awk '{print $1, $2, $3, $4}') $(echo "$sbs" | awk '{print $2, $4}')"
 }

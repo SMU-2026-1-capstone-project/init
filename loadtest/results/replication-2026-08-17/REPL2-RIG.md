@@ -84,7 +84,7 @@ REPL_AZ_MODE="same-az" PHASES="repl_preflight repl_gate repl collect" \
 | `CONNS` | `15` | `backend/.../application.yml:50` maximum-pool-size — 실 경로의 DB 동시성 상한 |
 | `ROWS_PER_TX` | `25` | `loadtest/ghz/gen_batch_multi.py` 기본 `--reps` — 한 요청의 프레임 수 |
 | `DUR` | `180` | 판당 초 |
-| `REPS` / `ARM_ORDER` | `3` / `A B B A A B` | 위치 합을 맞춘 배열(설계 §4) |
+| `REPS` / `ARM_ORDER` | `3` / (REPS 에서 생성) | 위치 합을 맞춘 배열(설계 §4). `REPS=3` → `A B B A A B`. `ARM_ORDER` 를 직접 주면 그쪽이 이기고, `REPS` 와 어긋나면 로그에 적는다 |
 | `GTID` | `1` | 설계 §9-1 ④ — **무대에서만** 켠다. 실 compose 는 안 건드린다 |
 | `REPLICA_INIT` | `xtrabackup` | 설계 §9-1 ③. 실패하면 논리 덤프로 자동 되돌림 |
 | `PER_ROUND_REINIT` | `0` | §4 와 다른 지점 — 아래 §4 |
@@ -93,6 +93,9 @@ REPL_AZ_MODE="same-az" PHASES="repl_preflight repl_gate repl collect" \
 ---
 
 ## 3. 무엇이 나오나
+
+러너(`run_all.sh`)로 돌리면 `OUT` 을 `<결과>/repl/` 로 넘기므로 산출물이 **`repl/` 바로 아래**
+떨어진다. `_out2/` 는 rig 을 손으로 돌릴 때의 기본값이다.
 
 ```
 _out2/
@@ -111,8 +114,9 @@ _out2/
 | 열 | 뜻 |
 |---|---|
 | `kind` | `discard` 는 버림판이다 — **표에 넣지 말 것** |
+| `status` | `FAIL` 은 **「재지 못했다」** 다. 나머지 열의 `-` 를 0 으로 읽지 말 것 |
 | `tps` · `c_p99_us` | Q2. 팔 A ↔ 팔 B 를 **같은 페이로드끼리만** 비교 |
-| `lag_p50/p95/max_us` | Q1. `lag_net` 기준(계측 바닥이 빠진 값) |
+| `lag_p50/p95/max_us` | Q1. `lag_net` 기준(계측 바닥이 빠진 값). **음수가 나올 수 있고 버리지 않는다** — 실제 지연이 계측 잡음보다 작았다는 관측이다. 못 읽은 표본만 `NA` 로 빠진다 |
 | `sbs_p50` · `sbs_max` | `Seconds_Behind_Source`. **정본이 아니라 대조용** — 로컬 라운드가 이미 「침묵한다」를 확인했다 |
 | `yes_tx_d` · `no_tx_d` | 반동기가 실제로 돌았는지. 팔 B 인데 `no_tx` 가 늘면 강등이다 |
 | `rows_before` | 판 시작 시점의 무대 크기. 판이 거듭될수록 커진다(§4 참고) |

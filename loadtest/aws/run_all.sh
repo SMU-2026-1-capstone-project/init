@@ -988,7 +988,10 @@ phase_collect() {
       fi
       echo "MySQL         : $(docker exec -i "$CONTAINER" mysql -h "$REPLICA_HOST" -P 3306 --get-server-public-key -uroot -p"$PW" -N -B -e 'SELECT VERSION();' 2>/dev/null | tr -d '\r')"
       echo "server_id     : 소스=$(docker exec -e MYSQL_PWD="$PW" "$CONTAINER" mysql -uroot -N -e 'SELECT @@server_id;' 2>/dev/null | tr -d '\r') / 리플리카=$(docker exec -i "$CONTAINER" mysql -h "$REPLICA_HOST" -P 3306 --get-server-public-key -uroot -p"$PW" -N -B -e 'SELECT @@server_id;' 2>/dev/null | tr -d '\r')"
-      echo "왕복·초기화   : repl/_out2/rtt.txt · repl/_out2/replica_build.txt 참조"
+      # 🔴 `_out2` 를 붙이지 않는다. 이 단계는 rig 에 `OUT=$OUTDIR/repl` 을 넘기므로
+      #    산출물이 `repl/` 바로 아래에 떨어진다. `_out2` 는 rig 를 손으로 돌릴 때의
+      #    기본값이다 (2026-08-22 리뷰 지적, PR #348).
+      echo "왕복·초기화   : repl/rtt.txt · repl/replica_build.txt 참조"
       echo "⚠️ 두 박스의 타입이 다르면 이 라운드의 지연 값은 **복제 구조의 값이 아니다**"
     fi
 
