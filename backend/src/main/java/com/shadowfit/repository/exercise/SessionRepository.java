@@ -103,6 +103,29 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     List<Long> findIdsByMemberIdAndStatus(@Param("memberId") Long memberId, @Param("status") Status status);
 
     /**
+     * 이 세션들 중 {@code since} 이후 <b>활동이 있었던</b> 것의 수 — "실제로 운동 중인가"의 판정
+     * (MemberService.deleteAccount, docs/decisions/withdrawal-with-active-session.md §3-2).
+     *
+     * <p><b>왜 세션 상태가 아니라 이걸 보나.</b> {@code IN_PROGRESS} 는 앱이 죽으면 갱신되지 않아
+     * 최대 "예상 운동시간 + 버퍼"(스쿼트 ~45분) 동안 남는다. 그 상태값으로 탈퇴를 막으면 운동 중이
+     * 아닌 사용자가 이유도 모른 채 막힌다. 반면 살아있는 세션은 rep 단위로 3~4초마다 프레임을
+     * 보내고 배치마다 {@code last_active_at} 이 갱신되므로(PoseDataService), <b>갱신이 끊긴 것은
+     * 세션이 죽었다는 직접 증거</b>다.
+     *
+     * <p>🔴 <b>{@code pose_data.created_at} 으로 재면 안 된다</b> (#317). 그 컬럼은 "프레임이 들어온
+     * 시각"이 아니라 <b>세션 시작 시각</b>이다 — #188 멱등 때문에 한 세션의 모든 행이 같은 앵커를
+     * 공유한다({@code sessionAnchor = session.getStartTime()}). 그래서 그걸로 재면 질문이 "최근에
+     * 프레임이 들어왔나"에서 <b>"세션이 최근에 시작됐나"</b>로 바뀌고, 4분째 운동 중인 사용자가
+     * 가드를 그냥 통과한다.
+     *
+     * <p>{@code last_active_at} 이 null 인 세션(첫 배치 전에 앱이 죽은 경우)은 비교에서 빠져 안
+     * 세어진다 — "유입 없음"과 같은 뜻이라 의도한 대로다.
+     */
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.id IN :sessionIds AND s.lastActiveAt > :since")
+    long countActiveSince(@Param("sessionIds") List<Long> sessionIds,
+                          @Param("since") LocalDateTime since);
+
+    /**
      * 이 종목으로 만들어진 세션이 <b>한 건이라도</b> 있는가 — 관리자 종목 삭제 가드.
      *
      * <p><b>{@code count} 가 아니라 {@code exists} 인 이유.</b> 판정에 필요한 건 0 이냐 아니냐뿐인데

@@ -215,7 +215,7 @@ if [ "$ROLE" = "p6-loader" ]; then
   cd $WORKDIR && \\
   S3_BASE=s3://<버킷>/<프리픽스> TARGET_HOST=<대상 사설 IP> \\
   TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>" \\
-  AI_PUBLIC_TOKEN=<대상과 같은 값> GHZ_TOKEN=<대상과 같은 값> \\
+  AI_PUBLIC_TOKEN=<대상 .env 의 AI_PUBLIC_TOKEN> GHZ_TOKEN=<대상 .env 의 INTERNAL_API_TOKEN> \\
   GHZ_RPS=19 GHZ_DATA=/root/batch_multi.json GHZ_BIN=$GHZ_BIN \\
   CORES_ARMS="A B C" \\
   PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \\

@@ -20,8 +20,12 @@ public class RefreshToken {
     @Column(name = "member_id", nullable = false)
     private Long memberId;
 
-    // ⚠️ 평문이다. DB 덤프가 유출되면 그 자체로 쓸 수 있는 자격증명이다
-    // (decisions/token-lifecycle.md §1-1-ㄱ — 해싱 여부는 #137 저장소 결정과 같이 정하기로 남겼다).
+    // ⚠️ 원문이 아니라 **SHA-256 해시**다 (이슈 #185). DB 덤프가 유출돼도 그 자체로는 자격증명이
+    // 아니다 — 해시로는 인증 요청을 만들 수 없다. 저장·대조는 RefreshTokenHasher.hash(원문) 로
+    // 하고, 원문은 클라에 나간 JWT 로만 존재한다. 되돌릴 수 없으므로 재발급 유예 경로는 저장값을
+    // 돌려주는 대신 새 토큰을 회전 발급한다 (#185 ㄱ, MemberService 재발급 참조).
+    //
+    // 컬럼 길이 512 는 원문 JWT 시절 값이라 넉넉하다(해시는 hex 64자). #135 회전은 그대로다.
     @Column(name = "token", nullable = false, length = 512)
     private String token;
 

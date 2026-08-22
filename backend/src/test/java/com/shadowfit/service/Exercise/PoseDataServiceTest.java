@@ -8,6 +8,7 @@ import com.shadowfit.model.exercise.ExerciseCategory;
 import com.shadowfit.model.exercise.ExerciseReference;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
+import com.shadowfit.model.exercise.SyncStats;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.UserRole;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
@@ -320,6 +321,33 @@ class PoseDataServiceTest {
         // 실제 저장 행수와 지표가 어긋나면 운영 중 다운샘플 비율을 잘못 읽게 된다
         assertThat(received.totalAmount() - receivedBefore).isEqualTo(7.0);
         assertThat(stored.totalAmount() - storedBefore).isEqualTo(2.0);
+    }
+
+    @Test
+    @DisplayName("종료된(COMPLETED) 세션에 도착한 배치는 조용히 버린다 — 삽입 없음 (#187 (b))")
+    void savePoseDataBatch_terminalSession_dropsWithoutInsert() {
+        session.complete(3, SyncStats.none(), null, LocalDateTime.now());  // status → COMPLETED
+        sessionRepository.saveAndFlush(session);
+
+        // 던지지 않는다 — #280 재시도가 영영 거절될 배치를 다시 던지지 않게, 조용히 반환한다
+        poseDataService.savePoseDataBatch(session.getId(), List.of(frame(0.0, 50.0)));
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pose_data WHERE session_id = ?", Integer.class, session.getId());
+        assertThat(count).isZero();
+    }
+
+    @Test
+    @DisplayName("FAILED 세션도 마찬가지로 버린다 (#187 (b))")
+    void savePoseDataBatch_failedSession_dropsWithoutInsert() {
+        session.fail(LocalDateTime.now());  // status → FAILED
+        sessionRepository.saveAndFlush(session);
+
+        poseDataService.savePoseDataBatch(session.getId(), List.of(frame(0.0, 50.0)));
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pose_data WHERE session_id = ?", Integer.class, session.getId());
+        assertThat(count).isZero();
     }
 
     @Test

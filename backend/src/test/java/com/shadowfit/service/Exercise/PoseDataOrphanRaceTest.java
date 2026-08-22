@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -57,7 +58,9 @@ import static org.mockito.Mockito.doAnswer;
  * 이라 Hibernate 가 {@code PoseData} 엔티티의 {@code @ManyToOne @JoinColumn(session_id)} 에서
  * FK 를 만들어버린다. 프로덕션에는 없는 FK 다. 그러면 ②가 참조무결성 위반으로 <b>터져서</b>
  * 고아가 안 생긴다 — 재현이 안 되는 게 아니라 결과가 반대로 나온다. "FK 가 없다"는 전제 위에
- * 세워진 결함이라 실제 MySQL 스키마({@code V1__baseline.sql}) 위에서만 관측된다.
+ *   for f in backend/src/main/resources/db/migration/V*.sql; do
+ *     docker exec -i shadowfit-race-mysql mysql -uroot -pracetest shadowfit &lt; "$f"; done
+ *   (V1 하나만 적재하면 안 된다 — 마이그레이션이 V8 까지 왔다. #342)
  * 그래서 {@code application-race.yml}(3307 일회용 컨테이너)을 쓴다.
  *
  * <p><b>실행법</b> — 시스템 프로퍼티가 없으면 통째로 건너뛰므로 CI 는 영향받지 않는다:
@@ -65,7 +68,9 @@ import static org.mockito.Mockito.doAnswer;
  *   docker run -d --name shadowfit-race-mysql -e MYSQL_ROOT_PASSWORD=racetest \
  *     -e MYSQL_DATABASE=shadowfit -p 3307:3306 mysql:8.0 \
  *     --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
- *   docker exec -i shadowfit-race-mysql mysql -uroot -pracetest shadowfit \n *     &lt; backend/src/main/resources/db/migration/V1__baseline.sql
+ *   for f in backend/src/main/resources/db/migration/V*.sql; do
+ *     docker exec -i shadowfit-race-mysql mysql -uroot -pracetest shadowfit &lt; "$f"; done
+ *   (V1 하나만 적재하면 안 된다 — 마이그레이션이 V8 까지 왔다. #342)
  *   ./gradlew :backend:test --tests '*PoseDataOrphanRaceTest' -Drace.mysql=true
  * </pre>
  *
@@ -95,6 +100,8 @@ class PoseDataOrphanRaceTest {
 
     private Long memberId;
     private Long sessionId;
+    /** ① 에서 서비스에 돌려줄 엔티티. 스파이라 실제 조회를 대신 부를 수 없어 시딩 때 붙잡아 둔다. */
+    private Session seededSession;
 
     @AfterEach
     void tearDown() {
@@ -117,18 +124,26 @@ class PoseDataOrphanRaceTest {
         CountDownLatch withdrawalDone = new CountDownLatch(1);
 
         doAnswer(invocation -> {
+            // 🔴 2026-08-22: 이음매를 existsById → findById 로 옮겼다.
+            //   #280(커밋 4e1d64c, 2026-08-20)이 적재 경로를 findById 로 바꿨는데(start_time 이
+            //   필요해서다 — PoseDataService:91) 이 테스트는 existsById 를 계속 잡고 있었다.
+            //   목이 안 불리니 래치가 안 풀리고 «예외도 안 나서» 이틀간 조용히 실패했다.
+            //   CI 는 이 테스트를 건너뛰므로 아무도 못 봤다 (#342).
+            //
             // invocation.callRealMethod() 는 여기서 못 쓴다 — SessionRepository 는 인터페이스라
-            // Mockito 가 "Cannot call abstract real method" 로 거절한다. 그래서 existsById 와
-            // 같은 의미의 조회를 SQL 로 직접 한다. 하드코딩된 true 로 때우지 않는 이유는,
-            // ① 시점에 세션이 <b>실제로 존재했다</b>는 사실이 확인돼야 나중에 남는 행을
-            // "고아"라고 부를 수 있기 때문이다.
+            // Mockito 가 "Cannot call abstract real method" 로 거절한다. 그래서 ① 시점에 세션이
+            // <b>실제로 존재했다</b>는 사실은 SQL 로 직접 확인하고(그게 확인돼야 나중에 남는 행을
+            // "고아"라고 부를 수 있다), 서비스에 돌려줄 엔티티는 시딩 때 붙잡아 둔 것을 쓴다.
             Integer found = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM exercise_sessions WHERE id = ?", Integer.class, sessionId);
-            boolean exists = found != null && found > 0;
+            if (found == null || found == 0) {
+                checkPassed.countDown();
+                return Optional.empty();               // 세션이 없으면 SESSION_NOT_FOUND 로 간다
+            }
             checkPassed.countDown();                    // "①을 통과했다" 를 알리고
             withdrawalDone.await(10, TimeUnit.SECONDS); // 탈퇴가 끝날 때까지 ②를 미룬다
-            return exists;
-        }).when(sessionRepository).existsById(sessionId);
+            return Optional.of(seededSession);
+        }).when(sessionRepository).findById(sessionId);
 
         AtomicReference<Throwable> ingestError = new AtomicReference<>();
         Thread ingest = new Thread(() -> {
@@ -146,7 +161,7 @@ class PoseDataOrphanRaceTest {
             withdrawalDone.countDown();
             ingest.join(TimeUnit.SECONDS.toMillis(5));
             throw new AssertionError(
-                    "①(existsById)까지 도달하지 못했다. ingest 스레드 예외: " + ingestError.get(),
+                    "①(findById)까지 도달하지 못했다. ingest 스레드 예외: " + ingestError.get(),
                     ingestError.get());
         }
 
@@ -204,10 +219,13 @@ class PoseDataOrphanRaceTest {
                 .syncThresholdAdvanced(new BigDecimal("85.00"))
                 .build());
 
+        // status 는 IN_PROGRESS 여야 한다 — #304 가 붙인 가드가 그 외 상태의 배치를 «조용히»
+        // 버리므로(PoseDataService:110), 다른 상태면 이 테스트는 아무 일도 안 하고 통과한다.
         Session session = sessionRepository.saveAndFlush(Session.builder()
                 .member(member).exercise(exercise).startTime(LocalDateTime.now())
                 .status(Status.IN_PROGRESS).totalReps(0).difficultyLevel(1).build());
         sessionId = session.getId();
+        seededSession = session;
     }
 
     /**

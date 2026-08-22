@@ -1,12 +1,14 @@
 package com.shadowfit.service.Exercise;
 
 import com.shadowfit.global.error.BusinessException;
+import com.shadowfit.global.observability.CallCancellation;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.grpc.PoseDataRequest;
 import com.shadowfit.model.exercise.Exercise;
 import com.shadowfit.model.exercise.ExerciseReference;
 import com.shadowfit.model.exercise.Session;
+import com.shadowfit.model.exercise.Status;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
@@ -90,6 +92,28 @@ public class PoseDataService {
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
 
+        // 종료된 세션에는 더 쌓지 않는다 (#187 (b) — 콜백 층 심층방어).
+        //
+        // 위 findById 는 «세션이 있는가» 만 본다. 그런데 세션이 COMPLETED/FAILED/CANCELLED 로
+        // 끝난 뒤에도 행은 남아 있어 통과하고, 그 상태에서 배치를 받으면 **이미 리포트가 확정된
+        // 세션에 pose_data 가 더 붙는다.** 정상 경로에선 안 오는 일이다 — endSession 은 endTime
+        // 만 찍고 status 는 IN_PROGRESS 로 두므로(사용자가 종료를 눌러도), 늦게 도착하는 정상
+        // 배치는 여전히 IN_PROGRESS 를 만나 통과한다. 여기 걸리는 것은 CompleteAnalysis 이후다.
+        //
+        // 🔴 던지지 않고 조용히 버린다. #188 재시도(#280)가 붙어 있어서, 던지면 AI 가 **영영
+        // 거절될 배치를 재시도**한다. 종료 세션 배치는 — 주입이면 버리는 게 맞고(#187), 종료
+        // 직전 경합으로 늦은 정상 배치면 이미 리포트가 확정돼 무의미하므로 — 두 경우 다 드롭이 옳다.
+        //
+        // ⚠️ 이것이 #187 을 «닫지» 않는다. 공격의 본체는 **진행 중인(IN_PROGRESS)** 남의 세션에
+        // 끼어드는 것이고, 그건 이 검사를 그대로 통과한다. 채널 ① 의 신원(nonce, 안 d)이 서야
+        // 본체가 막힌다. 이 가드는 «종료 후 창» 하나만 닫는 심층방어다.
+        if (session.getStatus() != Status.IN_PROGRESS) {
+            sessionMetrics.poseBatchRejected(session.getStatus().name());
+            log.warn("세션 {} : {} 상태에 도착한 pose 배치 {}건을 버린다 (#187 (b))",
+                    sessionId, session.getStatus(), grpcList.size());
+            return;
+        }
+
         // 이 배치가 만들 모든 행의 created_at. 세션 하나가 값 하나를 공유한다.
         // 재전송에도 같은 값이 나오는 것이 멱등의 근거이고(start_time 은 세션 생성 시 1회
         // 세팅되고 바뀌는 곳이 없다), 세션이 파티션 경계에서 쪼개지지 않는 것이 부수 이득이다.
@@ -100,6 +124,12 @@ public class PoseDataService {
         // INSERT 가 정리 뒤에 착지해 아무도 다시 훑지 않는 행으로 남는다. 창의 폭을 알아야
         // 발생 빈도의 상한을 잡고 수정안을 저울질할 수 있어 여기서 잰다.
         recordOrphanWindow(System.nanoTime());
+
+        // 되돌릴 수 없는 쓰기를 시작하기 직전이다. 여기까지 오는 동안 호출자가 포기했을 수 있다
+        // (#206 결함 B — GrpcServerDeadlineProbeTest 가 재현한 것이 정확히 이 순서다: 핸들러는
+        // 진입했고, 그 뒤에 deadline 이 만료됐다). 위 존재검사는 읽기라 되돌릴 게 없지만 아래
+        // batchUpdate 부터는 아니다. gRPC 밖 호출에서는 이 검사가 아무 일도 하지 않는다.
+        CallCancellation.abortIfAbandoned("pose 배치 저장 (session=" + sessionId + ")");
 
         List<PoseDataRequest> downsampled = downsample(grpcList, downsampleWindow);
 
