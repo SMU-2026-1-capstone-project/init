@@ -22,12 +22,43 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import os
 import statistics
 import sys
 
 from app.core.dtw_calculator import compute_dtw_distance, compute_sync_rate
 from app.core.reference_builder import _segment_reps
 from app.core.video_processor import analyze_video
+
+
+def describe_input(video: str, runs: int) -> str:
+    """이 판이 «무엇을》 먹었는지 한 덩어리로 돌려준다.
+
+    🔴 이 함수가 생긴 이유 (#256 착수 중 발견). 이 rig 의 결과 README 는 측정일·rig 경로·
+    선행 이슈까지 적으면서 **정작 입력 영상을 안 적었다** — 「다시 돌리는 법」이
+    `--video <스쿼트 영상 경로>` 라는 플레이스홀더로 끝난다.
+
+    그래서 2026-08-16 판(#234, 답 0.28점)은 **어떤 영상으로 잰 값인지 알 수 없고, 재현도
+    비교도 불가능하다.** 이 rig 이 재는 값(정답지 흔들림)은 영상에 따라 달라지므로 그건
+    치명적이다 — 새로 재도 «같은 조건인가» 를 말할 수 없다.
+
+    사람이 결과에 적어주기를 기대하지 않고 **rig 이 스스로 남긴다.** 해시를 쓰는 이유는
+    파일명이 같아도 다른 영상일 수 있어서다(재인코딩·자르기).
+    """
+    path = os.path.abspath(video)
+    size = os.path.getsize(path)
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return "\n".join([
+        "=== 입력 (결과에 이 블록을 그대로 옮길 것) ===",
+        f"  영상      : {path}",
+        f"  크기      : {size:,} bytes",
+        f"  sha256    : {h.hexdigest()}",
+        f"  반복 수   : {runs}",
+    ])
 
 
 def extract_reps(video: str):
@@ -43,6 +74,15 @@ def main() -> int:
     p.add_argument("--video", required=True)
     p.add_argument("--runs", type=int, default=5)
     args = p.parse_args()
+
+    if not os.path.isfile(args.video):
+        # analyze_video 까지 가면 MediaPipe 안쪽에서 알아보기 어려운 오류가 난다.
+        print(f"🔴 영상을 찾을 수 없다: {args.video}")
+        return 1
+
+    provenance = describe_input(args.video, args.runs)
+    print(provenance)
+    print()
 
     references = []   # (run, score, frame_count, min_knee, angles)
     user_seq = None
@@ -119,6 +159,11 @@ def main() -> int:
               + ("폭 ≥ 3.5° — ① 유지 (깊이 축 판정 불가)"
                  if mk_span >= 3.5 else
                  "폭 < 3.5° — 🔴 ① 의 결론이 뒤집힌다 (깊이 축이 살아난다)"))
+
+    # 입력을 끝에서 한 번 더 낸다. 결과를 옮길 때 «꼬리만» 복사하는 일이 흔한데,
+    # 그러면 위쪽 입력 블록이 떨어져 나가 이 rig 이 고치려던 문제가 그대로 재발한다.
+    print()
+    print(provenance)
     return 0
 
 
