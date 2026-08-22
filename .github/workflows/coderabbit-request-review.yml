@@ -29,6 +29,12 @@
 #
 # 시크릿 넣는 법:
 #   gh secret set CODERABBIT_TRIGGER_TOKEN --repo Shadowfit/init --body "<PAT>"
+#
+# ⚠️ **--body 를 빼면 안 된다.** 값 없이 실행하면 gh 가 stdin 에서 읽는데, TTY 가 아닌 곳
+#    (CI·에이전트 세션)에서는 즉시 EOF 라 **빈 문자열이 저장되고 명령은 성공한 듯 조용히
+#    끝난다.** 그러면 시크릿 목록에는 이름이 뜨는데 이 워크플로는 「없다」로 죽는다 —
+#    **「없다」와 「비었다」가 같은 얼굴이라** 2026-08-22 에 여섯 판을 헛태웠다(#362).
+#    판별: `gh api repos/<owner>/<repo>/actions/secrets/<NAME> --jq .updated_at` 이 갱신됐나.
 # ─────────────────────────────────────────────────────────────────────────
 name: Request CodeRabbit review
 
@@ -67,7 +73,9 @@ jobs:
           # ⓪ 개인 토큰이 없으면 **코멘트를 달지 않고 죽는다.** 달아봐야 버려지고,
           #    버려진 코멘트는 「리뷰 요청했다」는 착시만 남긴다(#349).
           if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::CODERABBIT_TRIGGER_TOKEN 시크릿이 없다. 봇 계정(GITHUB_TOKEN)이 단 코멘트는 CodeRabbit 이 무시한다(#349). 넣는 법: gh secret set CODERABBIT_TRIGGER_TOKEN --repo ${REPO} --body '<PAT>'"
+            echo "::error::[토큰] CODERABBIT_TRIGGER_TOKEN 이 **없거나 값이 비어 있다.** 봇 계정(GITHUB_TOKEN)이 단 코멘트는 CodeRabbit 이 무시하므로(#349) 코멘트를 달지 않고 죽는다."
+            echo "::error::[토큰] 넣는 법: gh secret set CODERABBIT_TRIGGER_TOKEN --repo ${REPO} --body '<PAT>'  ← **--body 를 빼면 안 된다.** TTY 가 아닌 곳(CI·에이전트 세션)에서 값 없이 실행하면 stdin 이 즉시 EOF 라 **빈 값이 조용히 저장된다** — 시크릿 목록에는 뜨는데 이 줄이 나온다(2026-08-22 실측)."
+            echo "::error::[토큰] 판별법: gh api repos/${REPO}/actions/secrets/CODERABBIT_TRIGGER_TOKEN --jq .updated_at 이 갱신됐는지 본다. 안 바뀌었으면 안 들어간 것이다."
             exit 1
           fi
 
