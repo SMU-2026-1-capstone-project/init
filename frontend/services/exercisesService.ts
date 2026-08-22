@@ -11,6 +11,12 @@ interface StartSessionResponse {
   exerciseId: number;
   startTime: string;
   status: string;
+  // 세션 소유권 비밀값 (이슈 #187). 이 응답으로만 내려오고, 이후 POST /pose 마다 동봉해야
+  // AI 가 «이 세션을 만든 클라» 로 인정한다. session_id 는 순차 정수라 추측되지만 이 값은
+  // 안 된다 — 안 보내면 프레임이 조용히 버려진다.
+  //
+  // 🔴 화면·로그·저장소 어디에도 남기지 말 것. 세션이 끝나면 같이 버린다.
+  sessionNonce: string;
 }
 
 export const exercisesService = {

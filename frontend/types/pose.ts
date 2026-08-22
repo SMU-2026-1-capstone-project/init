@@ -9,6 +9,10 @@ export interface PoseDetectRequest {
   image: string; // base64 인코딩 프레임
   exercise_type: string; // 'squat' | 'lunge' | 'plank' ... (AI는 squat 구현)
   session_id: number;
+  // 세션 소유권 비밀값 (이슈 #187). 세션 시작 응답의 sessionNonce 를 그대로 싣는다.
+  // 없거나 틀리면 AI 가 프레임을 버리는데, 응답은 «세션 없음» 과 같은 모양이라
+  // 클라에서는 «세션이 죽었다» 로 보인다 — 그게 의도다(살아있는 세션 열거를 막는다).
+  session_nonce: string;
   // timestamp_sec 은 제거했다 (이슈 #156). 프레임 시각은 서버가 도착 시각으로 만든다 —
   // 여기서 보내던 Date.now()/1000 은 epoch 라 「세션 시작 기준 경과 초」가 아니었고,
   // 변환 없이 리포트까지 흘러 시각 표시가 무의미해졌다. AI 는 이 필드가 와도 읽지 않는다.

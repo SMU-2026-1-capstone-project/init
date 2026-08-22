@@ -70,6 +70,10 @@ export default function ExerciseScreen() {
 
   // 백엔드 세션 (POST /exercises/sessions → PATCH /sessions/{id}/end)
   const [sessionId, setSessionId] = useState<number | null>(null);
+  // 세션 소유권 비밀값 (#187). sessionId 와 **같이 살고 같이 죽는다** — 화면 상태로만 들고
+  // 저장소에 남기지 않는다. 앱이 죽으면 세션도 같이 잃는 것이 지금 동작이고(재부착 호출이
+  // 아직 없다), 그래서 이 값만 따로 살릴 이유가 없다.
+  const [sessionNonce, setSessionNonce] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // 페르소나 멘트 프리로드 (TTS 보류 — 일단 받아서 보관만)
   const [, setFeedbackTemplates] = useState<FeedbackTemplate[]>([]);
@@ -88,6 +92,7 @@ export default function ExerciseScreen() {
         // ── 시작: 백엔드에 세션 생성 + 멘트 프리로드 ─────────
         const res = await exercisesService.startSession({ exerciseId });
         setSessionId(res.data.sessionId);
+        setSessionNonce(res.data.sessionNonce);
         // 멘트 프리로드는 실패해도 운동은 진행
         exercisesService
           .getFeedbackTemplates(exerciseId)
@@ -98,6 +103,9 @@ export default function ExerciseScreen() {
         // ── 종료: 백엔드 종료 통보 + 리포트로 이동 ──────────
         const id = sessionId;
         setIsRecording(false);
+        // 비밀값은 세션과 함께 버린다 (#187). 리포트 화면으로 넘어가면 어차피 언마운트되지만,
+        // «끝난 세션의 자격증명이 메모리에 남아 있다» 를 화면 전환 타이밍에 기대지 않는다.
+        setSessionNonce(null);
         if (id != null) {
           await exercisesService.endSession(id);
           router.replace(`/report/${id}` as any);
@@ -141,7 +149,9 @@ export default function ExerciseScreen() {
   // AI_PUBLIC_TOKEN 미설정 시 폴링 비활성 (DEV 시연 모드 — DEV 패널만 동작)
   // 내부 gRPC 토큰과 값이 분리돼 있다 (이슈 #134) — aiService.ts 주석 참고
   useEffect(() => {
-    if (!isRecording || sessionId == null) return;
+    // nonce 가 없으면 폴링을 시작하지 않는다 (#187 2단계). 보내봐야 AI 가 전부 버리므로,
+    // 프레임을 쏘면서 «세션 없음» 을 반복해 받느니 아예 시작을 안 하는 편이 낫다.
+    if (!isRecording || sessionId == null || sessionNonce == null) return;
     const token = process.env.EXPO_PUBLIC_AI_PUBLIC_TOKEN;
     if (!token) return;
 
@@ -180,6 +190,7 @@ export default function ExerciseScreen() {
           image,
           exercise_type: exerciseType,
           session_id: sessionId,
+          session_nonce: sessionNonce,
         });
         if (cancelled) return;
         const r = res.data;
@@ -199,7 +210,7 @@ export default function ExerciseScreen() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [isRecording, sessionId, exerciseId]);
+  }, [isRecording, sessionId, sessionNonce, exerciseId]);
 
   // 싱크로율 낮을 때 진동 피드백
   const prevSyncRef = useRef(syncRate);
