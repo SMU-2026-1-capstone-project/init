@@ -105,7 +105,7 @@
 | 시간 파티셔닝 | ✅ `PARTITION BY RANGE (unix_timestamp(created_at))` 월별 (DB 실측 2026-08-12) |
 | 만료 파티션 폐기 | ✅ `PoseDataPartitionScheduler.dropExpiredPartitions` — `DROP PARTITION` |
 | 미래 파티션 자동 생성 | ✅ 같은 스케줄러 `ensureFuturePartitions` (`REORGANIZE PARTITION pfuture`) |
-| 실측 근거 | ✅ ALTER 96분 / DROP PARTITION 1.8초 / DELETE 대비 **625배**(행당 정규화 570배, 로컬·더미. AWS 축소 재현 421배 — 조건표는 [`../portfolio/realmysql-experiments.md`](../portfolio/realmysql-experiments.md) §4-②d) |
+| 실측 근거 | ✅ ALTER 96분 / DROP PARTITION 1.8초 / DELETE 대비 **625배** ([§②d · 조건](../portfolio/realmysql-experiments.md#drop-partition-625x) — 2026-06-03 로컬 1억 행 더미 JSON, **두 팔의 행수가 달라 행당 정규화는 570배**. AWS 축소 재현은 **421배**) |
 | 볼륨 | ✅ 1억 행 시드 (133,334세션 × 750행, ~11GB) |
 
 FK 비호환 블로커도 **해소됐다** — FK 를 제거하고 애플리케이션 검증으로 대체했다
@@ -199,7 +199,7 @@ FK 비호환 블로커도 **해소됐다** — FK 를 제거하고 애플리케�
 > ⚠️ 이 절은 2026-06-05 초안. 그 뒤 실측·서사 작업으로 **5개 중 4개가 이미 해소**됐다. 아래는 현실 대조 결과.
 
 **해소됨 (문서 동기화):**
-- ~~착수 기능: 팬아웃 vs 파티셔닝~~ → **파티셔닝 채택·완료**([`realmysql-experiments.md §4-②d`](../portfolio/realmysql-experiments.md), 06-03: ALTER 96분 / DROP PARTITION 1.8초 / DELETE 대비 **625x** 실측). **팬아웃은 폐기**([`portfolio-narrative.md §4`](../portfolio/portfolio-narrative.md): "혼자 운동 도메인엔 억지 → 헤드라인 제외").
+- ~~착수 기능: 팬아웃 vs 파티셔닝~~ → **파티셔닝 채택·완료**([`realmysql-experiments.md §②d · 조건`](../portfolio/realmysql-experiments.md#drop-partition-625x), 2026-06-03 로컬 1억 행 더미 JSON: ALTER 96분 / DROP PARTITION 1.8초 / DELETE 대비 **625x** — 행당 정규화하면 570배). **팬아웃은 폐기**([`portfolio-narrative.md §4`](../portfolio/portfolio-narrative.md): "혼자 운동 도메인엔 억지 → 헤드라인 제외").
 - ~~소셜 도입 여부~~ → **드롭**(팬아웃 폐기와 동반). friendships/activity_feed/notifications 신규 테이블 **안 만듦**.
 - ~~볼륨 시드 규모~~ → **1억 행 완료**([`realmysql §3`](../portfolio/realmysql-experiments.md), 06-03: 133,334세션×750행·~11GB, `loadtest/seed/seed_pose_scale.sh`, 커밋 da69056).
 - ~~유튜브 좌표를 시드로~~ → **안 씀**. 실제 시드는 더미 JSON `{}`/`_pose_template`(행수·payload 디커플링). 유튜브 추출은 별도 기능([`youtube-coordinate-harvest.md`](./youtube-coordinate-harvest.md))으로 분리, 시드와 무관.

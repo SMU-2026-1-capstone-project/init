@@ -3,17 +3,43 @@
 
 단일 session_id=801 에 모든 INSERT 가 몰리면 인덱스 리프 페이지 래치·redo 커밋이
 직렬화돼 가짜 천장이 생긴다(귀속 분석 2026-06-12). 실제 DAU 1,000 은 서로 다른
-수천 세션이 각자 다른 인덱스 구간에 INSERT → 이 경합이 없다. 그래서 ghz 가
-round-robin 으로 N개 세션에 분산하도록 **메시지 배열**을 만든다.
+수천 세션이 각자 다른 인덱스 구간에 INSERT → 이 경합이 없다. 그래서 요청을
+round-robin 으로 N개 세션에 흩는다.
 
-ghz 는 --data-file 의 JSON 이 배열이면 요청마다 다음 원소를 순환 사용한다.
+─────────────────────────────────────────────────────────────────────────
+🔴 2026-08-17: 배열을 버리고 **ghz 템플릿**으로 갈아탔다 (#271)
+
+예전에는 «세션 N개짜리 메시지 배열» 을 만들고 ghz 가 `RequestNumber % len` 으로
+순환하게 했다. 그런데 그 방식은 **같은 세션에 두 번째로 가는 요청이 첫 요청과
+바이트 단위로 같다.** 2026-08-17 에 들어온 멱등 키
+(`uk_pose_event(session_id, rep_number, timestamp_sec, created_at)`, #188)가
+그 중복을 삼키면서 **세션당 첫 요청만 행을 만들게 됐다** — 그런데
+`ON DUPLICATE KEY UPDATE` 는 에러가 아니라 성공이라 `fail=0` 에 RPS 도 정상으로
+찍힌다. 표를 봐서는 안 보인다.
+
+그래서 유니크 키 네 열 중 하나(`rep_number`)를 **요청 번호로 움직인다.**
+세션 라우팅도 배열 순환에서 템플릿 산술로 옮겼다 — `mod` 가 하던 일이 같아서
+결과는 같고, 데이터가 **메시지 1개(≈54KB)** 로 줄어든다.
+
+크기가 왜 중요한가: ghz 는 **데이터에 템플릿이 있으면 캐시를 끄고 요청마다 전체를
+다시 파싱한다**(`runner/data.go`). 배열(100세션 ≈ 5.4MB)에 템플릿을 얹으면
+649 RPS 에서 3.5GB/s 가 되어 성립하지 않는다.
+
+⚠️ 출력은 **JSON 이 아니라 Go 템플릿**이다. 사람이 열면 `{{ }}` 가 보이고
+   `json.load` 로는 안 읽힌다 — 그게 정상이다. ghz 가 실행 후 파싱한다.
+설계: docs/decisions/loadtest-payload-uniqueness.md
+─────────────────────────────────────────────────────────────────────────
 
 사용:
-  python gen_batch_multi.py --sessions 901-1900 --reps 25 --out batch_multi.json
-  (901~1900 = seed 세션 1,000개. DB 에 존재해야 FK 통과 — exercise_sessions 601~5911 보유)
+  python gen_batch_multi.py --sessions 901-1000 --reps 25 --out batch_multi.json
+  (901~1000 = seed 세션 100개. DB 에 존재해야 한다 — 없으면 FK 검증에서 전 건 실패)
 """
 import argparse
 import json
+
+# json.dumps 를 거친 뒤 템플릿으로 바꿔치기할 자리. 값이 **숫자 자리**라 따옴표째 지운다.
+SESSION_SLOT = "@@GHZ_SESSION@@"
+REPNUM_SLOT = "@@GHZ_REPNUM@@"
 
 
 FEEDBACK_TYPES = ["", "", "KNEE_OUT", "BACK_BENT", "HIP_HIGH", "KNEE_IN", "", "KNEE_OUT"]
@@ -40,6 +66,10 @@ def make_pose_data(reps: int) -> list:
             "jointCoordinates": make_landmarks(f),
             "syncRate": round(45.0 + (f * 7 % 50), 2),
             "feedbackMessage": FEEDBACK_TYPES[f % len(FEEDBACK_TYPES)],
+            # 🔴 멱등 키를 움직이는 열이다(#271). 프레임끼리는 같은 값이어도 된다 —
+            #    같은 요청 안에서는 timestamp_sec 이 이미 서로 다르기 때문이다.
+            #    요청 사이에서 달라지는 것이 요점이다.
+            "repNumber": REPNUM_SLOT,
         })
     return pose
 
@@ -57,16 +87,28 @@ def main() -> None:
     args = ap.parse_args()
 
     sessions = parse_sessions(args.sessions)
-    pose = make_pose_data(args.reps)  # payload 동일 — 세션 라우팅만 변수
-    messages = [{"sessionId": sid, "poseData": pose} for sid in sessions]
-    payload = json.dumps(messages, separators=(",", ":"))
+    lo, n = sessions[0], len(sessions)
+
+    # 메시지는 **하나**다. 세션은 배열 순환이 아니라 템플릿이 고른다.
+    message = {"sessionId": SESSION_SLOT, "poseData": make_pose_data(args.reps)}
+    payload = json.dumps(message, separators=(",", ":"))
+
+    # 자리를 템플릿으로 바꾼다. 따옴표까지 포함해 지워야 **숫자**가 된다 —
+    # `"{{ ... }}"` 로 남으면 jsonpb 가 int64 필드에 문자열을 넣으려다 죽는다.
+    #
+    # `mod` 로 세션을 고르는 것이 예전 배열 순환(`RequestNumber % len`)과 같은 일이다.
+    # 레벨 1 이면 `mod .RequestNumber 1` = 0 이라 항상 첫 세션 — «단일 핫세션» 조건이
+    # 특수 처리 없이 그대로 나온다.
+    payload = payload.replace(f'"{SESSION_SLOT}"', f"{{{{ add {lo} (mod .RequestNumber {n}) }}}}")
+    payload = payload.replace(f'"{REPNUM_SLOT}"', "{{ .RequestNumber }}")
 
     with open(args.out, "w", encoding="utf-8") as fp:
         fp.write(payload)
 
-    size_mb = len(payload.encode("utf-8")) / 1024 / 1024
-    print(f"wrote {args.out}: sessions={len(sessions)} ({sessions[0]}~{sessions[-1]}) "
-          f"reps={args.reps} size={size_mb:.1f}MB")
+    size_kb = len(payload.encode("utf-8")) / 1024
+    print(f"wrote {args.out}: sessions={n} ({sessions[0]}~{sessions[-1]}, 템플릿 라우팅) "
+          f"reps={args.reps} size={size_kb:.1f}KB")
+    print("  ⚠️ 이 파일은 JSON 이 아니라 ghz 템플릿이다 — json.load 로는 안 읽힌다(#271)")
 
 
 if __name__ == "__main__":

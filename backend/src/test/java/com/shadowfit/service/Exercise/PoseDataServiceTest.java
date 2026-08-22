@@ -406,7 +406,7 @@ class PoseDataServiceTest {
     // sync·worst 구간)가 중복 수만큼 왜곡된다 — 즉 유실을 막으려다 다른 오염을 들이는 셈이다.
     //
     // ⚠️ 이 검증이 성립하는 이유는 엔티티에 uk_pose_event 가 선언돼 있어서다. 테스트는 H2 +
-    //    ddl-auto 라 Flyway(V5)를 보지 않으므로, 마이그레이션에만 넣었다면 제약 없는 스키마
+    //    ddl-auto 라 Flyway(V6)을 보지 않으므로, 마이그레이션에만 넣었다면 제약 없는 스키마
     //    위에서 초록불이 났을 것이다(test/resources/application.yml 의 경고와 같은 함정).
 
     @Test

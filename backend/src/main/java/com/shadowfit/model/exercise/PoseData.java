@@ -10,7 +10,7 @@ import lombok.*;
        // 테이블의 모든 유니크 키가 파티션 표현식의 컬럼을 포함할 것을 요구한다. 그래서 PK 도
        // (id, created_at) 이다.
        //
-       // 여기 선언이 마이그레이션(V5)과 **중복**인데, 그게 의도다: 테스트는 H2 + ddl-auto 라
+       // 여기 선언이 마이그레이션(V6)과 **중복**인데, 그게 의도다: 테스트는 H2 + ddl-auto 라
        // Flyway 를 안 보므로(test/resources/application.yml), 엔티티에 없으면 멱등 테스트가
        // 제약 없는 스키마 위에서 초록불을 낸다.
        uniqueConstraints = @UniqueConstraint(

@@ -67,7 +67,7 @@ B(적재 비용)를 줄이기로 *가정*하면, 줄이는 지점은 셋:
 - 포지셔닝: 절감 효과는 최대지만 **백엔드(Spring) 포폴 서사로는 약함**(최적화가 AI 쪽 코드에 있음).
 
 ### 3-B. Spring INSERT 직전에서 (추천 후보 — 백엔드 소유)
-- 장점: **ai-server 무수정**, 적재 최적화를 **Spring(쓰기 축)이 소유** → 포폴 서사 정합. 실측 병목이 **DB INSERT**(§realmysql ②a: batch로 throughput +99%)였으므로, 행수 감축은 *그 병목*을 직접 친다.
+- 장점: **ai-server 무수정**, 적재 최적화를 **Spring(쓰기 축)이 소유** → 포폴 서사 정합. 실측 병목이 **DB INSERT**(§realmysql ②a: batch로 throughput +99% — [조건](./load-test-strategy.md#batch-insert-99), 절대 RPS 인용 금지)였으므로, 행수 감축은 *그 병목*을 직접 친다.
 - 단점: gRPC/네트워크는 **이미 다 받은 뒤**라 절감 못 함(AI→Spring 구간 낭비 잔존). Spring CPU로 평균 계산.
 - 확장성([[feedback_industry_level_standard]]): 동시 세션↑ 시 INSERT 행수가 풀·p99을 압박 — 여기서 감축이 효과. 단 네트워크가 병목이 되는 구간에선 B로 부족 → 그때 A 재고.
 

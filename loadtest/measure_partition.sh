@@ -7,6 +7,12 @@
 #       ② TTL 만료 시 DROP PARTITION 은 O(1) 메타데이터 연산(락 거의 없음, 디스크 즉시 회수),
 #          DELETE WHERE 는 같은 ~8M 행을 행단위 삭제(undo·binlog·락 폭발) → 수 초~수십 초.
 # 핵심 reframe: 파티션의 가치는 쿼리 pruning 이 아니라(쿼리는 이미 인덱스로 빠름) "값싼 TTL".
+#
+# 📌 이 rig 이 낸 «625배»·«96분» 을 인용할 때의 조건:
+#    docs/portfolio/realmysql-experiments.md #drop-partition-625x
+#    - 두 팔의 행수가 다르다(DELETE 8,301,450 ↔ DROP 7,560,000) → 행당 정규화하면 570배
+#    - DROP 1.8초의 대부분도 O(1) 이 아니라 ~910MB .ibd 삭제 I/O 다
+#    - 절대 시간(18.6분·1.8초·96분)은 하드웨어 종속이라 「운영에서 N분」으로 인용 금지
 set -u
 PW=1234
 DB(){ docker exec shadowfit-mysql mysql -uroot -p$PW shadowfit "$@" 2>/dev/null; }
@@ -74,4 +80,6 @@ echo "DROP PARTITION ${n_drop} 행: $((t1-t0)) ms"
 echo "     p2026_02.ibd 디스크: $(IBD p2026_02)   ← 파일째 삭제, 공간 즉시 회수"
 echo
 echo "# 실측(2026-06-03, 로컬): ALTER PARTITION BY 5,767s / DELETE 1,118,936ms(18.6분) / DROP 1,790ms(1.8초) ≈ 625x"
+echo "#   ↑ 두 팔의 행수가 다르다(8,301,450 ↔ 7,560,000) — 행당 정규화하면 570x."
+echo "#   인용 조건: docs/portfolio/realmysql-experiments.md #drop-partition-625x"
 echo "DONE"

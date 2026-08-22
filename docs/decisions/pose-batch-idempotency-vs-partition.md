@@ -164,7 +164,7 @@ CREATE TABLE processed_pose_batch (
 ### 이 결정이 되돌리는 것 / 되돌리지 않는 것
 
 - 되돌리지 않는다: 파티셔닝 자체, 월별 RANGE 스킴, `DROP PARTITION` TTL. **키의 의미만 바꾼다.**
-- 기존 파티션 실험(ALTER 96분 / DROP PARTITION vs DELETE 625배 / pruning)은 전부 **구조**에 대한
+- 기존 파티션 실험(ALTER 96분 / DROP PARTITION vs DELETE 625배 — [조건](../portfolio/realmysql-experiments.md#drop-partition-625x) / pruning)은 전부 **구조**에 대한
   측정이라 **무효화되지 않는다.** 오히려 `realmysql-experiments.md` 의 「유일한 정당화 = TTL」 서사에
   *"그 TTL 의 기준이 적재일이라 틀려 있었고 이벤트 시각으로 맞췄다"* 는 정정이 얹힌다.
 

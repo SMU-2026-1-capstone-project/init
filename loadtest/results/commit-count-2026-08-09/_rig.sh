@@ -87,8 +87,37 @@ learn_all_hosts() {
 rsh() { ssh "${SSH_OPTS[@]}" "ec2-user@$1" "${@:2}"; }
 
 # ── MySQL ────────────────────────────────────────────────────────────────
+#
+# 🔴 컨테이너 이름을 박지 않는다. 예전엔 `sf-mysql` 이 하드코딩이었는데 **부트스트랩과
+#    docker-compose 가 만드는 이름은 `shadowfit-mysql`** 이다. 이름이 어긋나면
+#    `docker exec` 이 «No such container» 를 내는데, 아래가 stderr 를 버려서 결과가
+#    **빈 문자열**로 돌아온다 — 그러면 사전 확인이 「세션 시드가 부족하다 — ''/100」 처럼
+#    **엉뚱한 곳**을 가리킨다. 2026-08-17 P5 리허설에서 실제로 그렇게 헤맸다.
+MYSQL_CTN=${MYSQL_CTN:-shadowfit-mysql}
+# 자격증명도 같은 이유로 뺀다. 예전엔 `-ushadowfit -pshadowfit` 이 박혀 있었는데 부트스트랩이
+# 만드는 비밀번호는 **`.env` 의 `MYSQL_PASSWORD`**(기본 1234)다 — 탑승 목록도 «rig 기본 PW(1234)»
+# 라고 적고 있었으니, 코드 쪽이 문서와 어긋나 있었다.
+MYSQL_USER=${MYSQL_USER:-shadowfit}
+MYSQL_PW=${MYSQL_PW:-1234}
+
 mysql_q() {  # $1 = SQL. stdout 으로 결과(탭 구분, 헤더 없음)
-  rsh "$DB_PUB" "sudo docker exec sf-mysql mysql -ushadowfit -pshadowfit shadowfit -N -e \"$1\"" 2>/dev/null
+  rsh "$DB_PUB" "sudo docker exec $MYSQL_CTN mysql -u$MYSQL_USER -p$MYSQL_PW shadowfit -N -e \"$1\"" 2>/dev/null
+}
+
+# 🔴 stderr 를 버리는 대가를 여기서 갚는다. **한 번은** 삼키지 않고 물어본다 —
+#    이게 없으면 「DB 에 못 붙는다」가 「데이터가 없다」로 위장한다.
+assert_mysql_reachable() {
+  local out
+  out=$(rsh "$DB_PUB" "sudo docker exec $MYSQL_CTN mysql -u$MYSQL_USER -p$MYSQL_PW shadowfit -N -e 'SELECT 1;'" 2>&1)
+  # 🔴 stderr 를 같이 받는 것이 이 확인의 요점인데, mysql 클라이언트는 **성공해도**
+  #    "Using a password on the command line interface can be insecure." 를 stderr 로 낸다.
+  #    그 줄을 안 걷어내면 «정상인데 실패» 로 읽는다 — 2026-08-17 리허설 1차가 여기서 멈췄다.
+  #    경고만 지우고 나머지는 메시지에 그대로 보여준다(진짜 오류는 보여야 한다).
+  [ "$(printf '%s\n' "$out" | grep -vi 'warning' | tr -d '[:space:]')" = "1" ] \
+    || die "MySQL 에 질의할 수 없다 (컨테이너 '$MYSQL_CTN' @ $DB_PUB) — 받은 것: '$out'
+   이름이 다르면 MYSQL_CTN 으로 넘긴다. 이 확인이 없으면 다음 사전 확인들이
+   전부 «데이터가 없다» 로 잘못 보고한다"
+  echo "  MySQL: 컨테이너 '$MYSQL_CTN' 응답 확인"
 }
 
 # 🔴 카운터는 Prometheus 가 아니라 MySQL 에서 직접 읽는다.
@@ -124,6 +153,18 @@ set_durability() {  # $1 = innodb_flush_log_at_trx_commit, $2 = sync_binlog
 reset_rows() {  # 판 사이 상태 초기화. 실패하면 다음 판이 «테이블이 커진 것» 을 잰다 → 중단
   mysql_q "DELETE FROM pose_data WHERE session_id BETWEEN $SESS_LO AND $SESS_HI;" \
     || die "pose_data 초기화 실패 ($1) — 행 수는 이 실험이 고정해야 하는 조건이다"
+}
+
+# 세션 시드 확인. 없으면 전 요청이 실패하는데 그건 «측정했더니 낮다» 처럼 보인다.
+# 🔴 여기(공통부)에 둔다 — 예전엔 sessions_sweep.sh 에만 있어서 從 스크립트를 단독으로
+#    돌리면 이 그물이 통째로 없었다(#273 ③). 복사본을 만들면 한쪽만 고쳐진다는 것이
+#    이 파일이 존재하는 이유 그 자체다.
+assert_sessions_exist() {
+  local want=$(( SESS_HI - SESS_LO + 1 )) got
+  got=$(mysql_q "SELECT COUNT(*) FROM exercise_sessions WHERE id BETWEEN $SESS_LO AND $SESS_HI;")
+  [ "$got" = "$want" ] \
+    || die "세션 시드가 부족하다 — $SESS_LO~$SESS_HI 중 '$got'/$want 개만 있다. FK 로 전 요청이 실패한다"
+  echo "  세션 시드: $SESS_LO~$SESS_HI $want개 확인"
 }
 
 # ── 백엔드 ───────────────────────────────────────────────────────────────
@@ -192,7 +233,10 @@ restart_backend() {  # $1 = pool
 #    «워밍업 ghz 실패» 로 죽었고, 메시지는 «백엔드 미기동 / 포트 차단?» 을 가리켜
 #    엉뚱한 곳을 보게 만들었다. (restart_backend 안의 `~/app.jar` 등은 큰따옴표 안이라
 #    로컬 전개가 안 되고 원격에서 풀린다 — 그래서 그쪽은 멀쩡했다.)
-GHZ=/home/ec2-user/go/bin/ghz
+# 🔴 경로도 박지 않는다. 예전 값 `/home/ec2-user/go/bin/ghz` 는 **go 툴체인으로 깔던 시절**의
+#    자리인데, 지금 `bootstrap.sh` 는 릴리스 바이너리를 `/usr/local/bin/ghz` 에 넣는다.
+#    (#249·#259 가 run_all.sh 쪽에서 같은 것을 이미 고쳤고, 여기만 남아 있었다.)
+GHZ=${GHZ:-/usr/local/bin/ghz}
 WARM_C=3; WARM_SEC=30
 
 # 스윕이 ghz 에 인자를 더 얹는 통로. 기본은 빈 값이라 기존 스윕은 그대로다.
@@ -200,6 +244,20 @@ WARM_C=3; WARM_SEC=30
 # 🔴 **워밍업에도 같이 건다.** 커넥션 수처럼 «연결을 만드는 방식» 을 흔드는 인자를 본판에만
 #    걸면, 워밍업이 만들어 둔 연결 상태 위에서 본판이 돌아 조작 변수가 반쯤만 적용된다.
 GHZ_EXTRA=${GHZ_EXTRA:-}
+
+# 버림판 표시. 1 이면 이 판의 실패를 **집계에 넣지 않는다** — 버림판은 애초에 표 밖이다.
+# 🔴 예전엔 버림판이 실패하면 행은 sed 로 지워지는데 FAILED 에는 남아, 본판 25개가 전부
+#    멀쩡해도 스윕이 exit 1 로 끝나고 요약이 **표에 없는 태그**를 지목했다(#273 ①).
+GHZ_DISCARD=${GHZ_DISCARD:-0}
+
+# 실패를 집계할지 정한다. 버림판이면 행도 안 남긴다 — 어차피 호출부가 지운다.
+note_fail() {  # $1=태그 $2=사유
+  if [ "$GHZ_DISCARD" = "1" ]; then
+    echo "  (버림판 실패 — 집계에 넣지 않는다: $1:$2)" >&2
+    return 0
+  fi
+  fail_row "$1"; FAILED+=("$1:$2")
+}
 
 run_ghz() {  # $1=태그 $2=data-file $3=c $4=n  → TSV 행을 $LOG 에 남기고 "rps fail" 출력
   local tag=$1 data=$2 c=$3 n=$4
@@ -211,7 +269,7 @@ run_ghz() {  # $1=태그 $2=data-file $3=c $4=n  → TSV 행을 $LOG 에 남기�
            --data-file $data -c $WARM_C $GHZ_EXTRA -z ${WARM_SEC}s $APP_PRIV:6565 >/dev/null 2>&1"; then
     # 상태를 바꾸지 않은 실패다 — 이 판만 버리고 다음으로 간다.
     echo "  ✗ 워밍업 ghz 실패 — $tag 판을 버린다 (백엔드 미기동 / 포트 차단?)" >&2
-    fail_row "$tag"; FAILED+=("$tag:워밍업"); return 1
+    note_fail "$tag" "워밍업"; return 1
   fi
   reset_rows "워밍업 직후, $tag"
 
@@ -232,7 +290,7 @@ run_ghz() {  # $1=태그 $2=data-file $3=c $4=n  → TSV 행을 $LOG 에 남기�
 
   if ! scp "${SCP_OPTS[@]}" -q "ec2-user@$LOADER_PUB:/tmp/$f" "$OUT/$f"; then
     echo "  ✗ 결과 회수(scp) 실패 ($tag) — 원격 /tmp/$f 는 남아 있다" >&2
-    fail_row "$tag"; FAILED+=("$tag:회수"); return 1
+    note_fail "$tag" "회수"; return 1
   fi
   reset_rows "본판 직후, $tag"
 
@@ -280,7 +338,7 @@ print(f"    커밋={commits} fsync={fsyncs} ({round(fsyncs/secs,1)}/s) "
       f"fsync/커밋={round(fsyncs/commits,2) if commits > 0 else 'n/a'}")
 PY
   rc=$?
-  if [ $rc -ne 0 ]; then fail_row "$tag"; FAILED+=("$tag:파싱/내용"); return 1; fi
+  if [ $rc -ne 0 ]; then note_fail "$tag" "파싱/내용"; return 1; fi
   return 0
 }
 

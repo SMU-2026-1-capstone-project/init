@@ -104,7 +104,7 @@ AI가 코드를 빨리 짜주면 **순수 구현은 싸지고**, 차별화는 **
 |---|:--:|---|---|
 | [`portfolio/db-deep-dive.md`](../portfolio/db-deep-dive.md) | ✅ | ✅ | — |
 | [`portfolio/problem-solving-log.md`](../portfolio/problem-solving-log.md) | ✅ | ✅ | — |
-| projection 수치 카드 (before/after) | ⬜ | ✅ **완료** — payload −98.7%([`portfolio-narrative.md`](../portfolio/portfolio-narrative.md) §2 읽기축) | 6월 |
+| projection 수치 카드 (before/after) | ⬜ | ✅ **완료** — payload −98.7%([`portfolio-narrative.md`](../portfolio/portfolio-narrative.md) §2 읽기축 · [조건](../portfolio/realmysql-experiments.md#projection-98-7)) | 6월 |
 | 동시성 카드 2개 (일일집계·report 멱등성) | ⬜ | ✅ **완료** — 낙관락·멱등 수신·MVCC 재현까지 | 6월 |
 | 파티셔닝+TTL 설계 문서 | ⬜ | ✅ **완료** — DROP PARTITION, DELETE 대비 625x | 7월 |
 | case study (GET /reports 진화기) | ⬜ | ⬜ **없다** — `docs/portfolio/` 에 해당 문서 없음. 재료는 흩어져 있다(projection·인덱스·keyset·버퍼풀) | 7~8월 |

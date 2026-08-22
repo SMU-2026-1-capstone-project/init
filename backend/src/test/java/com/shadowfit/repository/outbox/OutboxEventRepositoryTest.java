@@ -26,8 +26,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 상태"는 곧 {@code lockedBy} 가 다른 값이라는 뜻이므로, 그 상태를 만들어놓고 옛 소유자 이름으로
  * 갱신을 시도하면 된다.
  *
- * <p>단, {@code FOR UPDATE SKIP LOCKED} 를 쓰는 선점 쿼리는 H2 가 지원하지 않아 여기서 검증하지
- * 못한다. 그쪽은 실제 MySQL 로 확인했다(PR #63).
+ * <p>🔴 <b>정정(2026-08-20)</b>: 여기엔 «{@code FOR UPDATE SKIP LOCKED} 를 H2 가 지원하지 않아
+ * 검증하지 못한다» 고 적혀 있었는데, <b>H2 는 그 문법을 받는다</b>(실제로 돌려 확인). 그 전제 때문에
+ * 발행기 경로 전체가 테스트 없이 남아 있었다 — 지금은
+ * {@code service.Exercise.OutboxPublisherFailureInjectionTest} 가 {@code dispatchPending()} 을 통째로
+ * 돌린다. 다만 <b>문법을 받는 것</b>과 <b>MySQL 과 같은 잠금 의미를 갖는 것</b>은 다르므로, 발행기를
+ * 둘 이상 띄웠을 때 서로 다른 행을 집는지는 여전히 실 MySQL 의 몫이다(PR #63 에서 수동 확인).
  */
 @SpringBootTest
 @Transactional

@@ -34,7 +34,7 @@
 - **문제**: pose_data 적재가 동시성 부하에서 느림(p99 수 초).
 - **Root cause**: `PoseDataService.savePoseDataBatch`의 JPA `saveAll`이 `@GeneratedValue(IDENTITY)` 때문에 Hibernate batch 원천 차단 → 개별 INSERT N방.
 - **Solution**: `JdbcTemplate.batchUpdate` multi-row INSERT (IDENTITY 우회, 25방→1방).
-- **Result**: throughput **23.5→46.7 RPS(+99%)**, p50 −64%, p99 **−37%** (공정 측정, [`load-test §7.6`](../decisions/load-test-strategy.md)).
+- **Result**: throughput **23.5→46.7 RPS(+99%)**, p50 −64%, p99 **−37%** (2026-05-31 로컬, warmup 60초 폐기 후 ramp 5→100 · 절대 RPS 는 인용 금지, 델타만 — [조건](../decisions/load-test-strategy.md#batch-insert-99)).
 - **면접**: "config `batch_size`로 왜 안 풀었나? → IDENTITY라 Hibernate batch 미발동, 드라이버 레벨 batch가 정석."
 
 ### #2 🔴 타임아웃 스케줄러 vs FastAPI 콜백 경합 → 낙관적 락
@@ -125,10 +125,10 @@
 
 | 카드 | 성격 | 상태 · 코드 위치 |
 |---|---|---|
-| **읽기 최적화 (projection)** | 🔴 헤드라인 | ✅ `PoseDataRepository:29` `PoseFrameProjection`(3컬럼). 실측 payload **−98.7%**, warm 쿼리 **8x**(로컬 412만 행) → **29~41x**(AWS 1억 행, 2026-07-15) ([`report-read-path.md`](../decisions/report-read-path.md) ①)<br>⚠️ precompute가 세션당 1회 도는 비동기 잡 — "리포트가 빨라졌다"가 아니라 **잡의 I/O·버퍼풀 점유 절감**<br>🔴 **정상 조회는 이 쿼리를 안 부른다**(precompute + 폴백 전용, 코드 판독·미측정). 3컬럼 시절 값이고 현재 4컬럼으로는 재검증 안 함 — [조건표](./realmysql-experiments.md) |
+| **읽기 최적화 (projection)** | 🔴 헤드라인 | ✅ `PoseDataRepository:29` `PoseFrameProjection`(**현재 4컬럼**, 측정은 3컬럼 시점). 실측 payload **−98.7%**, warm 쿼리 **8x**(로컬 412만 행) → **29~41x**(AWS 1억 행, 2026-07-15) ([`report-read-path.md`](../decisions/report-read-path.md) ① · [인용 조건](./realmysql-experiments.md#projection-98-7))<br>⚠️ precompute가 세션당 1회 도는 비동기 잡 — "리포트가 빨라졌다"가 아니라 **잡의 I/O·버퍼풀 점유 절감**<br>🔴 **정상 조회는 이 쿼리를 안 부른다**(precompute·폴백 전용, 코드 판독·미측정) |
 | **일일 집계 lost-update** | 🟠 동시성 | ✅ `DailyLogRepository:30` `ON DUPLICATE KEY UPDATE` 원자 upsert. 재현·비교는 `loadtest/measure_lock.sh`(scratch `lock_lab`) |
 | **report 생성 멱등성** | 🟠 정합성 | ✅ `mysql/schema.sql:204` `UNIQUE KEY uk_report_session (session_id)` |
-| **파티셔닝 + TTL** | 시계열 운영 | ✅ `mysql/schema.sql:148` `PARTITION BY RANGE(UNIX_TIMESTAMP(created_at))` + 자동 운영 스케줄러. **DROP PARTITION 625배** 실측<br>⚠️ 조건: 로컬·더미, 행수 불일치로 raw 625배 = **행당 570배**, DROP 도 진짜 O(1) 아님(파일 삭제 I/O). AWS 축소 재현 421배 — [조건표](./realmysql-experiments.md) |
+| **파티셔닝 + TTL** | 시계열 운영 | ✅ `mysql/schema.sql:148` `PARTITION BY RANGE(UNIX_TIMESTAMP(created_at))` + 자동 운영 스케줄러. **DROP PARTITION 625배** 실측([조건](./realmysql-experiments.md#drop-partition-625x) — 2026-06-03 로컬 1억 행 더미 JSON, 두 팔의 행수가 달라 행당 정규화는 570배) |
 | **Resilience4j** | 운영 신뢰성 | ✅ `ExerciseAnalysisService:83` `aiCircuitBreaker()` + gRPC deadline |
 
 > ⚠️ **"구현됨"과 "카드가 됨"은 다르다.** 위 다섯은 코드가 있다는 것까지만 확인했고, §2 카드들처럼 **문제 → 원인 → 해결 → 수치**로 정리된 상태가 아니다. 특히 *일일 집계 lost-update* 와 *report 멱등성* 은 **"경합이 실제로 일어나 손실이 났다"는 재현 근거**가 카드에 필요한데, 지금은 scratch 테이블 실험(`measure_lock.sh`)만 있고 실코드 경로의 사례가 아니다. 면접에서 "실제로 겪었나"를 물으면 갈린다.

@@ -15,6 +15,7 @@ import com.shadowfit.repository.exercise.SessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -57,7 +58,15 @@ public class PoseDataService {
     // 다운샘플 윈도우 크기 — R-sweep 실측(docs/decisions/pose-ingest-downsampling.md §5-1(4))에서
     // R=25→5는 처리량 +126%·저장 5배↓지만 R=5→1은 배치 고정비용 비중이 커져 행당 효율이 오히려
     // 악화되는 수확체감 지점이라 R=5를 하한으로 채택(2026-07-25, §5-1(7)(8) 분리배포 실측과 별개 결정).
-    private static final int DOWNSAMPLE_WINDOW = 5;
+    //
+    // 🔴 2026-08-18: 상수에서 설정으로 뺐다. **기본값이 5라 동작은 그대로다.**
+    //    이유는 튜닝이 아니라 측정이다 — 정본 「다운샘플 1.7배」(one-pager)가 **단일 핫세션**
+    //    조건에서 나온 값이고(fsync 3.47배를 1.03배로 무너뜨린 바로 그 조건), 다세션에서
+    //    배수가 유지되는지 아무도 모른다. 팔을 바꾸려면 재빌드가 필요했고, 그 재빌드가
+    //    실험 자체를 막고 있었다(P2, AWS-RIDE-ALONG §1).
+    //    ⚠️ 값을 바꾸는 것은 **측정 조건**이지 채택이 아니다. R=5 하한은 위 결정 그대로다.
+    @Value("${pose-data.downsample-window:5}")
+    private int downsampleWindow = 5;   // 초기값도 둔다 — Spring 밖에서 만들면 0 이 되고, 그 0 은 아래 루프에서 무한 루프다
 
     /**
      * [실시간 저장] FastAPI가 주기적으로 쏴주는 분석 좌표 데이터 묶음을 DB에 저장합니다.
@@ -122,7 +131,7 @@ public class PoseDataService {
         // batchUpdate 부터는 아니다. gRPC 밖 호출에서는 이 검사가 아무 일도 하지 않는다.
         CallCancellation.abortIfAbandoned("pose 배치 저장 (session=" + sessionId + ")");
 
-        List<PoseDataRequest> downsampled = downsample(grpcList, DOWNSAMPLE_WINDOW);
+        List<PoseDataRequest> downsampled = downsample(grpcList, downsampleWindow);
 
         jdbcTemplate.batchUpdate(INSERT_POSE_SQL, new BatchPreparedStatementSetter() {
             @Override
@@ -219,6 +228,12 @@ public class PoseDataService {
      * 실제로 가장 깊은 프레임이 밀려나므로, 섞임을 방지하는 것이기도 하다.
      */
     private List<PoseDataRequest> downsample(List<PoseDataRequest> frames, int window) {
+        // 🔴 0 이면 아래 `start += window` 가 **무한 루프**다 — 스레드가 매달리고 힙이 찬다.
+        //    설정으로 뺀 값(#207 아님, P2 측정용)이라 오타 하나가 그 상태를 만들 수 있어
+        //    조용히 고치지 않고 즉시 터뜨린다. 잘못된 설정은 첫 요청에서 드러나야 한다.
+        if (window < 1) {
+            throw new IllegalArgumentException("pose-data.downsample-window 는 1 이상이어야 한다: " + window);
+        }
         List<PoseDataRequest> result = new java.util.ArrayList<>();
         for (int start = 0; start < frames.size(); start += window) {
             int end = Math.min(start + window, frames.size());
