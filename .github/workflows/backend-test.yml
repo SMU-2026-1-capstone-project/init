@@ -62,6 +62,32 @@ jobs:
       - name: Run backend test suite
         run: ./gradlew :backend:test
 
+      # TEMP - #318 CI time measurement. Delete this step and branch when done.
+      - name: "class-time (#318)"
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, os
+          from xml.etree import ElementTree as ET
+          rows = []
+          for f in sorted(glob.glob("backend/build/test-results/test/TEST-*.xml")):
+              r = ET.parse(f).getroot()
+              rows.append((float(r.get("time", 0)), int(r.get("tests", 0)),
+                           int(r.get("skipped", 0)), r.get("name", os.path.basename(f))))
+          rows.sort(reverse=True)
+          print("=== class time top 15 (sec) ===")
+          for t, n, sk, name in rows[:15]:
+              print("%8.3f  tests=%-3d skip=%-3d %s" % (t, n, sk, name))
+          print()
+          print("classes=%d  sum_test_time=%.3f s  tests=%d  skipped=%d"
+                % (len(rows), sum(r[0] for r in rows),
+                   sum(r[1] for r in rows), sum(r[2] for r in rows)))
+          print()
+          probe = [r for r in rows if r[3].endswith("GrpcServerDeadlineProbeTest")]
+          print("=== probe ===")
+          print(probe[0] if probe else "no XML (disabled)")
+          PY
+
       # 실패 원인을 아티팩트 다운로드 없이 PR 화면에서 바로 보기 위한 요약.
       # 컴파일 단계에서 죽으면 XML 자체가 없으므로 그 경우도 명시적으로 알린다.
       - name: 테스트 결과 요약
