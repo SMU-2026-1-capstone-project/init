@@ -163,8 +163,9 @@ P6 의 rig 은 **부하기에서 돌며 대상 박스를 SSH 로 몬다**(`../re
 1. 인스턴스 **2대** — 대상 `c7i.4xlarge`, 부하기 `c7i.large`. 같은 VPC·서브넷(사설 IP 로 붙는다)
 2. 보안그룹 인바운드 — 부하기 → 대상 **22**(SSH), **8000**(AI HTTP), **8080**(Spring), **6565**(gRPC)
 3. **SSH 키를 부하기에 둔다** — `/root/.ssh/measure.pem`, `chmod 600`. 부하기가 대상을 몬다
-4. **양쪽 토큰 일치** — `AI_PUBLIC_TOKEN`(프레임 경로)·`INTERNAL_API_TOKEN`(gRPC 메타데이터).
-   다르면 preflight 가 막는다
+4. **두 박스가 같은 토큰을 든다** — `AI_PUBLIC_TOKEN`(프레임 경로)·`INTERNAL_API_TOKEN`(gRPC 메타데이터)을
+   대상과 부하기에서 **각각** 같은 값으로. 어긋나면 preflight 가 막는다.
+   ⚠️ **두 변수끼리는 달라야 한다** — 같은 값이면 AI 가 아예 안 뜬다(#230 단언 · #261)
 
 **부트스트랩 — `ROLE` 로 갈라 돌린다**
 
@@ -182,7 +183,7 @@ ROLE=p6-loader bash bootstrap.sh
 cd /root/init
 S3_BASE=s3://내버킷/shadowfit TARGET_HOST=<대상 사설 IP> \
 TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>" \
-AI_PUBLIC_TOKEN=<대상과 같은 값> GHZ_TOKEN=<대상과 같은 값> \
+AI_PUBLIC_TOKEN=<대상 .env 의 AI_PUBLIC_TOKEN> GHZ_TOKEN=<대상 .env 의 INTERNAL_API_TOKEN> \
 GHZ_RPS=19 GHZ_DATA=/root/batch_multi.json GHZ_BIN=/usr/local/bin/ghz \
 PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
   nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &

@@ -254,6 +254,24 @@ class GrpcServerDeadlineProbeTest {
     }
 
     /**
+     * {@code baseline} 이후로 늘어난 행 수. 하나라도 보이면 바로 돌려주고, 끝내 안 보이면
+     * 상한까지 기다린 뒤 0 을 돌려준다 (#302).
+     *
+     * <p>«기다렸는데도 0» 과 «아직 커밋이 안 보여서 0» 을 가르는 것이 이 메서드의 전부다.
+     * 앞의 것만이 «서버가 일을 안 했다» 는 뜻이다.
+     */
+    private long awaitRowsSince(long baseline, long timeoutMs) throws InterruptedException {
+        long deadline = System.nanoTime() + timeoutMs * 1_000_000L;
+        while (true) {
+            long rows = countRows() - baseline;
+            if (rows > 0 || System.nanoTime() >= deadline) {
+                return rows;
+            }
+            Thread.sleep(50);
+        }
+    }
+
+    /**
      * 행 수를 직접 센다. {@code PoseDataRepository.countSince} 는 쓸 수 없다 — 그 쿼리는
      * {@code created_at > :since} 조건인데, 운영 스키마에는 {@code DEFAULT CURRENT_TIMESTAMP} 가
      * 있지만(V1:205) H2 테스트 스키마는 엔티티에서 만들어지고 그 컬럼이

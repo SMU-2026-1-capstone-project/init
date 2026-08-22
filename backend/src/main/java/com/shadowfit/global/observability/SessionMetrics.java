@@ -27,6 +27,16 @@ public class SessionMetrics {
     private static final String POSE_BATCH_FRAMES = "shadowfit.pose.batch.frames";
 
     /**
+     * 종료된 세션에 도착한 pose 배치 콜백을 거절한 건수 (#187 (b)). tags: status(세션의 현재 상태)
+     *
+     * <p>이 지표가 0 이 아니면 둘 중 하나다 — ① 종료 직전 정상 배치가 CompleteAnalysis 와
+     * 경합해 뒤늦게 도착했거나, ② <b>남의 세션에 끼어들려는 주입이 그 세션이 끝난 뒤 도착</b>했다.
+     * 둘을 여기서 못 가른다(콜백에 «주장된 신원» 이 없다 — 그게 채널 ① nonce(d)가 필요한 이유다).
+     * 이 콜백 층 대조는 <b>심층방어</b>이지 #187 의 본체 방어가 아니다.
+     */
+    private static final String POSE_BATCH_REJECTED = "shadowfit.pose.batch.rejected";
+
+    /**
      * pose_data 배치 INSERT 가 만난 데드락과 그 재시도 결과. tags: outcome(retried/recovered/exhausted)
      *
      * <p>이 지표가 필요한 이유는 재시도 횟수를 «2회» 로 고정했기 때문이다 — 실측(#276)은
@@ -177,6 +187,14 @@ public class SessionMetrics {
      */
     public void poseBatchDeadlockRetry(String outcome) {
         registry.counter(POSE_DEADLOCK_RETRIES, "outcome", outcome).increment();
+    }
+
+    /**
+     * @param status 배치가 도착했을 때 세션이 있던 상태(COMPLETED/FAILED/CANCELLED). IN_PROGRESS
+     *               는 여기 안 온다 — 그건 정상 경로다.
+     */
+    public void poseBatchRejected(String status) {
+        registry.counter(POSE_BATCH_REJECTED, "status", status).increment();
     }
 
     private DistributionSummary frames(String stage) {
