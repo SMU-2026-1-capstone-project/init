@@ -1,0 +1,13 @@
+# 리플리카까지의 왕복 — 조건 칸에 같이 가는 값
+# AZ 구성: same-az(ap-northeast-2a)
+
+## ICMP (막혀 있으면 빈칸이 정상이다 — 보안그룹이 ICMP 를 안 열었을 뿐)
+10 packets transmitted, 0 received, 100% packet loss, time 9365ms
+
+  (ping 불가)
+
+## SQL 왕복 — 커밋 경로가 실제로 무는 자
+SELECT 1 왕복(us): p50=43623 p95=45811 max=107372 (n=30)
+
+# ⚠️ 이 왕복에는 docker exec 가 포함된다 — 순수 네트워크 RTT 가 아니라
+#    «이 rig 이 리플리카를 만질 때 무는 값» 이다. 계측 바닥으로 읽을 것.
