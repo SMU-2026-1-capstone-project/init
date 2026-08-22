@@ -257,8 +257,12 @@ docker pull -q percona/percona-toolkit || die "percona-toolkit pull 실패"
 #    없어도 «실패로 안 보이는» 것이 이 이미지의 성질이다 — 런타임 pull 로 넘어가거나
 #    논리 덤프로 되돌아가고, 되돌림은 「성공」처럼 보인다. 그래서 측정 전에 받는다.
 if [ "$ROLE" = "db" ]; then
-  step "percona-xtrabackup 이미지 (P3 백업 · P4 복제)"
-  docker pull -q percona/percona-xtrabackup:8.0 || die "percona-xtrabackup pull 실패"
+  # ⚠️ 이름의 정본은 rig 이다(`repl2_rig.sh:60`). 이 스크립트는 run_all.sh 보다 **먼저 도는
+  #    별개 실행**이라 그 값을 물려받을 길이 없어 기본값을 한 벌 더 갖는다 (#374).
+  #    한쪽만 덮어쓰면 run_all.sh 의 게이트가 «이미지가 없다» 로 **막는다** — 조용히 안 어긋난다.
+  XB_IMAGE=${XB_IMAGE:-percona/percona-xtrabackup:8.0}
+  step "xtrabackup 이미지 (P3 백업 · P4 복제) — $XB_IMAGE"
+  docker pull -q "$XB_IMAGE" || die "$XB_IMAGE pull 실패"
 fi
 
 # ── 스키마 (Flyway) ──────────────────────────────────────────────────────

@@ -213,6 +213,17 @@ REPL_REHEARSAL_SESSIONS=${REPL_REHEARSAL_SESSIONS:-134}   # 경로 점검용 축
 TIMEOUT_REPL_GATE=${TIMEOUT_REPL_GATE:-10800}  # 3시간
 TIMEOUT_REPL=${TIMEOUT_REPL:-14400}            # 4시간
 
+# 🔴 이름을 **여기서 한 번** 정하고 rig 에 물려준다 (#374).
+#    게이트(위 repl_preflight)와 rig(`repl2_rig.sh:60`)가 각각 이름을 들고 있으면,
+#    `XB_IMAGE` 를 덮어썼을 때 **게이트는 8.0 을 보고 통과시키고 rig 은 없는 이미지로 돈다.**
+#    그 실패는 논리 덤프로 되돌아가는데 **게이트를 이미 지난 뒤라 라운드가 그대로 돌고**,
+#    표에는 실패로 안 남는다(`replica_build.txt` 의 «초기화 경로» 열 하나뿐이다).
+#    export 하면 rig 이 이 값을 그대로 받으므로 둘이 어긋날 수 없다.
+#    ⚠️ `bootstrap.sh` 는 **이 스크립트보다 먼저 도는 별개 실행**이라 자기 기본값을 갖는다.
+#       한쪽만 덮어쓰면 위 게이트가 «없다» 로 **큰 소리로 막는다** — 조용히 어긋나지 않는다.
+XB_IMAGE=${XB_IMAGE:-percona/percona-xtrabackup:8.0}
+
+export XB_IMAGE
 export REPLICA_HOST REPLICA_SSH REPL_AZ_MODE
 
 export PW DB_NAME CONTAINER
@@ -470,10 +481,10 @@ phase_repl_preflight() {
   #       «의도한 덤프» 와 «이미지가 없어서 된 덤프» 를 여기서 가른다.
   if [ "${REPLICA_INIT:-xtrabackup}" = "dump" ]; then
     note "⏭  xtrabackup 이미지 검사 건너뜀 — REPLICA_INIT=dump (논리 덤프를 **의도한** 라운드다)"
-  elif docker image inspect percona/percona-xtrabackup:8.0 >/dev/null 2>&1; then
+  elif docker image inspect "$XB_IMAGE" >/dev/null 2>&1; then
     note "✅ xtrabackup 이미지"
   else
-    note "🔴 xtrabackup 이미지가 없다 — 이대로 돌면 리플리카 초기화가 조용히 논리 덤프로 대체되고, 이 라운드가 밟아 보려던 경로를 못 밟는다. 받는 법: docker pull percona/percona-xtrabackup:8.0. 부트스트랩(ROLE=db)이 받아 두므로, 없다면 이 박스가 부트스트랩을 안 거쳤다는 뜻이다"
+    note "🔴 xtrabackup 이미지가 없다 — 이대로 돌면 리플리카 초기화가 조용히 논리 덤프로 대체되고, 이 라운드가 밟아 보려던 경로를 못 밟는다. 받는 법: docker pull $XB_IMAGE. 부트스트랩(ROLE=db)이 받아 두므로, 없다면 이 박스가 부트스트랩을 안 거쳤다는 뜻이다"
     ok=1
   fi
 
@@ -481,10 +492,10 @@ phase_repl_preflight() {
   #    (`repl2_rig.sh:509`). 소스만 보고 통과시키면 절반만 확인한 것이다. P3(1대)엔
   #    없던 요구라 이 검사도 이 라운드가 처음이다.
   if [ -n "$REPLICA_HOST" ] && [ "${REPLICA_INIT:-xtrabackup}" != "dump" ]; then
-    if $REPLICA_SSH "docker image inspect percona/percona-xtrabackup:8.0 >/dev/null 2>&1" >/dev/null 2>&1; then
+    if $REPLICA_SSH "docker image inspect $XB_IMAGE >/dev/null 2>&1" >/dev/null 2>&1; then
       note "✅ xtrabackup 이미지 — 리플리카에도 있다"
     else
-      note "🔴 리플리카에 xtrabackup 이미지가 없다 — 사본을 붓는 단계가 거기서 막힌다. 리플리카 박스에서: docker pull percona/percona-xtrabackup:8.0"
+      note "🔴 리플리카에 xtrabackup 이미지가 없다 — 사본을 붓는 단계가 거기서 막힌다. 리플리카 박스에서: docker pull $XB_IMAGE"
       ok=1
     fi
   fi
