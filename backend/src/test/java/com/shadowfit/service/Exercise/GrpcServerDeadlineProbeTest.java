@@ -19,6 +19,7 @@ import io.grpc.Metadata;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
 import io.grpc.ManagedChannelBuilder;
+import net.devh.boot.grpc.server.event.GrpcServerStartedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +27,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -67,19 +71,54 @@ import static org.mockito.Mockito.doAnswer;
  * 실제 저장이라, 여기서 늦추면 «클라이언트가 포기한 뒤에 저장이 시작되는» 순서를 확정적으로
  * 만들 수 있다. 타이밍 경주에 맡기지 않는다 — {@code PoseDataOrphanRaceTest} 와 같은 방식이다.
  *
- * <p>테스트 전용 포트(16565)로 진짜 서버를 띄운다 — in-process 는 클래스패스 버전 문제로 못 쓴다
- * (상수 주석 참고).
+ * <p>진짜 서버를 띄운다 — in-process 는 클래스패스 버전 문제로 못 쓴다(아래 주석 참고). 포트는
+ * <b>OS 가 고르게 둔다</b>({@code grpc.server.port=0}) — 고정 포트는 같은 박스에서 테스트 JVM 이
+ * 둘 이상 뜰 때 뒤에 온 쪽을 통째로 무너뜨렸다(#306).
  */
-@SpringBootTest(properties = "grpc.server.port=" + GrpcServerDeadlineProbeTest.GRPC_PORT)
+@SpringBootTest(properties = "grpc.server.port=0")
 @DisplayName("#206-B gRPC 서버가 클라이언트의 포기를 보는가")
 class GrpcServerDeadlineProbeTest {
 
-    /**
-     * 테스트 전용 포트. in-process 서버는 못 쓴다 — 클래스패스의 grpc-inprocess 와 코어 버전이
-     * 어긋나 {@code AbstractMethodError} 로 기동에 실패한다(2026-08-16 실측). deadline 은 어차피
-     * 전송 계층이 아니라 {@code Context} 로 전파되므로 실제 포트로 재도 같은 것을 잰다.
-     */
-    static final int GRPC_PORT = 16565;
+    // ── 포트 정책 — 왜 고정하지 않는가 (#306) ──────────────────────────────────
+    //
+    // in-process 서버는 못 쓴다 — 클래스패스의 grpc-inprocess 와 코어 버전이 어긋나
+    // AbstractMethodError 로 기동에 실패한다(2026-08-16 실측). deadline 은 어차피 전송
+    // 계층이 아니라 Context 로 전파되므로 진짜 포트로 재도 같은 것을 잰다.
+    //
+    // 🔴 그렇다고 포트를 «고정» 하면 안 된다. 예전엔 16565 를 박아 뒀는데, 같은 박스에서
+    //    테스트 JVM 이 둘 이상 뜨면 뒤에 온 쪽이 «Address already in use» 로 컨텍스트를 못
+    //    띄우고, 그 실패가 이 테스트 하나로 끝나지 않았다 — 2026-08-21 실행에서 419건 중
+    //    45건이 무너졌고 그중 44건은 「DB 가 비었다」로 나와 원인을 안 가리켰다. 이 저장소는
+    //    동시 세션과 워크트리가 상시라 CI(단일 러너)에서는 안 보이고 «로컬에서만» 터진다.
+    //
+    // grpc.server.port=0 은 OS 가 빈 포트를 고르게 한다(net.devh 규약). 「빈 포트를 찾아서
+    // 닫고 그 번호를 쓴다」 는 방식과 달리 찾은 뒤 물기까지의 틈이 없다 — 서버가 직접 문다.
+    // 그래서 실제 번호는 기동 후에야 알 수 있고, 아래가 그것을 받는다.
+
+    /** 서버가 실제로 문 포트를 담아 둘 자리. */
+    @TestConfiguration
+    static class GrpcPortCapture {
+        @Bean
+        GrpcPortHolder grpcPortHolder() {
+            return new GrpcPortHolder();
+        }
+    }
+
+    /** 기동 이벤트에서 포트를 받는다. */
+    static class GrpcPortHolder implements ApplicationListener<GrpcServerStartedEvent> {
+        private volatile int port;
+
+        @Override
+        public void onApplicationEvent(GrpcServerStartedEvent event) {
+            this.port = event.getPort();
+        }
+
+        int port() {
+            return port;
+        }
+    }
+
+    @Autowired private GrpcPortHolder grpcPort;
 
     /**
      * 클라이언트가 기다리는 시간. 아래 지연보다 짧아야 «포기 후 저장» 순서가 확정된다.
@@ -129,7 +168,13 @@ class GrpcServerDeadlineProbeTest {
                 .startTime(LocalDateTime.now()).status(Status.IN_PROGRESS)
                 .totalReps(0).difficultyLevel(1).build()).getId();
 
-        channel = ManagedChannelBuilder.forAddress("localhost", GRPC_PORT).usePlaintext().build();
+        // 포트가 0 이면 서버가 안 떴다는 뜻이다. 그대로 두면 「연결 거부」로 나와 원인을 안
+        // 가리키므로, 여기서 무엇이 틀렸는지를 말하고 멈춘다.
+        assertThat(grpcPort.port())
+                .as("gRPC 서버가 기동하지 않았다 — GrpcServerStartedEvent 를 못 받았다 (#306)")
+                .isGreaterThan(0);
+
+        channel = ManagedChannelBuilder.forAddress("localhost", grpcPort.port()).usePlaintext().build();
     }
 
     @AfterEach
