@@ -551,6 +551,8 @@ GIL 구간의 일부) · keep-alive 무효까지 **하나로 설명된다.**
 > 읽기 `GET /api/v1/diag/frame-path` · 초기화 `POST /api/v1/diag/frame-path/reset` ·
 > 스위치 `FRAME_PATH_METRICS`(기본 **OFF**) · `GIL_SWITCH_INTERVAL`(기본 **0 = 안 건드림**).
 > 🔴 **아직 아무것도 안 쟀다.** 붙인 것과 재는 것은 다른 일이고, 아래 ⚠️ 두 개는 그대로 살아 있다.
+> 🟢 **2026-08-23: 그 «재는 일» 이 從 R10 으로 등록됐다**([`AWS-RIDE-ALONG.md` §1 從](../../loadtest/AWS-RIDE-ALONG.md)) — `c7i.4xlarge` **한 대 · ~30분**.
+> 계측의 대가는 먼저 쟀다: **A 팔 판 간 산포(2.4%) 이하**([결과](../../loadtest/results/frame-path-overhead-2026-08-23/README.md)) — **켜도 된다.**
 
 | 계측 | 무엇을 답하나 | 구현 |
 |---|---|---|
