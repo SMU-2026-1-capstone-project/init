@@ -50,6 +50,7 @@ class TokenReissueIntegrationTest {
     @Autowired private MemberRepository memberRepository;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private com.shadowfit.global.security.jwt.RefreshTokenHasher refreshTokenHasher;
 
     private Member member;
 
@@ -102,7 +103,10 @@ class TokenReissueIntegrationTest {
                 .isNotEqualTo(first);
 
         RefreshToken row = refreshTokenRepository.findById(member.getId()).orElseThrow();
-        assertThat(row.getToken()).isEqualTo(second);
+        assertThat(row.getToken())
+                .as("DB 에는 원문이 아니라 해시가 있어야 한다 — 덤프가 유출돼도 자격증명이 아니다 (#185)")
+                .isNotEqualTo(second)
+                .isEqualTo(refreshTokenHasher.hash(second));
         assertThat(row.getTokenVersion()).isEqualTo(versionAfterLogin + 1);
         assertThat(row.getRotatedAt())
                 .as("유예 판정의 기준 시각이라 회전 때 반드시 채워져야 한다")
@@ -110,23 +114,44 @@ class TokenReissueIntegrationTest {
     }
 
     @Test
-    @DisplayName("직전 토큰 재시도 — 응답 유실로 보고 회전 없이 현재 토큰을 돌려준다")
-    void reissue_withImmediatelyPreviousToken_isTreatedAsRetry() throws Exception {
+    @DisplayName("직전 토큰 재시도 — 유예 안이면 새 토큰을 회전 발급한다 (#185 ㄱ)")
+    void reissue_withImmediatelyPreviousToken_reissuesInGrace() throws Exception {
         String first = login();
         String second = reissueOk(first);
         long versionBefore = refreshTokenRepository.findById(member.getId()).orElseThrow().getTokenVersion();
 
-        // 클라가 second 를 못 받았다고 가정하고 first 로 다시 온다.
+        // 클라가 second 를 못 받았다고 가정하고 first(직전 세대)로 다시 온다.
         String retried = reissueOk(first);
 
-        assertThat(retried)
-                .as("재시도에는 «이미 발급한 그 토큰» 을 그대로 줘야 클라가 상태를 맞출 수 있다")
-                .isEqualTo(second);
+        // 🔴 ㄱ: 해시 저장이라 «저장된 토큰» 을 되돌려줄 수 없다. 대신 새 토큰을 회전 발급한다.
+        // 그래서 예전 계약(«second 를 그대로 준다»)과 달리 retried 는 second 도 first 도 아니다.
+        assertThat(retried).isNotEqualTo(second).isNotEqualTo(first);
 
         RefreshToken row = refreshTokenRepository.findById(member.getId()).orElseThrow();
+        assertThat(row.getToken())
+                .as("유예 재발급도 해시로 저장한다")
+                .isEqualTo(refreshTokenHasher.hash(retried));
         assertThat(row.getTokenVersion())
-                .as("재시도마다 회전하면 세대만 오르고 클라는 유효한 토큰을 영영 못 맞춘다")
-                .isEqualTo(versionBefore);
+                .as("ㄱ 은 유예에서도 회전하므로 세대가 오른다 (예전엔 그대로였다)")
+                .isEqualTo(versionBefore + 1);
+    }
+
+    @Test
+    @DisplayName("재시도 응답이 또 유실되면 — 같은 직전 토큰의 두 번째 재시도는 유예 밖이라 끊긴다 (#185 ㄱ의 대가)")
+    void reissue_repeatedLossFallsOutOfGrace() throws Exception {
+        String first = login();
+        reissueOk(first);          // second 발급 (유실 가정)
+        reissueOk(first);          // 유예 재발급 → 세대 +1 (이 응답도 유실 가정)
+
+        // first 는 이제 두 세대 전이다. ㄱ 은 반복 유실을 못 견딘다 — revoke.
+        mockMvc.perform(post("/member/reissue")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ReissueRequestDto(first))))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(refreshTokenRepository.findById(member.getId()))
+                .as("반복 유실은 유예 밖이라 세션이 끊긴다 — ㄱ 이 감수한 꼬리다")
+                .isEmpty();
     }
 
     @Test
@@ -158,8 +183,8 @@ class TokenReissueIntegrationTest {
 
         assertThat(secondDevice).isNotEqualTo(firstDevice);
         assertThat(refreshTokenRepository.findById(member.getId()).orElseThrow().getToken())
-                .as("행이 하나뿐이므로 나중 로그인이 앞 기기 토큰을 대체한다 — 이게 확정된 정책이다")
-                .isEqualTo(secondDevice);
+                .as("행이 하나뿐이므로 나중 로그인이 앞 기기 토큰을 대체한다 — 저장값은 해시다 (#185)")
+                .isEqualTo(refreshTokenHasher.hash(secondDevice));
 
         assertThat(refreshTokenRepository.findById(member.getId()).orElseThrow().getRotatedAt())
                 .as("로그인은 유예를 열면 안 된다 — 열면 앞 기기가 재발급으로 새 세션 토큰을 받아간다")

@@ -51,6 +51,11 @@ import static org.mockito.Mockito.doAnswer;
  * 중단된다면 이 이슈는 A 만 남는다.</b> 즉 이 테스트는 결함을 «확인» 하러 가는 것이 아니라
  * 두 갈래 중 어느 쪽인지 «가르러» 간다.
  *
+ * <p>⚠️ <b>이 테스트는 #280 머지 뒤 main 에서 깨져 있었다</b>(#302). 원인은 서버가 아니라
+ * 이 테스트였다 — {@code handlerFinished} 를 «저장이 끝났다» 로 읽고 커밋 전에 행을 셌다.
+ * 진단에서 즉시 0, 1초 뒤 2 가 나왔다. 그래서 판정은 «반증 조건 쪽» 으로 보였지만 실제로는
+ * <b>서버가 끝까지 저장하고 있었다</b>. 지금은 커밋이 보일 때까지 기다렸다 센다.
+ *
  * <p><b>증거는 DB 행이다</b>(이슈 §4). 로그로는 «시작했다» 까지만 알 수 있고 «완주했다» 를
  * 못 본다. 클라이언트가 포기한 배치의 행이 테이블에 남으면 서버가 계속 일한 것이다.
  *
@@ -82,6 +87,14 @@ class GrpcServerDeadlineProbeTest {
     private static final long CLIENT_DEADLINE_MS = 1_000;
     /** 존재 검증에서 붙잡아 두는 시간. */
     private static final long SERVER_STALL_MS = 4_000;
+
+    /**
+     * 커밋이 보이기를 기다리는 상한 (#302). 「행이 없다」를 판정하기 전에 이만큼은 기다린다.
+     *
+     * <p>이 값이 짧아서 판정이 뒤집히는 일은 없다 — 진단에서 커밋은 1초 안에 보였고, 여기서
+     * 재는 것은 «얼마나 걸리나» 가 아니라 «끝내 안 나타나는가» 다.
+     */
+    private static final long COMMIT_VISIBLE_TIMEOUT_MS = 5_000;
 
     @Value("${internal.api.token}")
     private String internalToken;
@@ -158,7 +171,7 @@ class GrpcServerDeadlineProbeTest {
                         .withCallCredentials(bearer(internalToken))
                         .withDeadlineAfter(CLIENT_DEADLINE_MS, TimeUnit.MILLISECONDS);
 
-        assertThatThrownBy(() -> stub.savePoseDataBatch(batchOf(10)))
+        assertThatThrownBy(() -> stub.savePoseDataBatch(batchOf(10, 2)))
                 .isInstanceOf(StatusRuntimeException.class)
                 .extracting(e -> ((StatusRuntimeException) e).getStatus().getCode())
                 .isEqualTo(Code.DEADLINE_EXCEEDED);
@@ -170,7 +183,13 @@ class GrpcServerDeadlineProbeTest {
         // 서버가 취소를 보고 스스로 그만두는지, 아니면 끝까지 가는지. 여기서 갈린다.
         boolean finishedOnItsOwn = handlerFinished.await(SERVER_STALL_MS * 3, TimeUnit.MILLISECONDS);
 
-        long rows = countRows() - rowsAfterWarmup;
+        // 🔴 커밋이 보일 때까지 기다렸다 센다 (#302).
+        //
+        // handlerFinished 는 «저장이 끝났다» 가 아니라 «스파이가 실제 메서드에서 돌아왔다» 다.
+        // 스파이가 @Transactional 프록시 «안쪽» 이라 커밋은 그 뒤에 일어난다 — 그대로 세면
+        // 커밋 전 값을 읽고, 결과가 «행 0 · 예외 없음» 으로 나온다. 그게 «서버가 멈췄다» 와
+        // 구분이 안 돼서 이 테스트가 main 에서 깨진 채로 있었다(#302 진단: 즉시 0, 1초 뒤 2).
+        long rows = awaitRowsSince(rowsAfterWarmup, COMMIT_VISIBLE_TIMEOUT_MS);
 
         System.out.printf("%n=== #206-B 관측 ===%n");
         System.out.printf("  클라이언트   : DEADLINE_EXCEEDED (%dms)%n", CLIENT_DEADLINE_MS);
@@ -178,7 +197,7 @@ class GrpcServerDeadlineProbeTest {
         System.out.printf("  저장 완주    : %s%n", finishedOnItsOwn);
         System.out.printf("  워밍업 행    : %d  (측정 수단이 도는지 확인용 — 0 이면 카운트가 고장난 것)%n",
                 rowsAfterWarmup);
-        System.out.printf("  pose_data 행 : %d  (포기당한 배치의 것)%n", rows);
+        System.out.printf("  pose_data 행 : %d  (포기당한 배치의 것, rep=2 라 워밍업과 안 겹친다)%n", rows);
         Throwable t = thrown.get();
         System.out.printf("  서버 예외    : %s%n",
                 t == null ? "없음" : t.getClass().getName() + " / msg=" + t.getMessage());
@@ -201,6 +220,24 @@ class GrpcServerDeadlineProbeTest {
     }
 
     /**
+     * {@code baseline} 이후로 늘어난 행 수. 하나라도 보이면 바로 돌려주고, 끝내 안 보이면
+     * 상한까지 기다린 뒤 0 을 돌려준다 (#302).
+     *
+     * <p>«기다렸는데도 0» 과 «아직 커밋이 안 보여서 0» 을 가르는 것이 이 메서드의 전부다.
+     * 앞의 것만이 «서버가 일을 안 했다» 는 뜻이다.
+     */
+    private long awaitRowsSince(long baseline, long timeoutMs) throws InterruptedException {
+        long deadline = System.nanoTime() + timeoutMs * 1_000_000L;
+        while (true) {
+            long rows = countRows() - baseline;
+            if (rows > 0 || System.nanoTime() >= deadline) {
+                return rows;
+            }
+            Thread.sleep(50);
+        }
+    }
+
+    /**
      * 행 수를 직접 센다. {@code PoseDataRepository.countSince} 는 쓸 수 없다 — 그 쿼리는
      * {@code created_at > :since} 조건인데, 운영 스키마에는 {@code DEFAULT CURRENT_TIMESTAMP} 가
      * 있지만(V1:205) H2 테스트 스키마는 엔티티에서 만들어지고 그 컬럼이
@@ -215,13 +252,23 @@ class GrpcServerDeadlineProbeTest {
     }
 
     private PoseDataBatchRequest batchOf(int frames) {
+        return batchOf(frames, 1);
+    }
+
+    /**
+     * {@code repNumber} 를 받는 이유 (#302). 멱등 키가 {@code uk_pose_event (session_id,
+     * rep_number, timestamp_sec, created_at)} 이고 {@code created_at} 은 세션 앵커라 상수다 —
+     * 즉 워밍업과 본 배치가 같은 rep 을 쓰면 <b>겹치는 timestamp 가 통째로 흡수된다</b>.
+     * 그러면 「행이 없다」가 «서버가 멈췄다» 인지 «멱등에 먹혔다» 인지 안 갈린다.
+     */
+    private PoseDataBatchRequest batchOf(int frames, int repNumber) {
         List<PoseDataRequest> list = new ArrayList<>();
         for (int i = 0; i < frames; i++) {
             list.add(PoseDataRequest.newBuilder()
                     .setTimestampSec(i * 0.1)
                     .setJointCoordinates("{}")
                     .setSyncRate(70.0)
-                    .setRepNumber(1)
+                    .setRepNumber(repNumber)
                     .setSmoothedKneeAngle(120.0)
                     .setFeedbackMessage("ok")
                     .build());
