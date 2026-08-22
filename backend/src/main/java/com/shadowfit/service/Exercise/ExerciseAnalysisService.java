@@ -2,7 +2,6 @@ package com.shadowfit.service.Exercise;
 
 import com.shadowfit.dto.exercises.VideoRequestDto;
 import com.shadowfit.dto.exercises.session.ReattachSessionResponseDto;
-import com.shadowfit.dto.exercises.session.SessionUpdateRequestDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.observability.CorrelationIds;
@@ -36,7 +35,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -46,7 +44,6 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 @Slf4j
 public class ExerciseAnalysisService {
-    private final WebClient webClient;
     private final SessionRepository sessionRepository;
     private final ExercisesRepository exercisesRepository;
     private final MemberRepository memberRepository;
@@ -57,7 +54,8 @@ public class ExerciseAnalysisService {
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final SessionMetrics sessionMetrics;
 
-    // 자기 주입: completeSession → applyCompleteFromApp 호출이 Spring 프록시를 통과하도록 함.
+    // 자기 주입: startAnalysis → sendAnalysisRequestToFastApi 호출이 Spring 프록시를 통과해
+    // @Async가 적용되도록 함(:199 주석 참조).
     @Lazy
     @Autowired
     private ExerciseAnalysisService self;
@@ -179,11 +177,23 @@ public class ExerciseAnalysisService {
     }
 
     /**
+     * 세션 시작이 클라에 돌려줘야 하는 것.
+     *
+     * <p>예전엔 {@code Long sessionId} 하나였는데 (#187 안 (d))로 <b>소유권 비밀값</b>이 붙으면서
+     * 둘이 됐다. 엔티티를 그대로 반환하지 않는 이유는 {@code open-in-view: false} 라 컨트롤러에서
+     * lazy 접근이 터지기 때문이다 — 필요한 두 값만 트랜잭션 안에서 꺼내 담는다.
+     *
+     * @param sessionNonce {@code null} 이 아니다. 이 경로로 만들어진 세션은 항상 값을 갖는다
+     *                     (NULL 인 것은 이 기능 배포 전에 시작된 세션뿐, V8 참조)
+     */
+    public record StartedSession(Long sessionId, String sessionNonce) {}
+
+    /**
      * [STEP 2: 운동 분석 시작 - Entry Point]
-     * 앱의 요청을 받아 DB에 세션을 생성하고 즉시 세션 ID를 반환합니다. (응답 속도 최적화)
+     * 앱의 요청을 받아 DB에 세션을 생성하고 즉시 세션 ID와 소유권 비밀값을 반환합니다. (응답 속도 최적화)
      */
     @Transactional
-    public Long startAnalysis(VideoRequestDto appDto, Long currentMemberId) {
+    public StartedSession startAnalysis(VideoRequestDto appDto, Long currentMemberId) {
         Member member = memberRepository.findById(currentMemberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -199,8 +209,7 @@ public class ExerciseAnalysisService {
 
         // 비동기로 FastAPI에 분석 요청 — self를 거쳐야 @Async가 Spring 프록시를 타고 실제로
         // 비동기 실행됨. this.로 호출하면 자기호출(self-invocation)이라 AOP 프록시를 우회해서
-        // @Async가 조용히 무시되고 동기 실행되는 문제가 있었음(2026-07-24, 테스트로 발견) —
-        // completeSession→applyCompleteFromApp에 이미 쓰던 self 패턴을 여기에도 동일 적용.
+        // @Async가 조용히 무시되고 동기 실행되는 문제가 있었음(2026-07-24, 테스트로 발견).
         //
         // ⚠️ CodeRabbit 지적으로 추가 수정(2026-07-24): self.로 진짜 비동기가 되면서 세션 INSERT가
         // 커밋되기 전에 이 비동기 작업이 먼저 실행될 수 있는 레이스가 새로 생김 — 서킷 OPEN/gRPC
@@ -211,12 +220,13 @@ public class ExerciseAnalysisService {
                 new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
-                        self.sendAnalysisRequestToFastApi(sessionId, appDto, finalUrl, persona);
+                        self.sendAnalysisRequestToFastApi(sessionId, appDto, finalUrl, persona,
+                                savedSession.getSessionNonce());
                     }
                 }
         );
 
-        return sessionId;
+        return new StartedSession(sessionId, savedSession.getSessionNonce());
     }
 
     /**
@@ -225,7 +235,8 @@ public class ExerciseAnalysisService {
      */
     @Async
     @Transactional(readOnly = true)
-    public void sendAnalysisRequestToFastApi(Long sessionId, VideoRequestDto appDto, String finalUrl, String persona) {
+    public void sendAnalysisRequestToFastApi(Long sessionId, VideoRequestDto appDto, String finalUrl, String persona,
+                                             String sessionNonce) {
         // 여기는 이미 @Async 워커 스레드 — cid 는 AsyncConfig 의 TaskDecorator 가 넘겨줬고,
         // 세션 id 는 이 흐름의 시작점인 여기서 얹는다.
         try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
@@ -233,11 +244,19 @@ public class ExerciseAnalysisService {
 
             List<ExerciseReference> referencePoses = referenceRepository.findByExerciseId(appDto.getExerciseId());
 
+            // nonce 는 호출부에서 인자로 받는다 — 여기서 세션을 다시 읽지 않는 것은 쿼리 하나를
+            // 아끼려는 게 아니라, «클라에 나간 값» 과 «AI 에 가는 값» 이 같은 한 곳에서 나오게
+            // 하려는 것이다. 여기서 다시 읽으면 두 경로가 서로 다른 시점의 행을 볼 수 있다.
+            //
+            // proto3 라 null 은 못 싣는다. 빈 문자열이 곧 «없음» 이고, AI 는 그것을 compat 통과로
+            // 읽는다 (#187 1단계). 이 경로로 만든 세션은 항상 값이 있으므로 실제로는 안 비지만,
+            // 재부착 경로에는 배포 전 세션이 올 수 있다.
             AnalyzeRequest.Builder requestBuilder = AnalyzeRequest.newBuilder()
                     .setExerciseId(appDto.getExerciseId())
                     .setSessionId(sessionId)
                     .setReferenceSource(finalUrl)
-                    .setPersona(persona);
+                    .setPersona(persona)
+                    .setSessionNonce(sessionNonce == null ? "" : sessionNonce);
 
             for (ExerciseReference ref : referencePoses) {
                 requestBuilder.addReferencePoses(PoseDataRequest.newBuilder()
@@ -366,8 +385,13 @@ public class ExerciseAnalysisService {
 
             // rep 수는 AI 응답을 신뢰한다 — already_active 면 살아있던 상태의 현재 값이 진실이고,
             // 그때 DB 값은 아직 넘어오지 않은 진행 중 rep 만큼 뒤처져 있을 수 있다.
+            // 클라가 세션을 잃었다 재부착으로 돌아오는 경우가 있으므로 nonce 도 같이 돌려준다.
+            // 값의 출처는 방금 조립한 요청이다 — DB 를 다시 읽지 않아야 AI 에 보낸 값과 같음이 보장된다.
+            // 빈 문자열(배포 전 세션)은 null 로 돌려준다 — «없음» 을 JSON 에서 빈 문자열로 흉내내면
+            // 클라가 그걸 동봉해 «틀린 nonce» 가 된다.
+            String reattachNonce = request.getSessionNonce().isEmpty() ? null : request.getSessionNonce();
             return ReattachSessionResponseDto.of(
-                    sessionId, response.getRepCount(), response.getAlreadyActive());
+                    sessionId, response.getRepCount(), response.getAlreadyActive(), reattachNonce);
         }
     }
 
@@ -408,12 +432,18 @@ public class ExerciseAnalysisService {
         // 들어간다. 준비에 20초 걸린 세션이면 재부착 이후 시각이 통째로 20초 앞서 표시된다.
         double elapsedSec = poseDataRepository.findMaxTimestampSecBySessionId(sessionId);
 
+        // AI 는 세션 종료 뒤 상태를 버린다 — 재부착으로 상태를 다시 세울 때 nonce 도 같이
+        // 실어야 «검증은 켜졌는데 보관값이 없는» 상태가 안 된다 (#187 (d)).
+        // 배포 전에 시작된 세션은 여기가 null 이고, 빈 문자열로 나가 compat 통과가 된다.
+        String sessionNonce = session.getSessionNonce();
+
         ReattachRequest.Builder requestBuilder = ReattachRequest.newBuilder()
                 .setSessionId(sessionId)
                 .setExerciseId(exerciseId)
                 .setPersona(session.getMember().getSelectedPersona().name())
                 .setInitialRepCount(restoredRepCount)
-                .setElapsedSec(elapsedSec);
+                .setElapsedSec(elapsedSec)
+                .setSessionNonce(sessionNonce == null ? "" : sessionNonce);
 
         // 기준 좌표는 AI 가 보관하지 않는다 — 시작 때와 똑같이 Spring 이 DB 에서 읽어 실어 보낸다.
         for (ExerciseReference ref : referenceRepository.findByExerciseId(exerciseId)) {
@@ -545,50 +575,5 @@ public class ExerciseAnalysisService {
         }
     }
 
-    /**
-     * [STEP 5: 분석 결과 영속화 (Callback)]
-     * AI 서버가 분석을 마치고 gRPC로 보고해온 최종 결과를 DB에 반영합니다.
-     *
-     * 낙관적 락 충돌 시(스케줄러가 동시에 FAILED로 변경한 경우) 재조회 후 COMPLETED로 덮어씁니다.
-     */
-    public void completeSession(Long sessionId, SessionUpdateRequestDto dto) {
-        try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
-            int maxAttempts = 3;
-            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-                try {
-                    self.applyCompleteFromApp(sessionId, dto);
-                    log.info("세션 {} DB 업데이트 완료", sessionId);
-                    return;
-                } catch (ObjectOptimisticLockingFailureException e) {
-                    // 상대는 보통 SessionTimeoutScheduler. 지표로 남겨두면 "이 경쟁이 운영 중
-                    // 실제로 얼마나 일어나는가"를 로그 grep 없이 집계로 볼 수 있다.
-                    sessionMetrics.optimisticLockConflict("app-callback", attempt == maxAttempts ? "exhausted" : "retry");
-                    if (attempt == maxAttempts) {
-                        throw e;
-                    }
-                    log.warn("세션 {} 완료 처리 충돌 - 재시도 {}/{}", sessionId, attempt, maxAttempts);
-                }
-            }
-        }
-    }
-
-    @Transactional
-    public void applyCompleteFromApp(Long sessionId, SessionUpdateRequestDto dto) {
-        Session session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
-
-        // 멱등성: 같은 결과가 재전송된 경우(2-1, 2-2) 첫 완료 시각/기록을 보존하고 즉시 종료
-        if (session.getStatus() == Status.COMPLETED) {
-            return;
-        }
-
-        session.setTotalReps(dto.getTotalReps());
-        session.setAvgSyncRate(java.math.BigDecimal.valueOf(dto.getAvgSyncRate()));
-        session.setStatus(Status.COMPLETED);
-        session.setEndTime(LocalDateTime.now());
-
-        sessionRepository.saveAndFlush(session);
-        sessionMetrics.sessionTransition(Status.COMPLETED, "app-callback");
-    }
 }
 

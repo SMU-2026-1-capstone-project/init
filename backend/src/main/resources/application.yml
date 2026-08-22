@@ -13,7 +13,14 @@ spring:
 
   # [1] 데이터베이스 및 JPA 설정 (spring 하위로 정렬)
   datasource:
-    # rewriteBatchedStatements=true: JDBC 드라이버가 batch INSERT 를 multi-row SQL 한 방으로 재작성 (부하테스트 §7.5 개선)
+    # rewriteBatchedStatements=true: JDBC 드라이버가 batch INSERT 를 multi-row SQL 한 방으로 재작성.
+    # 🔴 2026-08-18 실측 정정 (#221) — «개선» 이 아니다. 레벨 20세션·ABBA 8판 대조:
+    #      true   RPS 923.7  p50 88  p95 201  p99 486
+    #      false  RPS 964.8  p50 95  p95 131  p99 261
+    #    처리량 차이는 이상치 하나에 끌려 중앙값끼리는 942 ↔ 965 지만, **p99 는 4판 전부 일관되게
+    #    나쁘다**(444~595 ↔ 209~338). 팔은 Com_insert 30,000 ↔ 150,000 으로 확정했다.
+    #    ⚠️ 값을 아직 안 바꾼다 — 이 판은 레벨 20 한 지점이고, 끄는 결정은 별도 판단이다.
+    #    결과: loadtest/results/session-spread-aws-2026-08-17/
     url: jdbc:mysql://${DB_HOST:shadowfit-mysql}:${DB_PORT:3306}/${DB_NAME:shadowfit}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&rewriteBatchedStatements=true
     username: ${DB_USERNAME:shadowfit}
     password: ${DB_PASSWORD:shadowfit}
@@ -75,7 +82,24 @@ spring:
      properties:
        hibernate:
          jdbc:
-           batch_size: 25      # saveAll 을 batch 로 묶음 (부하테스트 §7.5 개선)
+           # 🔴 2026-08-18 정정 (#211). 예전 주석은 «saveAll 을 batch 로 묶음 (부하테스트 §7.5 개선)»
+           #    이었는데 **둘 다 사실이 아니다.**
+           #
+           #    ① **INSERT 는 이 설정으로 안 묶인다.** 이 프로젝트의 엔티티는 **11개 전부
+           #       `GenerationType.IDENTITY`** 다. IDENTITY 는 행마다 생성된 키를 받아와야 해서
+           #       Hibernate 가 insert 를 batch 로 못 묶는다 — 설정값과 무관하게 **꺼져 있다.**
+           #    ② **§7.5 의 개선은 이 설정이 낸 것이 아니다.** 그 개선은 pose 적재를 JPA 에서
+           #       `JdbcTemplate.batchUpdate` 로 옮긴 것이고(PoseDataService), 그 경로는 Hibernate 를
+           #       아예 안 탄다. 즉 이 줄은 그 성과의 공을 잘못 가져가고 있었다.
+           #
+           #    ⚠️ 그렇다고 죽은 설정은 아니다 — **UPDATE·DELETE 배치에는 그대로 걸린다**
+           #       (생성 키를 받을 필요가 없어서다). 지금 남은 `saveAll` 은 레퍼런스 저장
+           #       한 곳뿐이고(PoseDataService), 그것도 INSERT 라 배치가 안 된다.
+           #    📌 값을 바꾸려면 «무엇이 실제로 묶이는지» 부터 재고할 것. 지금 근거로는 25 를
+           #       유지할 이유도 바꿀 이유도 없다.
+           batch_size: 25
+         # 위와 같은 이유로 order_inserts 는 지금 효과가 없다(묶일 insert 자체가 없다).
+         # order_updates 는 유효하다.
          order_inserts: true
          order_updates: true
 
@@ -99,7 +123,13 @@ grpc:
     reflection-enabled: true
   client:
     fastapi-client: # @GrpcClient("fastapi-client")와 일치
-      address: 'static://shadowfit-ai:8585' # 컨테이너명:AI서버gRPC포트
+      # 주소는 compose 가 주는 환경변수에서 온다 (#285). 이 줄이 하드코딩이던 동안
+      # compose 의 AI_SERVER_HOST·AI_SERVER_GRPC_PORT 는 **아무도 안 읽는 죽은 키**였고,
+      # 값이 우연히 같아서 증상이 없었다. 컨테이너명이나 포트를 바꾸면 옛 주소로 계속
+      # 붙어 UNAVAILABLE → 서킷브레이커(aiServer) 열림 → 「AI 장애」로 오독됐을 자리다.
+      # 기본값은 도커 네트워크 기준이라 로컬 bootRun 은 AI_SERVER_HOST=localhost 를 준다
+      # (위 datasource url 의 ${DB_HOST:shadowfit-mysql} 과 같은 방식).
+      address: 'static://${AI_SERVER_HOST:shadowfit-ai}:${AI_SERVER_GRPC_PORT:8585}'
       negotiation-type: plaintext
 
 # [3] Swagger 및 기타 설정 (최상단 레벨)
@@ -208,9 +238,6 @@ internal:
   api:
     token: ${INTERNAL_API_TOKEN}
 
-ai-server:
-  url: ${AI_SERVER_URL:http://shadowfit-ai:8000}
-
 # [5] 운동 세션 타임아웃 설정
 exercise:
   session:
@@ -248,6 +275,13 @@ member:
 
 # [6] pose_data 파티션 TTL 설정 (report-read-path.md §9-B, 2026-07-24 확정)
 pose-data:
+  # 저장 전 다운샘플 윈도우 크기(R). 창 하나에서 대표 프레임 1개만 남긴다.
+  # 🔴 **튜닝 손잡이가 아니다.** R=5 는 실측으로 고른 하한이고(R 5→1 은 배치 고정비용 비중이
+  #    커져 행당 효율이 오히려 악화된다, pose-ingest-downsampling.md §5-1(4)), 그 결정은 그대로다.
+  #    설정으로 뺀 이유는 **측정**이다 — 정본 「다운샘플 1.7배」가 단일 핫세션 조건에서 나온 값이라
+  #    다세션에서 팔을 바꿔 재려면 재빌드가 필요했고, 그 재빌드가 실험을 막고 있었다(P2).
+  #    값을 바꾸는 것은 측정 조건이지 채택이 아니다.
+  downsample-window: 5
   partition:
     # 이번 달 + 이 개월 수만큼은 보존(버퍼), 그보다 오래된 파티션은 드롭
     retention-buffer-months: 1

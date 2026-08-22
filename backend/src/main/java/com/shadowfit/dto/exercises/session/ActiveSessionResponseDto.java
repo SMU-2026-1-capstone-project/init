@@ -54,6 +54,21 @@ public class ActiveSessionResponseDto {
     private LocalDateTime endTime;
 
     /**
+     * 세션 소유권 검증용 비밀값 (#187 안 (d)). <b>이 세션을 만든 클라에게만</b> 나간다.
+     *
+     * <p>클라는 이 값을 보관했다가 {@code POST /pose} 마다 동봉해야 한다 — AI 가 보관값과
+     * 대조해서 «남의 session_id 로 프레임 꽂기» 를 막는다. {@code session_id} 는 순차 정수라
+     * 추측되지만 이 값은 안 된다는 것이 방어의 전부다.
+     *
+     * <p>{@code null} 일 수 있다 — 이 기능 배포 <b>전에</b> 시작된 세션이다. 1단계는 그런 세션을
+     * 그대로 통과시킨다(compat).
+     *
+     * <p>🔴 클라도 이 값을 로그·화면에 남기면 안 된다.
+     */
+    @Schema(description = "세션 소유권 검증용 비밀값 (#187). POST /pose 에 동봉할 것. null이면 이 기능 배포 전 세션")
+    private String sessionNonce;
+
+    /**
      * exercise 는 호출부에서 JOIN FETCH 로 미리 가져온 상태여야 한다 —
      * open-in-view: false 라 트랜잭션 밖에서 lazy 접근하면 터진다.
      */
@@ -65,6 +80,9 @@ public class ActiveSessionResponseDto {
                 .startTime(session.getStartTime())
                 .status(session.getStatus())
                 .endTime(session.getEndTime())
+                // 🔴 이 경로가 없으면 «앱이 죽었다 살아난» 세션은 nonce 를 영영 못 얻는다.
+                //    복구는 되는데 그 뒤 POST /pose 가 전부 거절되는 상태가 된다(2단계에서).
+                .sessionNonce(session.getSessionNonce())
                 .build();
     }
 }

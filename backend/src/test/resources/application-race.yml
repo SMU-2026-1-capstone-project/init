@@ -14,8 +14,14 @@
 #   docker run -d --name shadowfit-race-mysql -e MYSQL_ROOT_PASSWORD=racetest \
 #     -e MYSQL_DATABASE=shadowfit -p 3307:3306 mysql:8.0 \
 #     --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-#   docker exec -i shadowfit-race-mysql mysql -uroot -pracetest shadowfit \
-#     < backend/src/main/resources/db/migration/V1__baseline.sql
+#   for f in backend/src/main/resources/db/migration/V*.sql; do \
+#     docker exec -i shadowfit-race-mysql mysql -uroot -pracetest shadowfit < "$f"; done
+#
+#   [정정 2026-08-22 · #342] 여기 「V1__baseline.sql 하나만」 적재하라고 적혀 있었다.
+#   마이그레이션이 V8 까지 왔으므로(V8 = 세션 nonce, #323) 그대로 따라 하면 엔티티와 스키마가
+#   어긋나 `Unknown column 'session_nonce'` 로 죽는다. 절차가 낡으면 테스트가 «있어도 안 도는»
+#   상태가 되고, 이 파일의 테스트들은 CI 에서 건너뛰므로 그 사실이 드러나지 않는다.
+#   그래서 파일을 집지 않고 디렉터리 전체를 순서대로 적재한다 — 마이그레이션이 늘어도 안 낡는다.
 #
 #   (경로가 바뀐 이유: Flyway 도입으로 schema.sql 이 V1__baseline.sql 이 됐다.
 #    파일에서 CREATE DATABASE/USE 를 뺐지만 위 명령이 DB 를 지정하므로 그대로 동작한다.)

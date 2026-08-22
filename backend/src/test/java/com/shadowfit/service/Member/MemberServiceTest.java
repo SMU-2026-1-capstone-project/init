@@ -11,7 +11,6 @@ import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.RefreshToken;
 import com.shadowfit.model.member.Sex;
 import com.shadowfit.model.member.UserRole;
-import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.member.RefreshTokenRepository;
@@ -62,7 +61,6 @@ class MemberServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private SessionRepository sessionRepository;
-    @Mock private PoseDataRepository poseDataRepository;
     @Mock private PoseDataCleanupService poseDataCleanupService;
     @Mock private PasswordEncoder passwordEncoder;
 
@@ -81,7 +79,8 @@ class MemberServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         memberService = new MemberService(jwtUtil, memberRepository, refreshTokenRepository,
-                sessionRepository, poseDataRepository, poseDataCleanupService, passwordEncoder);
+                sessionRepository, poseDataCleanupService, passwordEncoder,
+                new com.shadowfit.global.security.jwt.RefreshTokenHasher());
     }
 
     @Nested
@@ -260,7 +259,10 @@ class MemberServiceTest {
             ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
             verify(refreshTokenRepository).save(captor.capture());
             assertThat(captor.getValue().getMemberId()).isEqualTo(1L);
-            assertThat(captor.getValue().getToken()).isEqualTo("refresh-token");
+            // 저장값은 원문이 아니라 해시다 (#185). 응답(result.getRefreshToken)만 원문이다.
+            assertThat(captor.getValue().getToken())
+                    .isNotEqualTo("refresh-token")
+                    .isEqualTo(new com.shadowfit.global.security.jwt.RefreshTokenHasher().hash("refresh-token"));
             // 로그인은 유예를 열지 않는다 (이슈 #136). 열면 앞 기기가 재발급으로 새 세션의
             // refresh token 을 받아가서 「1인 1세션」의 정반대가 된다.
             assertThat(captor.getValue().getRotatedAt()).isNull();
@@ -311,7 +313,6 @@ class MemberServiceTest {
             // 본문 기준이면 ① 남의 토큰 값을 알면 남의 행을 지울 수 있고 ② 그 행이 이미 새
             // 로그인으로 교체된 뒤면 0행을 지우고 «로그아웃 성공» 을 응답한다.
             verify(refreshTokenRepository).deleteByMemberId(1L);
-            verify(refreshTokenRepository, never()).deleteByToken(anyString());
         }
 
         @Test

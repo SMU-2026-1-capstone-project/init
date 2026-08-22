@@ -1,0 +1,145 @@
+
+════════ 무인 측정 — ec2-20260816-162654 ════════
+  결과   : /root/init/loadtest/results/online-ddl-ec2-20260816-162654
+  S3     : s3://shadowfit-measure-055447613012/shadowfit/ec2-20260816-162654
+  단계   : coresidency_rehearsal
+  자동정지: 꺼짐
+  S3 주기 동기화 시작 — 300초마다 → s3://shadowfit-measure-055447613012/shadowfit/ec2-20260816-162654
+
+════════ coresidency_rehearsal ════════
+  게이트 G0~G3 → 축소 스윕 (LEVELS='5 10' DUR=20 REPEATS=1)
+  **이 판의 수치는 측정값이 아니다** — 경로만 본다
+════════ 동거 용량 rig — 승격 게이트 ════════
+
+──── G0. 합성 인체 사본 ↔ 원본 대조 ────
+  ✅ 사본이 원본과 글자 단위로 같다
+
+──── G1. 프레임 자산 — 검출이 되는가 ────
+  ✅ 30프레임 · 검출 30/30 · 무릎 85.23~124.3°
+     ⚠️ rep 문턱(155°)은 안 넘는다 — 그래서 Spring 부하는 ghz 로 따로 건다(README §2)
+
+──── G2. 세션 개설 → 프레임 수락 ────
+  ✅ 세션 생성 — sessionId=1901
+  ✅ 프레임 수락 + 검출 성공 (분석기 부착까지 0.5s 대기)
+
+──── G3. 컨테이너 자원 한도 — 팔이 실제로 갈리는가 ────
+  ✅ 메모리 한도 20000MB
+     CPU 한도: 없음  (팔 A·B 조건)
+
+✅ 전 게이트 통과 — EC2 로 올려도 된다
+🔴 프레임 자산이 대상에 온전히 안 갔다 (0/418135 B) — 자기 프로브를 끈다
+     從 부하 세션 시드 1000/1000 확인 (id 901~1900)
+     從 부하: 19 req/s 고정 · c=50 · 172.31.33.157:6565 · batch_multi.json
+     ⚠️ REPEATS(1) 가 팔 수(3)의 배수가 아니다 — 위치가 정확히 균형 잡히지 않는다.
+        순서 효과가 남을 수 있으니 결과에 그대로 적을 것 (방격이 아니라 «부분 균형» 이다)
+
+════ 앵커 판 anc1 — 팔 B · 10세션 (시간 추세용 기준점) ════
+     팔 B 구성
+time="2026-08-16T16:26:58Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+     팔 B 버림판 (앵커 앞에서 먼저 — 첫 앵커가 워밍업을 타면 계열이 오염된다)
+
+──────── B_anc1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786897701.7 · 정상구간 1786897706.7 ~ 1786897716.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 299 (정상구간 10s) · 처리 30.1/s · 검출성공 100.0%
+  지연 p50 25ms · p95 30ms · p99 40ms · 평균 26ms
+  분류 {'ok': 299}
+  → /root/init/loadtest/results/online-ddl-ec2-20260816-162654/coresidency_rehearsal/req_B_anc1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260816-162654/coresidency_rehearsal/req_B_anc1_10_summary.tsv
+
+════ 라운드 r1 — 팔 순서 A B C · 레벨 순서 5 10 ════
+     팔 A 구성
+time="2026-08-16T16:29:04Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 A (캡 없음) · caps.tsv 에 기록
+     팔 A 버림판 (표에 안 들어간다)
+
+──────── A_r1_5 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개 (prefix=cores)
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786897813.4 · 정상구간 1786897818.5 ~ 1786897828.3  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 149 (정상구간 10s) · 처리 15.2/s · 검출성공 100.0%
+  지연 p50 24ms · p95 26ms · p99 26ms · 평균 25ms
+  분류 {'ok': 149}
+  → /root/init/loadtest/results/online-ddl-ec2-20260816-162654/coresidency_rehearsal/req_A_r1_5.tsv · /root/init/loadtest/results/online-ddl-ec2-20260816-162654/coresidency_rehearsal/req_A_r1_5_summary.tsv
+
+──────── A_r1_10 ────────
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786897856.5 · 정상구간 1786897861.5 ~ 1786897871.5  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 300 (정상구간 10s) · 처리 30.1/s · 검출성공 100.0%
+  지연 p50 24ms · p95 27ms · p99 34ms · 평균 24ms
+  분류 {'ok': 300}
+  → /root/init/loadtest/results/online-ddl-ec2-20260816-162654/coresidency_rehearsal/req_A_r1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260816-162654/coresidency_rehearsal/req_A_r1_10_summary.tsv
+     팔 B 구성
+time="2026-08-16T16:31:35Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-ai Running 
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Running 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+     캡 확인 — 팔 B (캡 없음) · caps.tsv 에 기록
+
+──────── B_r1_5 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 5개 (prefix=cores)
+측정 — 동시 세션 5 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786897925.7 · 정상구간 1786897930.8 ~ 1786897940.6  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 150 (정상구간 10s) · 처리 15.3/s · 검출성공 100.0%
+  지연 p50 24ms · p95 25ms · p99 30ms · 평균 24ms
+  분류 {'ok': 150}
+  → /root/init/loadtest/results/online-ddl-ec2-20260816-162654/coresidency_rehearsal/req_B_r1_5.tsv · /root/init/loadtest/results/online-ddl-ec2-20260816-162654/coresidency_rehearsal/req_B_r1_5_summary.tsv
+
+──────── B_r1_10 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)
+프레임 30장 (무릎 85.23~124.3°, 검출 30/30)
+준비 — 계정 10개 (prefix=cores)
+측정 — 동시 세션 10 · 3.0fps · 20초
+
+  측정창(epoch) 시작 1786897978.9 · 정상구간 1786897983.9 ~ 1786897993.9  ← stats_*.tsv 를 이 구간으로 자를 것
+  요청 299 (정상구간 10s) · 처리 30.0/s · 검출성공 100.0%
+  지연 p50 24ms · p95 31ms · p99 36ms · 평균 25ms
+  분류 {'ok': 299}
+  → /root/init/loadtest/results/online-ddl-ec2-20260816-162654/coresidency_rehearsal/req_B_r1_10.tsv · /root/init/loadtest/results/online-ddl-ec2-20260816-162654/coresidency_rehearsal/req_B_r1_10_summary.tsv
+  ⚠️ 실측 18.9 req/s < 목표 19 — 부하기가 rate 를 못 따라갔다(-c 가 상한이거나 서버가 느리다)
+     조건 칸에는 **실측값**을 적는다. 「정한 값」이 실제로 걸린 값과 다르면 그건 다른 조건이다
+     팔 C 구성
+time="2026-08-16T16:33:41Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Recreate 
+ Container shadowfit-ai Recreate 
+ Container shadowfit-ai Recreated 
+ Container shadowfit-mysql Recreated 
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-ai Starting 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-ai Started 
+ Container shadowfit-mysql Started 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+     캡 확인 — 팔 C (캡 있음) · caps.tsv 에 기록
+     팔 C 버림판 (표에 안 들어간다)
+
+──────── C_r1_5 ────────
+     從 부하 시작 — 19 req/s 고정 · c=50 · 30s (AI 창 20s 를 앞뒤 5s 로 감싼다)

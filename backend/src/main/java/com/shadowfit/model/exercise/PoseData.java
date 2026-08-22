@@ -4,7 +4,18 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "pose_data")
+@Table(name = "pose_data",
+       // 멱등 키 (#188, decisions/pose-batch-idempotency-implementation.md).
+       // created_at 이 키에 들어가는 것은 설계가 아니라 **파티션 제약**이다 — MySQL 은 파티션
+       // 테이블의 모든 유니크 키가 파티션 표현식의 컬럼을 포함할 것을 요구한다. 그래서 PK 도
+       // (id, created_at) 이다.
+       //
+       // 여기 선언이 마이그레이션(V6)과 **중복**인데, 그게 의도다: 테스트는 H2 + ddl-auto 라
+       // Flyway 를 안 보므로(test/resources/application.yml), 엔티티에 없으면 멱등 테스트가
+       // 제약 없는 스키마 위에서 초록불을 낸다.
+       uniqueConstraints = @UniqueConstraint(
+               name = "uk_pose_event",
+               columnNames = {"session_id", "rep_number", "timestamp_sec", "created_at"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -63,13 +74,26 @@ public class PoseData {
     private String feedbackMessage; // AI가 주는 실시간 피드백
 
     /**
-     * DB가 채우는 적재 시각({@code DEFAULT CURRENT_TIMESTAMP}). 월별 RANGE 파티션의 키이자,
-     * "이 세션이 실제로 살아있는가"의 판정 근거다(MemberService.deleteAccount — 유입이 끊기면
-     * 죽은 세션으로 본다, docs/decisions/withdrawal-with-active-session.md §3-2).
+     * <b>세션 시작 시각</b>({@code exercise_sessions.start_time}). 한 세션의 모든 행이 같은 값을
+     * 갖는다. 월별 RANGE 파티션의 키이자, "이 세션이 실제로 살아있는가"의 판정 근거다
+     * (MemberService.deleteAccount — 유입이 끊기면 죽은 세션으로 본다,
+     * docs/decisions/withdrawal-with-active-session.md §3-2).
+     *
+     * <p><b>2026-08-17 이전에는 적재 시각이었다</b>({@code DEFAULT CURRENT_TIMESTAMP}). 바꾼 이유는
+     * 멱등이다 — 재전송은 나중에 도착하므로 적재 시각이면 값이 매번 달라지고, 그러면 위
+     * {@code uk_pose_event} 가 통째로 무력해진다(#188,
+     * docs/decisions/pose-batch-idempotency-implementation.md 분기 A).
+     *
+     * <p>세션 시작을 앵커로 고른 것은 <b>파티션을 세션 경계와 정렬</b>하기 위해서다. 프레임별
+     * 시각을 쓰면 자정을 걸친 세션이 두 파티션으로 쪼개지는데, 사용자가 보는 단위는 세션이다
+     * (리포트 1개 = 세션 1개). 프레임이 세션 안 어디인가는 {@code timestampSec} 이 답하므로 이
+     * 컬럼이 그 일을 겸할 이유가 없다. 대가는 자정을 걸친 세션이 <b>시작한 날</b> 칸에 통째로
+     * 들어가는 것이다.
      *
      * <p>{@code insertable=false, updatable=false} — 실제 쓰기는 {@code PoseDataService} 의
-     * JdbcTemplate 배치가 담당하고 값은 DB DEFAULT 가 채운다. JPA 가 쓰지 못하게 막아 두 경로가
-     * 어긋나지 않게 한다. 이 매핑은 <b>읽기 전용</b>이다.
+     * JdbcTemplate 배치가 담당한다. JPA 가 쓰지 못하게 막아 두 경로가 어긋나지 않게 한다.
+     * <b>값을 갱신해서도 안 된다</b>: 파티션 키라 UPDATE 는 행의 물리적 이동이고, 멱등 키의
+     * 구성요소라 사후 변경은 재전송 판정을 깨뜨린다.
      */
     @Column(name = "created_at", insertable = false, updatable = false)
     private java.time.LocalDateTime createdAt;

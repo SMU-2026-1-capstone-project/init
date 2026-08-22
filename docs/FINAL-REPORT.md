@@ -155,6 +155,7 @@
 
 ### 4.5 AI 서버 (FastAPI)
 - `POST /pose` 단일 이미지 포즈 추정, `POST /sync` 싱크로율 계산, `POST /video/analyze` 기준 좌표 추출.
+  - 🔴 이 중 **실제로 불리는 것은 `/pose` 하나**다([#293](https://github.com/Shadowfit/init/issues/293)). `/sync`·`/video/analyze` 는 저장소 안에 호출자가 0건이고, 각각의 정본은 gRPC 경로(`SavePoseDataBatch`·`ExtractReferenceData`)에 있다. 지우지 않고 표시만 해 둔 상태다.
 - MediaPipe 33개 관절 추출 → 분석 대상 관절 각도 계산 → DTW로 기준 시퀀스와 정렬·비교 → 싱크로율 산출.
 
 ### 4.6 프론트엔드 (React Native / Expo)
@@ -172,9 +173,10 @@
 ### 5.1 쓰기 — 배치 INSERT
 건별 INSERT → JdbcTemplate `batchUpdate` 적용:
 - **처리량 +99%**, **p99 지연 −37%**.
+- **조건**: 2026-05-31 로컬(2물리코어에 MySQL·백엔드·부하기 동거), 빌드마다 cold 기동 → warmup 60초 폐기 → ramp 5→100 step 210초. **절대 RPS(23.5 → 46.7)는 머신 부하에 흔들려 인용하지 않고 델타만 쓴다** — [조건 전체](./decisions/load-test-strategy.md#batch-insert-99).
 
 ### 5.2 읽기 — JSON projection
-세션 리포트 조회 시 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장) 전체를 헛로드하던 경로를 3컬럼 DTO projection으로 교체:
+세션 분석 계산 시 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장) 전체를 헛로드하던 경로를 DTO projection으로 교체(측정 시점 3컬럼, **현재 4컬럼** — `joint_coordinates` 를 안 싣는 방침은 유지):
 
 | 지표 | before | after | 효과 |
 |---|---|---|---|
@@ -183,9 +185,13 @@
 | payload (AWS 1억 행) | 1,740.1 KB | 22.6 KB | **−98.7%** |
 | warm 쿼리 (AWS 1억 행) | 40.6 ms | 1.4 ms | **29~41x** |
 
+→ **측정 조건**: warm(같은 쿼리 cold 721ms → warm 12ms), 750행/세션, 측정 시점 3컬럼 프로젝션. **−98.7% 는 DB→앱 payload** 지 앱→클라이언트 응답 바이트가 아니다. 절대 ms 는 하드웨어 종속이라 배수까지만 인용한다 — 조건 전체는 [`realmysql-experiments.md` §②b](./portfolio/realmysql-experiments.md#projection-98-7).
+
 → 인덱스는 동일. 차이는 JSON이 off-page overflow로 저장돼 SELECT 시 추가 random I/O가 발생하는데, projection이 이를 회피한 것.
 
 → **1억 행 재검증(2026-07-15, AWS EC2 m6i.xlarge)에서 배수가 오히려 커졌다.** 버퍼풀은 2GB로 동일한데 테이블이 25배(~230GB) 커지며 작업셋 대비 버퍼풀 비율이 나빠져, 풀엔티티 로드의 off-page 랜덤 I/O가 캐시에 덜 걸리고 실제 디스크를 더 탄 탓. 결론이 뒤집힌 게 아니라 스케일에 비례해 강화된 것이다. payload 감소율은 두 환경에서 동일(세션당 바이트 비율이라 행수 무관).
+
+> 📌 **조건** — 🔴 **정상적인 리포트 «조회» 는 이 쿼리를 부르지 않는다.** 세션 종료 시 `precomputeReport` 가 결과를 `report.detailed_analysis` 에 미리 넣고, 조회는 그 JSON 을 파싱하고 끝난다. projection 이 도는 곳은 **precompute 잡(세션당 1회, 비동기)** 과 **폴백**(그 컬럼이 비었거나 구버전일 때)뿐이라, 위 수치는 **사용자 체감 지연이 아니라 그 잡의 자원 소모 절감**이다. 이건 코드 판독이고 아직 측정은 아니다([`decisions/projection-end-to-end-remeasure.md`](./decisions/projection-end-to-end-remeasure.md) Q1). 또 위 값은 **3컬럼 시절** 프로젝션의 것이고 현재 4컬럼 형상으로는 재검증하지 않았다. 조건 전체는 [`portfolio/realmysql-experiments.md §②b`](./portfolio/realmysql-experiments.md).
 
 → ⚠️ **프레임 주의**: 이 쿼리는 사용자가 매번 누르는 조회가 아니라 **세션 종료 시 precompute가 세션당 한 번 도는 것**이고, 비동기라 사용자는 이 지연을 원래 못 느낀다. "리포트가 빨라졌다"가 아니라 **"세션마다 반복되는 잡의 I/O·버퍼풀 점유를 줄여 시스템 자원 부담을 낮췄다"**가 정확한 표현이다.
 
@@ -195,6 +201,8 @@
 - `IGNORE INDEX`로 풀스캔 강제 시: **412만 행 스캔 + filesort = 85초**.
 
 → "인덱스를 추가해 빨라졌다"가 아니라 **"이미 최적임을 측정으로 확인"** 한 것이 정직한 결론(인덱스 부재 시 85초가 lookup으로 바뀌는 역할은 대조로 입증).
+
+→ **조건**: 인덱스 유무 배수 **약 9,000배** 는 2026-07-20 로컬 재측정(412.5만 행, **실제 2.1KB JSON**, `SET profiling`). **더미 JSON 이면 660배**로 과소평가된다. 과거의 «7,000배» 는 짜깁기 추정이라 폐기된 값이다 — [조건 전체](./portfolio/realmysql-experiments.md#index-9000x).
 
 ### 5.4 페이지네이션 — offset → keyset (1억 행 rig)
 전체 테이블 시간순 페이지네이션을 OFFSET 방식과 keyset(cursor) 방식으로 비교(`EXPLAIN ANALYZE`, warm):
@@ -209,6 +217,8 @@
 
 → OFFSET은 **O(N) 선형**(깊이 10배 → 시간 ~10배, 스캔 후 폐기). keyset은 PK 범위 점프라 **깊이 무관(≈O(log n))**. 캐시돼도 선형이 유지되므로 병목은 디스크 I/O가 아니라 **행 스캔·폐기(CPU)** 자체.
 
+→ **조건**: 2026-06-03 로컬, 1억 행 더미 JSON(측정 시점 9,750만), warm 3회째. **489,868배는 깊이 5,000만 한 점의 값**이고 얕은 깊이에서는 급격히 작아진다(10만 → 798배). AWS 1억 행 real-JSON 재검증(2026-07-16)에서는 같은 깊이 offset 이 941.2초로 **더미보다 36배 악화**됐고, 그 판의 keyset 절대값(54~56ms)은 SSH 왕복 오버헤드가 바닥이라 액면가로 쓰지 않는다 — [조건 전체](./portfolio/realmysql-experiments.md#keyset-489868x).
+
 ### 5.5 파티션 — DROP PARTITION vs DELETE (TTL)
 `pose_data`를 `created_at` 월별 14파티션으로 전환한 뒤, 만료 데이터(~8M 행) 제거를 두 방식으로 비교:
 
@@ -218,6 +228,8 @@
 | `ALTER … DROP PARTITION` | 7,560,000 | **1,790 ms (1.8초)** | 파일 삭제 → ~910MB 즉시 회수 |
 
 → **약 625배**. DELETE는 행단위 삭제(undo·인덱스 유지·락) + 빈 파일 잔존, DROP은 파티션 `.ibd` 파일째 unlink.
+
+→ **조건**: 2026-06-03 로컬, 1억 행 더미 JSON, 월별 14파티션. ⚠️ **두 팔의 행수가 다르다**(8,301,450 ↔ 7,560,000) — 행당 정규화하면 **570배**. ⚠️ DROP 1.8초의 대부분도 ~910MB 파일 삭제 I/O 다. AWS real-JSON 축소 재검증 **421배** — [조건 전체](./portfolio/realmysql-experiments.md#drop-partition-625x).
 
 핵심 판단은 *"1억 행이니까 파티션"이 아니라* **"크기는 충분조건이 아니고, raw 데이터를 단기 버퍼로 보는 TTL 용도가 있어서 DROP이 정답"** 이라는 점이다. 세션 리포트 쿼리는 인덱스로 이미 빠르고 pruning 이득이 없다(오히려 파티션-로컬 인덱스로 미세 손해).
 
@@ -261,11 +273,11 @@ MediaPipe가 뱉는 **33개 landmark 전부**를 `joint_coordinates`에 저장�
 ### 5.10 측정 요약
 | 영역 | 개선 | 수치 |
 |---|---|---|
-| 쓰기 | 배치 INSERT | 처리량 +99%, p99 −37% |
-| 읽기 | JSON projection | payload −98.7%, warm 쿼리 8x(로컬 412만 행) → 29~41x(AWS 1억 행)<br>⚠️ precompute 잡의 자원 절감이지 사용자 체감 지연 아님 |
+| 쓰기 | 배치 INSERT | 처리량 +99%, p99 −37% ([조건](./decisions/load-test-strategy.md#batch-insert-99) — 절대 RPS 인용 금지) |
+| 읽기 | JSON projection | **DB→앱** payload −98.7%, warm 쿼리 8x(로컬 412만 행, 2026-06-02) → 29~41x(AWS 1억 행, 2026-07-15). warm·750행/세션·3컬럼 시절<br>⚠️ precompute 잡의 자원 절감이지 사용자 체감 지연 아님 — **정상 조회는 이 쿼리를 안 부른다**(precompute·폴백 전용) · [조건](./portfolio/realmysql-experiments.md#projection-98-7) |
 | 인덱스 | 풀스캔 대조 | 인덱스 부재 시 85초 |
-| 페이지네이션 | offset→keyset | 최대 489,868x |
-| 보존 | DROP PARTITION | DELETE 대비 625x |
+| 페이지네이션 | offset→keyset | 최대 489,868x ([조건](./portfolio/realmysql-experiments.md#keyset-489868x) — **깊이 5,000만 한 점**의 값, 얕으면 급격히 작아진다) |
+| 보존 | DROP PARTITION | DELETE 대비 625x ([조건](./portfolio/realmysql-experiments.md#drop-partition-625x) — 행당 정규화 570배, 로컬·더미) |
 | 동시성 | lost-update 방지 | RC 재현 → 원자 UPDATE·낙관락 |
 | JSON 저장 | 트림 33→13 | `joint_coordinates` −60.9% |
 | 동시성 읽기 | MVCC 스냅샷 | RR 일관읽기·읽기쓰기 비블로킹 |
@@ -351,12 +363,12 @@ ShadowFit은 카메라 한 대로 운동 자세를 정량 분석·교정하는 �
 | 도메인 | 주요 엔드포인트 |
 |---|---|
 | 회원/인증 | `POST /member/signup`·`/login`·`/logout`, `DELETE /member/{email}`, `GET·PATCH /member/onboarding/{email}` |
-| 운동 세션 | `POST /exercises/{id}/reference`, `POST /exercises/sessions`, `PUT /exercises/sessions/{id}/complete` |
+| 운동 세션 | `POST /exercises/{id}/reference`, `POST /exercises/sessions`, `PATCH /sessions/{id}/end`, `GET /sessions/active`, `POST /sessions/{id}/reattach` |
 | 내부 API | `POST /internal/exercises/pose-data`(REST), gRPC `ExerciseService.ReportFeedbackBatch` |
 | 피드백 템플릿 | `GET /exercises/{id}/feedback-templates` |
 | 리포트 | `GET /reports/weekly-summary`·`/calendar`·`/session/{id}`, `POST /reports/daily-logs` |
 | TTS/관리자 | `GET·PATCH /preferences/tts`, `PATCH /admin/exercises/{id}/thresholds` |
-| AI 서버 | `POST /pose`·`/sync`·`/video/analyze`, `GET /sync/onboarding-guide` |
+| AI 서버 | `POST /pose` (유일한 실사용) · 🔴 `/sync`·`/video/analyze`·`GET /sync/onboarding-guide` 는 호출자 0건 ([#293](https://github.com/Shadowfit/init/issues/293)) |
 
 ## 부록 B. 데이터베이스 스키마 요약
 

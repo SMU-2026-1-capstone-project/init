@@ -148,9 +148,10 @@ sessionId는 metadata가 아니라 메시지 payload 안에 있어 인터셉터�
 |---|---|
 | `ExerciseAnalysisService` 서킷 OPEN | FAILED/`circuit-open` 1건, **세션이 이미 종료면 0건**(조건 분기까지) |
 | `ExerciseAnalysisService` gRPC `onError` | FAILED/`grpc-error` 1건 — 목 스텁이 `onError` 를 직접 발화 |
-| `ExerciseAnalysisService` 앱 콜백 | COMPLETED/`app-callback` 1건, **멱등 재전송 시 중복 0건** |
-| `ExerciseAnalysisService` / `SessionService` 낙관락 충돌 | 1회 충돌 → `retry` 1건 / 3회 전패 → `retry` 2 + `exhausted` 1 후 예외 전파 |
+| `SessionService` 낙관락 충돌 | 1회 충돌 → `retry` 1건 / 3회 전패 → `retry` 2 + `exhausted` 1 후 예외 전파 |
 | `PoseDataService.savePoseDataBatch` | 7프레임 → `received` 7 / `stored` 2 (실제 저장 행수와 일치하는지) |
+
+> 당시에는 `ExerciseAnalysisService` 앱 콜백(COMPLETED/`app-callback`) 행과 그쪽 낙관락 충돌 검증도 있었으나, 그 경로 자체가 이슈 #179 에서 제거되면서 함께 걷어냈다. 낙관락 충돌 검증은 살아 있는 `SessionService`(`ai-callback`) 쪽에 그대로 남아 있다.
 
 설계 결정 3가지:
 

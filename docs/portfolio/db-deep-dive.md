@@ -109,7 +109,7 @@
 - **문제**: `PoseDataService.savePoseDataBatch`의 JPA `saveAll`이 `@GeneratedValue(IDENTITY)` 때문에 Hibernate batch가 원천 차단 → 개별 INSERT N방.
 - **해결**: `JdbcTemplate.batchUpdate` multi-row INSERT로 전환 (`FeedbackLogService` 패턴). IDENTITY 우회, INSERT 25방→1방.
 - **결과** (공정 측정, 워밍업 통제, [`load-test-strategy §7.6`](../decisions/load-test-strategy.md)):
-  - throughput **23.5 → 46.7 RPS (+99%)**, p50 −64%, p99 7,549→4,784ms (**−37%**)
+  - throughput **23.5 → 46.7 RPS (+99%)**, p50 −64%, p99 7,549→4,784ms (**−37%**) — [조건](../decisions/load-test-strategy.md#batch-insert-99): 2026-05-31 로컬, warmup 60초 폐기 후 ramp 5→100. **절대 RPS 는 인용하지 않는다**
 - 면접: "왜 config(`hibernate.jdbc.batch_size`)로 안 풀고 JdbcTemplate? → IDENTITY라 Hibernate batch 미발동, 드라이버 레벨 batch가 정석."
 - **면접(꼬리질문 대비)**: "왜 ID 전략을 SEQUENCE로 안 바꿨나? → SEQUENCE는 INSERT 전에 미리 ID를 확보할 수 있어 이론상 Hibernate batch가 가능하지만, MySQL엔 네이티브 SEQUENCE가 없어 별도 ID발급 테이블로 흉내내야 함(추가 오버헤드) + 엔티티 전체의 PK 생성 전략을 바꾸는 더 큰 변경. `JdbcTemplate.batchUpdate`는 이 저장 경로 하나만 국소적으로 우회해 같은 효과를 더 작은 변경으로 냄."
 
@@ -117,7 +117,7 @@
 
 목표 = `GET /reports/sessions/{id}` 응답시간 before/after.
 
-1. **projection** ✅ 측정 — `ReportService`가 엔티티 전체 로드 → worst 구간 계산은 `syncRate`·`feedbackMessage`·`timestampSec` 3개만 쓰는데 `joint_coordinates`(JSON 2.3KB)까지 끌어옴. → 3컬럼 projection DTO. **실측(2026-06-02, warm, 750행/세션, 로컬 412만 행): payload 1,716.8KB→22.4KB (−98.7%), warm 쿼리 12.1ms→1.5ms (8x)**. **AWS 1억 행 재검증(2026-07-15): payload 1,740.1KB→22.6KB (−98.7%, 동일), warm 쿼리 40.6ms→1.4ms (29~41x)** — 버퍼풀(2GB) 대비 테이블이 25배(~230GB) 커지며 작업셋 비율이 나빠져 배수가 오히려 커졌다(결론 강화). 같은 인덱스 — 차이는 JSON이 InnoDB **off-page 저장**이라 SELECT 시 overflow 페이지 random I/O, projection이 회피([`realmysql-experiments ②`](./realmysql-experiments.md)). ⚠️ 이 쿼리는 precompute가 세션당 1회 도는 비동기 잡이라 사용자 체감 지연이 아니라 **잡의 자원 소모 절감**으로 읽어야 한다.
+1. **projection** ✅ 측정 — `ReportService`가 엔티티 전체 로드 → worst 구간 계산은 당시 `syncRate`·`feedbackMessage`·`timestampSec` 3개만 쓰는데 `joint_coordinates`(JSON 2.3KB)까지 끌어옴. → projection DTO(**측정 시점 3컬럼, 현재 4컬럼** — `feedbackMessage` 제거·`repNumber`·`smoothedKneeAngle` 추가. `joint_coordinates` 를 안 싣는 방침은 유지). **실측(2026-06-02, warm, 750행/세션, 로컬 412만 행): payload 1,716.8KB→22.4KB (−98.7%), warm 쿼리 12.1ms→1.5ms (8x)**. **AWS 1억 행 재검증(2026-07-15): payload 1,740.1KB→22.6KB (−98.7%, 동일), warm 쿼리 40.6ms→1.4ms (29~41x)** — 버퍼풀(2GB) 대비 테이블이 25배(~230GB) 커지며 작업셋 비율이 나빠져 배수가 오히려 커졌다(결론 강화). 같은 인덱스 — 차이는 JSON이 InnoDB **off-page 저장**이라 SELECT 시 overflow 페이지 random I/O, projection이 회피([`realmysql-experiments ②` · 인용 조건](./realmysql-experiments.md#projection-98-7)). ⚠️ 이 쿼리는 precompute가 세션당 1회 도는 비동기 잡이라 사용자 체감 지연이 아니라 **잡의 자원 소모 절감**으로 읽어야 한다. 🔴 **정상 리포트 조회는 이 쿼리를 아예 안 탄다** — precompute 결과(JSON)를 읽고 끝난다. 도는 자리는 precompute 잡과 그 컬럼이 비었을 때의 폴백 둘뿐이다(코드 판독, 미측정).
 2. **Redis 캐싱** ⬜ — 세션 종료 후 리포트 불변 → cache-aside, 높은 적중률. stampede 방지.
 3. **precompute-on-write** ✅ **완료(2026-07-24)** — worst 구간을 세션 종료 시 1회 계산(`WorstSectionCalculator`)해 `reports.detailed_analysis`(JSON)에 저장, `SessionService.applyComplete`와 같은 트랜잭션. `ReportService.getSessionReport`는 이제 GET 때 `pose_data` 재스캔 없이 이 값을 읽기만 함(precompute 이전 리포트만 하위호환 fallback). 세부 설계 4가지(계산 위치·트랜잭션 경계·실패정책·백필)는 [`report-read-path.md §9`](../decisions/report-read-path.md).
 

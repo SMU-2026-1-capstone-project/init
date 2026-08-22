@@ -62,13 +62,30 @@ public class ReattachSessionResponseDto {
     @Schema(description = "클라가 그대로 노출해도 되는 안내 문구", requiredMode = Schema.RequiredMode.REQUIRED)
     private String message;
 
+    /**
+     * 세션 소유권 검증용 비밀값 (#187 안 (d)). <b>이 세션을 만든 클라에게만</b> 나간다.
+     *
+     * <p>클라는 이 값을 보관했다가 {@code POST /pose} 마다 동봉해야 한다 — AI 가 보관값과
+     * 대조해서 «남의 session_id 로 프레임 꽂기» 를 막는다. {@code session_id} 는 순차 정수라
+     * 추측되지만 이 값은 안 된다는 것이 방어의 전부다.
+     *
+     * <p>{@code null} 일 수 있다 — 이 기능 배포 <b>전에</b> 시작된 세션이다. 1단계는 그런 세션을
+     * 그대로 통과시킨다(compat).
+     *
+     * <p>🔴 클라도 이 값을 로그·화면에 남기면 안 된다.
+     */
+    @Schema(description = "세션 소유권 검증용 비밀값 (#187). POST /pose 에 동봉할 것. null이면 이 기능 배포 전 세션")
+    private String sessionNonce;
+
     private static final String MSG_ALREADY_ACTIVE = "이미 분석이 진행 중이라 그대로 이어서 진행합니다.";
     private static final String MSG_RESTORED =
             "%d회까지 이어서 진행합니다. 자세 판정이 잠시 흔들릴 수 있습니다.";
 
-    public static ReattachSessionResponseDto of(Long sessionId, int repCount, boolean alreadyActive) {
+    public static ReattachSessionResponseDto of(Long sessionId, int repCount, boolean alreadyActive,
+                                                String sessionNonce) {
         return ReattachSessionResponseDto.builder()
                 .sessionId(sessionId)
+                .sessionNonce(sessionNonce)
                 .restoredRepCount(repCount)
                 .alreadyActive(alreadyActive)
                 .analyzerStateReset(!alreadyActive)

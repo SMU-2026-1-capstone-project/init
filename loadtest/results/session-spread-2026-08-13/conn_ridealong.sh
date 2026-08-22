@@ -34,19 +34,24 @@
 #    돈다 — **그 선을 잇는 것이 아니라**, 이 라운드 안에서 «기본 ↔ 완화» 를 짝지어 답한다.
 #    3차 숫자와 나란히 놓지 말 것.
 #
-# 설계: docs/decisions/session-spread-sweep.md §4-4
+# 🔴 2026-08-17 (#271): 페이로드가 ghz 템플릿이 됐다 — 본 스윕과 같은 파일을 쓰므로 같이 바뀐다.
+#    `--connections` 는 이 스윕의 조작 변수이고, `GHZ_EXTRA` 가 워밍업에도 걸린다는 규약은 그대로다.
+#
+# 설계: docs/decisions/session-spread-sweep.md §4-4 · docs/decisions/loadtest-payload-uniqueness.md
 # 사용: sessions_sweep.sh 와 같은 환경변수 (OUT 은 같은 디렉터리를 준다)
 
 set -uo pipefail
 cd "$(dirname "$0")"
 
 SESS_LO=901
-LEVEL=${LEVEL:-100}                  # 본 스윕의 최고 레벨과 같은 무대에서 본다
+LEVEL=${LEVEL:-50}                   # 본 스윕의 최고 레벨과 같은 무대에서 본다(2026-08-17 격자 변경)
 SESS_HI=$(( SESS_LO + LEVEL - 1 ))   # reset_rows 범위
 C=${C:-100}
 N_REQ=${N_REQ:-30000}
 REPS=${REPS:-25}
-ROWS_PER_REQ=5
+# 본 스윕과 같은 유도식 — 상수로 두면 `REPS` 를 덮었을 때 `rows_s` 가 조용히 틀린다(#273 ②)
+DOWNSAMPLE_WINDOW=${DOWNSAMPLE_WINDOW:-5}     # 출처: PoseDataService.java:58
+ROWS_PER_REQ=$(( (REPS + DOWNSAMPLE_WINDOW - 1) / DOWNSAMPLE_WINDOW ))
 CONNS=(1 4 16)
 GEN=../../ghz/gen_batch_multi.py
 PY=${PY:-python}
@@ -75,8 +80,34 @@ LOG="$OUT/conn.tsv"
 
 source ./../commit-count-2026-08-09/_rig.sh
 
+# 🔴 ghz 는 `--connections` 를 **동시성(-c)보다 크게 못 잡는다.** 그런데 `_rig.sh` 의 워밍업은
+#    `WARM_C=3` 이고 이 스윕은 `--connections` 를 16까지 올린다 — 2026-08-18 1차 실행에서
+#    **6판 중 4판이 워밍업에서 죽었다**(conn4·conn16 전부). 통과한 둘은 conn1 뿐이었다.
+#    설계는 「GHZ_EXTRA 를 워밍업에도 건다」를 못박았으므로(연결 상태가 반쯤만 적용되면 안 된다)
+#    워밍업을 빼는 대신 **워밍업 동시성을 최대 커넥션 수 이상으로 올린다.**
+#    ⚠️ `${WARM_C:-16}` 로 쓰면 안 된다 — `_rig.sh` 가 이미 3 을 넣어놔서 `:-` 가 안 걸린다.
+#    2차 실행이 같은 자리에서 또 죽은 이유가 정확히 이것이다. 무조건 덮는다.
+WARM_C=${CONN_WARM_C:-16}
+
 learn_all_hosts
 init_log
+
+echo "=== 사전 확인 ==="
+assert_mysql_reachable
+assert_sessions_exist   # 공통부에 있다 — 단독 실행돼도 그물이 선다 (#273 ③)
+echo
+
+# 🔴 «보낸 요청이 실제로 행을 만들었는가» — 본 스윕과 같은 그물(#271).
+#    이쪽은 관측 채널이 없어 훅을 안 쓰던 자리인데, 이 확인만은 본 스윕과 같아야 한다.
+#    멈추는 것은 0 하나다(임계값이 아니라 «측정 불성립» 의 정의).
+round_end_hook() {  # $1=태그 $2=t0 $3=t1 — reset_rows 보다 먼저 돈다
+  local rows want
+  rows=$(mysql_q "SELECT COUNT(*) FROM pose_data WHERE session_id BETWEEN $SESS_LO AND $SESS_HI;")
+  want=$(( N_REQ * ROWS_PER_REQ ))
+  [ "${rows:-0}" = "0" ] && die "판 $1 이 행을 하나도 안 만들었다 — 요청은 갔는데 저장이 안 됐다 (#271)"
+  [ "${rows:-0}" = "$want" ] || echo "  ⚠️ 행수가 기대와 다르다 — $rows / $want" >&2
+  return 0
+}
 
 # 🔴 어떻게 끝나든 완화 상태를 남기지 않는다. 다음 실험이 그걸 모른 채 재면 3.47배만큼
 #    틀린 결론이 나온다. 4차 pool 스윕이 같은 이유로 같은 trap 을 갖고 있다.
@@ -101,7 +132,9 @@ PLANS=()
 
 echo "──────── 버림판 (기본 내구성 · --connections 4) ────────"
 set_durability 1 1
+GHZ_DISCARD=1                                                   # 실패해도 집계 밖 (#273 ①)
 GHZ_EXTRA="--connections 4" run_ghz "discard_conn" "$DATA" "$C" "$N_REQ" || true
+GHZ_DISCARD=0
 sed -i "/^discard_conn\t/d" "$LOG" 2>/dev/null
 echo "  (버림판은 표에서 제외했다)"
 echo

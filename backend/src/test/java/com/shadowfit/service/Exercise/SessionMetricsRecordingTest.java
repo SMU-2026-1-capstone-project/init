@@ -1,7 +1,6 @@
 package com.shadowfit.service.Exercise;
 
 import com.shadowfit.dto.exercises.VideoRequestDto;
-import com.shadowfit.dto.exercises.session.SessionUpdateRequestDto;
 import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.grpc.AnalyzeRequest;
 import com.shadowfit.grpc.AnalyzeResponse;
@@ -30,11 +29,9 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -98,7 +95,6 @@ SessionMetricsRecordingTest {
     @DisplayName("ExerciseAnalysisService")
     class AnalysisService {
 
-        @Mock private WebClient webClient;
         @Mock private SessionRepository sessionRepository;
         @Mock private ExercisesRepository exercisesRepository;
         @Mock private MemberRepository memberRepository;
@@ -125,7 +121,7 @@ SessionMetricsRecordingTest {
             when(blockingStub.withInterceptors(any())).thenReturn(blockingStub);
             when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
 
-            service = new ExerciseAnalysisService(webClient, sessionRepository, exercisesRepository,
+            service = new ExerciseAnalysisService(sessionRepository, exercisesRepository,
                     memberRepository, sessionService, referenceRepository, poseDataRepository,
                     circuitBreakerRegistry, metrics);
             ReflectionTestUtils.setField(service, "internalToken", "test-token");
@@ -145,7 +141,7 @@ SessionMetricsRecordingTest {
             circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
             when(sessionService.markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class))).thenReturn(true);
 
-            service.sendAnalysisRequestToFastApi(1L, dto(), "https://youtu.be/dummy", "BEGINNER");
+            service.sendAnalysisRequestToFastApi(1L, dto(), "https://youtu.be/dummy", "BEGINNER", "test-nonce");
 
             assertThat(transitions(Status.FAILED, "circuit-open")).isEqualTo(1.0);
             // 원인이 다른 FAILED와 섞이면 안 된다 — source 태그가 존재 이유이므로
@@ -158,7 +154,7 @@ SessionMetricsRecordingTest {
             circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
             when(sessionService.markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class))).thenReturn(false);
 
-            service.sendAnalysisRequestToFastApi(1L, dto(), "https://youtu.be/dummy", "BEGINNER");
+            service.sendAnalysisRequestToFastApi(1L, dto(), "https://youtu.be/dummy", "BEGINNER", "test-nonce");
 
             assertThat(transitions(Status.FAILED, "circuit-open")).isZero();
         }
@@ -178,7 +174,7 @@ SessionMetricsRecordingTest {
                 return null;
             }).when(stub).startAnalysis(any(AnalyzeRequest.class), any());
 
-            service.sendAnalysisRequestToFastApi(2L, dto(), "https://youtu.be/dummy", "BEGINNER");
+            service.sendAnalysisRequestToFastApi(2L, dto(), "https://youtu.be/dummy", "BEGINNER", "test-nonce");
 
             assertThat(transitions(Status.FAILED, "grpc-error")).isEqualTo(1.0);
             assertThat(transitions(Status.FAILED, "circuit-open")).isZero();
@@ -326,62 +322,6 @@ SessionMetricsRecordingTest {
                     .thenReturn(StopResponse.newBuilder().setSuccess(success).setMessage(message).build());
         }
 
-        @Test
-        @DisplayName("앱 콜백 완료 시 COMPLETED 전이가 source=app-callback 으로 기록된다")
-        void applyCompleteFromApp_recordsCompletedTransition() {
-            Session session = Session.builder().id(3L).status(Status.IN_PROGRESS)
-                    .startTime(LocalDateTime.now().minusMinutes(10)).build();
-            when(sessionRepository.findById(3L)).thenReturn(Optional.of(session));
-
-            service.applyCompleteFromApp(3L, new SessionUpdateRequestDto(12, 80.0, 90.0, 60.0, 100.0, 1));
-
-            assertThat(transitions(Status.COMPLETED, "app-callback")).isEqualTo(1.0);
-        }
-
-        @Test
-        @DisplayName("이미 COMPLETED면(멱등 재전송) 전이 지표를 중복으로 올리지 않는다")
-        void applyCompleteFromApp_alreadyCompleted_recordsNothing() {
-            Session session = Session.builder().id(4L).status(Status.COMPLETED)
-                    .startTime(LocalDateTime.now().minusMinutes(10)).build();
-            when(sessionRepository.findById(4L)).thenReturn(Optional.of(session));
-
-            service.applyCompleteFromApp(4L, new SessionUpdateRequestDto(12, 80.0, 90.0, 60.0, 100.0, 1));
-
-            assertThat(transitions(Status.COMPLETED, "app-callback")).isZero();
-        }
-
-        @Test
-        @DisplayName("낙관락 충돌 — 첫 시도만 실패하면 retry 1건만 기록되고 예외는 나지 않는다")
-        void completeSession_conflictThenSuccess_recordsRetry() {
-            ExerciseAnalysisService self = mock(ExerciseAnalysisService.class);
-            ReflectionTestUtils.setField(service, "self", self);
-            SessionUpdateRequestDto dto = new SessionUpdateRequestDto(12, 80.0, 90.0, 60.0, 100.0, 1);
-            doThrow(new ObjectOptimisticLockingFailureException(Session.class, 5L))
-                    .doNothing()
-                    .when(self).applyCompleteFromApp(eq(5L), any());
-
-            service.completeSession(5L, dto);
-
-            assertThat(conflicts("app-callback", "retry")).isEqualTo(1.0);
-            assertThat(conflicts("app-callback", "exhausted")).isZero();
-        }
-
-        @Test
-        @DisplayName("낙관락 충돌 — 3회 모두 실패하면 retry 2건 + exhausted 1건 후 예외가 전파된다")
-        void completeSession_alwaysConflict_recordsExhausted() {
-            ExerciseAnalysisService self = mock(ExerciseAnalysisService.class);
-            ReflectionTestUtils.setField(service, "self", self);
-            SessionUpdateRequestDto dto = new SessionUpdateRequestDto(12, 80.0, 90.0, 60.0, 100.0, 1);
-            doThrow(new ObjectOptimisticLockingFailureException(Session.class, 6L))
-                    .when(self).applyCompleteFromApp(eq(6L), any());
-
-            assertThatThrownBy(() -> service.completeSession(6L, dto))
-                    .isInstanceOf(ObjectOptimisticLockingFailureException.class);
-
-            // 마지막 시도만 exhausted — 재시도 여력이 남은 충돌과 포기한 충돌은 운영상 다른 사건이다
-            assertThat(conflicts("app-callback", "retry")).isEqualTo(2.0);
-            assertThat(conflicts("app-callback", "exhausted")).isEqualTo(1.0);
-        }
     }
 
     @Nested
@@ -400,7 +340,8 @@ SessionMetricsRecordingTest {
                     mock(com.shadowfit.service.Report.SessionAnalysisCalculator.class),
                     mock(com.shadowfit.repository.report.ReportRepository.class),
                     metrics,
-                    mock(com.shadowfit.repository.outbox.OutboxEventRepository.class));
+                    mock(com.shadowfit.repository.outbox.OutboxEventRepository.class),
+                    new com.shadowfit.global.security.SessionNonceGenerator());
             self = mock(SessionService.class);
             ReflectionTestUtils.setField(service, "self", self);
         }

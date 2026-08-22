@@ -61,7 +61,7 @@ class SessionFeedbackQueryServiceTest {
         when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(session));
         SessionFeedbackLog log = SessionFeedbackLog.builder()
                 .id(1L).session(session).feedbackType(FeedbackType.KNEE_OUT)
-                .occurredAt(LocalDateTime.now()).build();
+                .repNumber(1).occurredAt(LocalDateTime.now()).build();
         when(feedbackLogRepository.findBySessionIdOrderByOccurredAtAsc(SESSION_ID)).thenReturn(List.of(log));
 
         List<SessionFeedbackEventDto> result = service.getEvents(SESSION_ID, OWNER_ID);

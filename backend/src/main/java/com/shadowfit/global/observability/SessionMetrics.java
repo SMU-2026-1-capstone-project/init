@@ -27,6 +27,26 @@ public class SessionMetrics {
     private static final String POSE_BATCH_FRAMES = "shadowfit.pose.batch.frames";
 
     /**
+     * 종료된 세션에 도착한 pose 배치 콜백을 거절한 건수 (#187 (b)). tags: status(세션의 현재 상태)
+     *
+     * <p>이 지표가 0 이 아니면 둘 중 하나다 — ① 종료 직전 정상 배치가 CompleteAnalysis 와
+     * 경합해 뒤늦게 도착했거나, ② <b>남의 세션에 끼어들려는 주입이 그 세션이 끝난 뒤 도착</b>했다.
+     * 둘을 여기서 못 가른다(콜백에 «주장된 신원» 이 없다 — 그게 채널 ① nonce(d)가 필요한 이유다).
+     * 이 콜백 층 대조는 <b>심층방어</b>이지 #187 의 본체 방어가 아니다.
+     */
+    private static final String POSE_BATCH_REJECTED = "shadowfit.pose.batch.rejected";
+
+    /**
+     * pose_data 배치 INSERT 가 만난 데드락과 그 재시도 결과. tags: outcome(retried/recovered/exhausted)
+     *
+     * <p>이 지표가 필요한 이유는 재시도 횟수를 «2회» 로 고정했기 때문이다 — 실측(#276)은
+     * <b>워커 8 한 점</b>에서만 2회면 잔여 실패 0% 를 보였고, 같은 라운드가 <b>데드락 확률이
+     * 동시성의 함수</b>임을(워커 2 에서 1.2%, 16 에서 59.5%) 같이 보였다. 즉 운영 동시성이
+     * 실측 지점을 넘어서면 «2회» 가 모자랄 수 있고, 그때 그것을 알 수단이 이 지표뿐이다.
+     */
+    private static final String POSE_DEADLOCK_RETRIES = "shadowfit.pose.batch.deadlock.retries";
+
+    /**
      * AI 분석 중단(StopAnalysis) 응답의 업무 결과.
      * tags: outcome(ok/session-missing/session-missing-redelivery/grpc-error/error/skipped-circuit-open)
      *
@@ -157,6 +177,24 @@ public class SessionMetrics {
     public void poseBatch(int receivedFrames, int storedRows) {
         frames("received").record(receivedFrames);
         frames("stored").record(storedRows);
+    }
+
+    /**
+     * @param outcome retried(데드락을 만나 다시 던짐) / recovered(재시도 끝에 성공) /
+     *                exhausted(재시도를 다 쓰고도 실패 — AI 쪽 재전송으로 넘어간다).
+     *                셋을 나누는 이유는 «데드락이 났다» 와 «데이터를 잃었다» 가 다른 사건이기
+     *                때문이다. retried 가 늘어도 recovered 로 닫히면 유실은 0 이다.
+     */
+    public void poseBatchDeadlockRetry(String outcome) {
+        registry.counter(POSE_DEADLOCK_RETRIES, "outcome", outcome).increment();
+    }
+
+    /**
+     * @param status 배치가 도착했을 때 세션이 있던 상태(COMPLETED/FAILED/CANCELLED). IN_PROGRESS
+     *               는 여기 안 온다 — 그건 정상 경로다.
+     */
+    public void poseBatchRejected(String status) {
+        registry.counter(POSE_BATCH_REJECTED, "status", status).increment();
     }
 
     private DistributionSummary frames(String stage) {

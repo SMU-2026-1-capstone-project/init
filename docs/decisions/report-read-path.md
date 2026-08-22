@@ -76,7 +76,7 @@ GET /reports/sessions/{id}
  1. findSessionWithExerciseById         ← JOIN FETCH s.exercise (SessionRepository.java:16)
  2. reportRepository.findBySessionId     ← Report 1행, 없으면 REPORT_NOT_FOUND (ReportService.java:41)
  3. findFirstByMemberIdAndExerciseIdAndStatusOrderByStartTimeDesc  ← 이전 세션(비교용)
- 4. findFramesBySessionId ← pose_data 3컬럼 projection (2026-07-15 적용, §7)
+ 4. findFramesBySessionId ← pose_data 4컬럼 projection (2026-07-15 적용 당시 3컬럼, §7)
 ```
 
 이후 `buildReportResponse` → `selectWorstSection`([`:74`](../../backend/src/main/java/com/shadowfit/service/Report/ReportService.java))에서 연속 3프레임(`WORST_WINDOW_SIZE=3`) 슬라이딩으로 최저 syncRate 구간을 **자바 메모리에서 O(N) 재계산**.
@@ -89,7 +89,7 @@ GET /reports/sessions/{id}
 
 | # | 문제 | 상태 | 코드 근거 |
 |---|------|------|-----------|
-| ① | ~~**fat 컬럼 over-fetch** — 풀엔티티 로드, worst 계산은 `syncRate`·`timestampSec`·`feedbackMessage` 3개만 씀. `joint_coordinates`는 **한 번도 안 씀**~~ | **✅ 해결(2026-07-15)** | `findFramesBySessionId`(3컬럼 projection, §7)로 교체. 실측(§②b): payload −98.7%, warm 쿼리 **8x**(로컬 412만 행) → **29~41x**(AWS 1억 행, 2026-07-15 재검증) |
+| ① ([조건](../portfolio/realmysql-experiments.md#projection-98-7)) | ~~**fat 컬럼 over-fetch** — 풀엔티티 로드, worst 계산은 당시 `syncRate`·`timestampSec`·`feedbackMessage` 3개만 씀. `joint_coordinates`는 **한 번도 안 씀**~~ | **✅ 해결(2026-07-15)** | `findFramesBySessionId`(적용 당시 3컬럼 → **현재 4컬럼**, §7)로 교체. 실측(§②b): payload −98.7%, warm 쿼리 **8x**(로컬 412만 행) → **29~41x**(AWS 1억 행, 2026-07-15 재검증) |
 | ② | **재계산-on-read** — precompute 없이 매 GET마다 worst 구간 재계산 | ✅ 실재 | `selectWorstSection` 매 호출 |
 | ③ | **REPORT_NOT_FOUND 갭** — `completeAnalysis`가 `session`만 UPDATE, `reports`엔 안 씀 → 실제 세션은 Report 행 없음 → 404 | ✅ 실재(기능 끊김) | `applyCompleteFromApp`([`ExerciseAnalysisService.java:217`](../../backend/src/main/java/com/shadowfit/service/Exercise/ExerciseAnalysisService.java)) session만 UPDATE / `reports`는 [`data.sql:168`](../../mysql/data.sql) 시드뿐 |
 | ④ | ~~**exercise_sessions 인덱스 갭** — `(member_id, start_time)` 등 복합 인덱스 없음(FK 단일뿐) → 캘린더·이전세션 쿼리 filesort~~ | **✅ 해결(2026-07-11)** | `idx_session_member_starttime` 추가([`schema.sql:71`](../../mysql/schema.sql)), 실측: 월간 조회 1675행 Filter → 143행 Index range scan(cost 91.4→64.6), 연간 조회는 Covering index scan으로 전환. 커밋 `dbb0fec`<br>🔀 **2026-08-07**: 이 인덱스는 `idx_session_member_status_start (member_id, status, start_time)` 로 통합돼 이름이 사라졌다([#110](https://github.com/Shadowfit/init/issues/110), [`session-index-composition.md`](./session-index-composition.md)). 갭 자체는 여전히 해결 상태 — 다만 `status` 를 건너뛰어야 해 읽는 행이 14 → 20 으로 늘었다(절대 0.03ms) |
@@ -125,7 +125,7 @@ GET /reports/sessions/{id}
 | 행 특성 | 작고 균일 | **행마다 fat JSON(off-page)** |
 | 주 문제 | N+1, 인덱스 부재→풀스캔, 깊은 offset | **fat 헛로드·재계산·버퍼풀 오염·raw-in-OLTP** |
 | 인덱스 추가 효과 | 극적(헤드라인) | 이미 최적(조연) |
-| projection 효과 | 작음(행 작음) | **큼(−98.7%)** |
+| projection 효과 | 작음(행 작음) | **큼(−98.7%)** — 단 precompute·폴백 경로 한정(§7 아래 📌) ([조건](../portfolio/realmysql-experiments.md#projection-98-7)) |
 | 해결 성격 | textbook=평준화 | **판단 필요**(denormalization·티어링) |
 
 → 같은 "읽기"여도 **병목이 어느 단계냐**가 달라, 인덱스가 헤드라인(CRUD)이냐 조연(시계열)이냐가 갈린다. 유사 프로젝트도 *제대로 측정하면* 같은 문제를 만나지만 대부분 측정 안 해 모름 → **차별점은 "문제를 가진 것"이 아니라 "측정해 발견한 것"**([`db-deep-dive.md`](../portfolio/db-deep-dive.md) §0.3).
@@ -136,7 +136,7 @@ GET /reports/sessions/{id}
 
 | 등급 | 항목 | 의미 |
 |---|---|---|
-| 🟢 **실재 + 측정** | ① over-fetch (projection −98.7% 측정) | 코드에 있고 합성 볼륨으로 측정 |
+| 🟢 **실재 + 측정** | ① over-fetch (projection −98.7% 측정, [조건](../portfolio/realmysql-experiments.md#projection-98-7)) | 코드에 있고 합성 볼륨으로 측정. 단 **그 쿼리가 사는 경로는 precompute·폴백뿐**이다 |
 | 🟢 **실재 (코드)** | ② 재계산, ③ REPORT_NOT_FOUND | 코드/스키마에 실재 |
 | ✅ **해결됨(2026-07-11)** | ④ 인덱스 갭 | `idx_session_member_starttime` 추가, 실측 확인 — 커밋 `dbb0fec` |
 | 🟡 **잠재 (규모 미발동)** | ⑤ 버퍼풀 오염, ⑥ 무제한 프레임 | 메커니즘 실재하나 DAU 작아 안 터짐 |
@@ -168,7 +168,7 @@ GET /reports/sessions/{id}
 
 3파일 변경(`PoseFrameProjection.java` 신규, `PoseDataRepository.java`, `ReportService.java`). 기존 `findBySessionIdOrderByTimestampSecAsc`는 제거(테스트는 `findAll`/`count`만 써서 영향 없음, 전체 테스트 통과 확인).
 
-**① 신규 DTO** — `dto/report/PoseFrameProjection.java`
+**① 신규 DTO** — `dto/report/PoseFrameProjection.java` **(적용 시점 원문, 3컬럼)**
 ```java
 package com.shadowfit.dto.report;
 
@@ -176,7 +176,7 @@ package com.shadowfit.dto.report;
 public record PoseFrameProjection(Double timestampSec, Double syncRate, String feedbackMessage) {}
 ```
 
-**② Repository** — 명시적 JPQL로 컬럼 고정
+**② Repository** — 명시적 JPQL로 컬럼 고정 **(적용 시점 원문)**
 ```java
 @Query("SELECT new com.shadowfit.dto.report.PoseFrameProjection(" +
        "p.timestampSec, p.syncRate, p.feedbackMessage) " +
@@ -185,7 +185,24 @@ List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long session
 ```
 생성 SQL: `SELECT timestamp_sec, sync_rate, feedback_message FROM pose_data WHERE session_id=? ORDER BY timestamp_sec` (joint_coordinates 없음). `p.session.id`는 FK 컬럼 직접 사용(session 조인 안 함).
 
+> 🔴 **위 두 블록은 2026-07-15 적용 시점의 원문이고, 현재 코드가 아니다.** §②(b) 의 −98.7%·8x 를 잰 것이 이 3컬럼이라 근거 보존을 위해 남겨 둔다. 그 뒤 **컬럼이 두 번 바뀌었다** — `repNumber` 추가([#78](https://github.com/Shadowfit/init/issues/78): `sync_rate` 가 rep 안에서 상수라 rep 을 모르면 계산기가 경계를 넘는 것을 못 막는다), `feedbackMessage` 제거([#80](https://github.com/Shadowfit/init/issues/80): 값이 문자열 3개뿐이고 전부 `sync_rate` 를 임계값과 비교한 결과라 동어반복), `smoothedKneeAngle` 추가(§4-ㄹ: rep **안의** 프레임을 고르려면 프레임마다 실제로 다른 값이 필요하다). 정렬도 rep 우선으로 바뀌었다.
+
+**현재 형태 (4컬럼)** — [`PoseFrameProjection.java`](../../backend/src/main/java/com/shadowfit/dto/report/PoseFrameProjection.java) · [`PoseDataRepository.java:29-33`](../../backend/src/main/java/com/shadowfit/repository/exercise/PoseDataRepository.java)
+```java
+public record PoseFrameProjection(
+        Double timestampSec, Double syncRate, Integer repNumber, Double smoothedKneeAngle) {}
+
+@Query("SELECT new com.shadowfit.dto.report.PoseFrameProjection(" +
+       "p.timestampSec, p.syncRate, p.repNumber, p.smoothedKneeAngle) " +
+       "FROM PoseData p WHERE p.session.id = :sessionId " +
+       "ORDER BY p.repNumber ASC, p.timestampSec ASC")
+List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long sessionId);
+```
+**`joint_coordinates` 를 안 싣는 방침은 그대로다** — 늘어난 두 컬럼은 숫자 하나씩이라 off-page I/O 를 되살리지 않는다. 즉 −98.7% 의 **메커니즘**은 유지되고, 흔들릴 수 있는 것은 **배수의 소수점**이다(미측정, [`projection-end-to-end-remeasure.md`](./projection-end-to-end-remeasure.md) Q5).
+
 **③ ReportService** — `selectWorstSection`/`buildWorstReason`/`pickDominantFeedback` 시그니처를 `List<PoseFrameProjection>`로, 접근자 `getSyncRate()→syncRate()` 등으로 교체. 호출부(`:51`)를 `findFramesBySessionId`로.
+
+> 🔴 **③ 도 적용 시점 서술이다.** `pickDominantFeedback` 은 [#80](https://github.com/Shadowfit/init/issues/80) 으로 사라졌고, worst 구간 계산은 `ReportService` 를 떠나 [`SessionAnalysisCalculator`](../../backend/src/main/java/com/shadowfit/service/Report/SessionAnalysisCalculator.java) 로 옮겨 갔다(`ReportService:106`·`SessionService:327` 이 프로젝션을 읽어 넘긴다).
 
 > 기존 `findBySessionIdOrderByTimestampSecAsc`는 교체 후 미사용(테스트는 `findAll`/`count`만 씀) → 제거 선택.
 
@@ -193,7 +210,9 @@ List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long session
 
 **AWS 1억 행 재검증(2026-07-15)**: payload 1,740.1KB→22.6KB(−98.7%, 동일), warm 쿼리 **40.6ms→1.4ms(29~41x)**. 412만 행 때의 8x보다 배수가 커진 것은 버퍼풀(2GB) 대비 테이블이 25배(~230GB) 커지며 작업셋 비율이 나빠져 off-page 랜덤 I/O가 캐시에 덜 걸린 탓 — 결론이 강화된 방향이다. ⚠️ 이 쿼리는 precompute가 세션당 1회 도는 비동기 잡이라 **사용자 체감 지연이 아니라 잡의 자원 소모 절감**으로 읽어야 한다.
 
-**⚠️ 향후 컬럼 추가 예정 (BE-09 세트 도입, 현재 보류)**: `pose_data`에 `set_index` 컬럼이 추가되면([`22-backend-tasks-detail.md#BE-09`](../tasks/22-backend-tasks-detail.md)) `PoseFrameProjection`도 `setIndex`를 포함하도록 확장 필요 — worst 구간 계산이 세션 전체가 아니라 세트 단위로 바뀔 수 있음. BE-09는 스쿼트 외 운동 추가 시점까지 보류라 지금 미리 넣지 않음(YAGNI) — 확장 시점에 이 3컬럼 DTO부터 손대야 함을 기록.
+> 📌 **조건 (2026-08-17)** — 🔴 **정상 리포트 조회는 이 쿼리를 안 부른다.** `ReportService.resolveDetailedAnalysis` 가 저장된 `detailed_analysis` 를 파싱하고 끝내므로, projection 이 도는 곳은 **precompute** 와 **폴백**(그 컬럼이 비었거나 구버전일 때) 둘뿐이다 → 정상 경로 응답시간 기여는 **0**. 단 이건 **코드 판독이고 아직 측정이 아니다**([`./projection-end-to-end-remeasure.md`](./projection-end-to-end-remeasure.md) Q1 이 «0 임을 재는 것» 을 1차 산출물로 세워뒀다). 또한 위 수는 **3컬럼 시절** 값이고 현재 4컬럼 형상으로는 재검증하지 않았다. 조건 전체는 [`realmysql-experiments.md §②b` 조건표](../portfolio/realmysql-experiments.md#projection-98-7).
+
+**⚠️ 향후 컬럼 추가 예정 (BE-09 세트 도입, 현재 보류)**: `pose_data`에 `set_index` 컬럼이 추가되면([`22-backend-tasks-detail.md#BE-09`](../tasks/22-backend-tasks-detail.md)) `PoseFrameProjection`도 `setIndex`를 포함하도록 확장 필요 — worst 구간 계산이 세션 전체가 아니라 세트 단위로 바뀔 수 있음. BE-09는 스쿼트 외 운동 추가 시점까지 보류라 지금 미리 넣지 않음(YAGNI) — 확장 시점에 이 DTO부터 손대야 함을 기록. **(2026-08-20 주: 이 DTO 는 그 사이 이미 두 번 손댔다 — #78·#80·§4-ㄹ. 현재 4컬럼이고, `setIndex` 는 다섯 번째가 된다.)**
 
 ---
 
@@ -239,13 +258,13 @@ precompute 도입 이전에 이미 `COMPLETED`된 세션들은 `reports` row가 
 
 > **2026-07-24 최종 갱신**: precompute-on-write(§9)가 먼저 구현되면서 ②(삭제 근거)가 풀렸고, 그 위에 TTL 자동화(⑤⑥) 및 나머지 안전장치(보존기간·아카이빙·안전마진·검증)까지 전부 결정·구현 완료. `PoseDataPartitionScheduler`(신규, `com.shadowfit.service.Exercise`) 참조.
 
-`pose_data` TTL(§6 ④)은 개념·실측(`realmysql-experiments.md` §4②d, DROP PARTITION 625배)에 스키마 반영(PR #43)과 자동화까지 모두 끝났다. 6가지 축 — ①~④는 **정책 설계**, ⑤~⑥은 **운영 실행**.
+`pose_data` TTL(§6 ④)은 개념·실측([`realmysql-experiments.md` §②d · 조건](../portfolio/realmysql-experiments.md#drop-partition-625x), DROP PARTITION 625배)에 스키마 반영(PR #43)과 자동화까지 모두 끝났다. 6가지 축 — ①~④는 **정책 설계**, ⑤~⑥은 **운영 실행**.
 
 | # | 축 | 내용 | 이 프로젝트 상태 |
 |---|---|---|---|
 | ① | 버퍼 vs 영속 구분 | `pose_data`(raw, 단기) vs `reports`(집계, 영속) | ✅ 판단 완료(`db-deep-dive.md` §2-0) |
 | ② | 삭제 근거 | raw를 지워도 되는 건 precompute로 요약이 `reports`에 이미 박제됐을 때뿐 | ✅ precompute-on-write 완료(2026-07-24, §9) — 삭제 근거 확보 |
-| ③ | 삭제 메커니즘 | DROP PARTITION vs DELETE — DROP 채택(625배, 디스크 즉시 회수) | ✅ 실측 완료 |
+| ③ | 삭제 메커니즘 | DROP PARTITION vs DELETE — DROP 채택(625배[행당 570배], 디스크 즉시 회수 · [조건](../portfolio/realmysql-experiments.md#drop-partition-625x)) | ✅ 실측 완료 |
 | ④ | 파티션 단위 | 월별 — 너무 잘게(일별) 관리부담, 너무 크게(연별) 만료 단위가 거칠어짐 | ✅ 월별 14파티션 + `pfuture`, 실스키마 반영(`mysql/schema.sql`, PR #43) |
 | ⑤ | 실행 트리거 | 스케줄러가 주기적으로 DROP/ADD PARTITION 실행 | ✅ `PoseDataPartitionScheduler` 신설, 매일 새벽 4시(`@Scheduled(cron=...)`), `SessionTimeoutScheduler`와 동일 패턴 |
 | ⑥ | 파티션 유지보수 | 미래 파티션(`pfuture`)이 계속 커지지 않도록, 다다음 달 파티션을 미리 만들어둬야 함 | ✅ 이번 달 기준 +2개월(`lookahead-months`)까지 항상 실명 파티션 유지, 부족하면 `REORGANIZE PARTITION pfuture INTO (...)`로 확장 |

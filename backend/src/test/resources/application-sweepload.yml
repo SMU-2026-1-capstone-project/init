@@ -1,0 +1,74 @@
+# 타임아웃 스윕 적재량 측정 전용 프로파일 (#207).
+#
+# 재는 것: `SessionTimeoutScheduler.checkAndTimeoutSessions()` 1회의 **할당량과 소요시간**이
+# IN_PROGRESS 세션 수 N 에 어떻게 반응하는가. 선형이면 #207 이 맞고, 평탄하면 틀린 것이다
+# (#207 §6 반증 조건).
+#
+# ── 왜 H2 가 아닌가 ─────────────────────────────────────────────────────────
+# 재는 대상이 «쿼리 결과를 엔티티로 물리는 비용» 이라 그 결과 집합이 진짜여야 한다.
+# H2 + ddl-auto: create-drop 은 스키마도 옵티마이저도 다르고, 무엇보다 이 쿼리를 받치는
+# `idx_session_status_starttime (status, start_time)` 이 프로덕션 정의 그대로여야 한다.
+#
+# ── 왜 race 프로파일(3307)을 안 쓰는가 ──────────────────────────────────────
+# race 는 V1 을 손으로 부어 만든 스키마를 Flyway 없이 «그대로 관찰» 하는 것이 목적이다.
+# 여긴 반대로 **마이그레이션 전체(V1~)가 만든 스키마**여야 한다 — exercises 마스터 시드(V2)가
+# 있어야 세션을 만들 수 있고, 인덱스도 최신이어야 한다. 두 목적이 달라 컨테이너를 가른다.
+#
+# ── 띄우는 법 (3308, 이 리그 전용) ──────────────────────────────────────────
+#   docker run -d --name shadowfit-sweep-mysql -e MYSQL_ROOT_PASSWORD=sweeptest \
+#     -e MYSQL_DATABASE=shadowfit -p 3308:3306 mysql:8.0 \
+#     --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+#
+#   (스키마는 Flyway 가 만든다. 손으로 부을 것 없음.)
+#
+# ── 도는 법 ────────────────────────────────────────────────────────────────
+#   ./gradlew :backend:test --tests '*SessionTimeoutSweepLoadTest' -Dsweep.load=true
+#
+#   시스템 프로퍼티가 없으면 통째로 건너뛰므로 CI 는 영향받지 않는다.
+spring:
+  datasource:
+    # rewriteBatchedStatements — 시딩 10만 행을 위한 것이다. 측정 대상은 SELECT 라
+    # 이 옵션이 결과를 바꾸지 않는다(#221 이 재려는 그 기여분과는 다른 경로다).
+    url: jdbc:mysql://localhost:3308/shadowfit?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&rewriteBatchedStatements=true
+    username: root
+    password: sweeptest
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # 스키마는 마이그레이션이 만든다 — 프로덕션과 같은 정의를 재는 것이 요점이다.
+  flyway:
+    enabled: true
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    database-platform: org.hibernate.dialect.MySQLDialect
+    # 측정 중 SQL 로그가 할당에 섞이지 않게 한다.
+    show-sql: false
+
+  sql:
+    init:
+      mode: never
+
+# 🔴 스케줄러 자동 기동을 끈다. 켜두면 30초 뒤 한 번이 **측정 판과 겹쳐서** 돈다
+#    (#108 이 같은 이유로 이 스위치를 만들었다). 판은 테스트가 직접 호출한다.
+scheduling:
+  enabled: false
+
+exercise:
+  session:
+    timeout:
+      # 🔴 크게 잡는 것이 이 리그의 전제다. 임계는 lastActiveAt + idle-minutes 인데,
+      #    시딩 때 박은 last_active_at 하나로 리그가 도는 내내 «전부 타임아웃 아님» 이 유지돼야
+      #    한다. 기본 10분이면 리그가 10분을 넘기는 순간 세션이 걷히기 시작해, 재는 대상이
+      #    «일이 0인 판» 에서 «일이 있는 판» 으로 조용히 바뀐다.
+      #
+      #    판정 코드 경로는 그대로 탄다 — 상수만 크고 결과가 항상 false 일 뿐이다. 매 판
+      #    assertNothingCollected 가 이 전제를 다시 확인한다.
+      idle-minutes: 6000
+      default-buffer-minutes: 6000
+
+logging:
+  level:
+    root: WARN
+    com.shadowfit: WARN
+    org.hibernate.SQL: WARN

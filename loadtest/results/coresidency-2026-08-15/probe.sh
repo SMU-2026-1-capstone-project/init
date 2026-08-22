@@ -16,6 +16,11 @@ BASE=${BASE:-http://localhost:8080}
 AI=${AI:-http://localhost:8000}
 TOKEN=${TOKEN:-}
 AI_CONTAINER=${AI_CONTAINER:-shadowfit-ai}
+# 🔴 G3 는 **대상 박스의** 컨테이너를 봐야 한다. 게이트를 부하기에서 돌리면 로컬 docker 에는
+#    그 컨테이너가 없어서 «못 찾겠다» 로 떨어지는데, 그건 캡이 없는 것이 아니라 **보는 곳이
+#    틀린 것**이다. 환경 결함이 게이트 실패로 위장하는 자리라 통로를 열어둔다.
+#      예) DOCKER="ssh root@10.0.0.5 docker" bash probe.sh
+DOCKER=${DOCKER:-docker}
 ORIG=${ORIG:-$HERE/../../measure_ai_concurrency.py}
 FRAMES=${FRAMES:-$HERE/frames.json}
 
@@ -80,7 +85,7 @@ if [ -z "$TOKEN" ]; then
   no "TOKEN(AI_PUBLIC_TOKEN)이 비었다 — AI HTTP 는 401 이다"
 else
   python - "$BASE" "$AI" "$TOKEN" "$FRAMES" <<'PY'
-import json, sys, urllib.request, urllib.error, time
+import json, os, sys, time, urllib.request, urllib.error
 base, ai, token, framespath = sys.argv[1:5]
 def http(url, method="GET", body=None, headers=None):
     data = json.dumps(body).encode() if body is not None else None
@@ -114,20 +119,33 @@ except Exception:
 print(f"  ✅ 세션 생성 — sessionId={sid}")
 
 frames = json.load(open(framespath))["frames"]
-st, body = http(ai + "/api/v1/pose", "POST",
-                {"image": frames[0], "exercise_type": "squat", "session_id": sid,
-                 "timestamp_sec": 0.0}, {"Authorization": "Bearer " + token})
-if st != 200:
-    print(f"  🔴 프레임 {st}: {body[:150]}"); sys.exit(1)
-j = json.loads(body)
-if j.get("success"):
-    print("  ✅ 프레임 수락 + 검출 성공")
-else:
+
+# 🔴 세션 생성 응답은 즉시 오지만 `StartAnalysis` 는 afterCommit + @Async 로 **그 뒤에** 나간다
+#    (ExerciseAnalysisService:210-217). 그래서 생성 직후의 첫 프레임은 정상 시스템에서도
+#    «분석기가 없습니다» 로 거절된다 — 2026-08-16 EC2 실측: 0s 거절 / 2s 성공.
+#    붙을 때까지 기다리되, **안 붙는 것과 늦게 붙는 것은 구분해서** 적는다.
+ATTACH_SEC = float(os.environ.get("ATTACH_SEC", "20"))
+t0 = time.monotonic()
+waited = None
+while True:
+    st, body = http(ai + "/api/v1/pose", "POST",
+                    {"image": frames[0], "exercise_type": "squat", "session_id": sid,
+                     "timestamp_sec": 0.0}, {"Authorization": "Bearer " + token})
+    if st != 200:
+        print(f"  🔴 프레임 {st}: {body[:150]}"); sys.exit(1)
+    j = json.loads(body)
+    if j.get("success"):
+        waited = time.monotonic() - t0
+        break
     msg = j.get("message", "")
-    print(f"  🔴 프레임이 거절됐다: {msg[:120]}")
-    if "분석기가 없습니다" in msg:
-        print("     → StartAnalysis 가 안 붙었다. Spring→AI gRPC 또는 검출기 풀을 본다")
-    sys.exit(1)
+    if "분석기가 없습니다" not in msg:
+        print(f"  🔴 프레임이 거절됐다: {msg[:120]}"); sys.exit(1)
+    if time.monotonic() - t0 >= ATTACH_SEC:
+        print(f"  🔴 {ATTACH_SEC:.0f}s 안에 분석기가 안 붙었다: {msg[:120]}")
+        print("     → Spring→AI gRPC 또는 검출기 풀을 본다 (경합이 아니라 «안 붙는» 것이다)")
+        sys.exit(1)
+    time.sleep(0.5)   # AI 유입 간격 상한(300ms)보다 넉넉히
+print(f"  ✅ 프레임 수락 + 검출 성공 (분석기 부착까지 {waited:.1f}s 대기)")
 http(base + f"/sessions/{sid}/end", "PATCH", None, auth)
 PY
   [ $? -eq 0 ] || FAIL=$((FAIL+1))
@@ -135,10 +153,10 @@ fi
 
 # ── G3. 캡이 실제로 걸려 있는가 (팔 C·D 전제) ────────────────────────────
 g "G3. 컨테이너 자원 한도 — 팔이 실제로 갈리는가"
-lim=$(docker inspect -f '{{.HostConfig.Memory}}' "$AI_CONTAINER" 2>/dev/null)
-cpu=$(docker inspect -f '{{.HostConfig.NanoCpus}}' "$AI_CONTAINER" 2>/dev/null)
+lim=$($DOCKER inspect -f '{{.HostConfig.Memory}}' "$AI_CONTAINER" 2>/dev/null | tr -d '\r')
+cpu=$($DOCKER inspect -f '{{.HostConfig.NanoCpus}}' "$AI_CONTAINER" 2>/dev/null | tr -d '\r')
 if [ -z "$lim" ]; then
-  no "$AI_CONTAINER 를 못 찾겠다"
+  no "$AI_CONTAINER 를 못 찾겠다 (DOCKER='$DOCKER' — 보는 곳이 맞는지부터 볼 것)"
 else
   if [ "$lim" = "0" ]; then
     no "메모리 한도가 없다 — 첫 세션에서 RuntimeError 다 (#214). 팔 B 도 메모리 캡은 걸어야 한다"

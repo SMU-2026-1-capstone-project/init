@@ -6,6 +6,12 @@
 # 가설: LIMIT n OFFSET m 은 m(깊이)에 선형 비례 저하(앞 m행 스캔 후 폐기),
 #       keyset(WHERE id > last)은 PK 범위 점프라 평탄(≈O(log n)).
 # 측정: EXPLAIN ANALYZE 최상위(Limit) 노드 actual time 끝값(ms), warm(3회째).
+#
+# 📌 이 rig 이 낸 «최대 489,868배» 를 인용할 때의 조건:
+#    docs/portfolio/realmysql-experiments.md #keyset-489868x
+#    - 깊이 5,000만 한 점의 값이다. 10만 깊이면 798배, 0 이면 1배다
+#    - EXPLAIN ANALYZE(DB 내부 타이밍)라 SSH 왕복 오염이 없다 — AWS 재검증판(2026-07-16)의
+#      keyset 54~56ms 에 붙는 「~50ms 바닥」 캐비엇은 이 판에는 해당하지 않는다
 set -u
 PW=1234
 DB(){ docker exec shadowfit-mysql mysql -uroot -p$PW shadowfit "$@" 2>/dev/null; }

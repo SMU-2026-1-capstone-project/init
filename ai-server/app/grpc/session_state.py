@@ -7,12 +7,15 @@ StopAnalysis 또는 CompleteAnalysis 콜백 직후 제거된다.
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
 
 from app.models.pose import Landmark
+
+logger = logging.getLogger(__name__)
 
 # rep 하나에 담길 수 있는 최대 프레임 수 (이슈 #91).
 #
@@ -94,6 +97,17 @@ class SessionState:
     exercise_id: int
     exercise_type: str = "squat"
     persona: str = "BEGINNER"
+    # 세션 소유권 검증용 비밀값 (이슈 #187 안 (d)).
+    #
+    # Spring 이 세션 생성 시 만들어 ① REST 응답으로 클라에, ② StartAnalysis/ReattachAnalysis 로
+    # 여기에 흘린다. POST /pose 가 동봉한 값과 이 값을 대조하는 것이 방어의 전부다 — session_id 는
+    # AUTO_INCREMENT 순차 정수라 추측되지만 이 값은 안 된다.
+    #
+    # None = 이 기능 배포 전에 시작된 세션. 1단계는 그런 세션을 검증 없이 통과시킨다(compat).
+    # 안 그러면 배포 순간 진행 중이던 세션이 전부 끊긴다.
+    #
+    # 🔴 로그에 찍지 말 것. 값이 로그에 남으면 로그를 읽는 사람이 그 세션의 소유자가 된다.
+    session_nonce: str | None = None
     reference_angles: list[list[float]] = field(default_factory=list)
 
     # 진행 중인 rep에 누적되는 프레임들.
@@ -143,6 +157,13 @@ class SessionState:
     accepted_frame_count: int = 0
     dropped_frame_count: int = 0
 
+    # 상한을 통과하고도 **판정에 못 들어간** 프레임 (#267). 위 둘로는 안 잡히는 구멍이다 —
+    # 가시성 부족은 accept_frame 을 통과하므로 `accepted_frame_count` 에 들어가는데, 정작
+    # 상태기계에는 안 들어간다. 즉 「수락 30 · 드롭 0」이면서 판정은 0 일 수 있고, #196 통주행이
+    # 정확히 그 모양을 「되고 있다」로 읽었다. 이 값이 accepted 와 같으면 그 세션은 **한 프레임도
+    # 판정되지 않았다**는 뜻이다.
+    visibility_skip_count: int = 0
+
     # --- 프레임 시각의 기준점 (#156) ---
     #
     # timestamp_sec 은 «세션 시작 기준 경과 초» 여야 한다 — 계약서·엔티티 주석·리포트 포맷이
@@ -158,6 +179,33 @@ class SessionState:
     # (ReattachRequest.elapsed_sec) 여기에 담아 더한다. initial_rep_count 가 rep 축에서 하는 일을
     # 시간 축에서 하는 값이다.
     elapsed_offset_sec: float = 0.0
+
+    # ── 프레임 유입 진단 (#267) ────────────────────────────────────────────
+    #
+    # 계산을 StopAnalysis 안에 두지 않고 여기로 뺀 이유는 **시험 가능성**이다. servicer 메서드는
+    # gRPC 스텁이 필요해 이 저장소가 단위 테스트하지 않는 자리인데(`test_stop_idempotency` 머리말),
+    # 「판정 0 인 세션을 알아보는가」는 정확히 회귀가 나기 쉬운 판단이다. 값만 여기서 내면
+    # 로그 문구는 servicer 에 남기면서 판단은 테스트로 고정할 수 있다.
+
+    @property
+    def judged_frame_count(self) -> int:
+        """상태기계까지 실제로 들어간 프레임 수.
+
+        가시성 스킵은 `accept_frame` 을 **통과한 뒤** 떨어지므로 `accepted_frame_count` 에
+        들어가 있다. 그래서 «수락» 만 보면 판정된 것으로 오해한다 — 그 차이가 이 값이다.
+        """
+        return self.accepted_frame_count - self.visibility_skip_count
+
+    @property
+    def needs_intake_warning(self) -> bool:
+        """세션 종료 때 프레임 유입을 경고해야 하는가.
+
+        🔴 **판정 0 이면 카운터가 전부 0 이어도 경고한다.** 사람을 아예 못 찾은 세션은
+        `pose.py` 의 NO_POSE 갈래가 `accept_frame` 앞에서 반환해 세 카운터가 모두 0 이 되는데,
+        그때가 바로 리포트가 전 필드 0 으로 끝나는 경우다(#196). 「가시성 스킵이 있을 때만」
+        으로 걸면 제일 나쁜 경우를 정확히 놓친다.
+        """
+        return self.judged_frame_count <= 0 or self.visibility_skip_count > 0
 
 
 def elapsed_sec(state: SessionState, now: float) -> float:
@@ -255,6 +303,7 @@ class SessionStateRegistry:
         exercise_type: str = "squat",
         persona: str = "BEGINNER",
         initial_rep_count: int = 0,
+        session_nonce: str | None = None,
     ) -> SessionState:
         with self._lock:
             state = SessionState(
@@ -264,6 +313,7 @@ class SessionStateRegistry:
                 persona=persona,
                 reference_angles=reference_angles,
                 rep_count=initial_rep_count,
+                session_nonce=session_nonce,
             )
             self._sessions[session_id] = state
             return state
@@ -276,6 +326,7 @@ class SessionStateRegistry:
         exercise_type: str = "squat",
         persona: str = "BEGINNER",
         initial_rep_count: int = 0,
+        session_nonce: str | None = None,
     ) -> tuple[SessionState, bool]:
         """재부착 전용. 상태가 이미 있으면 **보존하고** 그대로 돌려준다.
 
@@ -292,6 +343,19 @@ class SessionStateRegistry:
         with self._lock:
             existing = self._sessions.get(session_id)
             if existing is not None:
+                # 분석 상태는 손대지 않는다(이 메서드의 전부). 다만 nonce 는 분석 상태가 아니라
+                # **신원**이고, 살아있는 상태가 아직 그것을 모를 수 있다 — 이 기능 배포 전에
+                # 시작돼 배포 후 재부착으로 돌아온 세션이다. 그 한 경우에만 채운다.
+                #
+                # 이미 값이 있으면 덮지 않는다. Spring 은 같은 DB 행에서 읽으므로 같은 값을 보내고,
+                # 다르다면 그건 «둘 중 하나가 틀렸다» 라 조용히 덮을 일이 아니다(로그만 남긴다).
+                if session_nonce and existing.session_nonce is None:
+                    existing.session_nonce = session_nonce
+                elif session_nonce and existing.session_nonce != session_nonce:
+                    logger.warning(
+                        "세션 %s 재부착 — 보관 중인 소유권 값과 다른 값이 왔다. 보관값을 유지한다 (#187)",
+                        session_id,
+                    )
                 return existing, True
 
             state = SessionState(
@@ -301,6 +365,7 @@ class SessionStateRegistry:
                 persona=persona,
                 reference_angles=reference_angles,
                 rep_count=initial_rep_count,
+                session_nonce=session_nonce,
             )
             self._sessions[session_id] = state
             return state, False

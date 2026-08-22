@@ -161,7 +161,7 @@ ghz 는 **처리량**을 재고, 이쪽은 **쿼리 하나의 실행 계획과 �
 | `measure_admin_stats_actual.sh` | D 대시보드 집계 5종의 추정 vs 실제, e 인덱스 가설 | 같은 문서 §4-5-1 |
 | `measure_admin_stats_curve.sh` | 집계 b 의 볼륨별 비용 곡선(선형성) | 같은 문서 §4-5 ②-1 |
 | `measure_admin_index.sh` | 관리자 인덱스 추가 전후 (초판 rig) | 같은 문서 §4-1 |
-| `measure_pagination.sh` · `measure_partition.sh` · `measure_json.sh` · `measure_bufferpool.sh` · `measure_lock*.sh` · `measure_mvcc.sh` · `measure_redundant_index.sh` | 각 주제별 단독 실험 | [`realmysql-experiments.md`](../docs/portfolio/realmysql-experiments.md) 등 |
+| `measure_pagination.sh` · `measure_partition.sh` · `measure_json.sh` · `measure_bufferpool.sh` · `measure_lock*.sh` · `measure_mvcc.sh` · 🔴 `measure_redundant_index.sh`([#320](https://github.com/Shadowfit/init/issues/320) — **V5 이전 스키마**를 만든다. 게이트가 걸려 있어 `REDUNDANT_INDEX_PRE_V5=1` 없이는 안 돈다) | 각 주제별 단독 실험 | [`realmysql-experiments.md`](../docs/portfolio/realmysql-experiments.md) 등 |
 
 **실행 순서** — `measure_admin_filter_explain.sh` 가 스크래치 DB 를 만들고 시딩하므로 **항상 먼저**
 돌린다. `_b_actual` · `_stats_actual` · `_stats_curve` 는 그 DB 를 재사용하고, 규모가 안 맞으면

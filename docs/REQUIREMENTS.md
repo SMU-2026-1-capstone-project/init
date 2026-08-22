@@ -48,7 +48,8 @@
 |---|---|---|
 | 기준 좌표 추출 | `POST /exercises/{exerciseId}/reference?youtubeUrl=` | YouTube → MediaPipe → `ExerciseReference` 저장 |
 | 운동 세션 시작 | `POST /exercises/sessions` | App → Spring → gRPC → FastAPI, 즉시 sessionId 반환 |
-| 운동 세션 종료 | `PUT /exercises/sessions/{sessionId}/complete` | totalReps 등 받아서 COMPLETED 처리 |
+| 운동 세션 종료 | `PATCH /sessions/{sessionId}/end` | 소유권 확인 후 endTime 기록 → 아웃박스로 AI 에 gRPC `StopAnalysis`. 멱등 |
+| 운동 세션 완료 반영 | gRPC `ExerciseService.CompleteAnalysis` (AI → Spring) | totalReps·싱크통계를 서버가 `pose_data` 에서 집계해 COMPLETED 처리. 앱이 결과를 직접 보고하던 `PUT .../complete` 는 제거됨 (ET-H) |
 | 세션 타임아웃 자동 실패 | 스케줄러 (1분 주기) | 시작시간 + 예상시간 + 30분 버퍼 초과 시 FAILED, `@Version` 낙관락으로 FastAPI 결과 우선 |
 
 세션 상태(`Status` enum): `IN_PROGRESS`, `COMPLETED`, `FAILED`
@@ -120,12 +121,15 @@
 
 ## 10. AI 서버 엔드포인트 (`/api/v1`)
 
-| 경로 | 기능 |
-|---|---|
-| `POST /pose` | 단일 이미지 포즈 추정 |
-| `POST /sync` | 싱크로율 계산 |
-| `GET /sync/onboarding-guide` | 온보딩 가이드 데이터 |
-| `POST /video/analyze` | 영상 업로드 분석 (기준 좌표 추출용) |
+| 경로 | 기능 | 실제 호출자 |
+|---|---|---|
+| `POST /pose` | 단일 이미지 포즈 추정 | ✅ 프론트 |
+| `POST /sync` | 싱크로율 계산 | 🔴 없음 ([#293](https://github.com/Shadowfit/init/issues/293)) |
+| `GET /sync/onboarding-guide` | 온보딩 가이드 데이터 | 🔴 없음 ([#293](https://github.com/Shadowfit/init/issues/293)) |
+| `POST /video/analyze` | 영상 업로드 분석 (기준 좌표 추출용) | 🔴 없음 ([#293](https://github.com/Shadowfit/init/issues/293)) |
+
+> 🔴 「없음」인 셋은 **구현돼 있고 뜨지만 아무도 안 부른다**(2026-08-22 확인). 정본은 gRPC 쪽이다 —
+> 싱크로율은 `SavePoseDataBatch`, 기준 좌표는 `ExtractReferenceData`. 지우지 않고 표시만 하기로 했다(#293).
 
 ---
 

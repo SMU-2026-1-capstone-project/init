@@ -1,1 +1,4 @@
 mysql/*.cnf text eol=lf
+
+# rig 셸 스크립트는 LF 로 고정한다 — 체크아웃에서 CRLF 가 붙으면 재현이 깨진다.
+loadtest/**/*.sh text eol=lf

@@ -42,12 +42,19 @@ React Native에서 직접 실행하는 대신 서버에서 처리하는 이유:
 
 ### API 엔드포인트
 
-| Method | URL | 용도 |
-|--------|-----|------|
-| POST | `/api/v1/pose` | 실시간 프레임 → 관절 좌표 + 각도 |
-| POST | `/api/v1/sync` | 각도 시퀀스 비교 → 싱크로율(%) |
-| POST | `/api/v1/video/analyze` | 참고 영상 전처리 (사전 분석) |
-| GET | `/health` | 서버 상태 확인 |
+| Method | URL | 용도 | 실제 호출자 |
+|--------|-----|------|---|
+| POST | `/api/v1/pose` | 실시간 프레임 → 관절 좌표 + 각도 | ✅ 프론트 (`services/aiService.ts`) |
+| POST | `/api/v1/sync` | 각도 시퀀스 비교 → 싱크로율(%) | 🔴 **없음** ([#293](https://github.com/Shadowfit/init/issues/293)) |
+| POST | `/api/v1/video/analyze` | 참고 영상 전처리 (사전 분석) | 🔴 **없음** ([#293](https://github.com/Shadowfit/init/issues/293)) |
+| GET | `/api/v1/sync/onboarding-guide` | 온보딩 촬영 가이드 문구 | 🔴 **없음** ([#293](https://github.com/Shadowfit/init/issues/293)) |
+| GET | `/health` | 서버 상태 확인 | ✅ 컨테이너 헬스체크 |
+
+> 🔴 **AI 로 가는 실제 트래픽은 두 갈래뿐이다** — 프론트의 `POST /pose`, 그리고 **Spring↔AI 의 gRPC**.
+> 위 표에서 「없음」인 셋은 저장소 안에 호출자가 0건이다(2026-08-22 확인). 싱크로율의 정본은
+> `squat_analyzer` → gRPC `SavePoseDataBatch` 이고, 기준 좌표 추출의 정본은 gRPC
+> `ExtractReferenceData` 다. **지우지 않고 표시만 하기로 했다**(#293) — 저장소 밖 소비자를
+> grep 으로 배제할 수 없어서다.
 
 ### React Native에서 AI Server 호출 예시
 ```typescript
@@ -66,6 +73,8 @@ const detectPose = async (base64Frame: string, exerciseType: string) => {
 };
 
 // 싱크로율 계산
+// 🔴 이 예시는 **현재 아무도 안 쓰는 경로**다 (#293). 실제 싱크로율은 AI 안에서
+//    squat_analyzer 가 계산해 gRPC 로 Spring 에 보낸다 — 프론트가 부르지 않는다.
 const calculateSyncRate = async (
   referenceAngles: number[][],
   userAngles: number[][]

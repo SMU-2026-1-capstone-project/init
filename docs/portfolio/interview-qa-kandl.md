@@ -83,16 +83,26 @@ DB마다 MVCC 구현과 기본 격리수준이 다릅니다 — 예를 들어 Or
 
 ### Q. 조회 성능 문제, 어떻게 찾고 고치셨어요?
 
-운동 세션마다 관절 좌표가 쌓이는 구조라 데이터가 늘수록 조회가 느려질 거라 예상하고, 인덱스 문제로 가정했습니다. 그런데 `EXPLAIN`으로 실측해보니 `idx_session_timestamp(session_id, timestamp_sec)`가 이미 `type=ref, Extra=NULL`(filesort 없음)로 최적이었습니다. `IGNORE INDEX`로 강제 풀스캔 시켜봤더니 412만 행 스캔+filesort로 85초가 걸려서, 인덱스가 없었다면 어떻게 됐을지 대조로 확인했습니다. 진짜 원인은 쿼리가 안 쓰는 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장)까지 매번 로드하는 거였고, 3컬럼 projection DTO로 바꿔서 해결했습니다.
+운동 세션마다 관절 좌표가 쌓이는 구조라 데이터가 늘수록 조회가 느려질 거라 예상하고, 인덱스 문제로 가정했습니다. 그런데 `EXPLAIN`으로 실측해보니 `idx_session_timestamp(session_id, timestamp_sec)`가 이미 `type=ref, Extra=NULL`(filesort 없음)로 최적이었습니다. `IGNORE INDEX`로 강제 풀스캔 시켜봤더니 412만 행 스캔+filesort로 85초가 걸려서, 인덱스가 없었다면 어떻게 됐을지 대조로 확인했습니다. 진짜 원인은 쿼리가 안 쓰는 `joint_coordinates`(2.3KB JSON, InnoDB off-page 저장)까지 매번 로드하는 거였고, 3컬럼 projection DTO로 바꿔서 해결했습니다(아래 수치는 이 3컬럼 시점 기준이고, 이후 rep 단위 계산이 들어오면서 지금은 4컬럼입니다 — `feedbackMessage` 를 빼고 `repNumber`·`smoothedKneeAngle` 을 넣었습니다. 둘 다 숫자 하나씩이라 `joint_coordinates` 를 안 싣는다는 핵심은 그대로입니다).
 
 ```
-근거:
-payload:      1,716.8 KB → 22.4 KB   (-98.7%)
-warm 쿼리:   12.1 ms → 1.5 ms         (8x, -87%)
+근거 (2026-06-02, 로컬 물리 2코어, warm, 750행/세션, 412만 행, 3컬럼 시절):
+payload:      1,716.8 KB → 22.4 KB   (-98.7%)   ← DB→앱 payload. 앱→클라이언트 응답 바이트 아님
+warm 쿼리:   12.1 ms → 1.5 ms         (8x, -87%)  ← 절대 ms 는 하드웨어 종속, 배수까지만
 풀스캔 대조: IGNORE INDEX 시 412만 행 스캔 + filesort = 85초 (AWS 1억 행 재검증: 2,120.9초=35분20초, 85×24.27배 선형추정 2,063초와 거의 일치)
 코드: PoseDataRepository.findFramesBySessionId (JPQL projection)
-     ReportService.selectWorstSection / buildWorstReason (PoseFrameProjection 사용)
+     SessionAnalysisCalculator.calculate (PoseFrameProjection 사용)
 ```
+
+> ⚠️ **먼저 말할 것 — 이 쿼리는 사용자가 누르는 조회가 아니다.** 세션 종료 시 precompute 가 세션당 한 번 도는 **비동기 잡**이라, 사용자는 이 지연을 원래 못 느낀다. **"리포트가 빨라졌다" 로 말하면 부정확**하고, "세션마다 반복되는 잡의 I/O·버퍼풀 점유를 줄였다" 가 정직한 표현이다. 조건 전체: [`realmysql-experiments.md` §②b](./realmysql-experiments.md#projection-98-7)
+
+### Q. 그래서 사용자 응답시간이 얼마나 빨라졌나요?
+
+**안 빨라졌습니다.** 세션이 끝날 때 `precomputeReport` 가 분석 결과를 미리 계산해 `report.detailed_analysis` 에 넣어 두고, **조회는 그 JSON 을 파싱하고 끝나서 `pose_data` 를 아예 안 읽습니다.** 그래서 정상 경로에서 API 응답시간에 기여하는 몫은 0 입니다. projection 이 준 건 체감 지연이 아니라 **그 잡이 세션마다 태우던 I/O·버퍼풀 점유의 절감**입니다. 응답 바이트가 안 줄어드는 것도 정상입니다 — −98.7% 는 **DB→앱** payload 지 앱→클라이언트가 아닙니다.
+
+다만 **동기로 노출되는 조건이 하나 있습니다.** `report.detailed_analysis` 가 비어 있거나 파싱에 실패하면 `ReportService.resolveDetailedAnalysis` 가 `pose_data` 즉석 재계산으로 흘립니다(구버전 포맷 대비 폴백). 그 폴백 경로에서는 이 쿼리가 사용자 요청 안에서 돌고, **그때 −98.7% 가 응답시간으로 얼마가 되는지는 아직 안 쟀습니다**(`docs/decisions/projection-end-to-end-remeasure.md`).
+
+덧붙이면 **이건 코드를 읽어서 안 것이고 아직 측정하지는 않았습니다.** 「정상 경로 기여가 0이다」를 실제로 재는 것을 다음 실험의 1차 산출물로 잡아 뒀습니다. 최적화를 했다는 것보다 **그 최적화가 지금 어느 경로에서만 사는지 아는 것**이 중요하다고 봤습니다.
 
 ### Q. payload는 98.7% 줄었는데 속도는 왜 87%(8배)밖에 안 줄었어요?
 
@@ -103,9 +113,11 @@ warm 쿼리:   12.1 ms → 1.5 ms         (8x, -87%)
 면접 준비하면서 로컬 하드웨어 제약(2코어, 디스크 223GB) 때문에 412만 행이 상한선이었다는 걸 인지하고, AWS EC2로 실제 1억 행·진짜 2.3KB JSON 환경을 만들어 같은 실험을 재검증했습니다. payload는 −98.7%로 거의 동일(세션당 바이트 비율이라 행수와 무관하게 예상대로), **속도는 오히려 29~41배로 412만 행 때(8배)보다 더 크게 개선**됐습니다. 버퍼풀(2GB)은 그대로인데 테이블이 25배 커지면서 작업셋 대비 버퍼풀 비율이 나빠져, 풀엔티티 로드의 off-page 랜덤 I/O가 캐시에 덜 걸리고 실제 디스크 I/O를 더 타게 된 게 원인입니다. 결론이 바뀐 게 아니라 스케일이 커질수록 오히려 강화되는 방향이라는 걸 직접 확인했습니다.
 
 ```
-근거 (2026-07-15, AWS m6i.xlarge, pose_data_real_scale 1억 행):
-payload: 1,740.1 KB → 22.6 KB (-98.7%)
+근거 (2026-07-15, AWS EC2 m6i.xlarge, pose_data_real_scale 1억 행, warm, 750행/세션, 3컬럼 시절):
+payload: 1,740.1 KB → 22.6 KB (-98.7%)      ← DB→앱 payload
 warm 쿼리: 40.6ms → 1.4ms (약 29배, 반복 측정 시 최대 41배)
+                                             ← 첫 측정은 SSH+docker exec 왕복(~50ms)에 묻혀 2배로 나왔음.
+                                                SET profiling=1 (DB 내부 타이밍)로 재측정한 값
 ```
 
 ---

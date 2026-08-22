@@ -30,7 +30,6 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
 	// --- DB & Utility ---
 	runtimeOnly 'com.mysql:mysql-connector-j'
@@ -42,8 +41,8 @@ dependencies {
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-mysql'
 	implementation 'io.github.cdimascio:dotenv-java:3.2.0'
-	implementation group: 'org.modelmapper', name: 'modelmapper', version: '3.2.6'
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
+	implementation 'org.modelmapper:modelmapper:3.2.6'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.0'
 	// springdoc(swagger-core-jakarta)이 끌어오는 commons-lang3 3.17.0이 GHSA-j288-q9x7-2f5v
 	// (3.0~3.17.x 취약, 긴 입력 처리 시 무한 재귀)에 걸려 있어 명시적으로 상향.
 	implementation 'org.apache.commons:commons-lang3:3.20.0'
@@ -66,7 +65,7 @@ dependencies {
 
 	// Boot 3.5.16이 관리하는 jackson-databind(2.21.4)가 GHSA-5jmj-h7xm-6q6v(2.19.0~2.21.4
 	// 취약)에 걸려 있어 이 모듈만 명시적으로 상향(jackson-bom의 나머지 모듈은 그대로 둠).
-	implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.1'
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
 
 	// --- QueryDSL (동적 조회 계층, querydsl-adoption.md §1-1 채택) ---
 	// 버전을 박지 않는 이유: Boot 3.5.16 의 의존성 관리가 QueryDSL 5.1.0 을 이미 잡고 있다.
@@ -140,10 +139,14 @@ sourceSets {
 	tasks.named('test') {
 		useJUnitPlatform()
 
-		// 아래 둘은 같은 문제의 서로 다른 사례다 — gradlew 에 준 -D 는 Gradle 자신의 JVM 에만
+		// 아래 셋은 같은 문제의 서로 다른 사례다 — gradlew 에 준 -D 는 Gradle 자신의 JVM 에만
 		// 붙고 포크된 테스트 JVM 으로 자동 전달되지 않아, 그대로 두면 @EnabledIfSystemProperty 가
-		// 테스트 쪽에서 못 보고 **조용히 스킵**된다. 둘 다 기본값이 없으므로 평소에는 프로퍼티
+		// 테스트 쪽에서 못 보고 **조용히 스킵**된다. 셋 다 기본값이 없으므로 평소에는 프로퍼티
 		// 자체가 없고 해당 테스트만 건너뛴다.
+		//
+		// 📌 이 주석이 이미 있는데도 #207 리그를 붙이며 그대로 한 번 밟았다(2026-08-17).
+		//    스킵은 BUILD SUCCESSFUL 로 나오므로, 켰다고 생각한 리그가 안 돈 것을 출력으로는
+		//    알 수 없다 — 리포트의 skipped 수를 봐야 한다.
 
 		// 레이스 재현 테스트(PoseDataOrphanRaceTest)는 실제 MySQL(3307)이 필요하다.
 		if (System.getProperty('race.mysql') != null) {
@@ -153,5 +156,15 @@ sourceSets {
 		// AdminMemberExplainCaptureTest — loadtest/measure_admin_filter_explain.sh 전용.
 		if (System.getProperty('explain.capture') != null) {
 			systemProperty 'explain.capture', System.getProperty('explain.capture')
+		}
+
+		// SessionTimeoutSweepLoadTest(#207) — 실제 MySQL(3308)이 필요하다.
+		// 이 리그는 결과를 stdout 으로 낸다(측정 표). 위 둘과 달리 **출력을 봐야 의미가 있으므로**
+		// 표준 스트림도 같이 연다 — 평소에는 프로퍼티가 없어 안 열린다.
+		if (System.getProperty('sweep.load') != null) {
+			systemProperty 'sweep.load', System.getProperty('sweep.load')
+			testLogging {
+				showStandardStreams = true
+			}
 		}
 	}
