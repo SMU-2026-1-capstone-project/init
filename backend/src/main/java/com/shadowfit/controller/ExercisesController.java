@@ -64,14 +64,19 @@ public class ExercisesController {
                 memberId, dto.getExerciseId());
 
         // 서비스 호출 (내부에서 gRPC 호출까지 이어짐)
-        Long sessionId = analysisService.startAnalysis(dto, memberId);
+        var started = analysisService.startAnalysis(dto, memberId);
 
         // 응답 DTO 생성
+        //
+        // sessionNonce 는 이 응답으로만 클라에 나간다 (#187 안 (d)) — 이후 POST /pose 마다
+        // 동봉해야 AI 가 «이 세션을 만든 클라» 로 인정한다. 앱이 죽어 이 응답을 잃으면
+        // GET /exercises/sessions/active 로 다시 받는다(ActiveSessionResponseDto).
         ExercisesResponseDto response = ExercisesResponseDto.builder()
-                .sessionId(sessionId)
+                .sessionId(started.sessionId())
                 .exerciseId(dto.getExerciseId())
                 .startTime(LocalDateTime.now())
                 .status(Status.IN_PROGRESS)
+                .sessionNonce(started.sessionNonce())
                 .build();
 
         return ResponseEntity.accepted().body(response);
