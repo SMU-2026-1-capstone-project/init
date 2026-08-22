@@ -241,7 +241,7 @@ S3_BASE=s3://내버킷/shadowfit \
 REPLICA_HOST=<리플리카 사설 IP> \
 REPLICA_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<리플리카 사설 IP>" \
 REPL_AZ_MODE="same-az(ap-northeast-2a)" \
-PHASES="repl_preflight repl_gate repl collect" \
+PHASES="repl_preflight repl_gate repl ridealong collect" \
   nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
 

@@ -73,7 +73,7 @@ bash loadtest/results/replication-2026-08-17/repl2_sweep.sh   # 본 측정
 OUTDIR=$PWD/loadtest/results/replication-aws-$(date +%F) \
 S3_BASE=s3://버킷/shadowfit REPLICA_HOST=10.0.0.6 \
 REPLICA_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@10.0.0.6" \
-REPL_AZ_MODE="same-az" PHASES="repl_preflight repl_gate repl collect" \
+REPL_AZ_MODE="same-az" PHASES="repl_preflight repl_gate repl ridealong collect" \
   nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
 
@@ -113,6 +113,15 @@ _out2/
 ├── repl2.tsv             ← 판별 결과 (아래)
 └── _raw/<판>/            ← lag.tsv(1초 샘플) · conn_*.tsv(트랜잭션별 커밋 지연)
 ```
+
+러너로 돌리면 `<결과>/ridealong/` 도 같이 선다 — `PHASES` 에 `ridealong` 이 있어서다.
+이 rig 의 산출물이 아니라 **從 항목**이고, 복제 라운드에 넣은 이유는 R2 하나다:
+
+| | |
+|---|---|
+| **R2** MySQL 지표 | `SHOW GLOBAL STATUS`·`VARIABLES` + top digest. 🔴 **복제 라운드에서 특히 값이 있다** — 반동기 상태 변수와 복제 지표가 같은 시점에 걷힌다. 「왜 그 수치였나」를 나중에 물을 때 유일한 재료이고, 그게 없어서 판정을 철회한 전례가 있다(pool-cliff 초판) |
+| **R1** worst-section | ⚠️ **이 무대에서는 전부 0 이 나온다.** `reports`·`exercise_sessions` 를 아무도 안 채우기 때문이다(무대는 `pose_data_scale`·`replprobe` 뿐). 「데이터가 없다」는 R1 이 물은 질문의 답이 아니다 — 같이 도는 것을 막을 손잡이가 없어서 남을 뿐이다([#371](https://github.com/Shadowfit/init/issues/371)) |
+| **R3** 3-way 조인 | 안 돈다. `reports`·`exercise_sessions`·`users` 시딩이 선행이고 이 라운드는 그걸 안 만든다. `SKIPPED.txt` 에 사유가 남는다 |
 
 `repl2.tsv` 읽는 법:
 
