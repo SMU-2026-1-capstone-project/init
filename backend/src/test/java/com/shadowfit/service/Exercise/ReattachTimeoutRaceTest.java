@@ -154,17 +154,19 @@ class ReattachTimeoutRaceTest {
     }
 
     @Test
-    @DisplayName("FAILED 세션에도 pose_data 가 계속 저장된다 — 상태를 보지 않는다")
-    void 실패세션에도_포즈데이터_저장됨() {
+    @DisplayName("FAILED 세션에 도착한 pose_data 는 버려진다 — 고아 행 창을 닫는다 (#187 (b), #77/#87)")
+    void 실패세션_포즈데이터_버려짐() {
         Session s = raceIntoFailed();
 
-        // AI 는 재부착에 성공했으므로 클라의 프레임을 받아 계속 콜백한다.
+        // AI 는 재부착에 성공했으므로 클라의 프레임을 받아 계속 콜백한다. 그런데 스케줄러가
+        // 이미 이 세션을 FAILED 로 걷어갔다 — 예전에는 이 콜백이 그대로 저장돼 아무도 다시
+        // 훑지 않는 고아 행이 됐다(#77/#87). 이제 status 가드(#187 (b))가 그 창을 닫는다.
         poseDataService.savePoseDataBatch(s.getId(), batch(1, 10));
 
         int rows = poseDataRepository.findFramesBySessionId(s.getId()).size();
         assertThat(rows)
-                .as("savePoseDataBatch 는 existsById 만 본다 — 세션이 FAILED 여도 막지 않는다")
-                .isGreaterThan(0);
+                .as("savePoseDataBatch 는 IN_PROGRESS 가 아니면 버린다 — FAILED 세션에 고아 행이 안 쌓인다")
+                .isZero();
     }
 
     @Test
