@@ -45,6 +45,19 @@ mkdir -p "$OUT"
 DB(){ docker exec -i shadowfit-mysql mysql -N -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit "$@" 2>/dev/null; }
 DBT(){ docker exec -i shadowfit-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit "$@" 2>/dev/null; }
 
+# 🔴 2026-08-22: 이 rig 은 8판 내내 «ibuf_merges 0» 을 찍었는데 **아무것도 안 재고 있었다.**
+#   MySQL 8.0 커뮤니티에 `Innodb_ibuf_merges` 라는 상태 변수가 없어서 빈 값이 왔고,
+#   bash 산술이 그것을 0 으로 쳤다(0-0=0). #271 계열의 «조용한 0» 이다.
+#   진짜 출처는 information_schema.INNODB_METRICS 이고, 없으면 여기서 죽는다.
+metric(){ DB -e "SELECT count FROM information_schema.INNODB_METRICS WHERE name='$1';" | tr -d '[:space:]'; }
+for _m in ibuf_merges ibuf_merges_insert; do
+  _v=$(metric "$_m")
+  case "$_v" in ''|*[!0-9]*) echo "🔴 계기 없음: INNODB_METRICS.$_m 를 못 읽었다 (값=[$_v]) — 중단"; exit 1;; esac
+  _st=$(DB -e "SELECT status FROM information_schema.INNODB_METRICS WHERE name='$_m';" | tr -d '[:space:]')
+  [ "$_st" = "enabled" ] || { echo "🔴 $_m 가 disabled — 중단"; exit 1; }
+done
+echo "  [계기 확인] INNODB_METRICS.ibuf_* 읽힘 · enabled"
+
 # 🔴 2026-08-20 2차 시도가 중단됐을 때 드러난 구멍: 스크립트를 죽여도 docker exec 로 띄운
 #   writer 가 컨테이너 «안에서» 계속 돌아 행을 넣는다. 바깥에서 지워봤자 뒤이어 다시 채워졌다.
 #   그래서 종료 시 DB 안의 writer 스레드를 먼저 죽이고, 그다음에 정리한다.
@@ -119,43 +132,55 @@ run_round(){ # $1=arm(A|B) $2=round $3=session_id
   local before after
   before=$(DB -e "SELECT CONCAT_WS(' ',
       VARIABLE_VALUE) FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_buffer_pool_reads';")
-  local pw0 im0
+  local pw0 im0 wr0 lw0
   pw0=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_pages_written';")
-  im0=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_ibuf_merges';")
+  im0=$(metric ibuf_merges)
+  # 🔴 2026-08-21: 이 박스에서 «시간» 은 못 쓴다 — 동일 조건 4판이 14.8·33.0·43.3·25.6초로
+  #   2.9배 벌어졌다(드리프트 아니라 잡음). 카드 B·C 가 보여줬듯 카운터는 결정적이다.
+  #   buffer_pool_write_requests = 페이지 «논리 수정» 횟수라 인덱스가 하나 늘면 그만큼 늘어야 하고,
+  #   플러시 타이밍·CPU 경합과 무관하다. log_write_requests 도 같은 성격이다.
+  wr0=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_buffer_pool_write_requests';")
+  lw0=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_log_write_requests';")
   local t0 t1
   t0=$(date +%s%3N)
   docker exec -i shadowfit-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit < "$SC/w.sql" > /dev/null 2>"$SC/err"
   t1=$(date +%s%3N)
   after=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_buffer_pool_reads';")
-  local pw1 im1
+  local pw1 im1 wr1 lw1
   pw1=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_pages_written';")
-  im1=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_ibuf_merges';")
+  im1=$(metric ibuf_merges)
+  wr1=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_buffer_pool_write_requests';")
+  lw1=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_log_write_requests';")
   local errs; errs=$(grep -c 'ERROR' "$SC/err" 2>/dev/null); errs=${errs:-0}
   local ms=$((t1-t0)) rows=$((STMTS*ROWS))
   # 🔴 2026-08-20 1차 시도: 여기서 판마다 DELETE 했다. 그러자 시간이 판 순서를 따라 단조 증가해
   #   (19초 → 139초) **드리프트가 팔 효과를 덮었다** — 중앙값은 A 1.9배로 나왔지만 A 가 평균적으로
   #   뒤에 섰고, 인접 판끼리는 오히려 A 가 빨랐다. 원인은 반복 INSERT+DELETE 의 purge·파편화 누적.
   #   그래서 판마다 지우지 않는다. 판마다 session_id 가 다르므로 섞이지 않고,
-  #   늘어나는 행은 판당 7,500(총 6만)으로 150만 대비 4% 다. 정리는 §3 에서 한 번에 한다.
-  local line="$arm $rd $ms $rows $((after-before)) $((pw1-pw0)) $((im1-im0)) $errs"
+  #   🔴 2026-08-22 정정: 이 줄이 «판당 7,500(총 6만) = 4%» 라고 적고 있었는데 **기본값과 안 맞는다**
+  #   (STMTS=800·ROWS=25 면 판당 20,000 · 8판 총 16만 = 123만 대비 **13%**). 그 수로 정당화를 다시 쓴다:
+  #   표가 판을 거치며 13% 커지므로 «순서 효과» 가 생길 수 있고, 그래서 ORDER 의 위치 균형이 필수다.
+  #   판정 지표(bp_write_req)는 행당 논리 페이지 수정 수라 13% 증가로 B-tree 깊이가 바뀌지 않는 한 둔감하다.
+  #   정리는 §3 에서 한 번에 한다.
+  local line="$arm $rd $ms $rows $((after-before)) $((pw1-pw0)) $((im1-im0)) $errs $((wr1-wr0)) $((lw1-lw0))"
   # 🔴 이 함수의 stdout 은 «데이터 한 줄» 뿐이어야 한다. 안내 문구가 섞이면 필드가 밀려
   #   표가 멀쩡한 채로 엉뚱한 값이 들어간다 — 2026-08-20 스모크에서 실제로 그랬다
   #   (set_cover 의 echo 가 여기 잡혀 ms 자리에 pages_written 이 들어갔다). 필드 수로 막는다.
-  if [ "$(echo "$line" | wc -w)" != "8" ]; then
-    echo "🔴 run_round 출력 필드가 8개가 아니다: [$line] — 중단" >&2; exit 1
+  if [ "$(echo "$line" | wc -w)" != "10" ]; then
+    echo "🔴 run_round 출력 필드가 10개가 아니다: [$line] — 중단" >&2; exit 1
   fi
   echo "$line"
 }
 
 echo
 echo "## [1] 판 순서: $ORDER (첫 판 버림) — 문 $STMTS · 행 $ROWS · 문당커밋 TXN_STMTS=$TXN_STMTS"
-echo "arm round ms rows bp_reads pages_written ibuf_merges errors" > "$SC/raw.txt"
+echo "arm round ms rows bp_reads pages_written ibuf_merges errors bp_write_req log_write_req" > "$SC/raw.txt"
 rd=0
 for a in $ORDER; do
   line=$(run_round "$a" "$rd" $((990000+rd)))
   echo "$line" >> "$SC/raw.txt"
   set -- $line
-  echo "  [$1] 판 $2 → ${3}ms · ${4}행 · bp_reads $5 · pages_written $6 · ibuf_merges $7 · err $8$([ "$rd" = 0 ] && echo '   ← 버림')"
+  echo "  [$1] 판 $2 → ${3}ms · ${4}행 · 🔑 bp_write_req ${9} · log_write_req ${10} · bp_reads $5 · pages_written $6 · ibuf $7 · err $8$([ "$rd" = 0 ] && echo '   ← 버림')"
   rd=$((rd+1))
 done
 
@@ -171,28 +196,46 @@ echo "## 조건"; echo; echo '```'; cat "$SC/cond.txt"; echo '```'
 echo
 echo "## 인덱스 크기"; echo; echo '```'; cat "$SC/idxsize.txt"; echo '```'
 echo
-echo "| 팔 | 판 | ms | 행 | rows/s | bp_reads | pages_written | ibuf_merges | err |"
-echo "|---|---|---|---|---|---|---|---|---|"
-awk 'NR>1 {rs=($3>0)? sprintf("%.0f", $4/($3/1000)) : "ms=0-실패"; printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s |%s\n", $1,$2,$3,$4,rs,$5,$6,$7,$8, ($2==0?" ← 버림":"")}' "$SC/raw.txt"
+echo "| 팔 | 판 | 🔑 bp_write_req | 🔑 log_write_req | ms | 행 | rows/s | bp_reads | pages_written | ibuf_merges | err |"
+echo "|---|---|---|---|---|---|---|---|---|---|---|"
+awk 'NR>1 {rs=($3>0)? sprintf("%.0f", $4/($3/1000)) : "ms=0-실패"; printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |%s\n", $1,$2,$9,$10,$3,$4,rs,$5,$6,$7,$8, ($2==0?" ← 버림":"")}' "$SC/raw.txt"
 echo
-echo "**판 순서별 시간** — 🔴 드리프트가 있으면 팔 비교가 무효다. 이 줄을 먼저 볼 것"; echo
+echo "⚠️ \`ibuf_merges\` 가 0 이어도 «change buffer 를 안 쓴다» 로 읽으면 안 된다 — 이 페이로드는 한 세션에"
+echo "순차 삽입이라 인덱스 오른쪽 끝 한 자리만 치고, 그 페이지가 메모리에 머물러 조건 자체가 안 선다."
+echo "삽입 지점을 흩뿌린 판은 따로 있다: \`measure_205_card_a_ibuf.sh\`"; echo
+echo "**판 순서별** — 🔴 이 박스에서 **ms 는 못 쓴다**: 2026-08-21 동일 조건 4판이 14.8·33.0·43.3·25.6초로 2.9배 벌어졌다(드리프트 아니라 잡음). 팔 비교는 🔑 카운터로 하고 ms 는 참고다."; echo
 echo "| 판 | " $(awk 'NR>1{printf "%s | ", $2}' "$SC/raw.txt")
 echo "|---|" $(awk 'NR>1{printf "---|"}' "$SC/raw.txt")
 echo "| 팔 | " $(awk 'NR>1{printf "%s | ", $1}' "$SC/raw.txt")
-echo "| ms | " $(awk 'NR>1{printf "%s | ", $3}' "$SC/raw.txt")
+echo "| 🔑 bp_write_req | " $(awk 'NR>1{printf "%s | ", $9}' "$SC/raw.txt")
+echo "| 🔑 log_write_req | " $(awk 'NR>1{printf "%s | ", $10}' "$SC/raw.txt")
+echo "| ms (참고) | " $(awk 'NR>1{printf "%s | ", $3}' "$SC/raw.txt")
 echo
-echo "**팔별 중앙값(첫 판 제외)**"; echo
-echo "| 팔 | ms 중앙값 | rows/s | bp_reads 중앙값 | ibuf_merges 중앙값 |"
-echo "|---|---|---|---|---|"
+echo "**팔별 중앙값(첫 판 제외)** — 🔑 판정 지표는 bp_write_req 다(ms 아님)"; echo
+echo "| 팔 | 🔑 bp_write_req | 🔑 log_write_req | ms(참고) | rows/s | bp_reads | ibuf_merges |"
+echo "|---|---|---|---|---|---|---|"
+# 🔴 초판은 ms 로 정렬한 뒤 «그 행의» 다른 열 값을 중앙값이라 적었다 — 열마다 순위가 다르므로
+#   그건 중앙값이 아니다. 열별로 따로 정렬해서 낸다.
+med(){ awk -v x="$1" -v c="$2" 'NR>1 && $1==x && $2>0 {print $c}' "$SC/raw.txt" | sort -n \
+     | awk '{v[NR]=$1} END{ if(NR==0){printf "-"; exit} printf "%.0f", (NR%2)? v[(NR+1)/2] : (v[NR/2]+v[NR/2+1])/2 }'; }
 for a in A B; do
-  awk -v x="$a" 'NR>1 && $1==x && $2>0 {print $3, $4, $5, $7}' "$SC/raw.txt" | sort -n | awk -v x="$a" '
-    {m[NR]=$1; rw[NR]=$2; bp[NR]=$3; ib[NR]=$4} END{
-      if (NR==0) { printf "| %s | — (유효 판 0) | — | — | — |\n", x; exit }
-      md=(NR%2)? m[(NR+1)/2] : (m[NR/2]+m[NR/2+1])/2;
-      bd=(NR%2)? bp[(NR+1)/2] : (bp[NR/2]+bp[NR/2+1])/2;
-      id=(NR%2)? ib[(NR+1)/2] : (ib[NR/2]+ib[NR/2+1])/2;
-      printf "| %s | %.0f | %.0f | %.0f | %.0f |\n", x, md, rw[1]/(md/1000), bd, id }'
+  n=$(awk -v x="$a" 'NR>1 && $1==x && $2>0' "$SC/raw.txt" | wc -l | tr -d '[:space:]')
+  if [ "$n" = "0" ]; then echo "| $a | — (유효 판 0) | — | — | — | — | — |"; continue; fi
+  wr=$(med "$a" 9); lw=$(med "$a" 10); msd=$(med "$a" 3); bpd=$(med "$a" 5); ibd=$(med "$a" 7)
+  rws=$(awk -v x="$a" 'NR>1 && $1==x && $2>0 {print $4; exit}' "$SC/raw.txt")
+  rs=$(awk -v m="$msd" -v r="$rws" 'BEGIN{ if(m>0) printf "%.0f", r/(m/1000); else printf "-" }')
+  echo "| $a | $wr | $lw | $msd | $rs | $bpd | $ibd |"
+  eval "WR_$a=\$wr; LW_$a=\$lw; MS_$a=\$msd"
 done
+echo
+if [ "${WR_B:-0}" != "0" ] && [ -n "${WR_A:-}" ]; then
+  echo "**팔 대비 (A÷B)** — 커버링 인덱스가 무는 값. 1.00 이면 «대가 없음»"; echo
+  awk -v a="${WR_A}" -v b="${WR_B}" -v la="${LW_A:-0}" -v lb="${LW_B:-0}" -v ma="${MS_A:-0}" -v mb="${MS_B:-0}" 'BEGIN{
+    printf "| 지표 | A(인덱스 있음) | B(없음) | A÷B |\n|---|---|---|---|\n";
+    printf "| 🔑 bp_write_req | %d | %d | **%.3f** |\n", a, b, a/b;
+    if (lb>0) printf "| 🔑 log_write_req | %d | %d | %.3f |\n", la, lb, la/lb;
+    if (mb>0) printf "| ms ⚠️ 잡음 2.9배 — 인용 금지 | %d | %d | %.2f |\n", ma, mb, ma/mb; }'
+fi
 } | tee "$OUT/summary.md"
 
 echo
