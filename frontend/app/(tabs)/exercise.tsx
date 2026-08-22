@@ -4,7 +4,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 import { exercisesService } from '@/services/exercisesService';
-import { aiService } from '@/services/aiService';
+import { aiService, aiConfigError } from '@/services/aiService';
 import type { FeedbackTemplate } from '@/types/feedback';
 import { FEEDBACK_TYPE_LABEL } from '@/types/feedback';
 import type { AiFeedbackType } from '@/types/pose';
@@ -86,6 +86,17 @@ export default function ExerciseScreen() {
 
   const handleToggleRecord = async () => {
     if (busy) return;
+
+    // AI 주소가 없거나 https 가 아니면 **시작 전에** 말한다 (이슈 #148).
+    //
+    // 예전에는 릴리스 빌드가 조용히 http://localhost:8000 을 만들었고, ATS·cleartext 정책이
+    // 그걸 막아 «세션은 시작됐는데 카운트가 안 오르는» 상태가 됐다. 원인이 주소라는 단서가
+    // 어디에도 없었다. 세션을 만들기 전에 걸러야 DB 에 못 쓸 세션이 안 남는다.
+    if (aiConfigError) {
+      Alert.alert('AI 서버 설정 오류', aiConfigError);
+      return;
+    }
+
     setBusy(true);
     try {
       if (!isRecording) {
