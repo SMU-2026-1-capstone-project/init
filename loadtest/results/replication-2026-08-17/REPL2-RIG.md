@@ -70,11 +70,16 @@ bash loadtest/results/replication-2026-08-17/repl2_sweep.sh   # 본 측정
 필요 없는 percona-toolkit 이미지를 묻고, 정작 물어야 할 리플리카 도달성은 안 묻는다:
 
 ```bash
+OUTDIR=$PWD/loadtest/results/replication-aws-$(date +%F) \
 S3_BASE=s3://버킷/shadowfit REPLICA_HOST=10.0.0.6 \
 REPLICA_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@10.0.0.6" \
 REPL_AZ_MODE="same-az" PHASES="repl_preflight repl_gate repl collect" \
   nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
+
+🔴 **`OUTDIR` 이 빠지면 이름이 틀린다** ([#358](https://github.com/Shadowfit/init/issues/358)) —
+기본값이 `results/online-ddl-$RUN_ID` 다(`aws/run_all.sh:27`). 설계 §9-1 ⑨ 가 정한 자리는
+`replication-aws-<날짜>` 이고, 산출물 자체는 멀쩡해 보이므로 **커밋할 때가 되어서야 눈에 띈다.**
 
 ### 손잡이
 

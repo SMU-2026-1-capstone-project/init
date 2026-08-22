@@ -236,6 +236,7 @@ PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
 
 ```bash
 cd /root/init
+OUTDIR=$PWD/loadtest/results/replication-aws-$(date +%F) \
 S3_BASE=s3://내버킷/shadowfit \
 REPLICA_HOST=<리플리카 사설 IP> \
 REPLICA_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<리플리카 사설 IP>" \
@@ -243,6 +244,13 @@ REPL_AZ_MODE="same-az(ap-northeast-2a)" \
 PHASES="repl_preflight repl_gate repl collect" \
   nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
+
+🔴 **`OUTDIR` 을 빼지 말 것** ([#358](https://github.com/Shadowfit/init/issues/358)). 기본값이
+`results/online-ddl-$RUN_ID` 로 하드코딩돼 있어서([`run_all.sh:27`](./run_all.sh)), 안 주면 복제
+라운드 산출물이 **`online-ddl-…/repl/`** 에 떨어진다. S3 키도 같이 따라간다. 설계가 정한 자리는
+`replication-aws-<날짜>` 다([`replication-lag-and-semisync.md` §9-1 ⑨](../../docs/decisions/replication-lag-and-semisync.md)).
+⚠️ **산출물 자체는 멀쩡해 보인다** — 틀린 것은 바깥 디렉터리 이름 하나라, 라운드가 끝나고
+결과를 커밋할 때가 되어서야 눈에 띈다. 무인 라운드면 그때는 인스턴스를 내린 뒤다.
 
 `repl_gate` 가 무대를 세우고 게이트 G1~G3 을 본다. **실패하면 `repl` 을 건너뛴다** —
 계측(G3 양성 대조군)이 안 선 채로 잰 지연은 「복제의 성질」이 아니라 「무대의 결함」이다.
