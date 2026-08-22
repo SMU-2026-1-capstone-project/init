@@ -248,6 +248,19 @@ docker exec shadowfit-mysql mysqladmin ping -h localhost --silent >/dev/null 2>&
 step "percona-toolkit 이미지"
 docker pull -q percona/percona-toolkit || die "percona-toolkit pull 실패"
 
+# 🔴 XtraBackup 은 **여기가 유일하게 «양쪽 박스» 를 거치는 지점**이다 (#368).
+#    P3(백업)은 1대라 rig 이 스스로 받아 넘겼는데(`backup-restore-2026-08-13/probe.sh:105`),
+#    P4(복제)는 2대다 — 소스에서 사본을 뜨고 **리플리카에서 그 사본을 붓는다**
+#    (`replication-2026-08-17/repl2_rig.sh:509`, `RSSH docker run`). 로컬에만 받으면 절반만 덮인다.
+#    두 박스가 다 이 부트스트랩을 거치므로 여기서 받으면 그 문제가 통째로 닫힌다.
+#
+#    없어도 «실패로 안 보이는» 것이 이 이미지의 성질이다 — 런타임 pull 로 넘어가거나
+#    논리 덤프로 되돌아가고, 되돌림은 「성공」처럼 보인다. 그래서 측정 전에 받는다.
+if [ "$ROLE" = "db" ]; then
+  step "percona-xtrabackup 이미지 (P3 백업 · P4 복제)"
+  docker pull -q percona/percona-xtrabackup:8.0 || die "percona-xtrabackup pull 실패"
+fi
+
 # ── 스키마 (Flyway) ──────────────────────────────────────────────────────
 #
 # 🔴 08-12 라운드에서 從 항목 R1·R3 이 **둘 다 «측정 대상 부재» 로 죽었다.** 러너가 DDL 측정에
