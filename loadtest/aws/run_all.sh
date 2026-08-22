@@ -458,9 +458,36 @@ phase_repl_preflight() {
     fi
   fi
 
-  docker image inspect percona/percona-xtrabackup:8.0 >/dev/null 2>&1 \
-    && note "✅ xtrabackup 이미지" \
-    || { note "⚠️ xtrabackup 이미지 없음 — 리플리카 초기화가 논리 덤프로 되돌아간다(느리지만 돈다)"; }
+  # 🔴 여기서 막는다 (#368). 예전에는 경고만 하고 넘겼는데, 그 문구(«논리 덤프로
+  #    되돌아간다 — 느리지만 돈다»)가 **폴백을 선택지처럼 읽히게** 만들었다.
+  #    폴백은 사고 대비이지 선택지가 아니다:
+  #      · 이 라운드의 목적 중 하나가 «XtraBackup 원격 절차를 처음 밟아 보는 것» 이다
+  #        (rig 문서 §6 — 그 경로는 코드로만 있고 실행 이력이 0 이다).
+  #        조용히 논리 덤프로 대체되면 게이트는 다 통과하고 **라운드가 목적을 못 이룬다**
+  #      · 그 대체는 표에 «실패» 로 안 남는다. `replica_build.txt` 의 «초기화 경로» 열
+  #        하나에만 남고, 그건 라운드가 끝난 뒤에 읽는 파일이다
+  #    ⚠️ 일부러 논리 덤프로 돌리려면 `REPLICA_INIT=dump` 를 준다 — 그때는 이 검사를 건너뛴다.
+  #       «의도한 덤프» 와 «이미지가 없어서 된 덤프» 를 여기서 가른다.
+  if [ "${REPLICA_INIT:-xtrabackup}" = "dump" ]; then
+    note "⏭  xtrabackup 이미지 검사 건너뜀 — REPLICA_INIT=dump (논리 덤프를 **의도한** 라운드다)"
+  elif docker image inspect percona/percona-xtrabackup:8.0 >/dev/null 2>&1; then
+    note "✅ xtrabackup 이미지"
+  else
+    note "🔴 xtrabackup 이미지가 없다 — 이대로 돌면 리플리카 초기화가 조용히 논리 덤프로 대체되고, 이 라운드가 밟아 보려던 경로를 못 밟는다. 받는 법: docker pull percona/percona-xtrabackup:8.0. 부트스트랩(ROLE=db)이 받아 두므로, 없다면 이 박스가 부트스트랩을 안 거쳤다는 뜻이다"
+    ok=1
+  fi
+
+  # 🔴 **리플리카에도 있어야 한다** — 사본을 붓는 `docker run` 이 그쪽에서 돈다
+  #    (`repl2_rig.sh:509`). 소스만 보고 통과시키면 절반만 확인한 것이다. P3(1대)엔
+  #    없던 요구라 이 검사도 이 라운드가 처음이다.
+  if [ -n "$REPLICA_HOST" ] && [ "${REPLICA_INIT:-xtrabackup}" != "dump" ]; then
+    if $REPLICA_SSH "docker image inspect percona/percona-xtrabackup:8.0 >/dev/null 2>&1" >/dev/null 2>&1; then
+      note "✅ xtrabackup 이미지 — 리플리카에도 있다"
+    else
+      note "🔴 리플리카에 xtrabackup 이미지가 없다 — 사본을 붓는 단계가 거기서 막힌다. 리플리카 박스에서: docker pull percona/percona-xtrabackup:8.0"
+      ok=1
+    fi
+  fi
 
   local free; free=$(df -BG --output=avail "$ROOT" | tail -1 | tr -dc '0-9')
   note "디스크 여유 ${free}GB (사본을 소스 박스에 한 번 만든다 + 판마다 행이 쌓인다)"
