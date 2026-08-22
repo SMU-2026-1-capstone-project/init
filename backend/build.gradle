@@ -30,7 +30,6 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
 	// --- DB & Utility ---
 	runtimeOnly 'com.mysql:mysql-connector-j'
@@ -42,7 +41,7 @@ dependencies {
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-mysql'
 	implementation 'io.github.cdimascio:dotenv-java:3.2.0'
-	implementation group: 'org.modelmapper', name: 'modelmapper', version: '3.2.6'
+	implementation 'org.modelmapper:modelmapper:3.2.6'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
 	// springdoc(swagger-core-jakarta)이 끌어오는 commons-lang3 3.17.0이 GHSA-j288-q9x7-2f5v
 	// (3.0~3.17.x 취약, 긴 입력 처리 시 무한 재귀)에 걸려 있어 명시적으로 상향.
