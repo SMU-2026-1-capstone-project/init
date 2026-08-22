@@ -19,6 +19,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 RIG=$ROOT/loadtest/results/online-ddl-2026-08-09
 BACKUP_RIG=$ROOT/loadtest/results/backup-restore-2026-08-13
 CORES_RIG=$ROOT/loadtest/results/coresidency-2026-08-15
+REPL_RIG=$ROOT/loadtest/results/replication-2026-08-17
 
 # ── 설정 ─────────────────────────────────────────────────────────────────
 S3_BASE=${S3_BASE:?S3_BASE 가 필요하다 — 예: s3://my-bucket/shadowfit}
@@ -144,6 +145,33 @@ GHZ_CONC=${GHZ_CONC:-50}
 # 상한은 그 2~3배로 준다 — 걸려서 끊기는 것보다 낫다(설계 원칙 ③).
 TIMEOUT_CORES=${TIMEOUT_CORES:-21600}                    # 6시간
 TIMEOUT_CORES_REHEARSAL=${TIMEOUT_CORES_REHEARSAL:-1800} # 30분 (예상 몇 분)
+
+# ── 복제 지연 · 반동기 (主 P4) ───────────────────────────────────────────
+#
+# 🔴 **이 라운드도 2대다.** 다만 P6 와 자리가 반대다 — P6 는 부하기에서 돌며 대상을
+#    SSH 로 몰지만, P4 의 러너는 **소스 박스**에서 돈다. 이유는 시계 하나다: 하트비트를
+#    «소스 시각 vs 리플리카 시각» 으로 재면 두 인스턴스의 시계 차이가 그대로 지연으로
+#    찍힌다(설계 §7). 그래서 쓰는 것도 읽는 것도 소스 박스의 시계로 묶는다.
+#    리플리카는 원격 3306 과 SSH 로만 만진다.
+#
+# 🔴 `repl` 을 `ddl`·`backup` 과 같은 PHASES 에 넣지 말 것. 저 둘은 디스크가 지배하고,
+#    이쪽은 무대(1,000만 행)를 자기 조건으로 고정한다 — 섞이면 셋 다 오염된다.
+#
+# 🔴 일반 `preflight` 를 쓰지 않는다. 그쪽은 percona-toolkit 이미지를 묻는데(팔 B DDL용)
+#    이 라운드엔 없어도 되고, 대신 **리플리카 도달성**을 물어야 한다. 환경이 맞는데
+#    실패로 찍히는 자리를 만들지 않으려고 preflight 를 따로 둔다(coresidency 와 같은 이유).
+REPLICA_HOST=${REPLICA_HOST:-}
+REPLICA_SSH=${REPLICA_SSH:-${REPLICA_HOST:+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@$REPLICA_HOST}}
+# AZ 구성은 rig 이 정하는 것이 아니라 «인스턴스를 어디 띄웠는지» 다. 라벨만 받아 조건에 박는다.
+# 설계 §9-1 ② 가 「이 문서에서 제일 중요한 미결정」이라 부른 항목이라 **비워두면 경고한다.**
+REPL_AZ_MODE=${REPL_AZ_MODE:-}
+REPL_SESSIONS=${REPL_SESSIONS:-13334}          # 1,000만 행 (설계 §9-1 ①)
+REPL_REHEARSAL_SESSIONS=${REPL_REHEARSAL_SESSIONS:-134}   # 경로 점검용 축소 무대
+# 게이트: 시딩 + XtraBackup 사본 전송 + 따라잡기 + G1~G3. 본 측정: 10판 × (DUR + 따라잡기).
+TIMEOUT_REPL_GATE=${TIMEOUT_REPL_GATE:-10800}  # 3시간
+TIMEOUT_REPL=${TIMEOUT_REPL:-14400}            # 4시간
+
+export REPLICA_HOST REPLICA_SSH REPL_AZ_MODE
 
 export PW DB_NAME CONTAINER
 
@@ -355,6 +383,78 @@ phase_backup_real() {
   note "real 대조 — ${BACKUP_REAL_SESSIONS}세션 × 750행(실 JSON ≈2KB/행), 팔 A·B 각 버림1+본판1"
   OUT=$out STAGE=real REAL_SESSIONS=$BACKUP_REAL_SESSIONS \
     timeout --kill-after=120 "$TIMEOUT_BACKUP_REAL" bash "$BACKUP_RIG/backup_sweep.sh" || return 1
+  return 0
+}
+
+# ── 복제 지연 · 반동기 (主 P4) ───────────────────────────────────────────
+#
+# 러너 = **소스 박스**. 리플리카는 원격이다(위 설정 블록의 이유).
+
+phase_repl_preflight() {
+  local ok=0
+
+  preflight_s3 || ok=1
+
+  docker exec "$CONTAINER" mysqladmin ping -h localhost --silent >/dev/null 2>&1 \
+    && note "✅ 소스 MySQL 응답" || { note "🔴 소스 MySQL 무응답"; ok=1; }
+
+  if [ -z "$REPLICA_HOST" ]; then
+    note "🔴 REPLICA_HOST 가 비었다 — 2대 무대가 성립하지 않는다"; ok=1
+  else
+    # 리플리카 3306 — 소스 컨테이너의 mysql 클라이언트로 «실제로 붙어» 본다.
+    # 포트가 열렸는지가 아니라 인증까지 되는지가 이 라운드의 전제다.
+    if docker exec -i "$CONTAINER" mysql -h "$REPLICA_HOST" -P 3306 --get-server-public-key \
+         -uroot -p"$PW" -N -B -e "SELECT 1;" >/dev/null 2>&1; then
+      note "✅ 리플리카 3306 접속 — $REPLICA_HOST"
+    else
+      note "🔴 리플리카($REPLICA_HOST:3306)에 못 붙는다 — 보안그룹 인바운드 3306 부터 볼 것"; ok=1
+    fi
+    if $REPLICA_SSH "echo ok" >/dev/null 2>&1; then
+      note "✅ 리플리카 SSH — 사본을 붓고 컨테이너를 올릴 수 있다"
+    else
+      note "🔴 리플리카 SSH 가 안 된다 — XtraBackup 경로가 통째로 막힌다(키·22 인바운드)"; ok=1
+    fi
+  fi
+
+  docker image inspect percona/percona-xtrabackup:8.0 >/dev/null 2>&1 \
+    && note "✅ xtrabackup 이미지" \
+    || { note "⚠️ xtrabackup 이미지 없음 — 리플리카 초기화가 논리 덤프로 되돌아간다(느리지만 돈다)"; }
+
+  local free; free=$(df -BG --output=avail "$ROOT" | tail -1 | tr -dc '0-9')
+  note "디스크 여유 ${free}GB (사본을 소스 박스에 한 번 만든다 + 판마다 행이 쌓인다)"
+  [ "${free:-0}" -ge 20 ] || { note "🔴 20GB 미만"; ok=1; }
+
+  # 🔴 막지는 않는다. 다만 이 값이 비면 **Q2 의 수치를 나중에 해석할 수 없다** —
+  #    반동기의 대가는 AZ 간 RTT 에 지배되기 때문이다(설계 §9-1 ②).
+  if [ -z "$REPL_AZ_MODE" ]; then
+    note "⚠️ REPL_AZ_MODE 가 비었다 — 결과의 조건 칸이 «(미기입)» 으로 남는다."
+    note "   예: REPL_AZ_MODE=\"same-az(ap-northeast-2a)\" 또는 \"cross-az(2a→2c)\""
+  else
+    note "✅ AZ 구성 — $REPL_AZ_MODE"
+  fi
+
+  preflight_tags
+  return $ok
+}
+
+# 무대 세우기 + 게이트 G1~G3. **여기서 막히면 본 측정을 안 돈다.**
+# G3(양성 대조군)이 특히 그렇다 — 계측이 안 서면 Q1 의 「지연이 작다」는
+# 「계측이 못 잡았다」와 구분되지 않는다.
+phase_repl_gate() {
+  local out=$OUTDIR/repl
+  mkdir -p "$out"
+  note "무대 SESSIONS=$REPL_SESSIONS · 리플리카=$REPLICA_HOST"
+  OUT=$out SESSIONS=$REPL_SESSIONS \
+    timeout --kill-after=120 "$TIMEOUT_REPL_GATE" bash "$REPL_RIG/repl2_probe.sh" || return 1
+  return 0
+}
+
+phase_repl() {
+  local out=$OUTDIR/repl
+  mkdir -p "$out"
+  note "본 측정 — 팔 A·B 각 버림1+본판3 + 핫세션 대조 2판"
+  OUT=$out SESSIONS=$REPL_SESSIONS \
+    timeout --kill-after=120 "$TIMEOUT_REPL" bash "$REPL_RIG/repl2_sweep.sh" || return 1
   return 0
 }
 
@@ -871,6 +971,30 @@ phase_collect() {
       echo "⚠️ 위 «캡» 은 라운드 **종료 시점** 값이다 — 스윕이 팔마다 갈아끼우므로 마지막 팔의 상태다"
     fi
 
+    # 🔴 P4 라운드의 조건은 **두 박스가 같은 기계인가** 다. 다르면 관측된 지연이
+    #    「복제 구조 때문」인지 「기계 차이 때문」인지 원리적으로 안 갈린다(설계 §3).
+    #    그 판정을 나중에 하려면 리플리카 쪽 스펙이 여기 남아 있어야 한다.
+    if [ -n "$REPLICA_HOST" ]; then
+      echo
+      echo "# 리플리카 박스 (위 블록은 «소스» 다)"
+      echo "호스트        : $REPLICA_HOST"
+      echo "AZ 구성(라벨) : ${REPL_AZ_MODE:-(미기입) — 사람이 채울 것. 이 값 없이는 Q2 를 해석할 수 없다}"
+      if [ -n "$REPLICA_SSH" ]; then
+        echo "인스턴스 타입 : $($REPLICA_SSH "TOK=\$(curl -sf --max-time 3 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60'); curl -sf --max-time 3 -H \"X-aws-ec2-metadata-token: \$TOK\" http://169.254.169.254/latest/meta-data/instance-type" 2>/dev/null | tr -d '\r')"
+        echo "AZ            : $($REPLICA_SSH "TOK=\$(curl -sf --max-time 3 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60'); curl -sf --max-time 3 -H \"X-aws-ec2-metadata-token: \$TOK\" http://169.254.169.254/latest/meta-data/placement/availability-zone" 2>/dev/null | tr -d '\r')"
+        echo "vCPU / RAM    : $($REPLICA_SSH "nproc; awk '/MemTotal/ {printf \"%.0fGB\", \$2/1048576}' /proc/meminfo" 2>/dev/null | tr '\n' ' ' | tr -d '\r')"
+      else
+        echo "인스턴스 타입 : (SSH 없음 — 못 걷었다)"
+      fi
+      echo "MySQL         : $(docker exec -i "$CONTAINER" mysql -h "$REPLICA_HOST" -P 3306 --get-server-public-key -uroot -p"$PW" -N -B -e 'SELECT VERSION();' 2>/dev/null | tr -d '\r')"
+      echo "server_id     : 소스=$(docker exec -e MYSQL_PWD="$PW" "$CONTAINER" mysql -uroot -N -e 'SELECT @@server_id;' 2>/dev/null | tr -d '\r') / 리플리카=$(docker exec -i "$CONTAINER" mysql -h "$REPLICA_HOST" -P 3306 --get-server-public-key -uroot -p"$PW" -N -B -e 'SELECT @@server_id;' 2>/dev/null | tr -d '\r')"
+      # 🔴 `_out2` 를 붙이지 않는다. 이 단계는 rig 에 `OUT=$OUTDIR/repl` 을 넘기므로
+      #    산출물이 `repl/` 바로 아래에 떨어진다. `_out2` 는 rig 를 손으로 돌릴 때의
+      #    기본값이다 (2026-08-22 리뷰 지적, PR #348).
+      echo "왕복·초기화   : repl/rtt.txt · repl/replica_build.txt 참조"
+      echo "⚠️ 두 박스의 타입이 다르면 이 라운드의 지연 값은 **복제 구조의 값이 아니다**"
+    fi
+
     echo
     echo "# 단계"
     cat "$PHASE_LOG"
@@ -928,6 +1052,26 @@ for p in $PHASES; do
       else
         note "⏭  real 대조 건너뜀 — 리허설이 실패했다"
         printf "backup_real\tSKIP\t0\t%s\n" "$(date -Is)" >> "$PHASE_LOG"
+      fi ;;
+    repl_preflight)
+      run_phase repl_preflight phase_repl_preflight || {
+        note "🔴 사전 확인 실패 — 여기서 멈춘다. 이 상태로 돌리면 «환경 결함» 이 «측정 결과» 로 찍힌다"
+        break
+      } ;;
+    repl_gate)
+      # backup 리허설과 같은 형태: `break` 도 `continue` 도 안 된다. 플래그로 그 단계만 막는다.
+      if run_phase repl_gate phase_repl_gate; then
+        REPL_GATE_OK=1
+      else
+        REPL_GATE_OK=0
+        note "🔴 게이트 실패 — 본 측정을 건너뛴다. 계측이 안 선 채로 잰 지연은 «복제의 성질» 이 아니라 «무대의 결함» 이다"
+      fi ;;
+    repl)
+      if [ "${REPL_GATE_OK:-1}" = "1" ]; then
+        run_phase repl phase_repl
+      else
+        note "⏭  복제 본 측정 건너뜀 — 게이트가 실패했다"
+        printf "repl\tSKIP\t0\t%s\n" "$(date -Is)" >> "$PHASE_LOG"
       fi ;;
     coresidency_preflight)
       run_phase coresidency_preflight phase_coresidency_preflight || {

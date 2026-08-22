@@ -42,7 +42,7 @@ dependencies {
 	implementation 'org.flywaydb:flyway-mysql'
 	implementation 'io.github.cdimascio:dotenv-java:3.2.0'
 	implementation 'org.modelmapper:modelmapper:3.2.6'
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.0'
 	// springdoc(swagger-core-jakarta)이 끌어오는 commons-lang3 3.17.0이 GHSA-j288-q9x7-2f5v
 	// (3.0~3.17.x 취약, 긴 입력 처리 시 무한 재귀)에 걸려 있어 명시적으로 상향.
 	implementation 'org.apache.commons:commons-lang3:3.20.0'
@@ -65,7 +65,7 @@ dependencies {
 
 	// Boot 3.5.16이 관리하는 jackson-databind(2.21.4)가 GHSA-5jmj-h7xm-6q6v(2.19.0~2.21.4
 	// 취약)에 걸려 있어 이 모듈만 명시적으로 상향(jackson-bom의 나머지 모듈은 그대로 둠).
-	implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.1'
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
 
 	// --- QueryDSL (동적 조회 계층, querydsl-adoption.md §1-1 채택) ---
 	// 버전을 박지 않는 이유: Boot 3.5.16 의 의존성 관리가 QueryDSL 5.1.0 을 이미 잡고 있다.

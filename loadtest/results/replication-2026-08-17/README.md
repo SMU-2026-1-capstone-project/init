@@ -7,6 +7,12 @@ rig: `docker-compose.yml` · `replication_probe.sh` · 산출물 `_out/`
 무는 값)는 **재지 않았다** — 같은 디스크·RTT ≈ 0 이라 로컬에서 재면 반동기 대가가 구조적으로
 과소평가된다. 그 둘은 「EC2 2대 필요, 안 함」으로 남는다.
 
+> 🔄 **그 Q1·Q2 를 재는 rig 이 2026-08-22 에 섰다** — 같은 디렉터리의
+> [`REPL2-RIG.md`](./REPL2-RIG.md) (`repl2_rig.sh`·`repl2_probe.sh`·`repl2_sweep.sh`, EC2 2대).
+> **아직 한 판도 안 돌았다.** 이 문서의 결과와 섞어 읽지 말 것 — 저쪽은 다른 무대다.
+> 이 라운드가 Q3 을 못 닫은 원인(질의 왕복이 현상보다 굵었다)은 저 rig 에서
+> «계측 바닥을 같은 표에 세우는» 열(`lag_src`)로 흡수했다.
+
 무대: `mysql:8.0`(8.0.46) 컨테이너 2대, `server_id` 1/2, `gtid_mode=OFF` 포지션 기반,
 `innodb_flush_log_at_trx_commit=1` · `sync_binlog=1`(프로젝트 기본 내구성 유지).
 
