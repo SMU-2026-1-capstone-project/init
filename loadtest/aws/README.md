@@ -209,6 +209,49 @@ PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
 
 ⚠️ **여기 적힌 절차로 2대를 실제로 띄워 본 적은 없다.** 포트·키 경로는 rig 코드에서 읽은 것이다.
 
+### P4 — 2대 구성 (복제 지연 · 반동기)
+
+🔴 **P6 와 자리가 반대다.** P6 는 부하기에서 돌며 대상을 SSH 로 몰지만, **P4 의 러너는
+소스 박스에서 돈다.** 이유는 시계 하나다 — 하트비트를 «소스 시각 vs 리플리카 시각» 으로
+재면 두 인스턴스의 시계 차이가 그대로 지연으로 찍힌다
+([설계](../../docs/decisions/replication-lag-and-semisync.md) §7). 그래서 쓰는 것도 읽는
+것도 소스 박스의 시계로 묶고, 리플리카는 원격 3306·SSH 로만 만진다.
+
+🔴 `repl` 을 `ddl`·`backup` 과 같은 `PHASES` 에 넣지 말 것. 저 둘은 디스크가 지배하고
+이쪽은 무대(1,000만 행)를 자기 조건으로 고정한다 — 섞이면 셋 다 오염된다.
+
+**사람이 먼저 해야 하는 것**
+
+1. 인스턴스 **2대 — 타입이 같아야 한다.** 다르면 관측된 지연이 「복제 구조 때문」인지
+   「기계 차이 때문」인지 원리적으로 안 갈린다(설계 §3). 「리플리카는 싼 걸로」는 운영
+   선택지지 이 실험의 조건이 아니다
+2. 보안그룹 — 소스 → 리플리카 **3306**·**22**, 리플리카 → 소스 **3306**(복제가 이 방향으로 붙는다)
+3. **SSH 키를 소스 박스에** (`/root/.ssh/measure.pem`, `chmod 600`) — 소스가 리플리카에
+   사본을 붓고 컨테이너를 올린다
+4. 둘 다 `ROLE=db` 로 부트스트랩 — 이 라운드는 백엔드·AI 를 안 쓴다
+5. **AZ 를 정하고 라벨로 넘긴다** — 같은 AZ / 다른 AZ. 설계 §9-1 ② 가 「제일 중요한
+   미결정」이라 부른 항목이고, **이 선택이 Q2 의 답을 자릿수 단위로 바꾼다**
+
+**실행 — 소스 박스에서**
+
+```bash
+cd /root/init
+S3_BASE=s3://내버킷/shadowfit \
+REPLICA_HOST=<리플리카 사설 IP> \
+REPLICA_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<리플리카 사설 IP>" \
+REPL_AZ_MODE="same-az(ap-northeast-2a)" \
+PHASES="repl_preflight repl_gate repl collect" \
+  nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+```
+
+`repl_gate` 가 무대를 세우고 게이트 G1~G3 을 본다. **실패하면 `repl` 을 건너뛴다** —
+계측(G3 양성 대조군)이 안 선 채로 잰 지연은 「복제의 성질」이 아니라 「무대의 결함」이다.
+
+rig 과 손잡이·산출물은 [`../results/replication-2026-08-17/REPL2-RIG.md`](../results/replication-2026-08-17/REPL2-RIG.md).
+
+⚠️ **여기 적힌 절차로 2대를 실제로 띄워 본 적은 없다.** 포트·키 경로는 rig 코드에서 읽은 것이다.
+첫 실행은 `REPL_SESSIONS=134 PHASES="repl_preflight repl_gate"` 로 끊어서 보는 편이 싸다.
+
 ## 설정
 
 | 변수 | 기본 | 비고 |
@@ -216,6 +259,11 @@ PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
 | `S3_BASE` | **필수** | `s3://버킷/프리픽스` |
 | `RUN_ID` | `ec2-<날짜시각>` | 결과 디렉터리·S3 프리픽스 |
 | `PHASES` | `preflight rehearsal ddl ridealong collect` | 단계 선택 |
+| `REPLICA_HOST` | (없음) | P4 필수 — 리플리카 사설 IP |
+| `REPLICA_SSH` | `ssh root@$REPLICA_HOST` | P4 — 키를 쓰면 직접 지정 |
+| `REPL_AZ_MODE` | (없음) | P4 — 조건 칸에 그대로 들어간다. 비면 경고(막지는 않는다) |
+| `REPL_SESSIONS` | `13334` | P4 무대 = 1,000만 행 |
+| `TIMEOUT_REPL_GATE` / `TIMEOUT_REPL` | `10800` / `14400` | 3시간 / 4시간 |
 | `AUTO_SHUTDOWN` | `0` | `1` 이면 **업로드 성공 시에만** 정지 |
 | `SYNC_SEC` | `300` | S3 주기 업로드 간격 |
 | `WRITER_MAX_SEC` | `14400` | ⚠️ rig 기본은 5,400. 아래 참고 |
@@ -274,7 +322,9 @@ loadtest/results/online-ddl-<RUN_ID>/
 
 - **主-P2**(다운샘플 다세션 재측정) — 백엔드 컨테이너와 ghz, `gen_batch_multi.py` 재생성이
   선행이라 단계로 안 넣었다. `PHASES` 에 추가하려면 그 준비부터 설계해야 한다
-- **主-P3·P4**(백업/복구·복제) — 설계 문서부터 써야 한다
+- ~~**主-P3·P4**(백업/복구·복제) — 설계 문서부터 써야 한다~~
+  → P3 는 08-13 라운드로 돌았고, **P4 는 rig·단계까지 붙었다**(`repl_preflight`·`repl_gate`·`repl`).
+  다만 **아직 한 판도 안 돌았고 2대 절차를 실제로 밟아본 적이 없다** — 위 「P4 — 2대 구성」 참고
 - **從-R3**(3-way 조인) — `reports`·`exercise_sessions`·`users` 시딩이 선행. 지금은 사유만 기록한다
 - 이 러너 자체는 **한 번도 EC2 에서 안 돌았다.** 첫 실행은 `PHASES="preflight rehearsal"`
   로 끊어서 확인하는 편이 싸다
