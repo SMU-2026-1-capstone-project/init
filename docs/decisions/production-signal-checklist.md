@@ -364,6 +364,9 @@ MediaPipe를 GPU로 5ms까지 줄이면 "MediaPipe 지배적이라 gRPC는 신�
 **신규 후보 3개** (코드로 확인, 우선순위순):
 
 1. ~~**`session_feedback_logs` 중복 인덱스**~~ — **✅ 해결(2026-07-24)**. 스크래치 테이블(`session_feedback_logs_scale`, 100만 행, [`loadtest/measure_redundant_index.sh`](../../loadtest/measure_redundant_index.sh))로 실측: EXPLAIN 상 실사용 쿼리 2종(`findBySessionIdOrderByOccurredAtAsc`, `GROUP BY feedback_type` 집계) 둘 다 `idx_session_feedback` 존재 시에도 옵티마이저가 `uk_session_event`만 선택(읽기 이득 0 확인) + 동일 규모(10만 행) batch INSERT가 3-index 7,894ms → 2-index(drop 후) 6,202ms(약 −21%, 로컬 2코어 환경이라 절대값보단 방향 신뢰). `idx_session_feedback` 제거, `mysql/schema.sql`에 반영.
+   - 🔴 **이 결론이 선 근거는 V5 에서 사라졌다** ([#320](https://github.com/Shadowfit/init/issues/320)). 위 판정의 축은 「`idx_session_feedback` 가 `uk_session_event` 의 선두 2컬럼과 겹친다」였는데, `V5__feedback_log_rep_key.sql:52-53` 이 그 키를 **`uk_session_rep (session_id, rep_number, feedback_type)`** 으로 갈아치웠다. 새 키는 `occurred_at` 을 두 번째로 갖지 않으므로 겹침이 없어졌고, `findBySessionIdOrderByOccurredAtAsc` 의 정렬은 **이제 filesort 다**(V5:58-70 이 같은 내용을 미측정으로 열어뒀다).
+   - **결론(인덱스를 안 되살린다)은 유지된다** — 다만 근거가 「중복이라서」가 아니라 「세션당 정렬 대상이 수십 행이라 filesort 가 싸다」로 **바뀌었다**. 그 새 근거는 구조적 판단이고 **EXPLAIN 으로 확인하지 않았다.**
+   - ⚠️ 위 rig(`measure_redundant_index.sh`)은 **V5 이전 스키마를 만든다.** 지금은 게이트가 걸려 있어 `REDUNDANT_INDEX_PRE_V5=1` 없이는 안 돈다 (#320).
 2. **배치 전 동기 존재검증 라운드트립** — `savePoseDataBatch`/`saveBatch`가 batch INSERT 전 `sessionRepository.existsById(sessionId)`를 별도 SELECT로 선실행, 배치당 왕복 2회. FK(`ON DELETE CASCADE`)가 이미 무결성 보장하므로 사전체크 제거 + FK violation을 예외로 변환하면 왕복 1회로 축소 가능 — 단 에러 처리 계약 변경 트레이드오프 있음.
 3. **트랜잭션 격리수준 미검토** — MySQL 기본 REPEATABLE READ 그대로, 배치 INSERT 위주 워크로드에서 READ COMMITTED로 gap lock 범위 축소 여지 미탐색. 단 우리 배치가 대부분 INSERT뿐이라 gap lock 경합 자체가 적을 수 있어 이득이 있을지부터 이론적으로 먼저 따져봐야 함.
 

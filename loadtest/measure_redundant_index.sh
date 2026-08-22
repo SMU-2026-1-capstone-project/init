@@ -9,7 +9,52 @@
 #       측정 가능한 차이가 있는지 스크래치 테이블(session_feedback_logs_scale)로 검증한다.
 #
 # ⚠️ 로컬 2코어(i3-6100) + MySQL·백엔드 동거 환경 — 절대 ms 수치는 신뢰 금지, 메커니즘·상대 델타만.
+#
+# ══════════════════════════════════════════════════════════════════════════════
+# 🔴 이 rig 은 **V5 이전 스키마**를 만든다 (#320)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# V5__feedback_log_rep_key.sql:52-53 이 키를 갈아치웠다:
+#
+#     DROP INDEX uk_session_event,                                    ← 없어진 키
+#     ADD UNIQUE KEY uk_session_rep (session_id, rep_number, feedback_type)
+#
+# 그런데 아래 [1/6] 의 CREATE TABLE 에는 rep_number 컬럼이 없고, [3/6] 은
+# uk_session_event (session_id, occurred_at, feedback_type) 를 만든다 — **V5 가 방금
+# 지운 그 키다.**
+#
+# 그래서 지금 이 rig 을 그대로 돌리면 occurred_at 을 두 번째로 가진 키 위에서 재게
+# 되고, 정렬이 인덱스를 타는 것은 **당연한 결과**다. V5 가 실제로 던진 질문 —
+# 「uk_session_rep 로 바뀐 뒤에도 idx_session_feedback 은 여전히 중복인가」 — 은
+# 건드리지도 못한 채, 위 가설의 결론만 재확인한 것처럼 보인다.
+#
+# 🔴 **틀린 근거로 같은 결론이 나오는 자리다.** V5:58-70 이 「측정 rig 은 여기 있다」고
+#    가리키고 있어서, 시키는 대로 따라온 사람이 정확히 그 함정에 빠진다.
+#
+# 고치려면 스키마를 올려야 한다(#320 ㄱ안) — rep_number 컬럼 추가 + uk_session_rep.
+# 그 전까지는 아래 게이트로 막는다. 옛 스키마 기준선을 일부러 재보려는 것이라면
+# REDUNDANT_INDEX_PRE_V5=1 을 주고 돌릴 것. 그 판의 결과는 **V5 이전 세계의 값**이다.
 set -u
+
+if [ "${REDUNDANT_INDEX_PRE_V5:-0}" != "1" ]; then
+    cat >&2 <<'WARN'
+🔴 거부한다 — 이 rig 은 V5 이전 스키마를 만든다 (#320).
+
+   만드는 것 : uk_session_event (session_id, occurred_at, feedback_type)   ← V5 가 지운 키
+   실제 스키마: uk_session_rep   (session_id, rep_number,  feedback_type)
+
+   이대로 돌리면 occurred_at 이 두 번째인 키 위에서 재게 되어 «정렬이 인덱스를 탄다» 가
+   당연히 나온다. V5:58-70 이 열어둔 질문(「새 키로 바뀐 뒤에도 중복인가」)은 답해지지 않는데,
+   표만 보면 답해진 것처럼 보인다.
+
+   · 스키마를 올려서 제대로 재려면      → #320 ㄱ안 (rep_number 컬럼 + uk_session_rep)
+   · V5 이전 기준선을 일부러 재려면     → REDUNDANT_INDEX_PRE_V5=1 로 다시 실행
+WARN
+    exit 1
+fi
+
+echo "⚠️ REDUNDANT_INDEX_PRE_V5=1 — V5 **이전** 스키마로 잰다. 결과를 현재 스키마의 근거로 쓰지 말 것 (#320)"
+
 PW=1234
 DB(){ docker exec shadowfit-mysql mysql -uroot -p$PW shadowfit "$@" 2>/dev/null; }
 
