@@ -476,9 +476,25 @@ H1 은 *「동거하면 내려간다」* 이므로, 내려간 천장이 **40~80 
 (`load_ai.py:37,209` — 스레드 160개 + 전역 `LOCK`), GIL 때문에 **1 vCPU 부근에서 먼저**
 막힌다. 총 CPU 200% 가 아니라 **`load_ai_pct` 가 ~100%** 에 붙는지를 본다.
 
-🔴 **⑦의 게이트가 핵심이다.** `run_all.sh` 의 판정은 `cores_assert_usable`·`cores_assert_ghz`
-둘뿐이고 **`loader_*.tsv` 를 안 본다.** 샘플러가 빈 파일을 남겨도 라운드는 성공으로 끝난다 —
+🔴 **⑦의 게이트가 핵심이다.** ~~`run_all.sh` 의 판정은 `cores_assert_usable`·`cores_assert_ghz`
+둘뿐이고 **`loader_*.tsv` 를 안 본다.** 샘플러가 빈 파일을 남겨도 라운드는 성공으로 끝난다~~ —
 「걷은 줄 알았는데 안 걷혔다」가 #250 의 실패 모드 그 자체다.
+
+✅ **정정 (2026-08-20, [#262](https://github.com/Shadowfit/init/issues/262)).** 위 취소선은 **2026-08-17 이전**
+서술이다. 지금 게이트는 **6종**이고 `loader_*.tsv` 를 보는 것이 그중 하나다:
+
+| 게이트 | 자리 | 무엇을 막나 |
+|---|---|---|
+| `cores_assert_usable` | `run_all.sh:505` | 판이 성립했나(`setup_fail`) |
+| `cores_assert_ghz` | `:538` | 從 부하가 실제로 갔나 |
+| `cores_assert_probe` | `:570` | 두 시계(자기 프로브)가 있나 |
+| `cores_assert_taskset` | `:598` | §T 가 돌았나 |
+| **`cores_assert_loader`** | **`:626`** | **부하기 계측이 걷혔나 — 「없다」고 적었던 그 게이트** |
+| `cores_assert_side` | `:655` | 옆(Spring·MySQL) 지표가 걷혔나 |
+
+여섯 개 다 `phase_coresidency_rehearsal`(`:718~728`)과 `phase_coresidency`(`:764~`)에서 호출되고,
+**2026-08-17 2차 리허설에서 6종 전부 실행·통과**했다. 판정은 「행이 있는가」가 아니라
+「정상 · 전부 0 · 헤더만 · 파일 없음」 4가지로 대조한다(커밋 `ee9927b`).
 
 ### 🍚 점심때 할 일 (2026-08-17 기록 · **2차 리허설 후 갱신**)
 
