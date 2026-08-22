@@ -85,7 +85,10 @@ worst 구간·rep 곡선을 갖고 있으므로, 주간은 **그것들의 집계
 
 - 세션 수 · 총 rep · 주간 평균 sync_rate · **지난주 대비 델타**
 - **rep 위치별 품질 곡선** — 주 전체 `rep_number` 별 평균 → 「몇 번째부터 무너지나」
-- **worst 국면 빈도** — 세션별 worst 국면을 세어 「어느 국면이 반복되나」
+- **worst 회차 분포** — 세션별 worst 회차를 세어 「어느 회차가 반복해서 약한가」
+  🔴 «국면» 이 아니다 — `WorstSectionDto` 에 국면 이름표가 없다(`reason` 은 `"2회차 · 싱크로율 75%"`
+  라는 문자열이고 문구도 잠정, [#80](https://github.com/Shadowfit/init/issues/80)). 국면 축은
+  [#218](https://github.com/Shadowfit/init/issues/218) 이 선행이다. §13-2 참고
 - 연속 운동일 · 요일/시간대 분포 · 이상치 세션
 
 ### LLM 이 하는 것 — 딱 셋
@@ -167,6 +170,10 @@ session_id BIGINT NOT NULL,
 
 **주간 리포트에는 세션이 없다.** 지금 `reports` 는 세션당 1건 전제라 `WEEKLY` 행을 **넣을 수가
 없다.** 필요한 변경:
+
+⚠️ **단 이 벽은 «저장할 때» 만난다.** 1단계(템플릿 문장)는 조회 시 계산이라 **스키마를 안 건드린다**
+— §13-0 을 먼저 볼 것. 아래는 LLM 을 붙여 «저장이 필요해지는» 시점의 목록이다.
+
 
 - `session_id` **nullable**
 - `period_start` · `period_end` 추가
@@ -276,6 +283,127 @@ session_id BIGINT NOT NULL,
 | ④ | **조언을 지금 만들 것인가** | **미룬다.** #217·#256 이 먼저 (§11) |
 | ⑤ | **스키마 변경 시점** — 주간을 택하면 필수 | 무중단 DDL 실측이 있으니 그 절차로 (§6) |
 | ⑥ | **아웃박스 튜닝** — 이벤트 타입별 리스·재시도 분리 | 별도 발행기 vs 타입별 설정 — **미정** (§5) |
+
+---
+
+## 13. 1단계 — 템플릿 문장을 LLM 없이 먼저 만든다 (구체안)
+
+**이 절이 실제 착수 단위다.** LLM 결정과 무관하게 어차피 필요하고(폴백), 만들고 나면
+「LLM 이 값을 하나」를 **추측이 아니라 실물로** 판단할 수 있다.
+
+### 13-0. 🔴 저장하지 않는다 — 그래서 스키마 변경도 없다
+
+§6 에서 `reports.session_id NOT NULL` 이 주간을 막는다고 적었는데, **1단계는 그 벽을 안 만난다.**
+**조회 시 계산**하면 되기 때문이다.
+
+저장이 필요한 조건은 둘 중 하나다 — **비싸거나, 비결정적이거나.** 템플릿 문장은 **둘 다 아니다**
+(세션 20~30행 집계 · 같은 입력이면 같은 문장). 저장이 필요해지는 순간은 **LLM 을 붙일 때**고,
+그때 §6 을 하면 된다. 지금 하면 **재기 전에 고르는 것**이다.
+
+⚠️ 단 **집계 비용은 재고 넘어간다** — 세션 수가 많은 사용자에서 지연이 문제되면 그때 캐시/저장을
+판단한다. 그 판단의 근거를 §13-5 가 만든다.
+
+### 13-1. 만들 것 넷
+
+| | 무엇 |
+|---|---|
+| `WeeklySummaryQueryRepository` | 집계 쿼리 (아래 Q1~Q4) |
+| `WeeklySummaryService` | 조립 + 규칙 적용 |
+| `WeeklySentenceRules` | **규칙 카탈로그** — 조건 → 문장. 순수 함수라 테스트가 쉽다 |
+| `ExerciseReportController` 엔드포인트 1개 | `GET /reports/weekly?start=YYYY-MM-DD` |
+
+### 13-2. 집계 쿼리 — 두 층으로 갈린다
+
+**A층: 세션 헤더만으로 되는 것** (`exercise_sessions`, JSON 파싱 불필요)
+
+```sql
+-- Q1
+SELECT COUNT(*)                                            AS sessions,
+       SUM(total_reps)                                     AS reps,
+       SUM(avg_sync_rate * total_reps)
+         / NULLIF(SUM(total_reps), 0)                      AS rep_weighted,     -- 미결정 ②-ㄱ
+       AVG(avg_sync_rate)                                  AS session_weighted, -- 미결정 ②-ㄴ
+       COUNT(DISTINCT DATE(start_time))                    AS active_days
+  FROM exercise_sessions
+ WHERE member_id = ? AND status = 'COMPLETED'
+   AND start_time >= ? AND start_time < ?
+```
+
+🔴 **두 평균을 «둘 다» 낸다.** §4 의 미결정 ②를 고르는 게 아니라 **재서** 정한다 — 카드 B 가
+세션 안에서 했던 것과 같은 수법이다. 둘의 차이가 0.1점이면 논쟁이 사라지고, 크면 그 크기가
+근거가 된다.
+
+⚠️ **가중치가 정확하지 않다.** `avg_sync_rate` 는 **측정된 rep 들의 평균**인데 `total_reps` 는
+**측정 안 된 rep 도 센다**. 정확한 가중치는 「측정된 rep 수」이고 그건 컬럼에 없다 —
+`repTrend` 배열 길이로만 알 수 있다(B층). 1차는 근사로 가되 **이 사실을 결과에 적는다.**
+
+**B층: `reports.detailed_analysis` JSON 을 펼쳐야 하는 것**
+
+```sql
+-- Q2  rep 위치별 곡선 — 「몇 번째부터 흔들리나」
+SELECT jt.rep_number, AVG(jt.sync_rate) AS avg_sync, COUNT(*) AS n
+  FROM reports r
+  JOIN exercise_sessions s ON s.id = r.session_id
+ CROSS JOIN JSON_TABLE(r.detailed_analysis, '$.repTrend[*]'
+        COLUMNS (rep_number INT    PATH '$.repNumber',
+                 sync_rate  DOUBLE PATH '$.syncRate')) jt
+ WHERE r.member_id = ? AND s.start_time >= ? AND s.start_time < ?
+ GROUP BY jt.rep_number
+ ORDER BY jt.rep_number
+```
+
+```sql
+-- Q3  worst 회차 분포
+SELECT JSON_EXTRACT(r.detailed_analysis, '$.worstSection.repNumber') AS worst_rep, COUNT(*) AS n
+  ...  GROUP BY worst_rep
+```
+
+🔴 **「worst 국면 빈도」는 못 만든다.** `WorstSectionDto` 에 국면 이름표가 없다 — `reason` 은
+`"2회차 · 싱크로율 75%"` 라는 **문자열**이고 문구도 잠정이다([#80](https://github.com/Shadowfit/init/issues/80)).
+만들 수 있는 것은 **worst «회차» 분포**뿐이다. 국면 축은 [#218](https://github.com/Shadowfit/init/issues/218)(국면 이름표와 rep 판정이
+다른 자를 쓴다)이 먼저다.
+
+**Q4**: Q1 을 지난주 기간으로 한 번 더 — 델타용.
+
+⚠️ **`JSON_TABLE` 은 그 자체로 카드 후보다** — 「JSON 컬럼을 SQL 안에서 펼쳐 집계한다」는
+읽기축에 없던 모양이다. 단 **계획을 재보기 전에는 카드라고 부르지 않는다**(EXPLAIN 선행).
+
+### 13-3. 🔴 문장 규칙 — 임계값을 못 쓴다
+
+규칙은 `조건 → 문장` 쌍이고 우선순위로 정렬해 상위 N개만 낸다. 그런데 여기서 이 프로젝트의
+규칙 하나에 걸린다 — **근거 없는 임계값 금지**([[feedback_no_arbitrary_threshold_values]]).
+
+「5점 이상 떨어지면 **무너진다**」의 5점에 근거가 없다. baseline 도 threshold 도 아직 없다.
+
+**그래서 1차 규칙은 «순위 · 방향 · 사실» 로만 만든다.**
+
+| 종류 | 예 | 임계값 필요? |
+|---|---|---|
+| **사실** | 「이번 주 {n}일, {m}세션 운동했어요」 | ❌ |
+| **방향** | 「싱크로율이 지난주보다 **올랐어요/내렸어요**」 | ❌ |
+| **순위** | 「가장 약했던 건 **{k}회차**였어요」 · 「곡선의 최댓값 대비 낙폭이 가장 큰 지점은 {k}회차」 | ❌ |
+| **분포** | 「{n}세션 중 {m}번 {k}회차가 가장 약했어요」 | ❌ |
+| ~~정도~~ | ~~「{k}회차부터 **무너집니다**」~~ | 🔴 **보류** — 임계값이 필요하고 근거가 없다 |
+
+**「정도」를 말하는 문장은 데이터가 쌓인 뒤 분포에서 임계값을 뽑아 추가한다.** 그때까지는 없다.
+⚠️ 데이터 부족(`sessions < 2`)일 때의 문장도 **사실**로만 쓴다 — 「추세를 보기엔 기록이 {n}건이에요」.
+
+### 13-4. 테스트
+
+- **집계 쿼리** — 고정 시드 → 기대값 단언. 특히 **두 평균이 다르다**는 것을 회귀로 박는다
+- **규칙** — 순수 함수라 조건 조합 → 문장 집합 단위 테스트
+- 🔴 **합성 데이터 한계**([[project_synthetic_data_distribution_limit]]) — 로컬 시드는 값 분포가
+  균일해서 **규칙이 실제로 발화하는지**를 검증하기 어렵다. 「쿼리가 맞는가」까지가 테스트 범위이고,
+  **「문장이 쓸모 있는가」는 실사용 데이터가 있어야 안다** — 그게 이 1단계를 만드는 이유이기도 하다
+
+### 13-5. 관측
+
+- 주간 조회 지연 · **사용자별 세션 수 분포** → 캐시/저장이 필요한지의 근거
+- 규칙별 발화 횟수 → **한 번도 안 터지는 규칙**을 찾아낸다([#193](https://github.com/Shadowfit/init/issues/193) 이 준 교훈: 코드가 있어도 안 불릴 수 있다)
+
+### 13-6. 범위 밖
+
+LLM · 저장 · 스키마 변경 · 조언 · 국면 축. **1단계는 읽기 전용이다.**
 
 ---
 
