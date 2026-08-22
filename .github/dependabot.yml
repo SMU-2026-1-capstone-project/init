@@ -11,3 +11,19 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # 메이저는 위 그룹 밖 개별 PR 로 나온다. 아래 둘은 Boot 3.5.16 에 머무는 동안
+    # 받을 수 없다는 것이 근거와 함께 확인된 것들이라, 매 버전 재등장하지 않게 막는다.
+    # 근거: docs/decisions/major-version-upgrade-policy.md
+    #
+    # - springdoc 3.x: 부모 POM 이 spring-boot-starter-parent 4.1.0 이고 Boot 4 전용
+    #   아티팩트(spring-boot-tomcat 등)를 끌어온다. 390건 중 219건 실패로 실측됐다(PR #189).
+    # - gradle-wrapper 9.x: Boot 3.5 Gradle 플러그인의 지원 목록은 7.6.4+/8.4+ 이고
+    #   9.x 는 Boot 4.0 플러그인부터다. 컴파일은 통과하지만 지원 조합이 아니다(PR #190).
+    #
+    # 🔴 Boot 4 로 이전한다면 이 두 항목을 먼저 지워야 한다 — 안 지우면 그때 필요한
+    #    상향이 조용히 안 올라온다. 막는 것과 잊는 것은 다르다.
+    ignore:
+      - dependency-name: "org.springdoc:springdoc-openapi-starter-webmvc-ui"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
