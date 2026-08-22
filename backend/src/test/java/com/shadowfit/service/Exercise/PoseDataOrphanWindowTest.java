@@ -155,7 +155,7 @@ class PoseDataOrphanWindowTest {
                     for (int i = 0; i < batchesPerThread; i++) {
                         // 스레드마다 다른 세션에서 출발해 같은 행 경합을 피한다
                         Long sessionId = sessionIds.get((threadIndex + i * concurrency) % SESSION_COUNT);
-                        poseDataService.savePoseDataBatch(sessionId, oneRep(i));
+                        saveWithDeadlockRetry(sessionId, i);
                     }
                 } catch (Throwable e) {
                     firstError.compareAndSet(null, e);
@@ -222,6 +222,35 @@ class PoseDataOrphanWindowTest {
     }
 
     /** 한 배치 = 한 rep. 무릎각만 스쿼트 한 회의 모양으로 움직인다(PoseDataServiceTest 와 같은 전제). */
+    /**
+     * 프로덕션과 같은 방식으로 저장한다 — 데드락이면 재시도한다.
+     *
+     * <p>🔴 <b>2026-08-22 에 추가됐다 (#342).</b> #280 이 {@code uk_pose_event} 를 넣은 뒤로 이
+     * 테스트가 데드락으로 죽었다({@code CannotAcquireLockException} — «배치 저장이 실패하면 측정이
+     * 무의미하다» 단언에 걸린다). #276 이 실측한 조건이 정확히 여기서 성립하기 때문이다 —
+     * 유니크 키 존재 · 서로 다른 키 · 같은 파티션 동시 삽입.
+     *
+     * <p><b>그런데 이건 프로덕션 결함이 아니다.</b> {@code savePoseDataBatch} 의 실제 호출자는
+     * gRPC 핸들러 하나뿐이고({@code ExerciseGrpcService:144}) 거기에 재시도가 붙어 있다
+     * ({@code savePoseDataBatchWithDeadlockRetry}, 최대 2회 — 실측 0회 37.8% · 1회 3.8% · 2회 0.0%).
+     * 서비스를 직접 부르는 이 테스트만 그 층을 건너뛰고 있었다. 즉 <b>테스트가 프로덕션에 없는
+     * 경로를 재고 있었던 것</b>이라, 핸들러와 같은 재시도를 여기서도 한다.
+     *
+     * <p>⚠️ 재시도 횟수는 창 폭 측정에 잡음이 된다 — 재시도한 배치는 ①~② 창을 두 번 지난다.
+     * 지금은 그 사실만 적어 둔다. 재시도가 몇 번 일어났는지를 측정에 반영하려면 별도 판이 필요하다.
+     */
+    private void saveWithDeadlockRetry(Long sessionId, int i) {
+        int retries = 0;
+        while (true) {
+            try {
+                poseDataService.savePoseDataBatch(sessionId, oneRep(i));
+                return;
+            } catch (org.springframework.dao.CannotAcquireLockException e) {
+                if (++retries > 2) throw e;
+            }
+        }
+    }
+
     private List<PoseDataRequest> oneRep(int repNumber) {
         List<PoseDataRequest> frames = new ArrayList<>();
         int half = FRAMES_PER_BATCH / 2;
