@@ -175,7 +175,6 @@ shadowfit/
 │   │   │   │   │   ├── config/InternalAuthInterceptor.java  # gRPC 토큰 검증
 │   │   │   │   │   ├── config/SchedulerConfig.java           # @EnableScheduling
 │   │   │   │   │   ├── config/AsyncConfig.java               # 🆕 @Async 경계 cid 전파
-│   │   │   │   │   ├── config/WebClientConfig.java
 │   │   │   │   │   ├── observability/          # 🆕 관측성 (2026-07-28)
 │   │   │   │   │   │   CorrelationIds.java, CorrelationIdFilter.java,
 │   │   │   │   │   │   GrpcCorrelationClientInterceptor.java,
