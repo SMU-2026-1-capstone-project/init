@@ -141,3 +141,14 @@ src/main/resources/application-local.properties
 
 # loadtest 시딩 산출물 (gen_pose_template.py 출력, ~1.3MB)
 loadtest/seed/template.sql
+
+# 개인 지원 서류 — 이 저장소는 PUBLIC 이다.
+# 지원서·경력기술서는 특정 회사에 낸 문서이고 개인 신상이 들어간다. 공개 이력에
+# 박히면 지우기 어렵고(포크·캐시), 회사명이 붙은 파일이 커밋 로그에 남는 것 자체가
+# 의도치 않은 노출이다. 로컬에는 그대로 두되 추적만 하지 않는다.
+#
+# 📌 여기 걸린 파일들은 애초에 커밋된 적이 없어 히스토리 정리가 필요 없었다.
+#    새로 쓸 때도 이 이름 규칙(application-*, career-statement-*)을 지키면 자동으로 빠진다.
+#    포트폴리오 본체(one-pager, db-deep-dive, realmysql-experiments 등)는 계속 추적한다.
+docs/portfolio/application-*
+docs/portfolio/career-statement-*
