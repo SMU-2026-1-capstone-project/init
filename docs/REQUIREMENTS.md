@@ -121,12 +121,15 @@
 
 ## 10. AI 서버 엔드포인트 (`/api/v1`)
 
-| 경로 | 기능 |
-|---|---|
-| `POST /pose` | 단일 이미지 포즈 추정 |
-| `POST /sync` | 싱크로율 계산 |
-| `GET /sync/onboarding-guide` | 온보딩 가이드 데이터 |
-| `POST /video/analyze` | 영상 업로드 분석 (기준 좌표 추출용) |
+| 경로 | 기능 | 실제 호출자 |
+|---|---|---|
+| `POST /pose` | 단일 이미지 포즈 추정 | ✅ 프론트 |
+| `POST /sync` | 싱크로율 계산 | 🔴 없음 ([#293](https://github.com/Shadowfit/init/issues/293)) |
+| `GET /sync/onboarding-guide` | 온보딩 가이드 데이터 | 🔴 없음 ([#293](https://github.com/Shadowfit/init/issues/293)) |
+| `POST /video/analyze` | 영상 업로드 분석 (기준 좌표 추출용) | 🔴 없음 ([#293](https://github.com/Shadowfit/init/issues/293)) |
+
+> 🔴 「없음」인 셋은 **구현돼 있고 뜨지만 아무도 안 부른다**(2026-08-22 확인). 정본은 gRPC 쪽이다 —
+> 싱크로율은 `SavePoseDataBatch`, 기준 좌표는 `ExtractReferenceData`. 지우지 않고 표시만 하기로 했다(#293).
 
 ---
 
