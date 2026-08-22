@@ -496,13 +496,14 @@ H1 은 *「동거하면 내려간다」* 이므로, 내려간 천장이 **40~80 
 | 4 | ~~부하기는 **`c7i.xlarge` 이상**으로 띄운다~~ → ✅ **완료** (2차도 `c7i.xlarge`, `ncpu=4`) | ~~2 vCPU 면 §T 가 성립하지 않는다(제한 = 전체)~~ |
 | 5 | ✅ **완료** — CRLF 는 `sed` 가 답이 아니었다: repo 블롭은 LF 이고 바꾸는 건 작업 트리의 `core.autocrlf=true` 다. `git show HEAD:<path>` 로 뽑으면 애초에 안 생긴다. ~~대상 박스 **root SSH 열기** · scp 후 **CRLF 제거** | AL2023 은 root 로그인 차단이 기본 · Windows 작업 트리는 CRLF 라 `$''` 로 죽는다 |
 
-**2차 리허설 명령** (부하기에서, `-n` 없이) — 🔴 **아래 명령에 결함 둘이 있다. 그대로 쓰지 말 것.** `CORES_ARMS="C A"` 로는 **§T 가 안 돈다**(`TASKSET_ARM=B` 가 `ARMS` 에 없어 조용히 건너뛴다, [#260](https://github.com/Shadowfit/init/issues/260)) — 2차는 `"C A B"` 로 고쳐서 태웠다. `GHZ_TOKEN=<같음>` 은 **`INTERNAL_API_TOKEN`** 을 뜻하며, `AI_PUBLIC_TOKEN` 과 **같으면 AI 가 아예 안 뜬다**([#261](https://github.com/Shadowfit/init/issues/261) · #230 단언).
+**2차 리허설 명령** (부하기에서, `-n` 없이) — 아래는 **2차에서 실제로 태운 형태로 고쳐 둔 것**이다([#260](https://github.com/Shadowfit/init/issues/260) · [#261](https://github.com/Shadowfit/init/issues/261)). 물렸던 자리 둘을 남겨 둔다. ⑴ `CORES_ARMS` 에 **`B` 가 없으면 §T 가 안 돈다** — `TASKSET_ARM=B` 가 `ARMS` 에 없으면 실패가 아니라 `note` 경고 한 줄로 조용히 건너뛴다(#260). ⑵ `GHZ_TOKEN` 이 받는 것은 **`INTERNAL_API_TOKEN`** 이고, `AI_PUBLIC_TOKEN` 과 **같은 값을 넣으면 AI 가 아예 안 뜬다**(#230 단언 · #261).
 
 ```bash
-cd /root/init && sudo env   S3_BASE=s3://shadowfit-measure-055447613012/shadowfit TARGET_HOST=<대상 사설 IP>   TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>"   AI_PUBLIC_TOKEN=<대상 .env 와 같은 값> GHZ_TOKEN=<같음>   GHZ_RPS=19 GHZ_DATA=/root/batch_multi.json GHZ_BIN=/usr/local/bin/ghz   CORES_ARMS="C A" CORES_REH_LEVELS="5" CORES_ANCHOR=0   PHASES=coresidency_rehearsal nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+cd /root/init && sudo env   S3_BASE=s3://shadowfit-measure-055447613012/shadowfit TARGET_HOST=<대상 사설 IP>   TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>"   AI_PUBLIC_TOKEN=<대상 .env 의 AI_PUBLIC_TOKEN> GHZ_TOKEN=<대상 .env 의 INTERNAL_API_TOKEN>   GHZ_RPS=19 GHZ_DATA=/root/batch_multi.json GHZ_BIN=/usr/local/bin/ghz   CORES_ARMS="C A B" CORES_REH_LEVELS="5" CORES_ANCHOR=0   PHASES=coresidency_rehearsal nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
 
-팔을 `C A` 로 두는 이유는 **캡이 걸린 뒤 풀리는 전이**를 보기 위해서다(`STALE` 판정 경로).
+팔에 `C A` 가 들어가는 이유는 **캡이 걸린 뒤 풀리는 전이**를 보기 위해서고(`STALE` 판정 경로),
+`B` 는 ⑩(§T)가 돌게 하려고 붙인다([#260](https://github.com/Shadowfit/init/issues/260)).
 ⚠️ 이 명령은 **S3 없이** 도는 형태다 — 3번을 풀면 `PHASES` 에 `coresidency_preflight` 와
 `collect` 를 다시 넣는다.
 
