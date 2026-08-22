@@ -4,6 +4,7 @@ import com.shadowfit.dto.login.*;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.security.jwt.JwtUtil;
+import com.shadowfit.global.security.jwt.RefreshTokenHasher;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.RefreshToken;
@@ -40,7 +41,7 @@ public class MemberService{
     private final PoseDataRepository poseDataRepository;
     private final PoseDataCleanupService poseDataCleanupService;
     private final PasswordEncoder passwordEncoder;
-    private final com.shadowfit.global.security.jwt.RefreshTokenHasher refreshTokenHasher;
+    private final RefreshTokenHasher refreshTokenHasher;
 
     /**
      * 이 시간 동안 프레임 유입이 없으면 그 세션은 죽은 것으로 본다(탈퇴 가드 판정 기준).
