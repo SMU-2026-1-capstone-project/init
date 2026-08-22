@@ -70,7 +70,8 @@ bash loadtest/results/replication-2026-08-17/repl2_sweep.sh   # 본 측정
 필요 없는 percona-toolkit 이미지를 묻고, 정작 물어야 할 리플리카 도달성은 안 묻는다:
 
 ```bash
-OUTDIR=$PWD/loadtest/results/replication-aws-$(date +%F) S3_BASE=s3://버킷/shadowfit REPLICA_HOST=10.0.0.6 \
+OUTDIR=$PWD/loadtest/results/replication-aws-$(date +%F) \
+S3_BASE=s3://버킷/shadowfit REPLICA_HOST=10.0.0.6 \
 REPLICA_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@10.0.0.6" \
 REPL_AZ_MODE="same-az" PHASES="repl_preflight repl_gate repl collect" \
   nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &

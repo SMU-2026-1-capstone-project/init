@@ -142,7 +142,7 @@ curl -fsSL https://raw.githubusercontent.com/Shadowfit/init/main/loadtest/aws/bo
 bash bootstrap.sh
 
 cd /root/init
-OUTDIR=$PWD/loadtest/results/replication-aws-$(date +%F) S3_BASE=s3://내버킷/shadowfit nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+S3_BASE=s3://내버킷/shadowfit nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
 
 `nohup` 없이 `&` 만 붙이면 **SSH 가 끊길 때 같이 죽는다.** 그러면 컴퓨터를 못 끈다.
@@ -236,6 +236,7 @@ PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
 
 ```bash
 cd /root/init
+OUTDIR=$PWD/loadtest/results/replication-aws-$(date +%F) \
 S3_BASE=s3://내버킷/shadowfit \
 REPLICA_HOST=<리플리카 사설 IP> \
 REPLICA_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<리플리카 사설 IP>" \
