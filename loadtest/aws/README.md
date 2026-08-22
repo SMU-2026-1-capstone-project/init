@@ -142,7 +142,7 @@ curl -fsSL https://raw.githubusercontent.com/Shadowfit/init/main/loadtest/aws/bo
 bash bootstrap.sh
 
 cd /root/init
-S3_BASE=s3://내버킷/shadowfit nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+OUTDIR=$PWD/loadtest/results/replication-aws-$(date +%F) S3_BASE=s3://내버킷/shadowfit nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
 
 `nohup` 없이 `&` 만 붙이면 **SSH 가 끊길 때 같이 죽는다.** 그러면 컴퓨터를 못 끈다.
@@ -243,6 +243,12 @@ REPL_AZ_MODE="same-az(ap-northeast-2a)" \
 PHASES="repl_preflight repl_gate repl collect" \
   nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
+
+💡 **`OUTDIR` 을 명시하는 이유** — 안 줘도 [#366](https://github.com/Shadowfit/init/pull/366) 이후로는
+`PHASES` 에서 라운드를 추론하므로 **`online-ddl-…` 에 떨어지지는 않는다**([#358](https://github.com/Shadowfit/init/issues/358) 이 닫은 자리).
+다만 추론된 이름에는 `RUN_ID` 가 그대로 들어가 **`replication-aws-ec2-<타임스탬프>`** 가 된다
+(`run_all.sh:26` · `:107`). 기존 결과 디렉터리는 **`<라운드>-aws-<날짜>`** 로 서 있으므로
+(`coresidency-aws-2026-08-17` 등), 관례를 맞추려면 위처럼 **날짜로 직접 주는 편이 낫다.**
 
 `repl_gate` 가 무대를 세우고 게이트 G1~G3 을 본다. **실패하면 `repl` 을 건너뛴다** —
 계측(G3 양성 대조군)이 안 선 채로 잰 지연은 「복제의 성질」이 아니라 「무대의 결함」이다.
