@@ -155,6 +155,7 @@
 
 ### 4.5 AI 서버 (FastAPI)
 - `POST /pose` 단일 이미지 포즈 추정, `POST /sync` 싱크로율 계산, `POST /video/analyze` 기준 좌표 추출.
+  - 🔴 이 중 **실제로 불리는 것은 `/pose` 하나**다([#293](https://github.com/Shadowfit/init/issues/293)). `/sync`·`/video/analyze` 는 저장소 안에 호출자가 0건이고, 각각의 정본은 gRPC 경로(`SavePoseDataBatch`·`ExtractReferenceData`)에 있다. 지우지 않고 표시만 해 둔 상태다.
 - MediaPipe 33개 관절 추출 → 분석 대상 관절 각도 계산 → DTW로 기준 시퀀스와 정렬·비교 → 싱크로율 산출.
 
 ### 4.6 프론트엔드 (React Native / Expo)
@@ -367,7 +368,7 @@ ShadowFit은 카메라 한 대로 운동 자세를 정량 분석·교정하는 �
 | 피드백 템플릿 | `GET /exercises/{id}/feedback-templates` |
 | 리포트 | `GET /reports/weekly-summary`·`/calendar`·`/session/{id}`, `POST /reports/daily-logs` |
 | TTS/관리자 | `GET·PATCH /preferences/tts`, `PATCH /admin/exercises/{id}/thresholds` |
-| AI 서버 | `POST /pose`·`/sync`·`/video/analyze`, `GET /sync/onboarding-guide` |
+| AI 서버 | `POST /pose` (유일한 실사용) · 🔴 `/sync`·`/video/analyze`·`GET /sync/onboarding-guide` 는 호출자 0건 ([#293](https://github.com/Shadowfit/init/issues/293)) |
 
 ## 부록 B. 데이터베이스 스키마 요약
 
