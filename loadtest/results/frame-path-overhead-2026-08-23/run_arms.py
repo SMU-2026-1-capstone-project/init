@@ -61,6 +61,18 @@ def wait_health(deadline_sec=90):
     return False
 
 
+def fetch_snapshot():
+    """계측 스냅샷을 서버가 살아 있을 때 회수한다. 실패는 값이 아니라 사유로 남긴다."""
+    req = urllib.request.Request(
+        AI + "/api/v1/diag/frame-path",
+        headers={"Authorization": "Bearer " + PUBLIC_TOKEN})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read().decode())
+    except Exception as e:
+        return {"error": repr(e)}
+
+
 def boot(arm, sessions):
     env = dict(os.environ)
     env.update({
@@ -132,6 +144,9 @@ def main():
                                 "error": "boot-timeout"})
                 continue
             r = run_load(arm, rn, a.sessions, a.fps, a.dur)
+            # 🔴 서버를 내리기 **전에** 계측을 걷는다. 이건 프로세스 메모리라 종료와 함께
+            #    사라진다 — 첫 라운드(run1)가 정확히 이걸 안 해서 B 판 넷의 구간 분포를 버렸다.
+            r["frame_path"] = fetch_snapshot() if arm == "B" else None
             r.update({"n": i + 1, "arm": arm, "discard": discard})
             results.append(r)
             print("  " + json.dumps(
