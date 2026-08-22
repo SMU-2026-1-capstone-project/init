@@ -9,7 +9,6 @@ import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.RefreshToken;
 import com.shadowfit.model.member.UserRole;
-import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.member.RefreshTokenRepository;
@@ -38,7 +37,6 @@ public class MemberService{
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final SessionRepository sessionRepository;
-    private final PoseDataRepository poseDataRepository;
     private final PoseDataCleanupService poseDataCleanupService;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenHasher refreshTokenHasher;
@@ -350,6 +348,12 @@ public class MemberService{
      * <p>임계값의 기준은 배치 간격(~3~4초)이 아니라 <b>세트 간 휴식(최대 90초)</b>이다. 짧게 잡으면
      * 쉬는 중인 사용자를 죽은 것으로 오판해 <b>정말 운동 중인데 탈퇴가 통과</b>한다 — 그건 막으려던
      * 결함 그 자체라, 반대 방향 오판(죽은 세션 때문에 몇 분 더 기다림)보다 훨씬 나쁘다.
+     *
+     * <p>🔴 <b>"유입"을 세는 자리가 pose_data 가 아니다</b> (#317). 원안은 {@code pose_data.created_at}
+     * 하한을 셌는데, #188 멱등이 들어오면서 그 컬럼이 <b>세션 시작 시각으로 고정</b>됐다 — 한 세션의
+     * 모든 행이 같은 값을 갖는다. 그래서 가드가 묻던 질문이 "최근 180초 안에 프레임이 들어왔나"에서
+     * <b>"세션이 최근 180초 안에 시작됐나"</b>로 바뀌었고, 4분째 운동 중인 사용자가 그냥 통과했다
+     * (거짓 음성). 지금은 배치마다 갱신되는 {@code exercise_sessions.last_active_at} 을 본다.
      */
     private void requireNoActiveWorkout(Long memberId) {
         List<Long> inProgressIds =
@@ -359,7 +363,7 @@ public class MemberService{
         }
 
         LocalDateTime since = LocalDateTime.now().minusSeconds(activeWorkoutIdleSeconds);
-        if (poseDataRepository.countSince(inProgressIds, since) > 0) {
+        if (sessionRepository.countActiveSince(inProgressIds, since) > 0) {
             throw new BusinessException(ErrorCode.WITHDRAWAL_BLOCKED_BY_ACTIVE_SESSION);
         }
         // 유입이 끊긴 IN_PROGRESS 세션(앱이 죽은 좀비)은 막지 않는다 — 탈퇴를 진행하고,
