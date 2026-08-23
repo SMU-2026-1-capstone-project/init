@@ -298,14 +298,16 @@ ROLE=ai-venv bash bootstrap.sh
 cd /root/init
 nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py \
   --sessions 160 --dur 90 --pool 201 \
-  --plan "B,A,B,A@0.001,B@0.001,B@0.001,A@0.001,B,A" --discard 1 \
+  --plan "A,A,B,A@0.0005,A@0.05,B@0.0005,B,A@0.0005,A@0.05,B@0.0005,A,A@0.0005,A@0.05,B@0.0005,A,B,A@0.05,B@0.0005,A,B,A@0.0005,B@0.0005,A,B,A@0.0005,A@0.05" --discard 1 \
   --out loadtest/results/frame-path-r10a-$(date +%F) > /root/r10a.log 2>&1 &
 ```
 
 | | |
 |---|---|
 | 규모 | **160세션 · 90초 · 풀 201** — 기존 라운드와 같은 조건이라야 비교가 된다([설계 §8-2](../../docs/decisions/ai-receive-path-scaling.md)). rig 기본은 8세션·45초·풀=세션+4 라 **안 주면 다른 판**이다 |
-| 팔 | `@<초>` 가 `GIL_SWITCH_INTERVAL` 이다. **ON/OFF 앵커 판 한 장**을 끼울 것 — 계측 대가(≤2.4%)를 이 박스에서도 확인하는 자리 |
+| 팔 | **5팔 · 5×5 라틴 방격 + 버림 1 = 26판.** 격자의 정본은 [설계 §13](../../docs/decisions/ai-receive-path-scaling.md) 이고 **위 문자열은 그것을 그대로 옮긴 것**이다 — 여기서 고치지 말 것. `A`=계측 OFF · `B`=ON · `@<초>`=`GIL_SWITCH_INTERVAL` |
+| 팔의 뜻 | `A`(기준) · `B`(구간·`lease` + 앵커) · `A@0.0005`·`A@0.05`(GIL **양방향**) · `B@0.0005`(계측×GIL **상호작용**, 2×2 를 닫는 칸) |
+| ⏱ 소요 | 판당 120초면 **52분**, 160초면 **69분** — `setup`(160세션 여는 시간)이 미측정이라 **버림판이 처음 준다.** 인스턴스는 1.5시간으로 |
 | 🔴 **안 읽는 값** | `handler_concurrency` — 부하기가 동거해서 **절대값이 다친다.** R10-b(2대)의 몫이다(§7) |
 | 러너 | `run_all.sh` 를 **안 쓴다.** 프레임 경로 phase 가 아직 없다([#400](https://github.com/Shadowfit/init/issues/400) ①) — 회수는 손으로 |
 
