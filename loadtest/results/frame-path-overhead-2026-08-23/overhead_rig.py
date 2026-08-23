@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 import sys
 import threading
@@ -82,7 +83,11 @@ def classify(status, text):
 
 def open_sessions(grpc_addr, internal_token, session_ids, exercise_id):
     """Spring 이 하던 일을 그대로 한다 — gRPC StartAnalysis 로 풀에 자리를 만든다."""
-    sys.path.insert(0, "ai-server")
+    # 🔴 cwd 에 기대지 않는다. run_arms 는 repo 루트에서 부르지만 손으로 돌릴 때는
+    #    아무 데서나 부르고, 그때 생성된 proto 스텁을 못 찾아 `ImportError` 가 난다.
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__)))))
+    sys.path.insert(0, os.path.join(repo, "ai-server"))
     import grpc                                   # noqa: E402
     import exercise_pb2                           # noqa: E402
     import exercise_pb2_grpc                      # noqa: E402
