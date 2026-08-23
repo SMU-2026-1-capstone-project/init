@@ -1,0 +1,15 @@
+# 백엔드 로그 발췌 — 원본은 S3 (r276app-20260823-142440/r276app/backend.log, 꼬리 2000줄)
+
+## «Deadlock found» 건수 (이 발췌 범위)
+61
+
+## 재시도 로그(#276 문구) 건수
+0
+
+## 실패 메시지 유형
+     61 저장 실패: PreparedStatementCallback; ; Deadlock found when trying to get lock; try restarting transaction
+
+## 표본 3줄
+2026-08-23 14:29:21.216 ERROR [ult-executor-26] [grpc-in-93e14d2c2af9|915] c.s.s.Exercise.ExerciseGrpcService       : 저장 실패: PreparedStatementCallback; SQL [INSERT INTO pose_data (session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, smoothed_knee_angle, feedback_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE session_id = session_id]; Deadlock found when trying to get lock; try restarting transaction
+2026-08-23 14:29:21.216 ERROR [ult-executor-11] [grpc-in-6581d31e2370|999] c.s.s.Exercise.ExerciseGrpcService       : 저장 실패: PreparedStatementCallback; SQL [INSERT INTO pose_data (session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, smoothed_knee_angle, feedback_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE session_id = session_id]; Deadlock found when trying to get lock; try restarting transaction
+2026-08-23 14:29:21.219 ERROR [ault-executor-2] [grpc-in-4287093ebc6b|923] c.s.s.Exercise.ExerciseGrpcService       : 저장 실패: PreparedStatementCallback; SQL [INSERT INTO pose_data (session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, smoothed_knee_angle, feedback_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE session_id = session_id]; Deadlock found when trying to get lock; try restarting transaction
