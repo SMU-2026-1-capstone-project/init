@@ -90,6 +90,7 @@ if [ -z "$OUTDIR" ]; then
       repl|repl_gate|repl_preflight)       _r=replication ;;
       coresidency*)                        _r=coresidency ;;
       r276)                                _r=r276-newkeys ;;
+      r276app)                             _r=r276-app-retry ;;
       framepath*)                          _r=frame-path ;;
       *)                                   continue ;;   # preflight·ridealong·collect 는 라운드를 안 정한다
     esac
@@ -173,6 +174,22 @@ R276_ROUNDS=${R276_ROUNDS:-4}
 # 넘는 첫 칸과 겹쳤다(r276-worker-sweep-fine, «해석이지 실측이 아니다»). 4 vCPU 박스에서
 # 8 은 그 위다. 값을 바꾸면 팔 비교가 아니라 다른 라운드가 되므로 기본값을 박아둔다.
 R276_WORKERS=${R276_WORKERS:-8}
+
+# ── #276 ② 앱 경로 재시도 스윕 ──────────────────────────────────────────
+#
+# 배포된 상한이 동시성이 올라가도 버티는지를 **실제 코드 경로**로 잰다.
+# 이 단계는 ROLE=p6-target 박스를 전제한다 — Spring 이 떠 있고 세션 901~1000 이 시드돼 있어야
+# 한다. ghz 는 p6-loader 역할에만 깔리므로 여기서 없으면 직접 받는다(부트스트랩을 두 번
+# 돌리면 .env 가 다시 쓰이면서 토큰이 어긋난다 — 그 길로 가지 않는다).
+TIMEOUT_R276APP=${TIMEOUT_R276APP:-5400}
+R276APP_LEVELS=${R276APP_LEVELS:-"8 16 32"}
+R276APP_REQS=${R276APP_REQS:-500}
+R276APP_BLOCKS=${R276APP_BLOCKS:-4}
+R276APP_SESSIONS=${R276APP_SESSIONS:-901-1000}
+# 상한 팔 (#276 ②). 비어 있으면 상한을 안 건드린다 — 1·2차 라운드와 같은 동작이다.
+R276APP_RETRY_ARMS=${R276APP_RETRY_ARMS:-""}
+# 백오프 팔 (#276 ③ 후속). RETRY_ARMS 와 동시에 주면 rig 이 막는다.
+R276APP_BACKOFF_ARMS=${R276APP_BACKOFF_ARMS:-""}
 
 # ── 동거 용량 (主 P6) ────────────────────────────────────────────────────
 #
@@ -1210,6 +1227,45 @@ phase_r276() {
   return 0
 }
 
+# #276 ② — 상한이 동시성을 어디까지 버티나 (앱 경로)
+phase_r276app() {
+  local out=$OUTDIR/r276app
+  mkdir -p "$out"
+
+  # ghz — p6-target 에는 안 깔린다. 없으면 여기서 받는다(부트스트랩 재실행은 .env 를 다시 써서
+  # Spring 이 들고 있는 토큰과 어긋나게 만든다).
+  if ! command -v ghz >/dev/null 2>&1 && [ ! -x /usr/local/bin/ghz ]; then
+    note "ghz 가 없다 — 릴리스를 받는다 (v${GHZ_VERSION:-0.120.0})"
+    case "$(uname -m)" in x86_64) _a=x86_64 ;; aarch64) _a=arm64 ;; *) _a="" ;; esac
+    if [ -n "$_a" ] && curl -fsSL \
+        "https://github.com/bojand/ghz/releases/download/v${GHZ_VERSION:-0.120.0}/ghz-linux-${_a}.tar.gz" \
+        -o /tmp/ghz.tgz && tar -xzf /tmp/ghz.tgz -C /tmp ghz; then
+      install -m 0755 /tmp/ghz /usr/local/bin/ghz
+    else
+      note "🔴 ghz 설치 실패 — 이 단계는 잴 것이 없다"
+      return 1
+    fi
+  fi
+
+  timeout $TIMEOUT_R276APP env \
+      LEVELS="$R276APP_LEVELS" REQS="$R276APP_REQS" BLOCKS="$R276APP_BLOCKS" \
+      SESSIONS="$R276APP_SESSIONS" RETRY_ARMS="$R276APP_RETRY_ARMS" \
+      BACKOFF_ARMS="$R276APP_BACKOFF_ARMS" \
+      CONTAINER="$CONTAINER" DB_NAME="$DB_NAME" PW="$PW" OUT="$out" \
+      bash "$ROOT/loadtest/measure_r276_app_retry.sh" > "$out/run.log" 2>&1
+  local rc=$?
+
+  # 🔴 백엔드 로그도 걷는다 — 데드락 재시도는 WARN 으로 남고, 지표와 어긋나면 그 로그가 심판이다.
+  docker logs --tail 2000 shadowfit-backend > "$out/backend.log" 2>&1
+
+  if [ $rc -ne 0 ]; then
+    note "🔴 #276 ② 라운드 rc=$rc — run.log 를 볼 것"
+    return 1
+  fi
+  note "#276 ② 라운드 완료 — 레벨 «$R276APP_LEVELS» · 판당 $R276APP_REQS 요청"
+  return 0
+}
+
 # 조건 기록. «조건 없는 수치는 인용 불가» 라 이 파일이 없으면 측정도 반쪽이다.
 phase_collect() {
   local m=$OUTDIR/MANIFEST.txt
@@ -1385,6 +1441,7 @@ for p in $PHASES; do
         note "🔴 프레임 경로 라운드 실패 — 게이트가 막았거나 rig 이 죽었다. run_arms.log 를 볼 것"
       } ;;
     r276)      run_phase r276      phase_r276 ;;
+    r276app)   run_phase r276app   phase_r276app ;;
     ridealong) run_phase ridealong phase_ridealong ;;
     collect)   run_phase collect   phase_collect ;;
     *)         note "알 수 없는 단계 '$p' — 건너뛴다" ;;
