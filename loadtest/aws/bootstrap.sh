@@ -425,6 +425,20 @@ PY
   } > "$AI_COND"
   echo "  $AI_COND — 🔴 **결과 디렉터리에 같이 넣을 것**"
 
+  # ── 축 0: 박스 보정 (#255) ───────────────────────────────────────────
+  # 🔴 이 박스가 «초당 얼마나 일하는가» 를 앱과 무관하게 재둔다. 같은 CPU% 로 다른 양의
+  #    일을 하는 경우가 있고(터보·이웃 소음), P6 1·2라운드의 +17.7% 가 그 모양이었는데
+  #    **그때 이 값이 없어서 사후에 못 가른다.** 여기서 재두면 다음엔 가른다.
+  #    설계: docs/decisions/round-to-round-nonreproducibility.md §3 축 0. 소요 10~20초.
+  step "박스 보정 (#255 축 0)"
+  if "$AI_VENV/bin/python" "$WORKDIR/loadtest/calibrate_box.py" \
+       --tsv /root/calibration.tsv 2>&1 | sed 's/^/  /'; then
+    { echo; echo "--- 박스 보정 (#255 축 0) ---"; cat /root/calibration.tsv; } >> "$AI_COND"
+    echo "  조건 파일에 붙였다 — 이 값이 라운드를 건너 비교된다"
+  else
+    echo "  ⚠️ 보정 실패 — 값 없이 진행한다. 이 박스는 비재현이 나와도 못 가른다"
+  fi
+
   # 검출기 메모리는 실측값으로 미리 보여준다. 판정이 아니라 대조용이다 —
   # 풀을 얼마로 띄울지는 rig 인자(`--pool`)이고 이 스크립트가 안 정한다.
   awk -v mem="$(awk '/MemTotal/{print $2}' /proc/meminfo)" 'BEGIN{
