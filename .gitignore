@@ -58,6 +58,12 @@ backend/.settings/
 backend/.springBeans
 backend/.sts4-cache
 
+# ==================== Python 바이트코드 (저장소 전체) ====================
+# ai-server 밖에도 파이썬이 산다 — loadtest 의 rig·seed 스크립트가 그렇다.
+# 아래 ai-server 절의 규칙은 그 경로를 안 덮어서 rig 을 돌릴 때마다 __pycache__ 가 뜬다.
+__pycache__/
+*.pyc
+
 # ==================== AI Server (Python / FastAPI) ====================
 .venv/
 venv/
