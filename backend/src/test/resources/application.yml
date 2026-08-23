@@ -66,18 +66,32 @@ ai-server:
 # ⚠️ 이 목록은 main 의 application.yml 과 **별개 사본**이다. 한쪽만 고치면 테스트와 운영의
 # 인증 경계가 갈린다 — 실제로 /member/reissue(#135)를 main 에만 넣었다가 통합테스트가 전부
 # 401 로 떨어져서 알았다. 다행히 «테스트가 먼저 깨지는» 방향이라 조용히 지나가지는 않는다.
+#
+# 🔴 2026-08-23: 그 안전장치가 **다섯 항목에는 안 걸렸다**(#350). 「테스트가 먼저 깨진다」는
+#    그 경로를 **부르는 테스트가 있을 때만** 성립하는데, /swagger-ui.html · /webjars/** ·
+#    /actuator/* 를 치는 테스트가 하나도 없어서 조용히 갈려 있었다(운영 13 · 테스트 8).
+#    그래서 목록을 맞추는 것만으로는 부족하다 — 두 사본이 같은지 **단언하는 테스트**를 붙였다
+#    (SecurityWhitelistParityTest). 다음 드리프트는 그 테스트가 시끄럽게 깬다.
 security:
   whitelist:
     - "/"
     - "/error"
     - "/v3/api-docs/**"
     - "/swagger-ui/**"
+    - "/swagger-ui.html"
+    - "/webjars/**"
     - "/member/login"
     - "/member/signup"
     # access 가 만료된 상태로 불리는 것이 정상 경로라 permitAll 이 전제다 (이슈 #135).
     # 신원은 refresh token 의 서명에서 나온다 — decisions/token-lifecycle.md §4-2
     - "/member/reissue"
     - "/ws/**"
+    - "/actuator/health"
+    - "/actuator/health/**"
+    # 관리 포트를 분리해도 필터체인은 두 포트에 공유된다(2026-08-08 실측) — 그래서 permitAll 이
+    # 필요하다. 지표가 안 새는 근거는 인증이 아니라 **포트 경계**다(prod compose 가 9090 을
+    # 호스트에 매핑하지 않는다). main 쪽 주석에 그 실측 로그가 있다.
+    - "/actuator/prometheus"
 
 exercise:
   session:
