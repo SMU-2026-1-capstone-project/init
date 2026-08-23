@@ -2,6 +2,7 @@ package com.shadowfit.service.Member;
 
 import com.shadowfit.dto.login.*;
 import com.shadowfit.global.error.BusinessException;
+import com.shadowfit.global.security.ratelimit.LoginAttemptLimiter;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.security.jwt.JwtUtil;
 import com.shadowfit.global.security.jwt.RefreshTokenHasher;
@@ -40,6 +41,7 @@ public class MemberService{
     private final PoseDataCleanupService poseDataCleanupService;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenHasher refreshTokenHasher;
+    private final LoginAttemptLimiter loginAttemptLimiter;
 
     /**
      * 이 시간 동안 프레임 유입이 없으면 그 세션은 죽은 것으로 본다(탈퇴 가드 판정 기준).
@@ -71,12 +73,27 @@ public class MemberService{
     //로그인 로직
     @Transactional
     public LoginResponseDto login(LoginRequestDto dto){
-        Member member = memberRepository.findByEmail(dto.getEmail()).
-                orElseThrow(()-> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        // 계정 단위 시도 제한 (이슈 #394). IP 제한(AuthRateLimitFilter)이 «한 곳에서 여러 계정»
+        // 을 막는다면 이쪽은 «여러 곳에서 한 계정» 을 막는다 — 로그인 브루트포스의 실제 모양이
+        // 후자다. 조회·해시 검증보다 **먼저** 부른다: 막을 요청에 BCrypt 비용을 쓰지 않는다.
+        loginAttemptLimiter.checkOrThrow(dto.getEmail());
+
+        Member member = memberRepository.findByEmail(dto.getEmail())
+                .orElseGet(() -> {
+                    // 🔴 «없는 계정» 도 실패로 센다. 있는 계정과 한도가 다르면 그 차이가
+                    //    곧 계정 존재 여부 오라클이 된다.
+                    loginAttemptLimiter.recordFailure(dto.getEmail());
+                    throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+                });
 
         if(!passwordEncoder.matches(dto.getPassword(), member.getPassword())){
+            loginAttemptLimiter.recordFailure(dto.getEmail());
             throw new BusinessException(ErrorCode.LOGIN_INPUT_INVALID);
         }
+
+        // 성사됐다 = 이 계정을 두드리던 것이 아니었다. 창을 비워, 기기를 여러 대 쓰는
+        // 정상 사용자가 자기 실패 이력에 발목 잡히지 않게 한다.
+        loginAttemptLimiter.recordSuccess(dto.getEmail());
 
         CustomUserInfoDto info = CustomUserInfoDto.builder()
                 .email(member.getEmail())
