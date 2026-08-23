@@ -89,6 +89,7 @@ if [ -z "$OUTDIR" ]; then
       backup|backup_rehearsal|backup_real) _r=backup-restore ;;
       repl|repl_gate|repl_preflight)       _r=replication ;;
       coresidency*)                        _r=coresidency ;;
+      r276)                                _r=r276-newkeys ;;
       framepath*)                          _r=frame-path ;;
       *)                                   continue ;;   # preflight·ridealong·collect 는 라운드를 안 정한다
     esac
@@ -156,6 +157,22 @@ BACKUP_SESSIONS=${BACKUP_SESSIONS:-133334}       # 1억 행 (133,334 × 750)
 TIMEOUT_BACKUP_REAL=${TIMEOUT_BACKUP_REAL:-7200} # 2시간 (무대 ~1.5GB, 판 4개)
 BACKUP_REAL_SESSIONS=${BACKUP_REAL_SESSIONS:-1000}  # 1,000 × 750행 ≈ 75만 행 ≈ 1.5GB
 TIMEOUT_RIDEALONG=${TIMEOUT_RIDEALONG:-900}
+
+# ── #276 데드락 라운드 ──────────────────────────────────────────────────
+#
+# 로컬(2물리코어)에서 팔 4 × 4판이 십수 분이었다. 팔 2 × 4판이면 그보다 짧다 —
+# 아래 1시간은 «매달리면 끊는다» 용 상한이지 예상 시간이 아니다.
+#
+# 🔴 이 라운드가 AWS 로 올라온 이유는 «더 큰 박스» 가 아니라 **격리**다. 로컬은 다른 작업이
+#    같은 MySQL 을 쓰고 있어 팔 비교가 그 부하에 오염된다(2026-08-23).
+TIMEOUT_R276=${TIMEOUT_R276:-3600}
+R276_ARMS=${R276_ARMS:-"same_partition new_keys_only"}
+R276_ORDER=${R276_ORDER:-latin}
+R276_ROUNDS=${R276_ROUNDS:-4}
+# 워커 수는 **박스의 코어 수에 걸린다** — 로컬 판이 2→3 에서 13배 뛰었고 그 자리가 코어 수를
+# 넘는 첫 칸과 겹쳤다(r276-worker-sweep-fine, «해석이지 실측이 아니다»). 4 vCPU 박스에서
+# 8 은 그 위다. 값을 바꾸면 팔 비교가 아니라 다른 라운드가 되므로 기본값을 박아둔다.
+R276_WORKERS=${R276_WORKERS:-8}
 
 # ── 동거 용량 (主 P6) ────────────────────────────────────────────────────
 #
@@ -1160,6 +1177,39 @@ phase_framepath() {
   return 0
 }
 
+# #276 — «uk 있음 + 중복 0 + 같은 파티션» 칸을 채운다.
+#
+# 이 단계가 답하는 것은 **정상 트래픽(재전송 없음)도 데드락이 나는가** 하나다. 로컬 라운드의
+# 네 팔에는 그 칸이 없었고, 그 빈칸 탓에 조건 서술이 두 벌로 갈렸다(이슈 08-17 코멘트 ↔
+# r276-deadlock-2026-08-20 README §0). rig 헤더 ㅁ 참고.
+#
+# 대조군 `same_partition` 을 **같은 라운드에서 같이** 돌린다 — 08-20 은 다른 박스·다른 날이라
+# 절대 비율을 갖다 붙일 수 없다. 팔 비교의 기준선은 이 라운드 안에 있어야 한다.
+phase_r276() {
+  local out=$OUTDIR/r276
+  mkdir -p "$out"
+
+  # rig 은 자기 자리에서 `. ./.env` 를 읽고 `$CONTAINER` 로 MySQL 을 친다 — 부트스트랩이
+  # 만든 .env 의 MYSQL_ROOT_PASSWORD 가 $PW 와 같아야 도는데, 그건 bootstrap.sh 가 맞춰준다.
+  timeout $TIMEOUT_R276 env \
+      ARMS="$R276_ARMS" ORDER="$R276_ORDER" ROUNDS="$R276_ROUNDS" WORKERS="$R276_WORKERS" \
+      CONTAINER="$CONTAINER" OUT="$out" \
+      bash "$ROOT/loadtest/measure_r276_deadlock.sh" > "$out/run.log" 2>&1
+  local rc=$?
+
+  # 🔴 잠금 원문은 **판이 끝난 직후에만** 있다 — 다음 데드락이 덮어쓴다. 08-20 라운드는
+  #    이걸 손으로 떴는데, 무인 라운드에서 손은 없다. rc 와 무관하게 뜬다(실패한 판일수록 필요하다).
+  docker exec -i -e MYSQL_PWD=$PW $CONTAINER mysql -uroot $DB_NAME \
+      -e "SHOW ENGINE INNODB STATUS\G" > "$out/innodb-status.txt" 2>"$out/_stderr.log"
+
+  if [ $rc -ne 0 ]; then
+    note "🔴 #276 라운드 rc=$rc — run.log 를 볼 것 (표가 찍혔는지는 summary.md 로 판단)"
+    return 1
+  fi
+  note "#276 라운드 완료 — 팔 «$R276_ARMS» · $R276_ROUNDS판 · 순서 $R276_ORDER"
+  return 0
+}
+
 # 조건 기록. «조건 없는 수치는 인용 불가» 라 이 파일이 없으면 측정도 반쪽이다.
 phase_collect() {
   local m=$OUTDIR/MANIFEST.txt
@@ -1334,6 +1384,7 @@ for p in $PHASES; do
       run_phase framepath phase_framepath || {
         note "🔴 프레임 경로 라운드 실패 — 게이트가 막았거나 rig 이 죽었다. run_arms.log 를 볼 것"
       } ;;
+    r276)      run_phase r276      phase_r276 ;;
     ridealong) run_phase ridealong phase_ridealong ;;
     collect)   run_phase collect   phase_collect ;;
     *)         note "알 수 없는 단계 '$p' — 건너뛴다" ;;
