@@ -173,18 +173,21 @@ run_one(){ # $1=level $2=block → "level block ok internal other retried recove
 
   "$GHZ" --insecure --call ExerciseService.SavePoseDataBatch \
     --metadata-file "$SC/meta.json" --data-file "$DATA" \
-    -n "$REQS" -c "$c" -O json -o "$SC/ghz.$c.$blk.json" "$TARGET" >/dev/null 2>"$SC/ghz.err"
+    -n "$REQS" -c "$c" -O json -o "$SC/ghz.${CEILING}.$c.$blk.json" "$TARGET" >/dev/null 2>"$SC/ghz.err"
 
   r1=$(counter retried); c1=$(counter recovered); e1=$(counter exhausted)
 
   # ghz 의 상태 분포. python3 이 없으면 grep 으로 떨어진다 — 둘 다 없으면 «못 읽었다» 를 남긴다.
   local dist ok internal other
-  dist=$(python3 - "$SC/ghz.$c.$blk.json" <<'PY' 2>/dev/null
+  dist=$(python3 - "$SC/ghz.${CEILING}.$c.$blk.json" <<'PY' 2>/dev/null
 import json, sys
 d = json.load(open(sys.argv[1], encoding="utf-8")).get("statusCodeDistribution", {})
 ok = d.get("OK", 0)
-internal = d.get("Internal", 0)
-print(ok, internal, sum(v for k, v in d.items() if k not in ("OK", "Internal")))
+# 🔴 «실패» 칸은 Internal + Aborted 다. #453 이후 재시도 소진은 ABORTED 로 나간다 —
+#    Internal 만 세면 그 실패가 «그 외» 로 새고, 표의 잔여 실패율이 0.00% 로 찍힌다
+#    (2026-08-23 백오프 라운드가 정확히 그 얼굴이었다. exhausted 지표가 아니었으면 못 봤다).
+failed = d.get("Internal", 0) + d.get("Aborted", 0)
+print(ok, failed, sum(v for k, v in d.items() if k not in ("OK", "Internal", "Aborted")))
 PY
 )
   [ -n "$dist" ] || dist="- - -"
@@ -258,7 +261,7 @@ echo "(\`shadowfit.pose.deadlock.backoff-ms\` · \`.backoff-jitter\`), 붙었는
 echo "**라틴 방격은 백오프 쪽에 걸었다.** 상한은 배포 기본값(3) 고정."
 fi
 echo
-echo "| 팔 | 동시성 | 블록 | OK | Internal | 그 외 | retried | recovered | **exhausted** | 저장된 행 |"
+echo "| 팔 | 동시성 | 블록 | OK | 실패(Internal+Aborted) | 그 외 | retried | recovered | **exhausted** | 저장된 행 |"
 echo "|---|---|---|---|---|---|---|---|---|---|"
 awk 'NR>1 {printf "| %s | %s | %s | %s | %s | %s | %s | %s | **%s** | %s |%s\n",
      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10, ($3==0?" ← 버림":"")}' "$SC/raw.txt"

@@ -1,0 +1,27 @@
+# 백엔드 로그 발췌 — 원본은 S3 (r276bo-20260823-165413, 꼬리 2000줄 = 마지막 팔 50)
+
+## 재시도 로그의 간격 표기 (#276 ③ 후속 손잡이가 실제로 먹었는지)
+     27 간격 50ms
+
+## rig 의 팔 단언 (run.log)
+  [백오프 0] BACKOFF_MS=0 JITTER=false ✅
+  [백오프 10] BACKOFF_MS=10 JITTER=false ✅
+  [백오프 50] BACKOFF_MS=50 JITTER=false ✅
+  [백오프 50j] BACKOFF_MS=50 JITTER=true ✅
+  [백오프 10] BACKOFF_MS=10 JITTER=false ✅
+  [백오프 50] BACKOFF_MS=50 JITTER=false ✅
+  [백오프 50j] BACKOFF_MS=50 JITTER=true ✅
+  [백오프 0] BACKOFF_MS=0 JITTER=false ✅
+  [백오프 50] BACKOFF_MS=50 JITTER=false ✅
+  [백오프 50j] BACKOFF_MS=50 JITTER=true ✅
+  [백오프 0] BACKOFF_MS=0 JITTER=false ✅
+  [백오프 10] BACKOFF_MS=10 JITTER=false ✅
+  [백오프 50j] BACKOFF_MS=50 JITTER=true ✅
+  [백오프 0] BACKOFF_MS=0 JITTER=false ✅
+  [백오프 10] BACKOFF_MS=10 JITTER=false ✅
+  [백오프 50] BACKOFF_MS=50 JITTER=false ✅
+
+## ghz 상태 분포 — 소진이 ABORTED 로 나가는지 (#453 계약)
+블록1(팔 0)  Aborted 44 / OK 456
+블록2(팔 10) Aborted 48 / OK 452
+블록3(팔 50) Aborted 16 / OK 484
