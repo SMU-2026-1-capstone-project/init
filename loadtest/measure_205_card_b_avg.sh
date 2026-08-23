@@ -100,6 +100,43 @@ set_cover(){ # $1=1|0
   echo "  [단언] idx_report_cover 컬럼 수 = $have (want=$want)"
 }
 
+# ── 원상 복구 ────────────────────────────────────────────────────────────────
+#
+# 🔴 **이 rig 은 Flyway 가 소유한 `pose_data` 를 만진다** (#429). 위 `set_cover` 가 만든
+#    인덱스를 종료 시 되돌리지 않으면, 마지막으로 세운 상태가 그대로 남는다. 같은 종류의
+#    잔재가 실제로 사고를 냈다 — `measure_report_query_explain.sh` 가 남긴 `uk_pose_event`
+#    때문에 나중에 Flyway V6 가 `Duplicate key name` 으로 실패했고, 실패한 마이그레이션이
+#    이력에 success=0 으로 남아 **백엔드가 아예 안 떴다.**
+#
+#    여기는 더 새기 쉽다 — `set_cover` 의 단언이 불일치에서 `exit 1` 을 하므로, **중간에
+#    죽는 경로가 스크립트 안에 이미 있다.** 그 경로로 죽으면 인덱스가 확실히 남는다.
+#
+#    R8(`uk_index_ridealong.sh`)의 관례를 따른다 — trap 으로 되돌리고 **복구를 확인**한다.
+BASE_COVER=absent
+[ "$(have_cover)" = "0" ] || BASE_COVER=present
+
+restore_cover(){
+  local rc=$?
+  echo
+  echo "=== 스키마 원복 (시작 시점: idx_report_cover=$BASE_COVER) ==="
+  if [ "$BASE_COVER" = absent ]; then
+    [ "$(have_cover)" = "0" ] || DB -e "ALTER TABLE pose_data DROP INDEX idx_report_cover;"
+  else
+    [ "$(have_cover)" = "0" ] && DB -e "ALTER TABLE pose_data $COVER_DDL;"
+  fi
+
+  # 「되돌렸다」와 「되돌아갔다」는 다르다.
+  local now=absent
+  [ "$(have_cover)" = "0" ] || now=present
+  if [ "$now" = "$BASE_COVER" ]; then
+    echo "  복구 확인 (idx_report_cover=$now)"
+  else
+    echo "  🔴 복구 실패 — 손으로 확인할 것 (지금: idx_report_cover=$now)" >&2
+  fi
+  return $rc
+}
+trap restore_cover EXIT
+
 measure_curve(){ # $1=팔 라벨
 for ((r=0;r<REPEATS;r++)); do
   out=$(docker exec -i shadowfit-mysql mysql -N -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit 2>/dev/null <<'SQL'
