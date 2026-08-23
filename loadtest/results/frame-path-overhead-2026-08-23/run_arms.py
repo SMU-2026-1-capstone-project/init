@@ -47,6 +47,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 
@@ -143,6 +144,155 @@ def fetch_snapshot():
         return {"error": repr(e)}
 
 
+class CpuSampler(threading.Thread):
+    """프로세스 트리 CPU 를 `/proc` 에서 직접 샘플링한다.
+
+    ## 왜 이게 필요한가
+
+    기준 관측 「346 RPS 에 **8.69 vCPU**」는 `docker stats` 로 걷힌 값이다. 그런데 R10 은
+    **도커 없이 venv 로** 띄우므로 그 명령이 없다 — 대체 수단이 없으면 라운드가 «구간 비율»
+    만 답하고 **제목의 숫자를 못 만진다**(#400 ⑤).
+
+    ## 눈금을 맞춘다
+
+    `docker stats` 의 `CPU %` 는 **100% = 1 vCPU** 다. 여기서도 같은 뜻으로 낸다 —
+    `Δ(utime+stime) / SC_CLK_TCK / Δ실시간`. 표를 나란히 놓을 수 있어야 한다.
+
+    ## 부하기도 같이 잰다
+
+    R10-a 는 **1대 동거**라 부하기가 같은 박스의 CPU 를 먹는다. 그 크기는
+    `r10-loadgen-topology.md` §8 이 **「잰 적이 없다」**로 열어둔 자리다 — 다른 박스에서
+    걷힌 0.5~1.4 vCPU 는 «그 박스에서» 잰 값이라 그대로 못 옮긴다. 여기서 처음 걷는다.
+
+    🔴 **트리로 센다.** 루트 프로세스만 보면 자식이 쓴 CPU 가 빠지는데, rig 은 부하기를
+    자식 프로세스로 띄운다. 매 틱 `/proc/*/stat` 를 훑어 부모-자식을 이어 합산한다.
+    """
+
+    def __init__(self, interval=1.0):
+        super().__init__(daemon=True)
+        self.interval = interval
+        self.roots: dict[str, int] = {}
+        self.samples: list[dict] = []
+        self.error = None
+        # 🔴 이름이 `_stop` 이면 안 된다 — `threading.Thread._stop()` 을 덮어써서
+        #    `join()` 이 «Event object is not callable» 로 죽는다(리눅스에서 실측).
+        self._done = threading.Event()
+        self._t0 = None
+        self._clk = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") else 100
+
+    # ── /proc 읽기 ──────────────────────────────────────────────────────
+    @staticmethod
+    def _procs():
+        """{pid: (ppid, utime+stime ticks)}. 읽는 중 사라지는 프로세스는 건너뛴다."""
+        out = {}
+        for name in os.listdir("/proc"):
+            if not name.isdigit():
+                continue
+            try:
+                with open(f"/proc/{name}/stat", "rb") as f:
+                    raw = f.read().decode("utf-8", "replace")
+            except OSError:
+                continue                      # 샘플 사이에 죽은 프로세스 — 정상이다
+            # comm 에 공백·괄호가 들어갈 수 있어 마지막 ')' 뒤부터 자른다
+            try:
+                rest = raw[raw.rindex(")") + 2:].split()
+                out[int(name)] = (int(rest[1]), int(rest[11]) + int(rest[12]))
+            except (ValueError, IndexError):
+                continue
+        return out
+
+    @staticmethod
+    def _box_busy():
+        """박스 전체가 «일한» 누적 tick (idle·iowait 제외)."""
+        with open("/proc/stat", "rb") as f:
+            f0 = f.readline().decode().split()
+        v = [int(x) for x in f0[1:]]
+        # user nice system idle iowait irq softirq steal ...
+        return sum(v) - v[3] - (v[4] if len(v) > 4 else 0)
+
+    def _tree_ticks(self, procs):
+        """루트별 자손 합. 부모→자식 맵을 만들어 훑는다."""
+        kids: dict[int, list[int]] = {}
+        for pid, (ppid, _) in procs.items():
+            kids.setdefault(ppid, []).append(pid)
+        res = {}
+        for name, root in self.roots.items():
+            total, stack, seen = 0, [root], set()
+            while stack:
+                pid = stack.pop()
+                if pid in seen:
+                    continue
+                seen.add(pid)
+                if pid in procs:
+                    total += procs[pid][1]
+                    stack.extend(kids.get(pid, ()))
+            res[name] = total
+        return res
+
+    # ── 수명 ────────────────────────────────────────────────────────────
+    def track(self, name, pid):
+        self.roots[name] = pid
+
+    def stop(self):
+        self._done.set()
+
+    def run(self):
+        if not os.path.isdir("/proc"):
+            # 🔴 값이 아니라 «사유» 를 남긴다. 로컬(Windows)에서는 이 샘플러가 못 돈다.
+            self.error = "no-procfs"
+            return
+        try:
+            prev_p, prev_b, prev_t = self._procs(), self._box_busy(), time.monotonic()
+        except Exception as e:                 # noqa: BLE001
+            self.error = repr(e)
+            return
+        self._t0 = prev_t
+        while not self._done.wait(self.interval):
+            try:
+                cur_p, cur_b, cur_t = self._procs(), self._box_busy(), time.monotonic()
+            except Exception as e:             # noqa: BLE001
+                self.error = repr(e)
+                return
+            dt = cur_t - prev_t
+            if dt <= 0:
+                continue
+            a, b = self._tree_ticks(prev_p), self._tree_ticks(cur_p)
+            row = {"t_rel": round(cur_t - self._t0, 2)}
+            for name in self.roots:
+                row[name] = round(max(0, b.get(name, 0) - a.get(name, 0)) / self._clk / dt, 3)
+            row["box"] = round(max(0, cur_b - prev_b) / self._clk / dt, 3)
+            self.samples.append(row)
+            prev_p, prev_b, prev_t = cur_p, cur_b, cur_t
+
+    # ── 요약 ────────────────────────────────────────────────────────────
+    def summary(self, warmup=0.0):
+        """단위는 **vCPU**(= docker stats 의 100%). 워밍업 구간은 버린다.
+
+        🔴 워밍업을 안 버리면 **검출기 지연 생성**이 평균에 섞인다 — 그 구간은
+        «부하를 처리하는 CPU» 가 아니라 «검출기를 만드는 CPU» 다.
+        """
+        if self.error:
+            return {"error": self.error}
+        kept = [s for s in self.samples if s["t_rel"] >= warmup]
+        if not kept:
+            return {"error": "no-samples", "raw": len(self.samples)}
+
+        def stat(key):
+            v = sorted(s[key] for s in kept if key in s)
+            if not v:
+                return None
+            mid = v[len(v) // 2] if len(v) % 2 else (v[len(v) // 2 - 1] + v[len(v) // 2]) / 2
+            return {"mean": round(sum(v) / len(v), 2), "p50": round(mid, 2), "peak": v[-1]}
+
+        out = {"unit": "vCPU (100% = 1코어, docker stats 와 같은 눈금)",
+               "interval": self.interval, "warmup_dropped": len(self.samples) - len(kept),
+               "n": len(kept), "ncpu": os.cpu_count()}
+        for name in list(self.roots) + ["box"]:
+            out[name] = stat(name)
+        out["series"] = kept
+        return out
+
+
 def boot(arm, pool, bind):
     metrics, gil = parse_arm(arm)
     env = dict(os.environ)
@@ -166,24 +316,30 @@ def boot(arm, pool, bind):
     return p, log
 
 
-def run_load(arm, round_no, sessions, fps, dur):
+def run_load(arm, round_no, sessions, fps, dur, warmup, sampler=None):
     label = f"{arm_slug(arm)}_r{round_no}"
     out_tsv = os.path.join(OUT, f"raw_{label}.tsv")
-    cp = subprocess.run(
+    # 🔴 run() 이 아니라 Popen 이다 — **부하기 자신의 pid** 가 필요하다. 1대 동거에서는
+    #    부하기가 재려는 박스의 CPU 를 먹고, 그 크기가 아직 «미측정» 이다(무대 문서 §8).
+    proc = subprocess.Popen(
         [PY, RIG, "--ai", AI, "--grpc", f"127.0.0.1:{GRPC_PORT}",
          "--token", PUBLIC_TOKEN, "--internal-token", INTERNAL_TOKEN,
          "--frames", FRAMES, "--sessions", str(sessions), "--fps", str(fps),
-         "--dur", str(dur), "--label", label, "--out", out_tsv],
-        cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+         "--dur", str(dur), "--warmup", str(warmup), "--label", label, "--out", out_tsv],
+        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, encoding="utf-8",
     )
-    if cp.returncode != 0:
-        return {"label": label, "error": cp.returncode, "stderr": (cp.stderr or "")[-500:]}
-    line = [l for l in (cp.stdout or "").splitlines() if l.startswith("{")]
+    if sampler is not None:
+        sampler.track("rig", proc.pid)
+    out, err = proc.communicate()
+    if proc.returncode != 0:
+        return {"label": label, "error": proc.returncode, "stderr": (err or "")[-500:]}
+    line = [l for l in (out or "").splitlines() if l.startswith("{")]
     if not line:
-        return {"label": label, "error": "no-json", "stderr": (cp.stderr or "")[-500:]}
+        return {"label": label, "error": "no-json", "stderr": (err or "")[-500:]}
     d = json.loads(line[-1])
-    if cp.stderr:
-        d["stderr_tail"] = cp.stderr.strip()[-300:]
+    if err:
+        d["stderr_tail"] = err.strip()[-300:]
     return d
 
 
@@ -210,6 +366,10 @@ def main():
                     help="앞에서 버릴 판 수")
     ap.add_argument("--settle", type=float, default=3.0,
                     help="판 사이 대기(초) — 포트·검출기 정리 여유")
+    ap.add_argument("--warmup", type=float, default=5.0,
+                    help="부하기가 표에서 버릴 앞 구간(초). CPU 요약도 같은 구간을 버린다")
+    ap.add_argument("--cpu-interval", type=float, default=1.0, dest="cpu_interval",
+                    help="CPU 샘플링 간격(초). /proc 가 없으면 샘플러는 사유만 남긴다")
     a = ap.parse_args()
     OUT, TAG = a.out, a.tag
     HTTP_PORT, GRPC_PORT = a.http_port, a.grpc_port
@@ -242,7 +402,17 @@ def main():
                 results.append({"n": i + 1, "arm": arm, "discard": discard,
                                 "error": "boot-timeout"})
                 continue
-            r = run_load(arm, rn, a.sessions, a.fps, a.dur)
+            # CPU 샘플러는 **헬스 통과 뒤** 시작한다 — 기동·모델 로드는 이 판의 부하가 아니다.
+            sampler = CpuSampler(a.cpu_interval)
+            sampler.track("ai", p.pid)
+            sampler.start()
+            r = run_load(arm, rn, a.sessions, a.fps, a.dur, a.warmup, sampler)
+            sampler.stop()
+            sampler.join(timeout=10)
+            # 🔴 샘플러의 t0 는 «부하기 프로세스 시작» 이고, 부하기의 t0 는 «세션을 다 연 뒤» 다.
+            #    그 사이(setup_sec)를 안 빼면 세션 여는 구간이 평균에 섞인다. 부하기가 그 값을
+            #    돌려주므로 추론하지 않고 받아서 쓴다.
+            r["cpu"] = sampler.summary((r.get("setup_sec") or 0.0) + a.warmup)
             # 🔴 서버를 내리기 **전에** 계측을 걷는다. 이건 프로세스 메모리라 종료와 함께
             #    사라진다 — 첫 라운드(run1)가 정확히 이걸 안 해서 B 판 넷의 구간 분포를 버렸다.
             r["frame_path"] = fetch_snapshot() if parse_arm(arm)[0] else None

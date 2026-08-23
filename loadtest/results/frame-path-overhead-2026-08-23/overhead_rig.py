@@ -171,6 +171,11 @@ def main():
     ap.add_argument("--out", default="")
     a = ap.parse_args()
 
+    # 🔴 프로세스가 시작한 시각. 아래 t0(= 부하 시작)와의 차이를 `setup_sec` 로 돌려준다 —
+    #    밖에서 도는 CPU 샘플러는 «이 프로세스가 뜬 때» 를 기준으로 재므로, 세션을 여는
+    #    구간을 빼려면 그 차이를 알아야 한다. 추론하게 두지 않고 잰 값을 준다.
+    proc_t0 = time.monotonic()
+
     frames = json.load(open(a.frames, encoding="utf-8"))["frames"]
     sids = list(range(a.first_sid, a.first_sid + a.sessions))
 
@@ -213,6 +218,8 @@ def main():
         "fps_target": a.fps,
         "dur": a.dur,
         "warmup_dropped": len(rows) - len(kept),
+        # 프로세스 시작 → 부하 시작. 세션 여는 데 걸린 시간이다(160세션이면 짧지 않다).
+        "setup_sec": round(t0 - proc_t0, 2),
         "span_sec": round(span, 2),
         "requests": len(kept),
         "processed_fps": round(processed / span, 2) if span > 0 else None,
