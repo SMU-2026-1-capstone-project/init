@@ -103,7 +103,7 @@ public class ReportService {
                 log.warn("세션 {} detailed_analysis 파싱 실패 — pose_data 즉석 재계산으로 대체", session.getId(), e);
             }
         }
-        List<PoseFrameProjection> poseFrames = poseDataRepository.findFramesBySessionId(session.getId());
+        List<PoseFrameProjection> poseFrames = poseDataRepository.findFramesBySessionId(session.getId(), session.getStartTime());
         return new SessionDetailedAnalysis(
                 sessionAnalysisCalculator.calculate(session, poseFrames),
                 sessionAnalysisCalculator.calculateRepTrend(poseFrames));

@@ -417,7 +417,7 @@ public class ExerciseAnalysisService {
 
         // 완료된 rep 은 세션 진행 중에 이미 pose_data 로 넘어와 있다(§3-2). AI 메모리가 날아가도
         // 여기서 되찾을 수 있다는 것이 재부착이 성립하는 근거다.
-        int restoredRepCount = poseDataRepository.findMaxRepNumberBySessionId(sessionId);
+        int restoredRepCount = poseDataRepository.findMaxRepNumberBySessionId(sessionId, session.getStartTime());
 
         // 시간 축도 rep 축과 똑같이 이어붙여야 한다 (이슈 #156). AI 는 프레임 시각을 «첫 프레임
         // 도착부터의 경과» 로 만드는데, 재부착으로 상태를 새로 만들면 그 기준이 재부착 시점이 되어
@@ -430,7 +430,7 @@ public class ExerciseAnalysisService {
         // session.start_time 기준 경과로 계산하면 안 된다(초판이 그렇게 했다가 고쳤다). 그건 원점이
         // «세션 생성» 이라, AI 가 «운동 시간이 아니다» 라며 의도적으로 뺀 자세 잡는 시간이 다시
         // 들어간다. 준비에 20초 걸린 세션이면 재부착 이후 시각이 통째로 20초 앞서 표시된다.
-        double elapsedSec = poseDataRepository.findMaxTimestampSecBySessionId(sessionId);
+        double elapsedSec = poseDataRepository.findMaxTimestampSecBySessionId(sessionId, session.getStartTime());
 
         // AI 는 세션 종료 뒤 상태를 버린다 — 재부착으로 상태를 다시 세울 때 nonce 도 같이
         // 실어야 «검증은 켜졌는데 보관값이 없는» 상태가 안 된다 (#187 (d)).

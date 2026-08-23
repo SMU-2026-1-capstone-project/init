@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -79,7 +80,7 @@ class ReattachFailurePathTest {
         // 테스트의 관심사가 아니고, 리포지토리가 전부 mock 이라 동작은 같다.
         ReflectionTestUtils.setField(service, "self", service);
         when(sessionService.findReattachableSession(SESSION_ID, MEMBER_ID)).thenReturn(session());
-        when(poseDataRepository.findMaxRepNumberBySessionId(SESSION_ID)).thenReturn(3);
+        when(poseDataRepository.findMaxRepNumberBySessionId(eq(SESSION_ID), any())).thenReturn(3);
         when(referenceRepository.findByExerciseId(anyLong())).thenReturn(List.of());
     }
     private Session session() {
@@ -185,7 +186,7 @@ class ReattachFailurePathTest {
         double lastRecorded = 160.0;
         when(sessionService.findReattachableSession(SESSION_ID, MEMBER_ID))
                 .thenReturn(sessionStartedMinutesAgo(3));
-        when(poseDataRepository.findMaxTimestampSecBySessionId(SESSION_ID)).thenReturn(lastRecorded);
+        when(poseDataRepository.findMaxTimestampSecBySessionId(eq(SESSION_ID), any())).thenReturn(lastRecorded);
         when(blockingStub.reattachAnalysis(any(ReattachRequest.class)))
                 .thenReturn(ReattachResponse.newBuilder()
                         .setSuccess(true).setSessionId(SESSION_ID).setRepCount(3).build());
@@ -213,7 +214,7 @@ class ReattachFailurePathTest {
     void 프레임없는세션은_경과가0() {
         when(sessionService.findReattachableSession(SESSION_ID, MEMBER_ID))
                 .thenReturn(sessionStartedMinutesAgo(3));
-        when(poseDataRepository.findMaxTimestampSecBySessionId(SESSION_ID)).thenReturn(0.0);
+        when(poseDataRepository.findMaxTimestampSecBySessionId(eq(SESSION_ID), any())).thenReturn(0.0);
         when(blockingStub.reattachAnalysis(any(ReattachRequest.class)))
                 .thenReturn(ReattachResponse.newBuilder()
                         .setSuccess(true).setSessionId(SESSION_ID).setRepCount(0).build());

@@ -108,7 +108,10 @@ class ExerciseSessionFlowIntegrationTest {
                 .member(testMember)
                 .exercise(testExercise)
                 .referenceSource("https://youtu.be/dummy")
-                .startTime(LocalDateTime.now())
+                // 초 이하를 버린다 — 프로덕션(SessionService.createSession)이 하는 것과 같다.
+                // 이 값이 pose_data 의 멱등 앵커이자 파티션 키라, 안 자르면 H2 가 나노초를 살려 둬서
+                // 앵커 등호 조회(#392)가 0행을 받는다.
+                .startTime(LocalDateTime.now().withNano(0))
                 .status(Status.IN_PROGRESS)
                 .totalReps(0)
                 .difficultyLevel(1)
@@ -491,7 +494,7 @@ class ExerciseSessionFlowIntegrationTest {
             // given: 같은 회원·같은 운동으로 먼저 끝난 세션(older, avg 70) → 나중에 끝난 세션(newer, avg 80)
             Session olderSession = sessionRepository.saveAndFlush(Session.builder()
                     .member(testMember).exercise(testExercise)
-                    .startTime(LocalDateTime.now().minusHours(2))
+                    .startTime(LocalDateTime.now().withNano(0).minusHours(2))
                     .status(Status.IN_PROGRESS).totalReps(0).difficultyLevel(1)
                     .build());
             @SuppressWarnings("unchecked")
@@ -500,7 +503,7 @@ class ExerciseSessionFlowIntegrationTest {
 
             Session newerSession = sessionRepository.saveAndFlush(Session.builder()
                     .member(testMember).exercise(testExercise)
-                    .startTime(LocalDateTime.now().minusMinutes(10))
+                    .startTime(LocalDateTime.now().withNano(0).minusMinutes(10))
                     .status(Status.IN_PROGRESS).totalReps(0).difficultyLevel(1)
                     .build());
             @SuppressWarnings("unchecked")

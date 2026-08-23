@@ -94,7 +94,7 @@ class ReattachTimeoutRaceTest {
                 .plusSeconds(3);
         return sessionRepository.saveAndFlush(Session.builder()
                 .member(owner).exercise(exercise)
-                .startTime(startTime).status(Status.IN_PROGRESS).endTime(null)
+                .startTime(startTime.withNano(0)).status(Status.IN_PROGRESS).endTime(null)
                 .totalReps(0).difficultyLevel(1).build());
     }
 
@@ -163,7 +163,7 @@ class ReattachTimeoutRaceTest {
         // 훑지 않는 고아 행이 됐다(#77/#87). 이제 status 가드(#187 (b))가 그 창을 닫는다.
         poseDataService.savePoseDataBatch(s.getId(), batch(1, 10));
 
-        int rows = poseDataRepository.findFramesBySessionId(s.getId()).size();
+        int rows = poseDataRepository.findFramesBySessionId(s.getId(), s.getStartTime()).size();
         assertThat(rows)
                 .as("savePoseDataBatch 는 IN_PROGRESS 가 아니면 버린다 — FAILED 세션에 고아 행이 안 쌓인다")
                 .isZero();

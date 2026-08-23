@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -52,6 +53,8 @@ class PoseDataCleanupServiceTest {
 
     private Long memberId;
     private Long exerciseId;
+    @Autowired private JdbcTemplate jdbcTemplate;
+
     private Session targetSession;
     private Session otherSession;
 
@@ -69,10 +72,10 @@ class PoseDataCleanupServiceTest {
         exerciseId = exercise.getId();
 
         targetSession = sessionRepository.saveAndFlush(Session.builder()
-                .member(member).exercise(exercise).startTime(LocalDateTime.now())
+                .member(member).exercise(exercise).startTime(LocalDateTime.now().withNano(0))
                 .status(Status.COMPLETED).totalReps(5).build());
         otherSession = sessionRepository.saveAndFlush(Session.builder()
-                .member(member).exercise(exercise).startTime(LocalDateTime.now())
+                .member(member).exercise(exercise).startTime(LocalDateTime.now().withNano(0))
                 .status(Status.COMPLETED).totalReps(5).build());
 
         poseDataRepository.saveAndFlush(PoseData.builder()
@@ -81,6 +84,21 @@ class PoseDataCleanupServiceTest {
         poseDataRepository.saveAndFlush(PoseData.builder()
                 .session(otherSession).timestampSec(0.0).jointCoordinates("{}")
                 .syncRate(70.0).build());
+
+        // created_at 을 세션 시작 시각으로 맞춘다 — 프로덕션 계약을 픽스처에서 재현하는 것이다.
+        //
+        // 엔티티는 이 컬럼을 insertable=false 로 막아 뒀고(PoseData 필드 주석), 실제 쓰기는
+        // PoseDataService 의 JdbcTemplate 배치가 «세션 시작 시각» 을 명시적으로 넣는다(#188 앵커).
+        // 즉 JPA 로 만든 픽스처 행은 그 값이 비어 있어, 앵커 등호로 조회하는 쿼리(#392)에
+        // 안 잡힌다. 여기서 채워야 픽스처가 «실제로 저장되는 행» 과 같은 모양이 된다.
+        anchorPoseRows(targetSession);
+        anchorPoseRows(otherSession);
+    }
+
+    /** {@link #setUp()} 주석 참고 — JPA 픽스처가 못 넣는 앵커를 네이티브로 채운다. */
+    private void anchorPoseRows(Session session) {
+        jdbcTemplate.update("UPDATE pose_data SET created_at = ? WHERE session_id = ?",
+                session.getStartTime(), session.getId());
     }
 
     @AfterEach
@@ -123,9 +141,9 @@ class PoseDataCleanupServiceTest {
         cleanupService.cleanupBySessionIds(List.of(targetSession.getId()));
 
         await().atMost(java.time.Duration.ofSeconds(3)).untilAsserted(() ->
-                assertThat(poseDataRepository.findFramesBySessionId(targetSession.getId())).isEmpty()
+                assertThat(poseDataRepository.findFramesBySessionId(targetSession.getId(), targetSession.getStartTime())).isEmpty()
         );
-        assertThat(poseDataRepository.findFramesBySessionId(otherSession.getId())).hasSize(1);
+        assertThat(poseDataRepository.findFramesBySessionId(otherSession.getId(), otherSession.getStartTime())).hasSize(1);
     }
 
     @Test
@@ -136,7 +154,7 @@ class PoseDataCleanupServiceTest {
         cleanupService.cleanupBySessionIds(List.of());
         cleanupService.cleanupBySessionIds(null);
 
-        assertThat(poseDataRepository.findFramesBySessionId(targetSession.getId())).hasSize(1);
-        assertThat(poseDataRepository.findFramesBySessionId(otherSession.getId())).hasSize(1);
+        assertThat(poseDataRepository.findFramesBySessionId(targetSession.getId(), targetSession.getStartTime())).hasSize(1);
+        assertThat(poseDataRepository.findFramesBySessionId(otherSession.getId(), otherSession.getStartTime())).hasSize(1);
     }
 }
