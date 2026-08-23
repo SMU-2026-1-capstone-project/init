@@ -31,7 +31,14 @@
 #
 # 2GB 버퍼풀을 인덱스만으로 넘기려면 엔트리 ~33B 기준 6,500만 행이 필요하다(시딩 몇 시간).
 # 우리가 원하는 것은 절대값이 아니라 **체제**이고, 두 팔이 같은 데이터를 쓰므로 버퍼풀을
-# 줄여도 델타 귀속은 그대로 성립한다. 그래서 `innodb_buffer_pool_size` 를 낮춘다.
+# 줄여도 델타 귀속은 그대로 성립한다. 그래서 버퍼풀을 낮춘다.
+#
+# 🔴 **`SET GLOBAL` 로는 못 줄인다** (2026-08-23 실측). MySQL 8 은 버퍼풀을
+#    `chunk_size × instances` 단위로만 바꾸는데 기본이 128MB × 8 = **1GB** 라, 128MB 를
+#    요청해도 **조용히 무시되고 2GB 그대로**였다(그 판은 게이트가 «성립 안 함» 으로 잡았다 —
+#    그래서 이게 판정이 아니라 게이트다). chunk·instances 는 **시작 인자**라 동적으로 못 바꾼다.
+#    그래서 이 rig 은 **전용 컨테이너를 작은 풀로 띄운다**(sweep/race 컨테이너 선례와 같은 방식).
+#    부수 이득: GLOBAL STATUS 가 서버 전역이라 다른 작업과 지표가 안 섞인다.
 #
 # 🔴 **게이트**: 판마다 `Innodb_buffer_pool_reads` 증분이 0 이면 그 판은 «성립 안 함» 이다.
 #    R8 이 정확히 그 자리에서 «메모리 안» 만 재고 끝났다 — 그러니 이건 판정이 아니라 게이트다.
@@ -50,7 +57,12 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 set -a; . ./.env; set +a
 
-CONTAINER=${CONTAINER:-shadowfit-mysql}
+SRC_CONTAINER=${CONTAINER:-shadowfit-mysql}   # 스키마를 가져올 곳 (Flyway 가 돈 컨테이너)
+OWN_CONTAINER=${OWN_CONTAINER:-1}            # 전용 컨테이너를 띄운다 (버퍼풀을 시작 인자로 주려고)
+CONTAINER=${UKBP_CONTAINER:-shadowfit-ukbp-mysql}
+CHUNK_MB=${CHUNK_MB:-32}                     # 풀 크기의 배수 단위 — 이걸 줄여야 작은 풀이 가능하다
+INSTANCES=${INSTANCES:-1}
+MYSQL_IMAGE=${MYSQL_IMAGE:-mysql:8.0}
 DB_NAME=${DB_NAME:-shadowfit}
 PW=${PW:-${MYSQL_ROOT_PASSWORD:-1234}}
 
@@ -68,8 +80,35 @@ mkdir -p "$OUT"
 DB(){ docker exec -i -e MYSQL_PWD="$PW" "$CONTAINER" mysql -uroot -N "$DB_NAME" "$@" 2>/dev/null; }
 die(){ echo "🔴 중단 — $*" >&2; exit 1; }
 
-echo "## [0] 무대 — 격리 테이블 $TABLE (실 pose_data 는 안 건드린다)"
-DB -e "CREATE TABLE IF NOT EXISTS $TABLE LIKE pose_data;" || die "테이블 생성 실패"
+SRC(){ docker exec -i -e MYSQL_PWD="$PW" "$SRC_CONTAINER" mysql -uroot -N "$DB_NAME" "$@" 2>/dev/null; }
+
+if [ "$OWN_CONTAINER" = "1" ]; then
+  echo "## [0-a] 전용 MySQL — 버퍼풀 ${POOL_MB}MB (chunk ${CHUNK_MB}MB × instances $INSTANCES)"
+  docker rm -f "$CONTAINER" >/dev/null 2>&1
+  docker run -d --name "$CONTAINER" -e MYSQL_ROOT_PASSWORD="$PW" -e MYSQL_DATABASE="$DB_NAME"     "$MYSQL_IMAGE"     --innodb-buffer-pool-size=$(( POOL_MB * 1024 * 1024 ))     --innodb-buffer-pool-chunk-size=$(( CHUNK_MB * 1024 * 1024 ))     --innodb-buffer-pool-instances=$INSTANCES >/dev/null || die "전용 컨테이너 기동 실패"
+
+  # 🔴 «떴다» 는 ping 이 아니라 **인증된 질의**로 본다 — 초기화 임시 서버에 속지 않으려는 것이다
+  #    (#275 ② 가 같은 자리에서 라운드를 둘 태웠다).
+  hits=0
+  for _ in $(seq 1 90); do
+    if DB -e "SELECT 1" >/dev/null 2>&1; then hits=$(( hits + 1 )); [ "$hits" -ge 2 ] && break; else hits=0; fi
+    sleep 5
+  done
+  [ "$hits" -ge 2 ] || die "전용 MySQL 이 7.5분 안에 준비되지 않았다"
+  GOT=$(DB -e "SELECT @@innodb_buffer_pool_size;" | tr -d "[:space:]")
+  echo "  버퍼풀 실제값: $GOT bytes (요청 $(( POOL_MB * 1024 * 1024 )))"
+  [ "${GOT:-0}" -le $(( POOL_MB * 1024 * 1024 )) ]     || die "버퍼풀이 요청보다 크다 ($GOT) — chunk/instances 를 확인할 것"
+
+  # 스키마는 원본 컨테이너에서 DDL 을 떠 온다 — 파티션·PK 가 그대로 와야 조건이 같다.
+  echo "  스키마: $SRC_CONTAINER 의 pose_data DDL 을 그대로 옮긴다"
+  SRC -e "SHOW CREATE TABLE pose_data" | cut -f2 > "$SC/ddl.sql"
+  grep -q "CREATE TABLE" "$SC/ddl.sql" || die "원본 pose_data DDL 을 못 읽었다 — Flyway 가 돌았는지 볼 것"
+  sed -i "s/CREATE TABLE ${BT}pose_data${BT}/CREATE TABLE IF NOT EXISTS ${BT}$TABLE${BT}/" "$SC/ddl.sql"
+  docker exec -i -e MYSQL_PWD="$PW" "$CONTAINER" mysql -uroot "$DB_NAME" < "$SC/ddl.sql"     || die "테이블 생성 실패 (DDL 은 $SC/ddl.sql)"
+fi
+
+echo "## [0] 무대 — 격리 테이블 $TABLE"
+DB -e "CREATE TABLE IF NOT EXISTS $TABLE LIKE pose_data;" >/dev/null 2>&1
 # LIKE 는 인덱스까지 복제한다 — 팔이 정하도록 세컨더리를 먼저 없앤다.
 DB -e "ALTER TABLE $TABLE DROP INDEX uk_pose_event;" >/dev/null 2>&1
 have=$(DB -e "SELECT COUNT(*) FROM $TABLE;" | tr -d '[:space:]')
@@ -98,9 +137,11 @@ SEEDED=$(DB -e "SELECT COUNT(*) FROM $TABLE;" | tr -d '[:space:]')
 echo "  무대 완성: $SEEDED 행"
 
 echo
-echo "## [1] 버퍼풀을 $POOL_MB MB 로 줄인다 — «인덱스가 안 들어가는» 체제를 만든다"
+echo "## [1] 버퍼풀 확인"
 BEFORE_POOL=$(DB -e "SELECT @@innodb_buffer_pool_size;" | tr -d '[:space:]')
-DB -e "SET GLOBAL innodb_buffer_pool_size = $(( POOL_MB * 1024 * 1024 ));" >/dev/null || die "버퍼풀 축소 실패"
+# 🔴 전용 컨테이너면 이미 시작 인자로 정해져 있다. 아니면 SET GLOBAL 을 시도하되 **믿지 않는다** —
+#    chunk×instances 단위로만 듣기 때문에 조용히 무시될 수 있다(2026-08-23 실측).
+[ "$OWN_CONTAINER" = "1" ] || DB -e "SET GLOBAL innodb_buffer_pool_size = $(( POOL_MB * 1024 * 1024 ));" >/dev/null 2>&1
 for _ in $(seq 1 60); do
   st=$(DB -e "SHOW STATUS LIKE 'Innodb_buffer_pool_resize_status';" | cut -f2)
   case "$st" in *complete*|"") break ;; esac
