@@ -1,0 +1,87 @@
+#!/bin/bash
+# Q2 — 살아있는 파티션에 뚫린 구멍이 DROP PARTITION 소요를 바꾸는가
+#   설계: docs/decisions/row-shape-partition-interaction.md §3 Q2 (설계가 「본체」라 부른 쪽)
+#
+# 무엇을 정하나: **보존정책(DROP PARTITION) 비용이 사용자 삭제량에 의존하는가.**
+#   의존한다면 「DROP 은 1.8초 · DELETE 대비 625배」를 구멍 유무와 무관하게 인용할 수 없다.
+#
+# 🔴 실 테이블(pose_data)은 안 건드린다 — 자체 파티션 테이블 pq_t 를 쓴다.
+#
+# 팔:
+#   clean  파티션에 N행을 넣고 그대로 둔다
+#   holed  같은 파티션에 더 넣었다가 지워 **구멍을 만들고**, 최종 행 수는 clean 과 **같게** 맞춘다
+#          → 논리 행 수는 같고 **점유 페이지만 다르다**. 그게 이 질문이 묻는 실제 상황이다
+#
+# ⚠️ 절대 시간은 이 박스에서 못 쓴다(2코어 동거). **팔 간 비** 만 읽는다.
+set -uo pipefail
+cd "$(dirname "$0")/../../.."
+set -a; . ./.env; set +a
+
+ROWS=${ROWS:-50000}      # 파티션당 최종 행 수 (≈157MB · DROP 약 2초 — 잡음에 안 묻힌다)
+CHURN=${CHURN:-25000}    # holed 팔이 넣었다 지우는 양
+KEEP_K=${KEEP_K:-8}      # 1/8 이 남아 구멍이 된다
+TARGET=${TARGET:-pholed} # 이 판에서 DROP 할 파티션 하나 (순서 교락 제거)
+
+DB(){ docker exec -i shadowfit-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit -N -e "$1" 2>/dev/null; }
+trap 'echo; echo "=== 정리 ==="; DB "DROP TABLE IF EXISTS pq_t; DROP TABLE IF EXISTS pq_nums;" >/dev/null; echo "  pq_t·pq_nums 제거"' EXIT
+
+echo "=== Q2 — 구멍이 DROP PARTITION 을 바꾸는가 (파티션당 ${ROWS}행 · 대상 $TARGET) ==="
+
+DB "DROP TABLE IF EXISTS pq_t;
+CREATE TABLE pq_t (
+  id BIGINT AUTO_INCREMENT, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  session_id BIGINT NOT NULL, rep_number INT NOT NULL DEFAULT 0, timestamp_sec DECIMAL(10,3) NOT NULL,
+  joint_coordinates JSON NOT NULL, sync_rate DOUBLE NULL, keep_flag TINYINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (id, created_at), INDEX idx_session (session_id, timestamp_sec)
+) ENGINE=InnoDB STATS_SAMPLE_PAGES=200
+PARTITION BY RANGE (UNIX_TIMESTAMP(created_at)) (
+  PARTITION pholed VALUES LESS THAN (UNIX_TIMESTAMP('2026-02-01')),
+  PARTITION pclean VALUES LESS THAN (UNIX_TIMESTAMP('2026-03-01')),
+  PARTITION pmax   VALUES LESS THAN MAXVALUE);"
+
+DB "SET SESSION cte_max_recursion_depth=1000000;
+    DROP TABLE IF EXISTS pq_nums; CREATE TABLE pq_nums (n INT PRIMARY KEY);
+    INSERT INTO pq_nums WITH RECURSIVE s(n) AS (SELECT 0 UNION ALL SELECT n+1 FROM s WHERE n+1 < $(( ROWS > CHURN ? ROWS : CHURN ))) SELECT n FROM s;"
+
+ins(){ # $1=날짜  $2=행수  $3=offset  $4=keep식
+  DB "INSERT INTO pq_t (created_at, session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, keep_flag)
+      SELECT TIMESTAMP('$1'), 800000 + (n+$3) DIV 750, (n+$3) % 30, ROUND(((n+$3) % 750)/10,3),
+             (SELECT joint_coordinates FROM pose_data LIMIT 1), 75.0, $4
+        FROM pq_nums WHERE n < $2;"
+}
+
+echo "## [1] pclean — ${ROWS}행 그대로"
+ins '2026-02-15 00:00:00' "$ROWS" 0 0
+
+echo "## [2] pholed — 넣었다 지워 구멍을 만들고 최종 ${ROWS}행으로 맞춘다"
+ins '2026-01-15 00:00:00' "$ROWS" 0 "IF(n % $KEEP_K = 0,1,0)"
+for r in 1 2 3; do
+  ins '2026-01-15 00:00:00' "$CHURN" $(( r * 100000 )) "IF(n % $KEEP_K = 0,1,0)"
+  DB "DELETE FROM pq_t PARTITION (pholed) WHERE keep_flag=0 ORDER BY id LIMIT $CHURN;" >/dev/null
+done
+# 최종 행 수를 pclean 과 같게 맞춘다 (구멍은 남기고 개수만 맞춘다)
+now=$(DB "SELECT COUNT(*) FROM pq_t PARTITION (pholed);")
+[ "$now" -gt "$ROWS" ] && DB "DELETE FROM pq_t PARTITION (pholed) WHERE keep_flag=0 ORDER BY id DESC LIMIT $(( now - ROWS ));" >/dev/null
+[ "$now" -lt "$ROWS" ] && ins '2026-01-15 00:00:00' $(( ROWS - now )) 900000 0
+
+DB "ANALYZE TABLE pq_t;" >/dev/null
+echo
+printf "    %-9s %-9s %-10s %-10s\n" 파티션 행 페이지 MB
+for p in pholed pclean; do
+  read -r rc dl <<<"$(DB "SELECT CONCAT(table_rows,' ',data_length) FROM information_schema.PARTITIONS WHERE table_schema='shadowfit' AND table_name='pq_t' AND partition_name='$p';")"
+  ac=$(DB "SELECT COUNT(*) FROM pq_t PARTITION ($p);")
+  printf "    %-9s %-9s %-10s %-10s\n" "$p" "$ac" "$(( dl / 16384 ))" "$(( dl / 1048576 ))"
+done
+
+echo
+echo "## [3] DROP PARTITION 소요 — **한 판에 하나만** 잰다"
+#
+# 🔴 초판은 한 판에서 둘을 연달아 DROP 했는데, 스모크에서 **순서가 부호를 뒤집었다**:
+#      hc: pholed 1,888ms → pclean 1,023ms
+#      ch: pclean   989ms → pholed   355ms
+#    두 판 다 «먼저 한 쪽» 이 느리다 — 페이지 수(1,352 vs 867)와 무관하다. 첫 DROP 이
+#    버퍼풀·메타데이터를 비우고 둘째가 그 덕을 보는 것으로 보인다(원인은 안 갈랐다).
+#    그래서 **팔당 한 판, 판마다 첫 DROP** 으로 바꾼다 — 순서가 팔에 안 섞인다.
+ms=$(DB "SET @t0=NOW(6); ALTER TABLE pq_t DROP PARTITION $TARGET; SELECT ROUND(TIMESTAMPDIFF(MICROSECOND,@t0,NOW(6))/1000,1);")
+printf "    %-9s %10s ms   (이 판의 **첫** DROP)
+" "$TARGET" "$ms"
