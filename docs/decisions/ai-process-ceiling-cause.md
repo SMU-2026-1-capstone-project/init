@@ -182,11 +182,19 @@ post    = t_inferred → t_response      앱 후처리 + 스레드 반납 + 루�
 
 ## 7. 필요한 코드 변경 — 셋, 전부 계측 뒤
 
+> ✅ **셋 다 들어갔다 (2026-08-23).** 아래는 실제로 넣은 모양이다.
+
 | | 무엇 | 서비스 경로 영향 |
 |---|---|---|
-| ① | limiter 샘플러 — `current_default_thread_limiter()` 를 주기 샘플 | `FRAME_PATH_METRICS` 켜졌을 때만 |
-| ② | `mark_handler_out()` 1줄 + `_spans_of` 에 `post_app`·`post_loop` | 꺼져 있으면 즉시 반환(기존 `mark_*` 와 같은 모양) |
-| ③ | loop lag 사이드카 | 같은 스위치 |
+| **①③** | 🔑 **한 태스크로 합쳤다** — `sample_pool()` 이 20ms 마다 limiter(`total_tokens`·`borrowed`·`tasks_waiting`)를 읽고, **자기가 늦게 깬 만큼**을 loop lag 으로 같이 남긴다. 어차피 `sleep` 하므로 관측 비용이 하나로 묶인다 | `FRAME_PATH_METRICS` 켜졌을 때만 뜨고, lifespan 이 취소한다 |
+| ② | `mark_handler_out()` + `_spans_of` 에 `post_app`·`post_loop` | 꺼져 있으면 즉시 반환(기존 `mark_*` 와 같다) |
+
+🔴 **②를 「반환마다 한 줄」이 아니라 «얇은 래퍼 + `try/finally`» 로 넣었다** — `_detect_pose`
+안에 **반환이 열 개**이고 예외 경로도 있다. 어느 쪽으로 끝나도 스레드는 반납되므로
+**한 자리에서 찍어야 짝이 맞는다.**
+
+⚠️ **최대와 분포를 남긴다** — 0단계 프로브에서 대기가 p50 0 · 최대 39 로 오갔다.
+`thread_pool.waiting` 은 중앙값이 아니라 **분포 전체**다.
 
 ⚠️ **`post` 는 지우지 않고 남긴다** — R10-a 값과 비교가 되어야 한다. `post_app + post_loop`
 합이 `post` 와 맞는지가 그 자체로 검산이다.
