@@ -25,8 +25,50 @@
    P6 의 대상이 c7i.4xlarge 로 고정된 이유는 값 비교다 — 08-14 의 「동시 156세션」이 나온
    박스가 아니면 **팔 A 가 기준선 구실을 못 한다**
    ([`../../docs/decisions/ai-coresidency-capacity.md`](../../docs/decisions/ai-coresidency-capacity.md) §10).
-4. **종료 동작 확인** — `AUTO_SHUTDOWN=1` 을 쓸 거면 인스턴스의
-   `InstanceInitiatedShutdownBehavior` 가 `stop` 인지 본다. `terminate` 면 **EBS까지 날아간다**
+4. **종료 동작 확인** — `InstanceInitiatedShutdownBehavior` 가 `stop` 인지 본다.
+   `terminate` 면 **EBS 까지 날아간다.** 🔴 **이 줄은 오래 「확인한다」만 적고 방법이 없었다.**
+
+   **⚠️ 먼저 — 이 속성은 «OS 안에서 끈 경우» 에만 적용된다:**
+
+   | 끄는 방법 | 이 속성이 관여하나 |
+   |---|---|
+   | 콘솔 · CLI `stop-instances` | ❌ **무관** — 무조건 stop |
+   | 박스 안에서 `shutdown -h` · `poweroff` | ⭕ **여기서만** stop/terminate 가 갈린다 |
+
+   즉 위험은 **`AUTO_SHUTDOWN=1` 을 쓰거나 박스 안에서 `shutdown` 을 칠 때**만 온다
+   ([#379](https://github.com/Shadowfit/init/pull/379) 가 자동 정지를 리플리카까지 넓히면서
+   **미검증으로 남겨둔 자리**가 이것이다). 손으로 도는 라운드(從 R10-a 등)는 **콘솔에서
+   Stop 하면 이 속성을 안 봐도 된다.**
+
+   ```bash
+   # ① 이미 떠 있는 인스턴스
+   aws ec2 describe-instance-attribute      --instance-id i-xxxxxxxx --attribute instanceInitiatedShutdownBehavior
+   # → {"InstanceInitiatedShutdownBehavior": {"Value": "stop"}}
+
+   # ② 띄울 때 아예 박아둔다 (기본값이 stop 이지만 명시하는 편이 낫다)
+   aws ec2 run-instances ... --instance-initiated-shutdown-behavior stop
+
+   # ③ 바꾸기 (실행 중에도 된다)
+   aws ec2 modify-instance-attribute      --instance-id i-xxxxxxxx --instance-initiated-shutdown-behavior stop
+   ```
+
+   콘솔이면 **인스턴스 → 작업 → 인스턴스 설정 → 종료 동작 변경**.
+
+   🔴 **박스 안에서는 못 본다.** 인스턴스 프로파일 권한이 [`iam/policy-s3-results.json`](iam/policy-s3-results.json)
+   의 **S3 다섯뿐**이라 `ec2:DescribeInstanceAttribute` 가 없다. **본인 자격증명(로컬·콘솔)으로
+   확인할 것** — SSH 로 들어가서 보려던 계획이면 안 된다.
+
+   **그리고 볼륨 쪽도 같이 본다.** 「terminate 면 EBS 까지」가 성립하려면 **terminate + 루트
+   볼륨 `DeleteOnTermination=true`** 둘이 만나야 하고, **런치 때 만든 루트 볼륨은 기본이 `true`** 다.
+
+   ```bash
+   aws ec2 describe-instances --instance-ids i-xxxxxxxx      --query 'Reservations[].Instances[].BlockDeviceMappings[].{dev:DeviceName,del:Ebs.DeleteOnTermination}'
+   ```
+
+   ⚠️ **둘 다 안전한 설정은 없다** — `false` 로 두면 인스턴스를 지워도 **볼륨이 남아 요금이
+   계속 나간다**(§산출물 끝의 경고와 같은 자리). 고르는 문제다.
+
+   ⚠️ **위 명령들은 이 저장소에 실행 이력이 없다** — AWS CLI 표준 문법이고, 여기서 처음 밟는다.
 5. **요금 태그** — 아래
 
 ### 요금을 기록하려면 (태그)
