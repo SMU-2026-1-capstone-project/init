@@ -2,6 +2,7 @@ package com.shadowfit.global.error;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -22,6 +23,29 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * 시도 제한 초과 (이슈 #394). {@link BusinessException} 의 하위라 아래 핸들러에도 걸리지만,
+     * <b>더 좁은 타입이 우선</b>하므로 여기가 잡는다. 여기 따로 두는 이유는 하나뿐이다 —
+     * {@code Retry-After} 를 실어야 해서. 429 는 「언제 다시 오라」를 못 주면 반쪽이다.
+     *
+     * <p>⚠️ IP 단위 제한({@code AuthRateLimitFilter})은 <b>MVC 밖</b>이라 이 핸들러를 안 탄다.
+     * 그쪽은 같은 본문·같은 헤더를 스스로 쓴다 — 두 자리의 응답 모양이 갈리면
+     * 클라가 「어떤 429 는 다르다」를 배워야 한다.
+     */
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponseDto> handleRateLimitExceeded(RateLimitExceededException e) {
+        ErrorCode code = e.getErrorCode();
+        log.warn("RateLimitExceeded: {} (retryAfter={}s)", code.getCode(), e.getRetryAfterSeconds());
+        return ResponseEntity
+                .status(code.getStatus())
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()))
+                .body(ErrorResponseDto.builder()
+                        .status(code.getStatus())
+                        .message(code.getMessage())
+                        .timestamp(LocalDateTime.now())
+                        .build());
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponseDto> handleBusinessException(BusinessException e) {

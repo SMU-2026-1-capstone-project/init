@@ -1,6 +1,6 @@
 # 에러 코드 & 예외 처리 가이드
 
-마지막 업데이트: 2026-05-23
+마지막 업데이트: 2026-08-23 (시도 제한 A007·A008 추가 — 이슈 #394. 같이 밀린 것 둘도 정정: A006 누락·핸들러 부재 메모)
 범위: Spring 백엔드의 에러 코드 enum, 응답 포맷, gRPC 에러 매핑. 사용자가 받게 되는 메시지는 한국어 단일 ([[project_korean_only]]).
 
 ---
@@ -17,7 +17,9 @@
 }
 ```
 
-> **현재 상태 메모**: `ErrorCode`·`BusinessException`·`ErrorResponseDto` 는 정의돼 있지만 **`@RestControllerAdvice` 형태의 GlobalExceptionHandler 는 아직 코드에 없음**. 그 결과 컨트롤러에서 `throw new BusinessException(ErrorCode.X)` 해도 위 포맷으로 자동 변환되지 않고 Spring 기본 500 응답으로 떨어진다. 핸들러 도입은 별도 작업 — 본 문서는 도입 후를 가정한 약속.
+> ~~**현재 상태 메모**: … **GlobalExceptionHandler 는 아직 코드에 없음** … 본 문서는 도입 후를 가정한 약속.~~
+>
+> 🔄 **2026-08-23 정정 — 이 메모는 낡았다.** `global/error/GlobalExceptionHandler.java` 가 **있다**(`@RestControllerAdvice`). `BusinessException` 뿐 아니라 `@Valid` 실패·`AccessDeniedException`·타입 변환 실패·`NoResourceFoundException` 까지 같은 포맷으로 통일돼 있다. 즉 이 문서는 더 이상 「약속」이 아니라 **동작 서술**이다. (기능은 붙는데 문서의 「보장·운영」 절이 뒤처지는 [[project_doc_drift_pattern]] 의 그 모양이다 — 시도 제한을 적으러 왔다가 발견했다)
 
 ---
 
@@ -40,6 +42,28 @@
 | `A003` `TOKEN_EXPIRED` | 401 | 인증 토큰이 만료되었습니다. |
 | `A004` `INVALID_TOKEN` | 401 | 잘못된 인증 토큰입니다. |
 | `A005` `LOGIN_INPUT_INVALID` | 401 | 비밀번호가 틀렸습니다. |
+| `A006` `REFRESH_TOKEN_REUSED` | 401 | 만료된 로그인 정보입니다. 보안을 위해 다시 로그인해 주세요. |
+| `A007` `TOO_MANY_LOGIN_ATTEMPTS` | **429** | 로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요. |
+| `A008` `TOO_MANY_AUTH_REQUESTS` | **429** | 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요. |
+
+> 📌 `A006` 은 표에 **빠져 있던 것**을 이번에 채웠다(이슈 #135 때 enum 에는 들어갔으나 문서에 안 왔다).
+
+#### A007·A008 — 시도 제한 (이슈 #394)
+
+429 를 쓰는 이유는 401/403 과 **클라가 할 일이 다르기 때문**이다. 자격증명이 틀린 것도 권한이 없는 것도 아니라 **너무 잦다**는 뜻이고, 답이 「고쳐서 다시」가 아니라 **「기다렸다 다시」** 다.
+
+그래서 둘 다 **`Retry-After` 헤더를 같이 싣는다** — 초 단위다. 429 는 「언제 다시 오라」를 못 주면 반쪽이다.
+
+| | 키 | 어디서 | 무엇을 막나 |
+|---|---|---|---|
+| `A007` | **계정**(이메일, 소문자 정규화) | `MemberService.login` | 여러 IP 에서 **한 계정**을 두드리는 것. **실패만** 세고 성공하면 초기화 |
+| `A008` | **IP**(경로별 버킷) | `AuthRateLimitFilter` | 한 곳에서 **여러 계정**을 훑는 것 — 가입 스팸·계정 열거 |
+
+⚠️ **`Retry-After` 값은 정확한 잔여가 아니라 상한**(창 길이)이다. 틀리는 방향이 「필요보다 오래 기다린다」(안전)라서 그렇게 뒀다.
+
+⚠️ **A008 은 MVC 밖(서블릿 필터)에서 나간다.** `GlobalExceptionHandler` 를 안 타므로 그 필터가 같은 본문·같은 헤더를 **직접** 쓴다. 두 429 의 응답 모양이 갈리면 클라가 「어떤 429 는 다르다」를 배워야 하므로, 형식을 맞춘 것이 계약이다.
+
+한도 값과 그 **유도 근거**(가정 넷)는 `backend/src/main/resources/application.yml` 의 `security.rate-limit` 블록에 있다. 🔴 값만 보고 옮겨 적지 말 것 — 그 숫자는 가정에 매달려 있다.
 
 ### 사용자/페르소나 (U00x)
 | 코드 | HTTP | 메시지 |
@@ -140,8 +164,10 @@ Session session = sessionRepository.findById(sessionId)
 
 ## 5. 알려진 미흡점 (도입 작업 후보)
 
-1. **`GlobalExceptionHandler` 미구현** — 위에 명시. `@RestControllerAdvice` + `@ExceptionHandler(BusinessException.class)` 도입 시 응답 형식 통일.
-2. **Validation 에러 매핑** — `@Valid` 실패의 `MethodArgumentNotValidException` 을 `C001 INVALID_INPUT_VALUE` 로 매핑하는 핸들러 필요.
+> 🔄 **2026-08-23 정정 — 1·2번은 이미 됐다.** §1 의 메모와 같은 드리프트였다(한 문서 안에서 앞뒤가 어긋나 있어 읽는 사람이 구현 상태를 판단할 수 없었다). CodeRabbit 지적으로 발견, PR #423 에서 같이 고친다.
+
+1. ~~**`GlobalExceptionHandler` 미구현**~~ → ✅ **있다.** `global/error/GlobalExceptionHandler.java` (`@RestControllerAdvice`).
+2. ~~**Validation 에러 매핑**~~ → ✅ **된다.** `MethodArgumentNotValidException` 핸들러가 필드별 메시지를 모아 `C001` 로 낸다. `MethodArgumentTypeMismatchException`·`NoResourceFoundException`·`AccessDeniedException` 도 같이 덮는다.
 3. **`OptimisticLockingFailureException` 매핑** — 현재는 `SessionService.completeSession` 에서 3회 재시도 후 throw. 핸들러에서 `I003 DATABASE_LOCK_FAILURE` 로 매핑 가능.
 4. **AI/gRPC 에러 → REST 매핑** — AI 콜백 실패가 사용자 요청 응답에 즉시 영향을 주는 경로는 없음 (비동기). 향후 동기 경로 추가 시 `AI001 AI_FEEDBACK_FAILED` 활용.
 5. **에러 코드 → ErrorCode 객체 노출** — 응답 DTO 가 `code(String)` 를 포함하지 않음. 클라이언트에서 분기할 때 메시지 문자열 매칭이라 깨지기 쉬움. `code` 필드 추가 권장.
@@ -150,7 +176,8 @@ Session session = sessionRepository.findById(sessionId)
 
 ## 6. 클라이언트 처리 권장 (한국어 UX)
 
-- 401(`A001`, `A003`, `A004`) → 로그인 화면 강제 이동
+- 401(`A001`, `A003`, `A004`, `A006`) → 로그인 화면 강제 이동
+- **429(`A007`, `A008`) → `Retry-After` 초만큼 기다렸다 재시도.** 사용자에게는 남은 시간을 보여주는 것이 맞다 (🔶 프론트 미구현)
 - 403(`A002`, `A005`, `C005`) → "권한이 없습니다" 토스트
 - 404(`U001`, `W001`, `W003`, `R001`) → 빈 화면 + 새로고침 안내
 - 422·400 (`V00x`, `INVALID_*`) → 메시지를 그대로 사용자에게 표시 (이미 한국어)
@@ -164,6 +191,8 @@ Session session = sessionRepository.findById(sessionId)
 - `backend/src/main/java/com/shadowfit/global/error/ErrorCode.java`
 - `backend/src/main/java/com/shadowfit/global/error/BusinessException.java`
 - `backend/src/main/java/com/shadowfit/global/error/ErrorResponseDto.java`
-- (예정) `backend/src/main/java/com/shadowfit/global/error/GlobalExceptionHandler.java`
+- `backend/src/main/java/com/shadowfit/global/error/GlobalExceptionHandler.java`
+- `backend/src/main/java/com/shadowfit/global/error/RateLimitExceededException.java` (429 + `Retry-After`)
+- `backend/src/main/java/com/shadowfit/global/security/ratelimit/` (시도 제한 — 이슈 #394)
 - `backend/src/main/java/com/shadowfit/global/config/InternalAuthInterceptor.java` (gRPC `UNAUTHENTICATED`)
 - `ai-server/app/grpc/server.py` (AI 측 인증 인터셉터)

@@ -1,5 +1,7 @@
 package com.shadowfit.service.Member;
 
+import com.shadowfit.global.security.ratelimit.AuthRateLimitProperties;
+import com.shadowfit.global.security.ratelimit.LoginAttemptLimiter;
 import com.shadowfit.dto.login.CustomUserInfoDto;
 import com.shadowfit.dto.login.LoginRequestDto;
 import com.shadowfit.dto.login.LoginResponseDto;
@@ -78,9 +80,13 @@ class MemberServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        // 시도 제한기는 mock 이 아니라 **진짜**를 넣는다 (이슈 #394). Caffeine 하나뿐이라 가볍고,
+        // mock 을 쓰면 기존 테스트들이 "제한이 안 걸린다"를 우연히 전제하게 된다 —
+        // 여기 진짜를 넣어야 로그인 테스트가 제한 로직까지 같이 지난다.
         memberService = new MemberService(jwtUtil, memberRepository, refreshTokenRepository,
                 sessionRepository, poseDataCleanupService, passwordEncoder,
-                new com.shadowfit.global.security.jwt.RefreshTokenHasher());
+                new com.shadowfit.global.security.jwt.RefreshTokenHasher(),
+                new LoginAttemptLimiter(new AuthRateLimitProperties()));
     }
 
     @Nested
