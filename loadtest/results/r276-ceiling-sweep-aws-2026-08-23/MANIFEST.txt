@@ -1,0 +1,38 @@
+# 측정 조건 — r276ceil-20260823-152942
+생성          : 2026-08-23T06:40:50+00:00
+커밋          : 74266bebcd16d5753a90582a05a3ef8612814299 (HEAD)
+인스턴스 타입 : c7i.xlarge
+인스턴스 ID   : i-0cdc2acc1cbca0a36
+AZ / 리전     : ap-northeast-2c / ap-northeast-2
+vCPU / RAM    : 4 / 8GB
+커널          : 6.12.100-125.179.amzn2023.x86_64
+디스크        : 60G 여유 53G
+MySQL         : 8.0.46
+버퍼풀        : 2147483648
+WRITER_MAX_SEC: 14400
+S3 결과       : s3://shadowfit-measure-055447613012/shadowfit/r276ceil-20260823-152942
+
+# 단계
+phase	status	seconds	started_at
+preflight	OK	2	2026-08-23T06:35:44+00:00
+r276app	OK	303	2026-08-23T06:35:46+00:00
+
+⚠️ 절대 소요 시간을 «운영에서 N분» 으로 인용 금지 — 하드웨어 종속(설계 §5)
+⚠️ rehearsal/ 의 수치는 측정값이 아니다 — 경로 점검용 축소 판
+
+# 단계 (최종)
+phase	status	seconds	started_at
+preflight	OK	2	2026-08-23T06:35:44+00:00
+r276app	OK	303	2026-08-23T06:35:46+00:00
+collect	OK	0	2026-08-23T06:40:50+00:00
+
+# 요금 (청구액은 나중에 채운다)
+인스턴스 타입   : c7i.xlarge
+리전            : ap-northeast-2
+태그            : Name Project
+인스턴스 가동   : 0.15시간 (부팅부터 지금까지 — 요금 대상은 이쪽)
+러너 소요       : 0.09시간
+루트 볼륨       :  60G disk
+실제 청구액     : (미기입) — Cost Explorer 에서 태그 Project=shadowfit-measure 로 필터해 채울 것
+
+⚠️ 인스턴스를 끈 뒤에도 **볼륨이 남으면 요금이 계속 나간다.** 삭제까지 확인할 것
