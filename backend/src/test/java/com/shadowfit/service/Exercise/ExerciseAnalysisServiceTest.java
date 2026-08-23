@@ -167,6 +167,29 @@ class ExerciseAnalysisServiceTest {
     }
 
     @Test
+    @DisplayName("세션 시작 — 응답의 startTime 이 «지금» 이 아니라 DB 에 저장된 값이다 (#467)")
+    void startAnalysis_startTimeIsThePersistedValue() {
+        VideoRequestDto dto = VideoRequestDto.builder().exerciseId(exercise.getId()).build();
+
+        var started = analysisService.startAnalysis(dto, member.getId());
+
+        Session saved = sessionRepository.findById(started.sessionId()).orElseThrow();
+        // 🔴 예전에는 컨트롤러가 응답을 만들며 LocalDateTime.now() 를 **새로 읽어** 실었다.
+        //    세션을 저장한 시각과 다른 now() 호출이라 초 경계를 넘으면 1초 갈렸고,
+        //    실제로 관측됐다(2026-08-23: 응답 13:21:04 · DB 13:21:05).
+        //
+        //    표시용 값이 아니라서 아프다 — 이 값은 pose_data 의 멱등 앵커이자 파티션 키이고
+        //    (#188 · #392), 리포트·재부착 조회가 등호로 찾는 바로 그 값이다.
+        assertThat(started.startTime())
+                .as("세션 시작 응답의 startTime 은 저장된 값과 같아야 한다")
+                .isNotNull()
+                .isEqualTo(saved.getStartTime());
+        assertThat(started.startTime().getNano())
+                .as("앵커라서 초 이하가 없다 (#446, Session 의 @PrePersist)")
+                .isZero();
+    }
+
+    @Test
     @DisplayName("세션 시작 — 두 세션이 서로 다른 값을 받는다 (같으면 서로를 통과한다)")
     void startAnalysis_nonceDiffersPerSession() {
         VideoRequestDto dto = VideoRequestDto.builder().exerciseId(exercise.getId()).build();
