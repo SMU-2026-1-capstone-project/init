@@ -11,7 +11,7 @@ import com.shadowfit.grpc.PoseDataResponse;
 import com.shadowfit.global.observability.SessionMetrics;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.shadowfit.grpc.*;
@@ -96,7 +96,9 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                         .withDescription(e.getMessage())
                         .asRuntimeException());
             } catch (Exception e) {
-                log.error("저장 실패: {}", e.getMessage());
+                // 🔴 클래스명을 같이 찍는다. 예전엔 메시지만 찍었는데, 그 탓에 «데드락인데 재시도가
+                //    안 돌았다» 를 로그 한 줄로 못 닫고 라운드를 하나 태워서야 알았다 (#416).
+                log.error("저장 실패: {} — {}", e.getClass().getSimpleName(), e.getMessage());
                 responseObserver.onError(io.grpc.Status.INTERNAL.asRuntimeException());
             }
         }
@@ -136,6 +138,19 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
      * 나빠질 수도 있다(상대에게 커밋할 시간을 주지만, 요청이 오래 살아 동시성을 올린다).
      *
      * <p>상한을 다 써도 실패하면 그대로 던진다. 그 위에 AI 쪽 재전송(3회 · 1s→3s)이 한 겹 더 있다.
+     *
+     * <p>🔴 <b>왜 {@code PessimisticLockingFailureException} 인가</b> (#416). 처음엔
+     * {@code DeadlockLoserDataAccessException} 만 잡았는데, <b>그 예외는 실사용에서 오지 않는다</b> —
+     * Spring 6 의 기본 번역기 {@code SQLExceptionSubclassTranslator} 는 그 클래스를 아예 만들지 않고,
+     * MySQL 데드락(1213 / SQLState 40001)이 올려보내는 {@code SQLTransactionRollbackException} 을
+     * {@code CannotAcquireLockException} 계열로 바꾼다. 둘은 이 예외의 <b>형제</b>라 좁게 잡으면 빗나간다.
+     *
+     * <p>그래서 이 루프는 2026-08-23 까지 <b>한 번도 돌지 않았다.</b> 앱 경로 라운드가 그것을 실측으로
+     * 잡았다 — 데드락 61건에 재시도 로그 0줄, 잔여 실패율이 «재시도 없던» 시절과 같은 자리
+     * ({@code loadtest/results/r276-app-retry-aws-2026-08-23/}).
+     *
+     * <p>부모로 넓히면 잠금 획득 실패(락 대기 타임아웃 등)까지 재시도 대상이 된다. <b>그래도 되는</b>
+     * 이유는 이 경로가 멱등이기 때문이다({@code uk_pose_event} + ODKU, #188) — 다시 던져도 행이 안 는다.
      */
     private void savePoseDataBatchWithDeadlockRetry(PoseDataBatchRequest request) {
         int retries = 0;
@@ -148,7 +163,7 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                             request.getSessionId(), retries);
                 }
                 return;
-            } catch (DeadlockLoserDataAccessException e) {
+            } catch (PessimisticLockingFailureException e) {
                 if (retries >= DEADLOCK_MAX_RETRIES) {
                     sessionMetrics.poseBatchDeadlockRetry("exhausted");
                     log.warn("세션 {} : 데드락 재시도 {}회를 다 썼다 — AI 재전송으로 넘긴다 (#276)",
