@@ -210,12 +210,23 @@ services:
       # CLIENT·performance_schema SELECT)은 앱 계정이 가지면 안 되는 것이고, 반대로 앱
       # 계정의 DML 권한은 익스포터가 가질 이유가 없다. 계정 생성은 mysql/apply-exporter-user.sh.
       #
-      # 🔴 기본값(:-exporter)을 뺐다 (#167). 계정 생성이 별도 파일로 갈려 있어서, 기본값이
+      # 🔴 기본값(:-exporter)을 뺐던 이유 (#167): 계정 생성이 별도 파일로 갈려 있어서, 기본값이
       #    있으면 «compose 는 .env 값, 계정은 옛 값» 인 조합이 조용히 성립한다. 그 결과는
       #    타깃 DOWN 이고, 그건 MySQL 지표만 통째로 비는 형태라 알아채기 어렵다.
-      #    MYSQL_ROOT_PASSWORD 와 같은 관례로 «잊으면 시끄럽게 깨지게» 둔다.
       #    값을 바꿨으면 apply-exporter-user.sh 를 다시 돌려 계정도 맞출 것.
-      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_EXPORTER_PASSWORD:?MYSQL_EXPORTER_PASSWORD 미설정 — .env.example 참고}
+      #
+      # 🔴 그런데 `:?`(필수)는 **쓸 수 없다** (#427). compose 는 **활성 프로파일과 무관하게
+      #    파일 전체를 보간**하므로, 안 켜는 이 서비스의 필수 변수가 `docker compose build
+      #    shadowfit-backend` 같은 **무관한 명령까지 전부 죽인다**(v2.40.3 에서 확인).
+      #    실제로 exporter 가 들어오기 전에 만들어진 `.env` 를 쓰던 박스에서 백엔드 빌드가
+      #    막혔고, 그걸 «빌드 성공» 으로 오독해 옛 이미지로 검증을 한 판 돌린 사고가 있었다.
+      #
+      #    ⚠️ **무엇을 내줬는지 분명히 한다**: #167 이 노린 «잊으면 시끄럽게 깨진다» 가
+      #    «obs 를 켰을 때만 깨진다» 로 약해졌다. 안 켠 사람을 막지 않는 대가다.
+      #    값이 비면 아래 센티넬이 들어가 인증에 실패하고 `mysql_up 0` 으로 나타난다 —
+      #    **센티넬 문자열 자체가 원인을 말하도록** 이름을 지었다. 확인:
+      #      docker compose --profile obs exec -T mysqld-exporter       #        wget -qO- localhost:9104/metrics | grep '^mysql_up'
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_EXPORTER_PASSWORD:-UNSET_SEE_env_example_AND_ISSUE_427}
       TZ: Asia/Seoul
     depends_on:
       - mysql
