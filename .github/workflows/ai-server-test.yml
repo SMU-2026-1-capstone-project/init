@@ -54,17 +54,27 @@ jobs:
       # 설치가 이 워크플로 시간의 대부분이다 — mediapipe·opencv 가 크다. 캐시가 얼마나
       # 줄여주는지는 실행 기록으로 확인한다(이슈 #96 미검증 항목).
       - name: Install dependencies
-        run: pip install -r ai-server/requirements.txt
+        run: pip install -r ai-server/requirements-dev.txt
 
-      # discover 는 ai-server 를 작업 디렉토리로 해야 app 패키지가 import 된다.
-      # 러너를 새로 들이지 않고 unittest 를 쓰는 이유: 저장소에 pytest 설정도 의존성도 없고
-      # 기존 테스트가 전부 unittest(+ 평범한 assert 함수) 형태다.
+      # ai-server 를 작업 디렉토리로 해야 app 패키지가 import 된다.
+      #
+      # 🔴 **unittest 에서 pytest 로 바꿨다 (#465).** 예전 주석은 «러너를 새로 들이지 않고
+      #    unittest 를 쓰는 이유: 저장소에 pytest 설정도 의존성도 없고 기존 테스트가 전부
+      #    unittest(+ 평범한 assert 함수) 형태다» 였는데, 그 «+ 평범한 assert 함수» 가 문제였다 —
+      #    `unittest discover` 는 **TestCase 하위 클래스만 걷는다.** 함수형 판은 모듈을
+      #    import 만 하고 호출하지 않아서, **47판 / 6파일이 한 번도 안 돌고 있었다**
+      #    (unittest 88판 ↔ pytest 138판). 그중 8판이 #134 보안 회귀를 막는다고 적힌
+      #    test_auth_middleware.py 다 — 막는다는 근거가 실행되지 않았다.
+      #
+      #    실패가 아니라 **침묵**이라 안 보였다. pytest 는 두 형태를 모두 걷으므로 테스트를
+      #    한 판도 고쳐 쓰지 않고 살아난다. 의존성은 requirements-dev.txt 로 갈라 **운영
+      #    이미지에는 안 들어간다**(Dockerfile 은 requirements.txt 만 설치한다).
       - name: Run ai-server test suite
         working-directory: ai-server
         run: |
           set -o pipefail
-          # unittest 는 결과를 stderr 로 낸다 — 요약 단계에서 읽으려면 합쳐야 한다.
-          python -m unittest discover -s tests 2>&1 | tee test-output.txt
+          # 요약 단계가 tail 로 읽으므로 stderr 도 합친다.
+          python -m pytest tests -q 2>&1 | tee test-output.txt
 
       # 실패 원인을 로그 전체를 뒤지지 않고 PR 화면에서 바로 보기 위한 요약.
       # 설치 단계에서 죽으면 출력 파일 자체가 없으므로 그 경우도 명시적으로 알린다.
