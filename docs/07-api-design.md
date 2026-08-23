@@ -216,7 +216,23 @@ AI = 운동 통계의 단일 진실 원천 원칙. (커밋 143a2e4)
 }
 ```
 
-### GET /reports/weekly - 주간 보고서
+### ~~GET /reports/weekly~~ → **GET /reports/weekly-summary 로 합쳤다** (2026-08-23, #352)
+
+주간이 두 경로로 갈려 있었고 새 쪽은 **부르는 곳이 없었다**. 이제 하나다.
+
+**요청**: 파라미터 없음. 인증 필요. 기준은 **오늘이 속한 주(월 시작)** 고정
+— 기준일 파라미터를 안 받는 이유는 응답의 두 절반(활동 집계 · A층 요약)이 같은 주를 보게 하기 위해서다.
+
+**응답** `WeeklyActivityResponseDto`
+
+| 필드 | 뜻 |
+|---|---|
+| `dateRange` · `totalWorkouts` · `totalMinutes` · `totalCalories` | 활동 집계 |
+| `dailyLogs[]` · `todayDetails[]` | 요일별 막대 · 오늘 상세 |
+| **`summary`** | A층 요약 — `periodStart` · `periodEnd`(미포함) · `thisWeek` · `lastWeek` 집계와 `sentences[]`(규칙 문장) |
+
+기록이 없어도 **200** 이다 — 「이번 주에 운동을 안 했다」는 정상 상태라 빈 집계와 그 사실을 말하는 문장을 돌려준다.
+
 ### GET /reports/monthly - 월간 보고서
 
 ## 사용자 환경설정 API (2026-05 추가)
