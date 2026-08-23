@@ -40,7 +40,9 @@ curl -X POST localhost:8080/member/signup -H 'Content-Type: application/json'   
 # ③ 리포트가 붙은 세션 id 를 뽑아 K6_SIDS 로 넘긴다 (rig 파일 머리 참고)
 ```
 
-⚠️ **rig 은 이 시드 단계를 자동화하지 않는다.** 지금은 손으로 만든 계정을 `K6_EMAIL`/`K6_PASSWORD` 로 넘기는 형태다 — 다시 돌리려면 위 세 단계를 사람이 밟아야 한다.
+~~⚠️ **rig 은 이 시드 단계를 자동화하지 않는다.**~~ 🟢 **자동화됐다 (2026-08-24)** — [`seed_k6_read_account.sh`](../../seed/seed_k6_read_account.sh) 가 위 세 단계를 한 번에 밟고 **k6 실행줄까지 찍는다.** 이 판은 손으로 밟은 것이고, **從 R12**([`AWS-RIDE-ALONG.md`](../../AWS-RIDE-ALONG.md))가 EC2 에서 그걸 다시 손으로 하지 않게 만든 선결이다.
+
+🔴 **그 스크립트는 시더를 복사하지 않는다** — `seed_report_rig.sh` 에 `MEMBER_ID`·`WITH_REPORTS` 를 넘겨 호출한다. 행 모양의 정본은 여전히 그쪽 하나다([#303](https://github.com/Shadowfit/init/issues/303) — rig 사본이 드리프트를 낳는다).
 
 ---
 

@@ -25,6 +25,17 @@ ROWS=${ROWS:-750}
 REP_FRAMES=${REP_FRAMES:-30}   # rep 당 프레임 수 → 750/30 = rep 25개/세션
 TAG=${TAG:-seed204}
 
+# 🔴 소유자를 밖에서 정할 수 있게 뺀다 (從 R12).
+#   기본값은 **예전 그대로** — member_id 를 1·5·12 로 돌린다. 그래서 #204 계열 판은 안 바뀐다.
+#   MEMBER_ID 를 주면 그 회원 소유로 시드한다. k6 읽기 rig 은 «로그인할 수 있는 계정에
+#   읽을 데이터가 있어야» 돌아가는데, 하드코딩된 1·5·12 는 그 조건을 못 만든다.
+#   ⚠️ 남의 계정 비밀번호를 갈아끼우는 길은 택하지 않았다 — 내 계정에 데이터를 넣는다.
+MEMBER_EXPR=${MEMBER_ID:+$MEMBER_ID}
+MEMBER_EXPR=${MEMBER_EXPR:-'ELT(1 + (n % 3), 1, 5, 12)'}
+
+# 세션당 리포트 1건도 같이 넣을지. k6 읽기 rig 의 네 엔드포인트 중 셋이 reports 를 읽는다.
+WITH_REPORTS=${WITH_REPORTS:-0}
+
 DB(){ docker exec -i shadowfit-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit "$@"; }
 
 echo "## [1] 세션 $SESSIONS 개 — 2026 전 기간 균등 분산 (tag=$TAG)"
@@ -33,7 +44,7 @@ DB -e "
 INSERT INTO exercise_sessions
     (member_id, exercise_id, reference_source, start_time, end_time,
      total_reps, avg_sync_rate, max_sync_rate, min_sync_rate, status, version, created_at)
-SELECT ELT(1 + (n % 3), 1, 5, 12), 1 + (n % 3), '$TAG',
+SELECT $MEMBER_EXPR, 1 + (n % 3), '$TAG',
        ts, ts + INTERVAL 15 MINUTE,
        $((ROWS / REP_FRAMES)), 75.00, 95.00, 50.00, 'COMPLETED', 0, ts
 FROM (
@@ -86,6 +97,30 @@ for i in $(seq 0 9); do
                  WHERE reference_source='$TAG' AND id % 10 = $i) s;"
   echo "  청크 $i/9"
 done
+
+if [ "$WITH_REPORTS" = "1" ]; then
+  echo
+  echo "## [3-b] 세션당 리포트 1건"
+  # 🔴 IGNORE 를 안 쓴다 (#219). IGNORE 는 중복만 삼키지 않는다 — FK 위반이면 행이 조용히
+  #    사라지고 NOT NULL 위반이면 빈 값이 들어간다. 시드가 조용히 덜 들어가면 그 판은
+  #    «데이터가 없어서» 빠른 것을 «쿼리가 빨라서» 로 읽게 된다. 터지게 둔다.
+  # 🔴 detailed_analysis 는 «채워진» 상태로 넣는다. 비워두면 리포트 조회가 폴백 경로로 빠져
+  #    재계산을 타고, 그러면 이 rig 이 재는 것이 «읽기» 가 아니라 «재계산» 이 된다.
+  #    (worst-section-rep-resolution.md 가 그 두 경로를 갈라놓은 자리다)
+  DB -e "
+    INSERT INTO reports (member_id, session_id, report_type, summary, detailed_analysis,
+                         improvement_tips, created_at, updated_at)
+    SELECT s.member_id, s.id, 'SESSION',
+           CONCAT('세션 ', s.id, ' 요약 — 시드(', '$TAG', ')'),
+           JSON_OBJECT('worst_section', 'BOTTOM', 'avg_sync_rate', s.avg_sync_rate,
+                       'rep_count', s.total_reps, 'seeded', TRUE),
+           '무릎이 발끝을 넘지 않게 유지하세요',
+           s.start_time, s.start_time
+      FROM exercise_sessions s
+     WHERE s.reference_source='$TAG';"
+  DB -e "SELECT COUNT(*) reports FROM reports r JOIN exercise_sessions s ON s.id=r.session_id
+          WHERE s.reference_source='$TAG';"
+fi
 
 echo
 echo "## [4] 통계 갱신 · 확인"
