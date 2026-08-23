@@ -152,8 +152,29 @@ MYSQL_PORT=3306
 MYSQL_EXPORTER_PASSWORD=$PW
 DB_USERNAME=shadowfit
 DB_PASSWORD=$PW
+# 🔴 AI 토큰 둘 — **이 역할에서는 AI 를 띄우지 않는데도** 필요하다 (2026-08-23).
+#
+#    위 주석이 말한 함정이 그대로 재발했다: `compose up -d mysql` 이어도 compose 는 **파일 전체를
+#    해석**하고, `shadowfit-ai` 의 `INTERNAL_API_TOKEN:?` 가 필수라 mysql 하나 띄우는 것도 죽는다.
+#    2026-08-13 에는 `MYSQL_EXPORTER_PASSWORD` 가 같은 이유로 죽였고, 그 뒤 AI 서비스에 필수 변수가
+#    **새로 늘면서** ROLE=db 가 다시 깨졌다 — 즉 이건 «한 번 고치면 끝» 이 아니라
+#    **compose 에 `:?` 가 늘 때마다 여기가 따라와야 하는** 자리다.
+#
+#    값은 아무 문자열이어도 된다. 이 역할은 AI 를 안 띄우므로 아무도 이 토큰으로 인증하지 않는다.
+#    ⚠️ p6-target 은 아래에서 **진짜 값으로 덮어쓴다**(양쪽이 같아야 하는 자리라 거기선 생성한다).
+AI_PUBLIC_TOKEN=${AI_PUBLIC_TOKEN:-unused-in-this-role}
+INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-unused-in-this-role}
 EOF
 echo "  MYSQL_ROOT_PASSWORD 를 rig 기본값과 맞췄다 (+ 해석만 되면 되는 변수들)"
+
+# 🔴 여기서 한 번 확인한다 — «compose 가 해석은 되는가».
+#    안 그러면 실패가 `compose up` 까지 밀리고, 그때는 원인이 «mysql 이 안 뜬다» 로 보인다.
+if ! docker compose --project-directory "$WORKDIR" config >/dev/null 2>"$WORKDIR/.compose-config.err"; then
+  echo "  🔴 compose 해석 실패 — 필수 변수가 더 늘었을 수 있다:"
+  sed -n '1,5p' "$WORKDIR/.compose-config.err"
+  die "compose 파일이 이 .env 로 해석되지 않는다 (위 메시지의 변수를 .env 블록에 추가할 것)"
+fi
+echo "  compose 해석 확인 ✅ (mysql 만 띄워도 파일 전체가 해석된다)"
 
 if [ "$ROLE" = "p6-target" ]; then
   # 토큰은 없으면 만든다 — 값 자체는 아무 문자열이어도 되지만 **양쪽이 같아야** 한다.
