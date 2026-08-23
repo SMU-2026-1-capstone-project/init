@@ -11,6 +11,7 @@ import com.shadowfit.grpc.PoseDataResponse;
 import com.shadowfit.global.observability.SessionMetrics;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.PessimisticLockingFailureException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -118,8 +119,19 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
      * <p>🔴 <b>이 값이 기대는 조건</b>: 실측은 <b>워커 8 한 점</b>이고, 같은 라운드가 데드락 확률이
      * 동시성의 함수임을 보였다(워커 2 에서 1.2%, 16 에서 59.5%). 더 높은 동시성에서도 2회로
      * 0% 인지는 <b>안 쟀다</b>. 그래서 {@code shadowfit.pose.batch.deadlock.retries} 로 관측한다.
+     *
+     * <p>🔴 <b>2026-08-23: 상수에서 설정으로 뺐다. 기본값이 2 라 동작은 그대로다.</b>
+     * 이유는 튜닝이 아니라 <b>측정</b>이다 — 위 「2회면 0.0%」는 <b>저장 프로시저 경로</b>의 값이고,
+     * 앱 경로에서 다시 재보니 동시성 8 에서도 <b>14.2%</b> 가 상한을 다 쓰고 죽는다
+     * ({@code loadtest/results/r276-app-retry2-aws-2026-08-23/}). 즉 <b>2 가 맞는 값인지 아직 모른다.</b>
+     * 그런데 상수라 3·4·5 를 재려면 재빌드가 필요했고, 그 재빌드가 실험 자체를 막고 있었다
+     * ({@code PoseDataService} 의 다운샘플 창이 같은 이유로 설정이 됐다).
+     *
+     * <p>⚠️ 값을 바꾸는 것은 <b>측정 조건</b>이지 채택이 아니다. 기본 2 는 위 실측 그대로이고,
+     * 바꾸려면 앱 경로 스윕의 결과와 사용자 confirm 이 있어야 한다.
      */
-    private static final int DEADLOCK_MAX_RETRIES = 2;
+    @Value("${shadowfit.pose.deadlock.max-retries:2}")
+    private int deadlockMaxRetries = 2;   // 초기값도 둔다 — Spring 밖에서 만들면 0 이 되고, 그 0 은 «재시도 없음» 이다
 
     /**
      * pose_data 배치 저장을 데드락에 한해 다시 던진다.
@@ -164,16 +176,16 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                 }
                 return;
             } catch (PessimisticLockingFailureException e) {
-                if (retries >= DEADLOCK_MAX_RETRIES) {
+                if (retries >= deadlockMaxRetries) {
                     sessionMetrics.poseBatchDeadlockRetry("exhausted");
                     log.warn("세션 {} : 데드락 재시도 {}회를 다 썼다 — AI 재전송으로 넘긴다 (#276)",
-                            request.getSessionId(), DEADLOCK_MAX_RETRIES);
+                            request.getSessionId(), deadlockMaxRetries);
                     throw e;
                 }
                 retries++;
                 sessionMetrics.poseBatchDeadlockRetry("retried");
                 log.warn("세션 {} : 배치 INSERT 데드락 — {}/{}회째 다시 던진다 (#276)",
-                        request.getSessionId(), retries, DEADLOCK_MAX_RETRIES);
+                        request.getSessionId(), retries, deadlockMaxRetries);
             }
         }
     }
