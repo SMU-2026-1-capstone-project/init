@@ -68,6 +68,9 @@ VENV_CANDIDATES = (
 PY = None
 RESPONSE_MODE = "model"   # main() 이 --response-mode 로 덮는다
 TRANSPORT = "urllib"      # main() 이 --transport 로 덮는다 (§12 의 팔)
+NULL_HANDLER = False      # main() 이 --null-handler 로 덮는다 (축 3)
+GIL_PROBE = 0.0           # main() 이 --gil-probe 로 덮는다 (축 5) · 0 = 안 띄운다
+FLOOR_SEC = 0.0           # 부하 «전» 에 프로브 바닥을 걷는 초 · 0 = 안 걷는다
 HTTP_PORT = 8100          # 8000 은 08-23 로컬 박스에서 이미 쓰이고 있었다
 GRPC_PORT = 8685
 AI = None
@@ -144,6 +147,47 @@ def fetch_snapshot():
             return json.loads(r.read().decode())
     except Exception as e:
         return {"error": repr(e)}
+
+
+def reset_snapshot():
+    """판 사이 초기화. 실패해도 판은 계속하되 **사유를 값으로 돌려준다.**"""
+    req = urllib.request.Request(
+        AI + "/api/v1/diag/frame-path/reset", data=b"",
+        headers={"Authorization": "Bearer " + PUBLIC_TOKEN}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            r.read()
+        return None
+    except Exception as e:
+        return repr(e)
+
+
+def measure_floor(sec):
+    """🔴 **부하를 걸기 «전»** 에 GIL 프로브 바닥을 걷는다 (축 5 계약 1).
+
+    프로브가 재는 `sleep` 초과분에는 **OS 타이머 해상도**가 부하와 무관하게 깔려 있다.
+    그 바닥을 안 빼면 GIL 대기를 과대평가한다 — 절대값으로 「GIL 대기 N ms」 라고
+    읽으면 틀린다는 것이 `per-process-ceiling-cause.md` 축 5 의 계약이다.
+
+    🔑 **같은 프로세스·같은 박스·같은 판에서** 걷는다. 다른 박스나 다른 날의 바닥을
+       빌려오면 그 자체가 #255(라운드 간 비재현)를 판정에 끌어들이는 것이 된다.
+
+    ⚠️ 걷고 나서 **반드시 초기화한다.** 안 그러면 바닥 표본이 부하 표본에 섞여
+       평균을 끌어내린다 — 그러면 「GIL 대기가 작다」로 잘못 읽힌다.
+    """
+    time.sleep(sec)
+    snap = fetch_snapshot()
+    floor = {"sec": sec}
+    if isinstance(snap, dict) and "gil_lag" in snap:
+        floor.update(snap["gil_lag"])
+        floor["loop_lag"] = snap.get("loop_lag")
+        floor["requests"] = snap.get("requests")   # 🔴 0 이 아니면 «무부하» 가 아니다
+    else:
+        floor["error"] = (snap or {}).get("error", "gil_lag 없음")
+    err = reset_snapshot()
+    if err:
+        floor["reset_error"] = err
+    return floor
 
 
 class CpuSampler(threading.Thread):
@@ -370,6 +414,12 @@ def boot(arm, pool, bind):
         # 🔴 판마다 바꾸려면 **재기동이 필요하다** — `response_model` 이 데코레이터 시점에
         #    굳기 때문이다. 이 rig 은 어차피 판마다 uvicorn 을 다시 띄우므로 맞물린다.
         "RESPONSE_MODE": RESPONSE_MODE,
+        # 축 3 — 널 핸들러 팔. 켜면 본문만 받고 즉시 반환한다(디코딩·추론·분석 없음).
+        # 🔴 응답이 가짜다. 「빨라졌다」가 아니라 「계산을 뺐다」로 읽어야 한다.
+        "POSE_NULL_HANDLER": "true" if NULL_HANDLER else "false",
+        # 축 5 — GIL 지연 프로브 주기(초). 0 이면 안 띄운다.
+        # 🔴 `FRAME_PATH_METRICS` 가 꺼진 팔에서는 담을 자리가 없어 안 뜬다(앱이 경고한다).
+        "GIL_PROBE_INTERVAL": str(GIL_PROBE),
         "PYTHONUNBUFFERED": "1",
     })
     log = open(os.path.join(OUT, f"server_{TAG}.log"), "ab")
@@ -411,6 +461,7 @@ def run_load(arm, round_no, sessions, fps, dur, warmup, sampler=None):
 
 def main():
     global OUT, TAG, PY, AI, HTTP_PORT, GRPC_PORT, RESPONSE_MODE, TRANSPORT
+    global NULL_HANDLER, GIL_PROBE, FLOOR_SEC
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)))
     ap.add_argument("--sessions", type=int, default=8)
@@ -439,6 +490,14 @@ def main():
                     help="부하기 전송 방식(§12 의 팔). urllib=현행 · new=매번 새 연결 · "
                          "keepalive=재사용. 🔴 사본을 만들지 않고 **같은 rig 의 팔**로 넣었다 — "
                          "예전 시도가 사본이 세션을 못 붙여 무효였다")
+    ap.add_argument("--null-handler", action="store_true", dest="null_handler",
+                    help="축 3 — POST /pose 가 본문만 받고 즉시 반환한다(계산 전부 없음). "
+                         "🔴 응답이 가짜다. 실행 단위로 걸린다(판마다가 아니다)")
+    ap.add_argument("--gil-probe", type=float, default=0.0, dest="gil_probe",
+                    help="축 5 — GIL 지연 프로브 주기(초). 0 이면 안 띄운다. 권장 0.001")
+    ap.add_argument("--floor-sec", type=float, default=0.0, dest="floor_sec",
+                    help="부하 «전» 에 프로브 바닥을 걷는 초. 🔴 --gil-probe 를 쓰면 "
+                         "이걸 안 주는 것은 «절대값으로 읽겠다» 는 뜻이고 축 5 계약 위반이다")
     ap.add_argument("--settle", type=float, default=3.0,
                     help="판 사이 대기(초) — 포트·검출기 정리 여유")
     ap.add_argument("--warmup", type=float, default=5.0,
@@ -452,6 +511,9 @@ def main():
     PY = resolve_python(a.python_bin)
     RESPONSE_MODE = a.response_mode
     TRANSPORT = a.transport
+    NULL_HANDLER = a.null_handler
+    GIL_PROBE = a.gil_probe
+    FLOOR_SEC = a.floor_sec
     plan = [t.strip() for t in a.plan.split(",") if t.strip()]
     for tok in plan:
         parse_arm(tok)                      # 🔴 한 판이라도 돌기 전에 팔 표기를 다 검증한다
@@ -479,6 +541,9 @@ def main():
                 results.append({"n": i + 1, "arm": arm, "discard": discard,
                                 "error": "boot-timeout"})
                 continue
+            # 🔴 바닥은 **부하 전** 이고 **샘플러 전** 이다 — 이 구간은 이 판의 값이
+            #    아니다(축 5 계약 1). 걷고 나서 계측을 초기화하므로 아래 스냅샷에는 안 섞인다.
+            floor = measure_floor(FLOOR_SEC) if (FLOOR_SEC > 0 and GIL_PROBE > 0) else None
             # CPU 샘플러는 **헬스 통과 뒤** 시작한다 — 기동·모델 로드는 이 판의 부하가 아니다.
             sampler = CpuSampler(a.cpu_interval)
             sampler.track("ai", p.pid, threads=True)   # 🔑 루프/워커를 쪼갠다
@@ -493,6 +558,8 @@ def main():
             # 🔴 서버를 내리기 **전에** 계측을 걷는다. 이건 프로세스 메모리라 종료와 함께
             #    사라진다 — 첫 라운드(run1)가 정확히 이걸 안 해서 B 판 넷의 구간 분포를 버렸다.
             r["frame_path"] = fetch_snapshot() if parse_arm(arm)[0] else None
+            if floor is not None:
+                r["gil_floor"] = floor
             r.update({"n": i + 1, "arm": arm, "discard": discard})
             results.append(r)
             print("  " + json.dumps(
@@ -514,6 +581,7 @@ def main():
                    "pool": pool,
         "response_mode": RESPONSE_MODE,
         "transport": TRANSPORT, "bind": a.bind, "python": PY,
+        "null_handler": NULL_HANDLER, "gil_probe": GIL_PROBE, "floor_sec": FLOOR_SEC,
                    "results": results}, f, ensure_ascii=False, indent=2)
     print("\n결과:", path)
     return 0
