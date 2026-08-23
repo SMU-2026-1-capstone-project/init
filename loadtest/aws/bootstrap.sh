@@ -350,15 +350,44 @@ step "MySQL 컨테이너"
 cd "$WORKDIR" || die "$WORKDIR 로 못 들어간다"
 docker compose up -d mysql || die "compose up 실패"
 
+# 🔴 `mysqladmin ping` 한 번으로는 «준비됐다» 를 못 본다 (#275 ②, 2026-08-23 재발).
+#    MySQL 공식 이미지는 초기화 때 **임시 서버를 띄웠다 껐다** 하는데 ping 은 그 임시 서버에도
+#    붙는다. 그래서 예전 코드는 루프에서 «떴다» 를 찍고 **바로 다음 줄에서** 「안 떴다」로 죽었다:
+#
+#        헬스체크 대기. — 떴다
+#      🔴 부트스트랩 중단 — MySQL 이 5분 안에 안 떴다
+#
+#    2026-08-23 라운드가 정확히 이 두 줄로 죽어 인스턴스를 한 번 버렸다. ping 은 «지금 응답하나»
+#    를 보고 헬스체크는 «준비됐나» 를 본다 — 그래서 컨테이너 헬스 상태를 본다
+#    (compose 가 mysql 에 healthcheck 를 정의해 뒀다: interval 10s · start_period 20s).
+#    헬스체크가 없는 compose 를 만나면 status 가 빈 문자열이므로, 그때만 ping 으로 떨어지되
+#    **연속 3회**를 요구한다 — 임시 서버 창은 연속으로는 못 통과한다.
 echo -n "  헬스체크 대기"
+mysql_ready=0
 for _ in $(seq 1 60); do
-  if docker exec shadowfit-mysql mysqladmin ping -h localhost --silent >/dev/null 2>&1; then
-    echo " — 떴다"; break
+  hs=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' shadowfit-mysql 2>/dev/null)
+  if [ "$hs" = "healthy" ]; then
+    mysql_ready=1; echo " — 떴다 (healthy)"; break
+  fi
+  if [ -z "$hs" ]; then
+    hits=0
+    for _ in 1 2 3; do
+      if docker exec shadowfit-mysql mysqladmin ping -h localhost --silent >/dev/null 2>&1; then
+        hits=$((hits+1))
+      else
+        hits=0
+      fi
+      sleep 2
+    done
+    if [ "$hits" = 3 ]; then
+      mysql_ready=1; echo " — 떴다 (헬스체크 없음 · ping 연속 3회)"; break
+    fi
   fi
   echo -n "."; sleep 5
 done
-docker exec shadowfit-mysql mysqladmin ping -h localhost --silent >/dev/null 2>&1 \
-  || die "MySQL 이 5분 안에 안 떴다"
+# 🔴 여기서 ping 을 **다시 하지 않는다.** 예전 코드의 결함이 그 재확인이었다 —
+#    루프가 이미 «준비» 를 확인했는데 재시작 창에 걸려 라운드를 통째로 잃었다.
+[ "$mysql_ready" = 1 ] || die "MySQL 이 5분 안에 준비되지 않았다 (#275 ②)"
 
 # ── 도구 이미지 ──────────────────────────────────────────────────────────
 #
