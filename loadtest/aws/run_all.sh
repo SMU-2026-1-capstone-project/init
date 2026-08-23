@@ -1245,10 +1245,29 @@ cat "$PHASE_LOG"
 # 🔴 업로드가 실패했으면 **절대 안 끈다.** 인스턴스 안에만 있는 결과를 끄는 건
 #    측정을 통째로 버리는 것과 같다. 사람이 와서 회수해야 한다.
 if [ "$AUTO_SHUTDOWN" = "1" ] && [ "$FINAL_OK" = "1" ]; then
+  # 🔴 **리플리카를 먼저 끈다.** 2대 라운드(P4)에서 이 스크립트는 소스 박스에서 돌고,
+  #    소스를 먼저 끄면 리플리카를 끌 SSH 가 사라져 **그 박스가 켜진 채로 남는다.**
+  #    결과는 이미 S3 에 올라갔고(FINAL_OK) 리플리카에는 산출물이 없으므로 꺼도 잃을 것이 없다.
+  #    ⚠️ 업로드가 실패한 판(아래 elif)에서는 리플리카도 안 끈다 — 무대를 들여다볼 수 있어야 한다.
+  if [ -n "$REPLICA_HOST" ]; then
+    if $REPLICA_SSH "shutdown -h +1 '측정 종료 — run_all.sh (소스가 껐다)'" >/dev/null 2>&1; then
+      note "리플리카($REPLICA_HOST)에 정지를 걸었다 — 60초 후"
+    else
+      note "🔴 리플리카($REPLICA_HOST)를 못 껐다 — **직접 정지할 것.** 소스만 꺼지면 그 박스는 켜진 채 요금이 붙는다"
+    fi
+  fi
   note "60초 후 정지한다 (취소: pkill -f 'shutdown')"
   shutdown -h +1 "측정 종료 — run_all.sh"
 elif [ "$AUTO_SHUTDOWN" = "1" ]; then
   note "⚠️ 자동 정지가 켜져 있지만 업로드가 실패해서 **끄지 않는다.** 결과가 이 인스턴스에만 있다"
+  if [ -n "$REPLICA_HOST" ]; then
+    note "   리플리카($REPLICA_HOST)도 안 끈다 — 무대를 들여다볼 수 있어야 한다. 회수한 뒤 **두 대 다** 직접 정지할 것"
+  fi
 else
   note "자동 정지 꺼짐 — 회수 확인 후 직접 정지할 것. AWS-RIDE-ALONG.md §5 체크리스트를 볼 것"
+  # 🔴 `&&` 로 쓰지 말 것 — 이 줄이 스크립트의 **마지막 명령**이라, 1대 라운드에서 조건이
+  #    거짓이면 run_all.sh 가 **종료코드 1** 로 끝난다(성공한 판인데도).
+  if [ -n "$REPLICA_HOST" ]; then
+    note "   🔴 **두 대다.** 리플리카($REPLICA_HOST)를 잊지 말 것 — 산출물이 없어서 눈에 안 띈다"
+  fi
 fi
