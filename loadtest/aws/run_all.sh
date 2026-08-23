@@ -171,6 +171,8 @@ R276APP_SESSIONS=${R276APP_SESSIONS:-901-1000}
 # 상한 팔 (#276 ②). 비어 있으면 상한을 안 건드린다 — 1·2차 라운드와 같은 동작이다.
 # 값을 주면 rig 이 팔마다 백엔드를 그 상한으로 다시 띄운다(재기동 시간이 판마다 붙는다).
 R276APP_RETRY_ARMS=${R276APP_RETRY_ARMS:-""}
+# 백오프 팔 (#276 ③ 후속). RETRY_ARMS 와 동시에 주면 rig 이 막는다.
+R276APP_BACKOFF_ARMS=${R276APP_BACKOFF_ARMS:-""}
 
 # ── 동거 용량 (主 P6) ────────────────────────────────────────────────────
 #
@@ -1062,6 +1064,7 @@ phase_r276app() {
   timeout $TIMEOUT_R276APP env \
       LEVELS="$R276APP_LEVELS" REQS="$R276APP_REQS" BLOCKS="$R276APP_BLOCKS" \
       SESSIONS="$R276APP_SESSIONS" RETRY_ARMS="$R276APP_RETRY_ARMS" \
+      BACKOFF_ARMS="$R276APP_BACKOFF_ARMS" \
       CONTAINER="$CONTAINER" DB_NAME="$DB_NAME" PW="$PW" OUT="$out" \
       bash "$ROOT/loadtest/measure_r276_app_retry.sh" > "$out/run.log" 2>&1
   local rc=$?
