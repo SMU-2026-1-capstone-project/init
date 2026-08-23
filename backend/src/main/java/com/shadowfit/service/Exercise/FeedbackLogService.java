@@ -104,7 +104,40 @@ public class FeedbackLogService {
                         + "안 채웠을 가능성이 크다", sessionId, event.getRepNumber());
                 throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
             }
+
+            // occurred_at 도 같은 뿌리다 (#288). 다만 이쪽은 **메시지 타입이라 «미설정» 을 물어볼 수
+            // 있다** — proto3 스칼라와 달리 has-bit 이 있다. 안 물어보면 Timestamps.toMillis 가 0 을
+            // 돌려주고 그게 **1970-01-01** 로 저장된다. 컬럼은 NOT NULL 이라 NULL 로 남길 수도 없어,
+            // 「안 보냈다」가 「1970 에 일어났다」로 굳는다. 정렬·표시용 필드라 그 값이 화면에 그대로 나온다.
+            if (!event.hasOccurredAt()) {
+                log.warn("세션 {} 피드백 batch 거부 — occurred_at 이 비었다(rep={}). 그대로 저장하면 "
+                        + "1970 으로 굳는다", sessionId, event.getRepNumber());
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+            }
+
+            // sync_rate_at_trigger 는 **퍼센트**다(컬럼도 DECIMAL(5,2), 다른 싱크율 컬럼과 같은 폭).
+            // 범위 밖 값을 그대로 넘기면 두 가지가 일어난다:
+            //   · strict mode 면 «Out of range» 로 **INSERT 문 전체**가 죽는다 — 이벤트 하나가 배치를 끌고 나간다
+            //   · 비-strict 면 999.99 로 잘려 들어간다 — 더 나쁘다(조용하다)
+            // 둘 다 «보내는 쪽이 틀렸다» 인데 증상은 «우리가 아프다» 로 보인다. 입구에서 막는다.
+            double rate = event.getSyncRateAtTrigger();
+            if (rate < 0.0 || rate > 100.0 || Double.isNaN(rate)) {
+                log.warn("세션 {} 피드백 batch 거부 — sync_rate_at_trigger 가 퍼센트 범위 밖이다(={}, rep={})",
+                        sessionId, rate, event.getRepNumber());
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+            }
         }
+
+        // 🔴 여기서 **못 막는 것**을 적어둔다 (#288).
+        //
+        // sync_rate_at_trigger 는 proto3 `double` 이라 «미설정» 과 «진짜 0.00» 을 **구분할 수 없다.**
+        // rep_number 는 1-based 라 0 을 «미설정» 으로 읽을 수 있었지만, 싱크율 0% 는 유효한 값이다.
+        // 즉 위 검사는 «범위 밖» 만 막고, 「안 보냈다」가 「싱크율 0%」로 저장되는 것은 그대로다.
+        // 컬럼이 NULL 을 받을 수 있는데 NULL 이 한 번도 안 쓰이는 이유가 그것이다.
+        //
+        // 가르려면 proto 를 `optional double` 로 바꿔 has-bit 을 만들어야 하고, 그건 proto 2벌 +
+        // pb2 재생성 + 배포 순서가 걸린 크로스 레포 변경이다. 감지기(#228)가 이 필드를 실제로
+        // 채우게 될 때 같이 보는 것이 맞다고 판단해 여기서는 안 한다.
 
         // 유형 검증 (#297). 여기까지는 «enum 에 있는가» 만 봤다 — 그런데 FeedbackType 은 8종이고
         // 멘트(exercise_feedback_templates)는 운동마다 다르다. 스쿼트에는 HEAD_DOWN 이 없는데
