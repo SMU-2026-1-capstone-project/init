@@ -89,6 +89,7 @@ if [ -z "$OUTDIR" ]; then
       backup|backup_rehearsal|backup_real) _r=backup-restore ;;
       repl|repl_gate|repl_preflight)       _r=replication ;;
       coresidency*)                        _r=coresidency ;;
+      framepath*)                          _r=frame-path ;;
       *)                                   continue ;;   # preflight·ridealong·collect 는 라운드를 안 정한다
     esac
     case " $_rounds " in *" $_r "*) ;; *) _rounds="${_rounds:+$_rounds }$_r" ;; esac
@@ -209,6 +210,34 @@ GHZ_CONC=${GHZ_CONC:-50}
 # 상한은 그 2~3배로 준다 — 걸려서 끊기는 것보다 낫다(설계 원칙 ③).
 TIMEOUT_CORES=${TIMEOUT_CORES:-21600}                    # 6시간
 TIMEOUT_CORES_REHEARSAL=${TIMEOUT_CORES_REHEARSAL:-1800} # 30분 (예상 몇 분)
+
+# ── 프레임 경로 계측 (從 R10-a) ──────────────────────────────────────────
+#
+# 🔴 이 단계는 다른 단계와 **구조가 다르다.** coresidency 는 부하기에서 돌며 대상 박스를
+#    SSH 로 모는데, R10-a 는 **1대 동거**라 러너가 곧 그 박스다(무대 결정:
+#    docs/decisions/r10-loadgen-topology.md §7). 그래서 여기엔 TARGET_SSH 가 없고,
+#    서버는 **rig 이 팔마다 직접 띄우고 내린다**(재기동이 곧 팔 전환이라 그 구조가 필요했다).
+#
+# 🔴 `FP_PLAN` 에 기본값을 두지 않는다. 격자의 정본은 설계 §13 이고, 여기에 예시를 박아두면
+#    그 예시가 조용히 정본이 된다 — 2026-08-23 에 실제로 격자가 두 벌이 된 적이 있다.
+#    반면 세션·판길이·풀은 «재현 대상이 있는 값» 이라 기본을 둔다(§13-2: 160·90·201).
+FP_PLAN=${FP_PLAN:-}
+FP_SESSIONS=${FP_SESSIONS:-160}
+FP_FPS=${FP_FPS:-3}
+FP_DUR=${FP_DUR:-90}
+FP_POOL=${FP_POOL:-201}
+FP_WARMUP=${FP_WARMUP:-5}
+FP_DISCARD=${FP_DISCARD:-1}
+FP_TAG=${FP_TAG:-run1}
+FP_HTTP_PORT=${FP_HTTP_PORT:-8100}
+FP_GRPC_PORT=${FP_GRPC_PORT:-8685}
+FP_RIG=${FP_RIG:-$ROOT/loadtest/results/frame-path-overhead-2026-08-23/run_arms.py}
+FP_VENV=${FP_VENV:-$ROOT/ai-server/.venv/bin/python}
+
+# 소요 환산(설계 §13-7): 26판 × (부하 90s + setup + 기동·정리). 판당 120초면 52분,
+# 160초면 69분. 🔴 setup(160세션 여는 시간)이 미측정이라 버림판이 처음 준다.
+# 상한은 그 2~3배로 준다 — 걸려서 끊기는 것보다 낫다.
+TIMEOUT_FP=${TIMEOUT_FP:-10800}                          # 3시간
 
 # ── 복제 지연 · 반동기 (主 P4) ───────────────────────────────────────────
 #
@@ -1025,6 +1054,112 @@ phase_ridealong() {
   return 0
 }
 
+# ── 프레임 경로 계측 (從 R10-a) ──────────────────────────────────────────
+#
+# 게이트가 먼저다. 이 라운드는 «환경 결함» 이 «측정 결과» 로 위장하기 쉬운 자리가 넷 있고,
+# 넷 다 **판이 끝난 뒤에는 구분이 안 된다.**
+fp_gate() {
+  local rc=0
+
+  # ① 인터프리터 — 3.12 가 아니면 GIL 거동이 다른 기계다(설계 §13, 부트스트랩 ai-venv 와 같은 이유)
+  if [ ! -x "$FP_VENV" ]; then
+    note "🔴 venv 인터프리터가 없다: $FP_VENV — ROLE=ai-venv 부트스트랩을 안 거쳤다"; rc=1
+  else
+    local v; v=$("$FP_VENV" -V 2>&1 | awk '{print $2}')
+    case "$v" in
+      3.12.*) note "✅ python $v" ;;
+      *) note "🔴 python $v — 기준 라운드는 3.12.x 다. GIL 을 흔드는 판이라 이건 «조건» 이 아니라 «교락» 이다"; rc=1 ;;
+    esac
+  fi
+
+  # ② 격자 — 없으면 여기서 멈춘다. «아무 판이나» 돌면 팔과 판 순서가 안 갈린다
+  if [ -z "$FP_PLAN" ]; then
+    note "🔴 FP_PLAN 이 비었다 — 기본값을 두지 않는 것이 의도다(설계 §13 이 정본)."
+    note "   격자를 먼저 정하고 그 문자열을 그대로 넘길 것. aws/README.md 의 R10-a 절에 있다"
+    rc=1
+  else
+    note "격자 $(echo "$FP_PLAN" | tr ',' '\n' | wc -l)판 · 버림 $FP_DISCARD · 세션 $FP_SESSIONS · ${FP_DUR}초 · 풀 $FP_POOL"
+  fi
+
+  # ③ 프레임 자산 — 이 박스에서 못 만든다(mediapipe 로 영상을 돌려야 한다)
+  [ -f "$CORES_RIG/frames.json" ] \
+    && note "✅ frames.json $(wc -c < "$CORES_RIG/frames.json") B" \
+    || { note "🔴 frames.json 이 없다 — 부하기가 쏠 프레임이 없다"; rc=1; }
+
+  # ④ 🔴 포트가 비어 있나 — 전 판 서버가 안 죽어 있으면 **팔이 조용히 안 바뀐다.**
+  #    rig 이 새로 띄우려다 실패해도 «기존 서버» 가 응답하므로 판은 정상으로 보인다.
+  local p
+  for p in "$FP_HTTP_PORT" "$FP_GRPC_PORT"; do
+    if (exec 3<>/dev/tcp/127.0.0.1/"$p") 2>/dev/null; then
+      exec 3<&- 2>/dev/null; exec 3>&- 2>/dev/null
+      note "🔴 포트 $p 가 이미 열려 있다 — 그 프로세스를 내리고 다시 시작할 것 (안 내리면 팔 전환이 조용히 안 먹는다)"
+      rc=1
+    fi
+  done
+
+  # ⑤ CPU 샘플러 — 도커가 없어 docker stats 를 못 쓴다. /proc 가 대체 수단이다(#400 ⑤)
+  [ -d /proc ] && note "✅ /proc — AI·부하기 CPU 를 걷는다" \
+    || note "⚠️ /proc 가 없다 — CPU 축이 통째로 빈다. 「9.5 of 16」을 못 만진다"
+
+  return $rc
+}
+
+# 판이 끝난 뒤 «성립했나» 를 본다. **막지 않는다** — 이미 다 돌았고, 판정은 사람이 한다.
+# (coresidency 의 cores_assert_* 와 같은 결)
+fp_assert() {
+  local j=$1
+  [ -f "$j" ] || { note "🔴 요약이 없다: $j"; return 1; }
+  "$FP_VENV" - "$j" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+rs = [r for r in d["results"] if not r.get("discard")]
+bad = []
+def add(c, m):
+    if c: bad.append(m)
+add([r for r in rs if r.get("error")], "기동·부하 실패 판이 있다")
+# 🔴 풀 소진은 RPS 를 «천장 돌파» 처럼 보이게 한다 (설계 §2-3 — 그 판들은 전부 무효였다)
+add([r for r in rs if (r.get("outcomes") or {}).get("nolease")], "nolease>0 판이 있다 — 풀 소진. 그 판은 무효다")
+add([r for r in rs if r.get("setup_fail")], "setup_fail>0 판이 있다 — 세션이 다 안 열렸다")
+on = [r for r in rs if r.get("frame_path") is not None]
+add(not on, "계측 ON 판이 하나도 없다 — 구간 비율·lease 가 통째로 빈다")
+add([r for r in on if (r.get("frame_path") or {}).get("error")], "계측 스냅샷 회수 실패 판이 있다")
+add([r for r in rs if (r.get("cpu") or {}).get("error")], "CPU 샘플러가 실패한 판이 있다 — 제목의 숫자를 못 만진다")
+print(f"  본판 {len(rs)} · 계측 ON {len(on)}")
+for m in bad:
+    print("  🔴 " + m)
+sys.exit(1 if bad else 0)
+PY
+}
+
+phase_framepath() {
+  local out=$OUTDIR/framepath
+  mkdir -p "$out"
+
+  fp_gate || { note "🔴 게이트 실패 — 이 상태로 돌리면 «환경 결함» 이 «측정 결과» 로 찍힌다"; return 1; }
+
+  note "rig 이 서버를 팔마다 직접 띄우고 내린다 (재기동이 곧 팔 전환이다)"
+  note "🔴 부하기가 같은 박스에 산다 — 절대 처리량 인용 금지. 이 판이 답하는 것은 팔 사이의 상대 델타다"
+
+  timeout --kill-after=120 "$TIMEOUT_FP" \
+    "$FP_VENV" "$FP_RIG" \
+      --out "$out" --tag "$FP_TAG" \
+      --python "$FP_VENV" \
+      --sessions "$FP_SESSIONS" --fps "$FP_FPS" --dur "$FP_DUR" \
+      --pool "$FP_POOL" --warmup "$FP_WARMUP" \
+      --plan "$FP_PLAN" --discard "$FP_DISCARD" \
+      --http-port "$FP_HTTP_PORT" --grpc-port "$FP_GRPC_PORT" \
+    > "$out/run_arms.log" 2>&1 || { tail -40 "$out/run_arms.log"; return 1; }
+  tail -20 "$out/run_arms.log"
+
+  fp_assert "$out/arms_$FP_TAG.json" \
+    || note "⚠️ 위 판들은 그대로 남긴다 — 지우지 말고 «성립 안 함» 으로 읽을 것"
+
+  # 조건 파일은 부트스트랩이 만든다(ROLE=ai-venv). 결과 옆에 같이 둔다 — 없으면 스택이 안 남는다
+  [ -f /root/ai_venv_conditions.txt ] && cp /root/ai_venv_conditions.txt "$out/" \
+    || note "⚠️ ai_venv_conditions.txt 가 없다 — 무엇을 깔았는지가 결과에 안 남는다"
+  return 0
+}
+
 # 조건 기록. «조건 없는 수치는 인용 불가» 라 이 파일이 없으면 측정도 반쪽이다.
 phase_collect() {
   local m=$OUTDIR/MANIFEST.txt
@@ -1195,6 +1330,10 @@ for p in $PHASES; do
         note "⏭  동거 본 측정 건너뜀 — 리허설이 실패했다"
         printf "coresidency\tSKIP\t0\t%s\n" "$(date -Is)" >> "$PHASE_LOG"
       fi ;;
+    framepath)
+      run_phase framepath phase_framepath || {
+        note "🔴 프레임 경로 라운드 실패 — 게이트가 막았거나 rig 이 죽었다. run_arms.log 를 볼 것"
+      } ;;
     ridealong) run_phase ridealong phase_ridealong ;;
     collect)   run_phase collect   phase_collect ;;
     *)         note "알 수 없는 단계 '$p' — 건너뛴다" ;;
