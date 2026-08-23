@@ -227,7 +227,11 @@ docker compose up -d
 - 백업 없으면 reverse ALTER 수동 작성 + 실행
 - `mysql_data` 볼륨 삭제 (`docker compose down -v`) 는 **모든 운영 데이터가 날아감** — 절대 운영에서 사용 금지
 
-> 운영 DB 백업 정책 — **TODO**: 백업 빈도, 백업 위치(S3/등), 복구 RTO/RPO 미정. 결정 필요.
+> 운영 DB 백업 정책 — **절반 TODO**: 백업 빈도, 백업 위치(S3/등) 미정. 결정 필요.
+>
+> 🔄 **2026-08-23 정정 — 「복구 RTO/RPO 미정」은 낡았다.** 2026-08-13 EC2 에서 **본 측정을 마쳤다** — RTO 약 21분(팔 A) · 논리(`mysqldump`) ↔ 물리 약 **7배** · **PITR 실제 복원 확인** · 재측정 b라운드와 팔 B 교정까지. 근거: [`decisions/backup-restore-rto-rpo.md`](./decisions/backup-restore-rto-rpo.md).
+>
+> 🔴 **남은 것은 «빈도·위치» 이고 그건 배포 호스트가 정해져야 한다** — S3 든 EBS 스냅샷이든 대상이 있어야 고른다.
 
 ---
 
