@@ -40,6 +40,55 @@ COV="ALTER TABLE pose_data ADD KEY idx_report_cover (session_id, rep_number, tim
 
 has_index(){ [ "$(DB -N -e "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema='shadowfit' AND table_name='pose_data' AND index_name='$1'")" -gt 0 ]; }
 
+# ── 원상 복구 ────────────────────────────────────────────────────────────────
+#
+# 🔴 **이 rig 이 스키마를 만지고 안 돌려놨다** (#429). 팔 B·C 가 인덱스를 만드는데 종료 시
+#    복구가 없어서, 마지막에 돈 팔의 스키마가 그대로 남았다. 그 결과 나중에 Flyway 가
+#    V6(`ADD UNIQUE KEY uk_pose_event`)을 적용할 때 **`Duplicate key name` 으로 실패**하고,
+#    실패한 마이그레이션이 이력에 success=0 으로 남아 **백엔드가 아예 안 떴다.**
+#    스키마는 맞는데 이력만 틀린 상태라 원인까지 가는 데 시간이 든다.
+#
+#    같은 계열 rig 인 R8(`uk_index_ridealong.sh`)은 처음부터 trap 으로 되돌리고 **복구를
+#    확인**까지 한다. 그 관례를 여기에도 맞춘다.
+#
+# ⚠️ **되돌리는 것은 인덱스뿐이다.** 아래 `dedup` 이 지우는 행은 복구 경로가 없다
+#    (V6 가 main 에 들어온 뒤로는 중복이 존재할 수 없어 사실상 0행이지만, 옛 스냅샷에
+#    돌리면 지워진다). 그건 이 trap 이 답할 수 있는 문제가 아니다.
+BASE_UK=absent
+BASE_COV=absent
+has_index uk_pose_event    && BASE_UK=present
+has_index idx_report_cover && BASE_COV=present
+
+restore_schema(){
+  local rc=$?
+  echo
+  echo "=== 스키마 원복 (시작 시점: uk_pose_event=$BASE_UK · idx_report_cover=$BASE_COV) ==="
+
+  if [ "$BASE_UK" = absent ]; then
+    has_index uk_pose_event    && DB -e "ALTER TABLE pose_data DROP KEY uk_pose_event"
+  else
+    has_index uk_pose_event    || { dedup; DB -e "$UK"; }
+  fi
+
+  if [ "$BASE_COV" = absent ]; then
+    has_index idx_report_cover && DB -e "ALTER TABLE pose_data DROP KEY idx_report_cover"
+  else
+    has_index idx_report_cover || DB -e "$COV"
+  fi
+
+  # 「되돌렸다」와 「되돌아갔다」는 다르다 — R8 이 같은 이유로 확인을 넣었다.
+  local now_uk=absent now_cov=absent
+  has_index uk_pose_event    && now_uk=present
+  has_index idx_report_cover && now_cov=present
+  if [ "$now_uk" = "$BASE_UK" ] && [ "$now_cov" = "$BASE_COV" ]; then
+    echo "  복구 확인 (uk_pose_event=$now_uk · idx_report_cover=$now_cov)"
+  else
+    echo "  🔴 복구 실패 — 손으로 확인할 것 (지금: uk_pose_event=$now_uk · idx_report_cover=$now_cov)" >&2
+  fi
+  return $rc
+}
+trap restore_schema EXIT
+
 # V6 마이그레이션의 1) 단계와 같다 — 기존 위반 행(부하 rig 이 같은 메시지를 여러 번 보낸 것,
 # 전부 세션 801)을 지워야 ADD UNIQUE KEY 가 성립한다. 그룹당 최소 id 1행은 반드시 남는다.
 dedup(){
