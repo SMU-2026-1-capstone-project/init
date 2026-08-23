@@ -41,6 +41,44 @@ public final class FixedWindowCounter {
         return windows.get(key, k -> new AtomicInteger()).incrementAndGet();
     }
 
+    /**
+     * 한도에 여유가 있을 때만 <b>원자적으로</b> 한 칸을 잡는다. 잡았으면 {@code true}.
+     *
+     * <p>🔴 <b>{@code current() } 로 보고 나중에 {@code increment()} 하는 것과 다르다.</b>
+     * 그 둘 사이에 다른 스레드가 끼어들 수 있어서, 한도가 3이고 현재 2일 때 동시에 도착한
+     * 요청이 <b>전부 검사를 통과</b>한다 — 한 배치의 동시성만큼 한도가 초과된다. 로그인
+     * 브루트포스는 정확히 그 형태로 오므로, 검사와 예약이 갈라지면 이 장치가 반쪽이 된다.
+     * (CodeRabbit 지적, PR #423)
+     *
+     * <p>CAS 루프인 이유: {@code incrementAndGet} 후 초과면 되돌리는 방식은 되돌리기 전에
+     * 다른 요청이 그 값을 보고 거절당한다 — 한도가 잠깐 낮아진다.
+     */
+    public boolean tryAcquire(String key, int limit) {
+        AtomicInteger counter = windows.get(key, k -> new AtomicInteger());
+        while (true) {
+            int now = counter.get();
+            if (now >= limit) {
+                return false;
+            }
+            if (counter.compareAndSet(now, now + 1)) {
+                return true;
+            }
+        }
+    }
+
+    /**
+     * 잡아둔 한 칸을 되돌린다. 0 아래로는 안 내려간다.
+     *
+     * <p>«이 시도는 셀 대상이 아니었다» 가 밝혀졌을 때 쓴다 — 예컨대 DB 장애로 로그인이
+     * 실패한 경우. 그걸 실패로 세면 <b>인프라 흔들림이 사용자 한도를 갉아먹는다.</b>
+     */
+    public void release(String key) {
+        AtomicInteger counter = windows.getIfPresent(key);
+        if (counter != null) {
+            counter.updateAndGet(v -> v > 0 ? v - 1 : 0);
+        }
+    }
+
     /** 올리지 않고 현재 값만 본다. 창이 지났으면 0. */
     public int current(String key) {
         AtomicInteger counter = windows.getIfPresent(key);

@@ -38,13 +38,25 @@ public class LoginAttemptLimiter {
         this.counter = new FixedWindowCounter(properties.getWindowSeconds(), properties.getMaxKeys());
     }
 
-    /** 한도를 넘었으면 429 로 끊는다. 로그인 처리에 들어가기 <b>전에</b> 부른다. */
-    public void checkOrThrow(String email) {
+    /**
+     * 한 칸을 <b>원자적으로 잡고</b> 들어간다. 여유가 없으면 429 로 끊는다.
+     * 로그인 처리에 들어가기 <b>전에</b> 부른다.
+     *
+     * <p>🔴 <b>«보고 나서 나중에 센다» 가 아니다.</b> 검사(현재값 읽기)와 기록(증가)이 갈라져
+     * 있으면 그 사이에 동시 요청이 전부 통과한다 — 한도 3에 현재 2여도 동시에 온 열 건이
+     * 다 들어가고, 각자 BCrypt 를 태운 뒤 실패를 기록한다. 브루트포스가 정확히 그 형태라
+     * 여기서만은 <b>잡고 들어가야</b> 한다. (CodeRabbit 지적, PR #423)
+     *
+     * <p>잡은 칸은 <b>기본이 «유지»</b> 다 — 로그인은 실패가 정상 결과이기 때문이다.
+     * 되돌리는 것은 {@link #releaseReservation} 을 명시적으로 부를 때뿐이고,
+     * 성공하면 {@link #recordSuccess} 가 창을 통째로 비운다.
+     */
+    public void acquireOrThrow(String email) {
         if (!properties.isEnabled()) {
             return;
         }
         String key = normalize(email);
-        if (counter.current(key) >= properties.getAccountFailuresPerWindow()) {
+        if (!counter.tryAcquire(key, properties.getAccountFailuresPerWindow())) {
             // 🔴 이메일을 로그에 찍지 않는다 (이슈 #411 과 같은 이유 — 로그는 유출 표면이다).
             //    누구였는지는 이 요청이 인증 전이라 actor 로도 안 남는데, 그건 감수한다.
             //    여기 이메일을 찍으면 «로그인 실패한 계정 목록» 이 로그에 쌓인다.
@@ -55,9 +67,18 @@ public class LoginAttemptLimiter {
         }
     }
 
-    /** 비밀번호 불일치·계정 없음 — 어느 쪽이든 실패다. */
-    public void recordFailure(String email) {
-        counter.increment(normalize(email));
+    /**
+     * 잡아둔 칸을 되돌린다 — <b>인증과 무관한 실패</b>에만 쓴다(DB 장애 등).
+     *
+     * <p>비밀번호 불일치·계정 없음에는 <b>부르지 않는다.</b> 그게 이 장치가 세려는 바로
+     * 그 사건이다. 반대로 인프라가 흔들려 실패한 것까지 세면 <b>장애가 사용자 한도를
+     * 갉아먹는다</b> — 로그인이 안 되는 와중에 429 까지 받게 된다.
+     */
+    public void releaseReservation(String email) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+        counter.release(normalize(email));
     }
 
     /** 로그인이 성사됐다 = 이 계정을 두드리던 것이 아니었다. 창을 비운다. */

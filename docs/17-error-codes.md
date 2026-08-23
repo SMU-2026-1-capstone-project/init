@@ -164,8 +164,10 @@ Session session = sessionRepository.findById(sessionId)
 
 ## 5. 알려진 미흡점 (도입 작업 후보)
 
-1. **`GlobalExceptionHandler` 미구현** — 위에 명시. `@RestControllerAdvice` + `@ExceptionHandler(BusinessException.class)` 도입 시 응답 형식 통일.
-2. **Validation 에러 매핑** — `@Valid` 실패의 `MethodArgumentNotValidException` 을 `C001 INVALID_INPUT_VALUE` 로 매핑하는 핸들러 필요.
+> 🔄 **2026-08-23 정정 — 1·2번은 이미 됐다.** §1 의 메모와 같은 드리프트였다(한 문서 안에서 앞뒤가 어긋나 있어 읽는 사람이 구현 상태를 판단할 수 없었다). CodeRabbit 지적으로 발견, PR #423 에서 같이 고친다.
+
+1. ~~**`GlobalExceptionHandler` 미구현**~~ → ✅ **있다.** `global/error/GlobalExceptionHandler.java` (`@RestControllerAdvice`).
+2. ~~**Validation 에러 매핑**~~ → ✅ **된다.** `MethodArgumentNotValidException` 핸들러가 필드별 메시지를 모아 `C001` 로 낸다. `MethodArgumentTypeMismatchException`·`NoResourceFoundException`·`AccessDeniedException` 도 같이 덮는다.
 3. **`OptimisticLockingFailureException` 매핑** — 현재는 `SessionService.completeSession` 에서 3회 재시도 후 throw. 핸들러에서 `I003 DATABASE_LOCK_FAILURE` 로 매핑 가능.
 4. **AI/gRPC 에러 → REST 매핑** — AI 콜백 실패가 사용자 요청 응답에 즉시 영향을 주는 경로는 없음 (비동기). 향후 동기 경로 추가 시 `AI001 AI_FEEDBACK_FAILED` 활용.
 5. **에러 코드 → ErrorCode 객체 노출** — 응답 DTO 가 `code(String)` 를 포함하지 않음. 클라이언트에서 분기할 때 메시지 문자열 매칭이라 깨지기 쉬움. `code` 필드 추가 권장.
@@ -189,6 +191,8 @@ Session session = sessionRepository.findById(sessionId)
 - `backend/src/main/java/com/shadowfit/global/error/ErrorCode.java`
 - `backend/src/main/java/com/shadowfit/global/error/BusinessException.java`
 - `backend/src/main/java/com/shadowfit/global/error/ErrorResponseDto.java`
-- (예정) `backend/src/main/java/com/shadowfit/global/error/GlobalExceptionHandler.java`
+- `backend/src/main/java/com/shadowfit/global/error/GlobalExceptionHandler.java`
+- `backend/src/main/java/com/shadowfit/global/error/RateLimitExceededException.java` (429 + `Retry-After`)
+- `backend/src/main/java/com/shadowfit/global/security/ratelimit/` (시도 제한 — 이슈 #394)
 - `backend/src/main/java/com/shadowfit/global/config/InternalAuthInterceptor.java` (gRPC `UNAUTHENTICATED`)
 - `ai-server/app/grpc/server.py` (AI 측 인증 인터셉터)

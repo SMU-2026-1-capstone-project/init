@@ -5,6 +5,11 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.error.RateLimitExceededException;
 import jakarta.servlet.FilterChain;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -191,15 +196,14 @@ class AuthRateLimitTest {
     class Account {
 
         @Test
-        @DisplayName("실패가 한도에 닿으면 다음 시도를 429 로 끊는다")
-        void blocksAfterFailures() {
+        @DisplayName("한도만큼 잡으면 다음 시도를 429 로 끊는다")
+        void blocksAfterLimit() {
             LoginAttemptLimiter limiter = new LoginAttemptLimiter(props(60, 2, 60));
 
-            limiter.recordFailure("a@b.com");
-            assertThatCode(() -> limiter.checkOrThrow("a@b.com")).doesNotThrowAnyException();
+            limiter.acquireOrThrow("a@b.com");
+            assertThatCode(() -> limiter.acquireOrThrow("a@b.com")).doesNotThrowAnyException();
 
-            limiter.recordFailure("a@b.com");
-            assertThatThrownBy(() -> limiter.checkOrThrow("a@b.com"))
+            assertThatThrownBy(() -> limiter.acquireOrThrow("a@b.com"))
                     .isInstanceOf(RateLimitExceededException.class)
                     .satisfies(e -> {
                         RateLimitExceededException ex = (RateLimitExceededException) e;
@@ -209,15 +213,76 @@ class AuthRateLimitTest {
         }
 
         @Test
+        @DisplayName("🔴 동시에 밀어넣어도 한도를 넘지 못한다 — 검사와 예약이 갈라지면 여기서 깨진다")
+        void concurrentAcquiresRespectLimit() throws Exception {
+            int limit = 3;
+            int threads = 64;
+            LoginAttemptLimiter limiter = new LoginAttemptLimiter(props(60, limit, 60));
+
+            // 이 테스트가 이 파일에서 가장 중요하다. 「current() 로 보고 나중에 increment()」
+            // 였을 때는 64개가 전부 통과했다 — 한도가 아니라 **동시성**이 상한이 된다.
+            // 브루트포스는 정확히 그 형태로 온다. (CodeRabbit 지적, PR #423)
+            ExecutorService pool = Executors.newFixedThreadPool(16);
+            CountDownLatch start = new CountDownLatch(1);
+            AtomicInteger passed = new AtomicInteger();
+            try {
+                for (int i = 0; i < threads; i++) {
+                    pool.submit(() -> {
+                        try {
+                            start.await();
+                            limiter.acquireOrThrow("race@b.com");
+                            passed.incrementAndGet();
+                        } catch (RateLimitExceededException expected) {
+                            // 정상 — 한도를 넘은 쪽
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    });
+                }
+                start.countDown();
+                pool.shutdown();
+                assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+            } finally {
+                pool.shutdownNow();
+            }
+
+            assertThat(passed.get()).isEqualTo(limit);
+        }
+
+        @Test
         @DisplayName("성공하면 창이 비어, 기기를 여러 대 쓰는 사용자가 자기 실패 이력에 안 걸린다")
         void successResetsWindow() {
             LoginAttemptLimiter limiter = new LoginAttemptLimiter(props(60, 2, 60));
 
-            limiter.recordFailure("a@b.com");
-            limiter.recordFailure("a@b.com");
+            limiter.acquireOrThrow("a@b.com");
+            limiter.acquireOrThrow("a@b.com");
             limiter.recordSuccess("a@b.com");
 
-            assertThatCode(() -> limiter.checkOrThrow("a@b.com")).doesNotThrowAnyException();
+            assertThatCode(() -> limiter.acquireOrThrow("a@b.com")).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("인증 외 실패는 예약을 되돌린다 — 인프라 장애가 사용자 한도를 갉아먹으면 안 된다")
+        void releaseGivesTheSlotBack() {
+            LoginAttemptLimiter limiter = new LoginAttemptLimiter(props(60, 1, 60));
+
+            limiter.acquireOrThrow("a@b.com");
+            limiter.releaseReservation("a@b.com");
+
+            assertThatCode(() -> limiter.acquireOrThrow("a@b.com")).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("되돌리기가 0 아래로 안 내려간다 — 남는 예약이 한도를 늘려주면 안 된다")
+        void releaseDoesNotGoNegative() {
+            LoginAttemptLimiter limiter = new LoginAttemptLimiter(props(60, 1, 60));
+
+            limiter.releaseReservation("a@b.com");
+            limiter.releaseReservation("a@b.com");
+
+            limiter.acquireOrThrow("a@b.com");
+            assertThatThrownBy(() -> limiter.acquireOrThrow("a@b.com"))
+                    .isInstanceOf(RateLimitExceededException.class);
         }
 
         @Test
@@ -225,11 +290,11 @@ class AuthRateLimitTest {
         void keyIsNormalized() {
             LoginAttemptLimiter limiter = new LoginAttemptLimiter(props(60, 2, 60));
 
-            limiter.recordFailure("a@b.com");
-            limiter.recordFailure("A@B.COM");
+            limiter.acquireOrThrow("a@b.com");
+            limiter.acquireOrThrow("A@B.COM");
 
             // 정규화가 없으면 이 둘이 다른 버킷이라 여기서 안 걸린다.
-            assertThatThrownBy(() -> limiter.checkOrThrow("  A@b.Com  "))
+            assertThatThrownBy(() -> limiter.acquireOrThrow("  A@b.Com  "))
                     .isInstanceOf(RateLimitExceededException.class);
         }
 
@@ -238,9 +303,9 @@ class AuthRateLimitTest {
         void perAccountBuckets() {
             LoginAttemptLimiter limiter = new LoginAttemptLimiter(props(60, 1, 60));
 
-            limiter.recordFailure("a@b.com");
+            limiter.acquireOrThrow("a@b.com");
 
-            assertThatCode(() -> limiter.checkOrThrow("c@d.com")).doesNotThrowAnyException();
+            assertThatCode(() -> limiter.acquireOrThrow("c@d.com")).doesNotThrowAnyException();
         }
 
         @Test
@@ -250,10 +315,9 @@ class AuthRateLimitTest {
             p.setEnabled(false);
             LoginAttemptLimiter limiter = new LoginAttemptLimiter(p);
 
-            limiter.recordFailure("a@b.com");
-            limiter.recordFailure("a@b.com");
-
-            assertThatCode(() -> limiter.checkOrThrow("a@b.com")).doesNotThrowAnyException();
+            for (int i = 0; i < 10; i++) {
+                assertThatCode(() -> limiter.acquireOrThrow("a@b.com")).doesNotThrowAnyException();
+            }
         }
     }
 }

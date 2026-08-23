@@ -23,8 +23,14 @@ public class AuthRateLimitProperties {
      * 끄는 스위치. 기본 {@code true}.
      *
      * <p>테스트에서 끄기 위한 것이 아니다(테스트는 자기 인스턴스를 직접 만든다) —
-     * 운영에서 <b>이 장치가 오히려 사고를 낼 때</b> 재배포 없이 끌 수 있어야 해서다.
-     * 가장 그럴 법한 시나리오가 {@link AuthRateLimitFilter} 의 프록시 경고다.
+     * 운영에서 <b>이 장치가 오히려 사고를 낼 때</b> 끌 수 있어야 해서다. 가장 그럴 법한
+     * 시나리오가 {@link AuthRateLimitFilter} 의 프록시 경고다.
+     *
+     * <p>🔴 <b>«무중단으로» 바뀌지는 않는다.</b> 이 값은 기동 시 {@code @ConfigurationProperties}
+     * 로 한 번 바인딩되고, 이 저장소에는 Spring Cloud refresh 도 {@code /actuator/refresh} 도
+     * 없다. 끄려면 <b>재시작</b>이 필요하다 — 다만 <b>이미지 재빌드는 필요 없다</b>
+     * ({@code .env} 의 {@code AUTH_RATE_LIMIT_ENABLED} 를 고치고 컨테이너만 다시 띄운다).
+     * 그 구분이 이 스위치가 존재하는 이유다. (CodeRabbit 지적, PR #423)
      */
     private boolean enabled = true;
 

@@ -76,18 +76,40 @@ public class MemberService{
         // 계정 단위 시도 제한 (이슈 #394). IP 제한(AuthRateLimitFilter)이 «한 곳에서 여러 계정»
         // 을 막는다면 이쪽은 «여러 곳에서 한 계정» 을 막는다 — 로그인 브루트포스의 실제 모양이
         // 후자다. 조회·해시 검증보다 **먼저** 부른다: 막을 요청에 BCrypt 비용을 쓰지 않는다.
-        loginAttemptLimiter.checkOrThrow(dto.getEmail());
+        //
+        // 🔴 «검사» 가 아니라 «예약» 이다. 읽고 나서 나중에 세면 그 사이에 동시 요청이 전부
+        //    통과한다 — 한도만큼이 아니라 **동시성만큼** 들어간다 (CodeRabbit 지적, PR #423).
+        loginAttemptLimiter.acquireOrThrow(dto.getEmail());
+        try {
+            return doLogin(dto);
+        } catch (BusinessException e) {
+            // 인증 실패(비밀번호 불일치·계정 없음)는 **예약을 유지한다** — 그게 세려던 사건이다.
+            // 🔴 «없는 계정» 도 세는 이유: 있는 계정과 한도가 다르면 그 차이가 곧
+            //    계정 존재 여부 오라클이 된다.
+            //
+            // 그 밖(검증·인프라)은 되돌린다. 장애로 로그인이 안 되는 와중에 그것까지 세면
+            // **장애가 사용자 한도를 갉아먹는다.**
+            if (!isAuthenticationFailure(e.getErrorCode())) {
+                loginAttemptLimiter.releaseReservation(dto.getEmail());
+            }
+            throw e;
+        } catch (RuntimeException e) {
+            // DB 장애 등. 사용자의 잘못이 아니므로 되돌린다.
+            loginAttemptLimiter.releaseReservation(dto.getEmail());
+            throw e;
+        }
+    }
 
-        Member member = memberRepository.findByEmail(dto.getEmail())
-                .orElseGet(() -> {
-                    // 🔴 «없는 계정» 도 실패로 센다. 있는 계정과 한도가 다르면 그 차이가
-                    //    곧 계정 존재 여부 오라클이 된다.
-                    loginAttemptLimiter.recordFailure(dto.getEmail());
-                    throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-                });
+    /** 인증 «실패» 로 셀 것인가 — 예약을 유지할 에러코드 목록. */
+    private static boolean isAuthenticationFailure(ErrorCode code) {
+        return code == ErrorCode.USER_NOT_FOUND || code == ErrorCode.LOGIN_INPUT_INVALID;
+    }
+
+    private LoginResponseDto doLogin(LoginRequestDto dto) {
+        Member member = memberRepository.findByEmail(dto.getEmail()).
+                orElseThrow(()-> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if(!passwordEncoder.matches(dto.getPassword(), member.getPassword())){
-            loginAttemptLimiter.recordFailure(dto.getEmail());
             throw new BusinessException(ErrorCode.LOGIN_INPUT_INVALID);
         }
 
