@@ -350,44 +350,45 @@ step "MySQL 컨테이너"
 cd "$WORKDIR" || die "$WORKDIR 로 못 들어간다"
 docker compose up -d mysql || die "compose up 실패"
 
-# 🔴 `mysqladmin ping` 한 번으로는 «준비됐다» 를 못 본다 (#275 ②, 2026-08-23 재발).
+# 🔴 `mysqladmin ping` 으로는 «준비됐다» 를 못 본다 (#275 ②, 2026-08-23 재발 — 인스턴스 둘).
 #    MySQL 공식 이미지는 초기화 때 **임시 서버를 띄웠다 껐다** 하는데 ping 은 그 임시 서버에도
-#    붙는다. 그래서 예전 코드는 루프에서 «떴다» 를 찍고 **바로 다음 줄에서** 「안 떴다」로 죽었다:
+#    붙는다. 그래서 예전 코드는 루프에서 «떴다» 를 찍고 **바로 다음 줄에서** 죽었다:
 #
 #        헬스체크 대기. — 떴다
 #      🔴 부트스트랩 중단 — MySQL 이 5분 안에 안 떴다
 #
-#    2026-08-23 라운드가 정확히 이 두 줄로 죽어 인스턴스를 한 번 버렸다. ping 은 «지금 응답하나»
-#    를 보고 헬스체크는 «준비됐나» 를 본다 — 그래서 컨테이너 헬스 상태를 본다
-#    (compose 가 mysql 에 healthcheck 를 정의해 뒀다: interval 10s · start_period 20s).
-#    헬스체크가 없는 compose 를 만나면 status 가 빈 문자열이므로, 그때만 ping 으로 떨어지되
-#    **연속 3회**를 요구한다 — 임시 서버 창은 연속으로는 못 통과한다.
-echo -n "  헬스체크 대기"
+#    🔴 #275 가 제안한 두 방향(**헬스 상태** / **ping 연속 N회**)은 **둘 다 안 된다.**
+#    2026-08-23 에 fresh `mysql:8.0` 을 띄워 1초 간격으로 찍은 타임라인이 그것을 지운다:
+#
+#        t=18~20  health=healthy · ping(소켓)=OK · 실제 질의=실패   ← 임시 서버
+#        t=21~23  health=healthy(낡음) · ping=실패 · 질의=실패      ← 재시작 창(옛 코드가 죽던 자리)
+#        t=24     health=healthy · ping=실패 · **질의=1**           ← 진짜 서버
+#
+#    헬스체크의 test 가 `mysqladmin ping` 이라 **헬스 상태도 임시 서버를 healthy 로 본다.**
+#    ping 연속 3회도 t=18~20 구간에 그대로 들어맞는다. 그래서 기준을 하나로 바꾼다 —
+#    «인증된 질의가 TCP 로 되는가».
+echo -n "  준비 대기"
 mysql_ready=0
-for _ in $(seq 1 60); do
-  hs=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' shadowfit-mysql 2>/dev/null)
-  if [ "$hs" = "healthy" ]; then
-    mysql_ready=1; echo " — 떴다 (healthy)"; break
-  fi
-  if [ -z "$hs" ]; then
-    hits=0
-    for _ in 1 2 3; do
-      if docker exec shadowfit-mysql mysqladmin ping -h localhost --silent >/dev/null 2>&1; then
-        hits=$((hits+1))
-      else
-        hits=0
-      fi
-      sleep 2
-    done
-    if [ "$hits" = 3 ]; then
-      mysql_ready=1; echo " — 떴다 (헬스체크 없음 · ping 연속 3회)"; break
+# 상한 90회 × 5초 = 7.5분. 예전 5분에서 올렸다 — 2026-08-23 스모크에서 (부하가 걸린) 로컬
+# 박스가 **166초**를 썼다. 실패의 대가가 «인스턴스 하나» 라 여유를 두는 편이 싸다.
+for _ in $(seq 1 90); do
+  # 🔴 «인증된 질의가 TCP 로 되는가» 하나만 본다. ping 도 헬스 상태도 임시 서버를 통과한다(위).
+  #    TCP 인 이유: 임시 서버는 네트워킹 없이 소켓으로만 뜨므로 TCP 는 **진짜 서버의 신호**다.
+  #    MYSQL_PWD 로 넘긴다 — argv 에 실리지 않고 경고도 안 난다(run_all.sh 의 같은 규약).
+  if docker exec -e MYSQL_PWD="$PW" shadowfit-mysql \
+       mysql -uroot -h 127.0.0.1 --protocol=TCP -N -e "SELECT 1" >/dev/null 2>&1; then
+    mysql_ready=$((mysql_ready+1))
+    if [ "$mysql_ready" -ge 2 ]; then
+      echo " — 떴다 (TCP 인증 질의 연속 2회)"; break
     fi
+  else
+    mysql_ready=0
   fi
   echo -n "."; sleep 5
 done
-# 🔴 여기서 ping 을 **다시 하지 않는다.** 예전 코드의 결함이 그 재확인이었다 —
-#    루프가 이미 «준비» 를 확인했는데 재시작 창에 걸려 라운드를 통째로 잃었다.
-[ "$mysql_ready" = 1 ] || die "MySQL 이 5분 안에 준비되지 않았다 (#275 ②)"
+# 🔴 여기서 다시 묻지 않는다. 예전 코드의 결함이 그 재확인이었다 — 루프가 «준비» 를 확인한
+#    뒤 한 번 더 물어서, 재시작 창에 걸리면 멀쩡한 박스를 버린다.
+[ "$mysql_ready" -ge 2 ] || die "MySQL 이 7.5분 안에 준비되지 않았다 (#275 ②)"
 
 # ── 도구 이미지 ──────────────────────────────────────────────────────────
 #
