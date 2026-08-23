@@ -335,7 +335,7 @@ session_id BIGINT NOT NULL,
 | `WeeklySummaryQueryRepository` | 집계 쿼리 (아래 Q1~Q4) |
 | `WeeklySummaryService` | 조립 + 규칙 적용 |
 | `WeeklySentenceRules` | **규칙 카탈로그** — 조건 → 문장. 순수 함수라 테스트가 쉽다 |
-| `ExerciseReportController` 엔드포인트 1개 | `GET /reports/weekly?start=YYYY-MM-DD` |
+| ~~`ExerciseReportController` 엔드포인트 1개~~ | ~~`GET /reports/weekly?start=YYYY-MM-DD`~~ → 🔵 **정정 (2026-08-23, #352)**: 그 경로는 **호출자가 0** 이었다(같은 base 에 `/reports/weekly-summary` 가 이미 있어 프론트에서 안 보였다). A층 요약은 그 기존 응답의 `summary` 필드로 **합쳤고**, 파라미터는 안 받는다 — 응답의 두 절반이 같은 주를 보게 하려는 것이다 |
 
 ### 13-2. 집계 쿼리 — 두 층으로 갈린다
 
