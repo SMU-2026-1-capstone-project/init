@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DeadlockLoserDataAccessException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -107,6 +108,32 @@ class ExerciseGrpcServiceTest {
         verify(obs).onCompleted();
         verify(obs, never()).onError(any());
         verify(sessionMetrics, times(2)).poseBatchDeadlockRetry("retried");
+        verify(sessionMetrics).poseBatchDeadlockRetry("recovered");
+    }
+
+    @Test
+    @DisplayName("savePoseDataBatch 데드락 — **실사용에서 오는 타입**(CannotAcquireLock)도 재시도한다 (#416)")
+    void savePoseDataBatch_deadlockRetriesOnTranslatedType() {
+        PoseDataBatchRequest request = PoseDataBatchRequest.newBuilder().setSessionId(1L).build();
+        @SuppressWarnings("unchecked")
+        StreamObserver<PoseDataResponse> obs = mock(StreamObserver.class);
+
+        // 🔴 이 테스트가 존재하는 이유 (#416).
+        //    위 두 테스트는 DeadlockLoserDataAccessException 을 **직접** 던진다. 그런데 실사용에서는
+        //    그 타입이 오지 않는다 — Spring 6 의 기본 번역기(SQLExceptionSubclassTranslator)는 그
+        //    클래스를 만들지 않고, MySQL 데드락(1213/40001)을 CannotAcquireLockException 계열로 바꾼다.
+        //    그래서 재시도 루프가 2026-08-23 까지 **한 번도 돌지 않았는데도** 위 테스트는 초록이었다.
+        //    가정이 그대로 테스트가 된 것이고, 이 테스트는 그 가정 밖을 지킨다.
+        doThrow(new CannotAcquireLockException("Deadlock found when trying to get lock"))
+                .doNothing()
+                .when(poseDataService).savePoseDataBatch(anyLong(), anyList());
+
+        grpcService.savePoseDataBatch(request, obs);
+
+        verify(poseDataService, times(2)).savePoseDataBatch(anyLong(), anyList());
+        verify(obs).onCompleted();
+        verify(obs, never()).onError(any());
+        verify(sessionMetrics).poseBatchDeadlockRetry("retried");
         verify(sessionMetrics).poseBatchDeadlockRetry("recovered");
     }
 
