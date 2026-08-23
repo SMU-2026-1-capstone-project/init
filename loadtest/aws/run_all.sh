@@ -135,7 +135,14 @@ if [ -z "$OUTDIR" ]; then
 fi
 
 SYNC_SEC=${SYNC_SEC:-300}
-AUTO_SHUTDOWN=${AUTO_SHUTDOWN:-0}
+# 🔴 기본이 **켜짐**이다 (2026-08-24 사용자 지시: "측정 다 하면 EC2 가 자동으로 끄는 걸로").
+#    끄는 조건은 그대로다 — **업로드가 성공한 판에서만** 끈다(아래 FINAL_OK 갈래).
+#    업로드가 실패하면 결과가 그 인스턴스에만 있으므로 켜 둔 채 남긴다.
+#
+#    ⚠️ 이것만으로는 요금이 안 끊긴다. `shutdown` 이 stop 이냐 terminate 냐는 **인스턴스 속성**이라,
+#       띄울 때 `--instance-initiated-shutdown-behavior terminate` 로 띄워야 EBS 까지 지워진다.
+#       stop 으로 띄운 박스는 꺼져도 볼륨 요금이 계속 나간다(AWS-RIDE-ALONG §5).
+AUTO_SHUTDOWN=${AUTO_SHUTDOWN:-1}
 
 PW=${PW:-1234}
 DB_NAME=${DB_NAME:-shadowfit}
