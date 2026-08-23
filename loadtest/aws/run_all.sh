@@ -223,8 +223,10 @@ HTTPW_MULTS=${HTTPW_MULTS:-"60 180 360"}   # 표본 수로 고른 값 — rig �
 HTTPW_DUR=${HTTPW_DUR:-120s}
 HTTPW_BLOCKS=${HTTPW_BLOCKS:-4}
 # 🔴 64 가 아니다 — 인증 레이트리밋(IP당 60초 60건)이 정하는 값이다. 1차 판(2026-08-23)이
-#    계정 64개를 만들다 61번째 로그인에서 429 로 죽었다. rig 머리 참고.
-HTTPW_ACCOUNTS=${HTTPW_ACCOUNTS:-32}
+#    계정 64개를 만들다 61번째 로그인에서 429 로 죽었다.
+#    아래에서 막는 것은 **완결 왕복**이다 — 계정은 «종료 요청» 이 아니라 «AI 콜백» 뒤에야 풀린다.
+#    도달 가능 도착률 ≈ 계정 수 ÷ 왕복(≈1~1.5초). rig 머리 참고.
+HTTPW_ACCOUNTS=${HTTPW_ACCOUNTS:-48}
 HTTPW_EXERCISE_ID=${HTTPW_EXERCISE_ID:-1}
 HTTPW_PORT=${HTTPW_PORT:-8080}
 
