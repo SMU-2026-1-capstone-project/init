@@ -268,7 +268,7 @@ GIL 경합이 크면 이 값이 크다. ⚠️ **단독 판정에는 못 쓴다*
 현행 경로만 쓰므로 조건이 단순하고, 그 결과가 이 판의 `wait` 해석에 들어온다.
 
 ⚠️ **두 판은 같은 박스지만 같은 판이 아니다.** 절대값을 가로질러 비교하면
-[#255](https://github.com/Shadowfit/init/issues/255) 를 판정에 끌어들이는 것이다 — 각 판 안에서만 팔을 비교한다.
+[라운드 간 비재현](./round-to-round-nonreproducibility.md)([#498](https://github.com/Shadowfit/init/issues/498)) 를 판정에 끌어들이는 것이다 — 각 판 안에서만 팔을 비교한다.
 🟢 박스 보정([#499](https://github.com/Shadowfit/init/pull/499))이 둘 다에 붙어 **사후에 그 선을 확인할 수 있다.**
 
 ---
