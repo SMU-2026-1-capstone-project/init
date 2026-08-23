@@ -1,0 +1,14 @@
+# 백엔드 로그 발췌 — 원본은 S3 (r276app2-20260823-145128, 꼬리 2000줄)
+
+## 재시도 로그(«다시 던진다») 건수
+45
+## 소진 로그(«다 썼다») 건수
+24
+
+## 🔴 실패 예외 클래스 — #416 이 추가한 로깅이 답을 찍었다
+     24 저장 실패: CannotAcquireLockException
+
+## 표본
+2026-08-23 14:56:23.609  WARN [ult-executor-10] [grpc-in-225407c1b20a|967] c.s.s.Exercise.ExerciseGrpcService       : 세션 967 : 배치 INSERT 데드락 — 1/2회째 다시 던진다 (#276)
+2026-08-23 14:56:23.616  WARN [ault-executor-9] [grpc-in-1d2d1041042b|971] c.s.s.Exercise.ExerciseGrpcService       : 세션 971 : 배치 INSERT 데드락 — 1/2회째 다시 던진다 (#276)
+2026-08-23 14:56:23.609 ERROR [ault-executor-1] [grpc-in-a6d2dc64bcf8|959] c.s.s.Exercise.ExerciseGrpcService       : 저장 실패: CannotAcquireLockException — PreparedStatementCallback; SQL [INSERT INTO pose_data (session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, smoothed_knee_angle, feedback_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE session_id = session_id]; Deadlock found when trying to get lock; try restarting transaction
