@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +49,7 @@ class SessionSyncStatsTest {
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
     @Autowired private PoseDataRepository poseDataRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
     // 발행기가 테스트 도중 돌면 검증이 흔들린다 (SessionServiceTest 와 같은 이유).
     @MockitoBean private OutboxPublisher outboxPublisher;
 
@@ -65,7 +67,7 @@ class SessionSyncStatsTest {
                 .analysisSupported(true).build());
         session = sessionRepository.saveAndFlush(Session.builder()
                 .member(member).exercise(exercise)
-                .startTime(LocalDateTime.now().minusMinutes(10))
+                .startTime(LocalDateTime.now().withNano(0).minusMinutes(10))
                 .status(Status.IN_PROGRESS).build());
     }
 
@@ -81,6 +83,14 @@ class SessionSyncStatsTest {
                     .build());
         }
         poseDataRepository.flush();
+
+        // created_at 을 세션 시작 시각으로 맞춘다 (#392 앵커 등호 조회의 전제).
+        //
+        // 엔티티가 이 컬럼을 insertable=false 로 막아 둬서 JPA 픽스처로는 못 넣는다 — 프로덕션에서
+        // 그 값을 넣는 것은 PoseDataService 의 JdbcTemplate 배치다(#188). 안 맞추면 rep 평균
+        // 조회가 0행을 받아, 이 테스트가 «집계가 틀렸다» 가 아니라 «데이터가 없다» 로 깨진다.
+        jdbcTemplate.update("UPDATE pose_data SET created_at = ? WHERE session_id = ?",
+                session.getStartTime(), session.getId());
     }
 
     private void completeWithAiReported(double aiAvgSyncRate) {

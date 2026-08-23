@@ -124,11 +124,24 @@ public class SessionService {
         // (ExerciseAnalysisService 의 registerSynchronization), REST 응답도 커밋 뒤에 나간다.
         // 즉 커밋된 이 값 하나를 두 경로가 나중에 같이 읽는 모양이라야 세 곳(클라·AI·DB)이
         // 어긋나지 않는다. 나중 단계에서 만들면 «클라가 받은 값» 과 «AI 가 받은 값» 이 갈릴 수 있다.
+        // 🔴 startTime 의 «초 이하» 를 여기서 버린다 (#392).
+        //
+        // 이 값은 세션 시작 시각이면서 동시에 **pose_data 의 멱등 앵커**다 — PoseDataService 가
+        // 이 값을 그대로 created_at 에 넣고(#188), 리포트·재부착 조회는 그 값으로 파티션을
+        // 특정한다(PoseDataRepository 클래스 주석). 즉 «메모리의 값» 과 «저장된 값» 이 정확히
+        // 같아야 조회가 성립한다.
+        //
+        // 그런데 두 컬럼 모두 MySQL 정밀도 0 이라(V1: start_time DATETIME · created_at TIMESTAMP)
+        // 초 이하가 **버림이 아니라 반올림**으로 사라진다. 안 자르면 두 가지가 어긋난다:
+        //   ① 응답 body 는 14:32:04.7 을 «04» 로 보내는데 DB 에는 «05» 가 박힌다
+        //   ② 아직 DB 를 안 거친 엔티티로 조회하면 나노초가 남아 등호가 안 맞고 **조용히 0행**이 된다
+        // 자르면 둘 다 사라진다 — 이건 정밀도를 «버리는» 게 아니라, 저장소가 이미 버리고 있던
+        // 것을 애플리케이션이 **명시**하는 것이다.
         Session session = Session.builder()
                 .member(member)
                 .exercise(exercise)
                 .referenceSource(finalUrl)
-                .startTime(LocalDateTime.now())
+                .startTime(LocalDateTime.now().withNano(0))
                 .status(Status.IN_PROGRESS)
                 .sessionNonce(sessionNonceGenerator.generate())
                 .build();
@@ -302,7 +315,7 @@ public class SessionService {
      * 프레임 단위로 평균 내면 값이 달라진다.
      */
     private SyncStats resolveSyncStats(Session session, SessionCompleteRequest request) {
-        List<Double> repAverages = poseDataRepository.findRepAverageSyncRates(session.getId());
+        List<Double> repAverages = poseDataRepository.findRepAverageSyncRates(session.getId(), session.getStartTime());
 
         if (repAverages.isEmpty()) {
             // rep 단위로 셀 수 있는 프레임이 없다. 두 경우가 섞여 있고 처리가 다르다.
@@ -335,7 +348,7 @@ public class SessionService {
      * 추이 때문에 되살아난다.
      */
     private void precomputeReport(Session session) {
-        List<PoseFrameProjection> poseFrames = poseDataRepository.findFramesBySessionId(session.getId());
+        List<PoseFrameProjection> poseFrames = poseDataRepository.findFramesBySessionId(session.getId(), session.getStartTime());
         WorstSectionDto worstSection = sessionAnalysisCalculator.calculate(session, poseFrames);
         List<RepSyncRateDto> repTrend = sessionAnalysisCalculator.calculateRepTrend(poseFrames);
 

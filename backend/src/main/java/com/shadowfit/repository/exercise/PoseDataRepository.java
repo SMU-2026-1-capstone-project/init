@@ -8,8 +8,26 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * <b>조회 넷이 전부 {@code sessionAnchor} 를 받는 이유</b> (#392): {@code pose_data} 는
+ * {@code created_at} 으로 월별 RANGE 파티셔닝돼 있는데({@code V1__baseline.sql}), {@code WHERE} 에
+ * 그 컬럼이 없으면 <b>파티션 프루닝이 안 걸린다.</b> #204 EXPLAIN 스윕 실측: 인덱스를 셋 다
+ * 바꿔봐도 <b>14개 파티션 전탐색</b>이고 {@code Handler_read_key} 가 14 — 파티션마다 인덱스
+ * 다이브를 한 번씩 하고 있었다. {@code created_at} 을 같이 넘긴 판만 1파티션 · 다이브 1회로 준다.
+ *
+ * <p>넘길 값이 이미 손에 있다는 것이 핵심이다 — {@code created_at} 은 V6({@link
+ * com.shadowfit.service.Exercise.PoseDataService} 멱등 앵커, #188)부터 «적재 시각» 이 아니라
+ * <b>세션 시작 시각</b>이라, 한 세션의 모든 행이 값 하나를 공유한다. 즉 호출부는
+ * {@code session.getStartTime()} 하나로 파티션을 특정할 수 있고 <b>추가 조회가 필요 없다.</b>
+ *
+ * <p>🔴 <b>등호라서 앵커가 어긋난 행은 안 잡힌다.</b> V6 이전에 적재된 행은 컬럼
+ * DEFAULT(CURRENT_TIMESTAMP)를 받아 적재 시각이 들어 있었고, 그 전제를
+ * {@code V9__normalize_pose_created_at.sql} 이 없앴다(접고 보정). 즉 <b>이 술어는 V9 에 의존한다</b> —
+ * 앵커를 안 맞춘 채로 이 조회를 쓰면 그 행들이 조용히 빠진다.
+ */
 @Repository
 public interface PoseDataRepository extends JpaRepository<PoseData, Long> {
     /**
@@ -28,16 +46,19 @@ public interface PoseDataRepository extends JpaRepository<PoseData, Long> {
      */
     @Query("SELECT new com.shadowfit.dto.report.PoseFrameProjection(" +
            "p.timestampSec, p.syncRate, p.repNumber, p.smoothedKneeAngle) " +
-           "FROM PoseData p WHERE p.session.id = :sessionId " +
+           "FROM PoseData p WHERE p.session.id = :sessionId AND p.createdAt = :sessionAnchor " +
            "ORDER BY p.repNumber ASC, p.timestampSec ASC")
-    List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long sessionId);
+    List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long sessionId,
+                                                    @Param("sessionAnchor") LocalDateTime sessionAnchor);
 
     // 재부착 시 AI 에 주입할 rep 카운트. AI 메모리가 증발해도 완료된 rep 은 진행 중에 이미
     // pose_data 로 넘어와 있다(docs/decisions/session-resume-and-ai-state.md §3-2).
     // COALESCE 로 0 을 주는 이유: 프레임이 한 건도 없는 세션(시작 직후 재부착)이면 MAX 가 null 이라
     // 호출부가 null 분기를 하나 더 지게 된다. rep_number 의 "미상"도 0 이라 의미가 어긋나지 않는다.
-    @Query("SELECT COALESCE(MAX(p.repNumber), 0) FROM PoseData p WHERE p.session.id = :sessionId")
-    int findMaxRepNumberBySessionId(@Param("sessionId") Long sessionId);
+    @Query("SELECT COALESCE(MAX(p.repNumber), 0) FROM PoseData p " +
+           "WHERE p.session.id = :sessionId AND p.createdAt = :sessionAnchor")
+    int findMaxRepNumberBySessionId(@Param("sessionId") Long sessionId,
+                                    @Param("sessionAnchor") LocalDateTime sessionAnchor);
 
     // 재부착 시 AI 에 주입할 «이미 흐른 초» (이슈 #156). 바로 위 rep 축 복원과 **같은 데이터원**을
     // 쓰는 것이 핵심이다 — timestamp_sec 은 AI 가 «첫 프레임 도착» 을 0 으로 잡아 만든 값이라,
@@ -48,8 +69,10 @@ public interface PoseDataRepository extends JpaRepository<PoseData, Long> {
     //
     // ⚠️ 대가: 마지막 프레임 이후 재부착까지의 공백(AI 장애 구간)은 시간 축에 안 잡힌다. 그 구간엔
     //    분석된 프레임이 없어 «운동 시각» 을 붙일 근거도 없고, 무엇보다 원점을 섞지 않는 쪽을 택했다.
-    @Query("SELECT COALESCE(MAX(p.timestampSec), 0.0) FROM PoseData p WHERE p.session.id = :sessionId")
-    double findMaxTimestampSecBySessionId(@Param("sessionId") Long sessionId);
+    @Query("SELECT COALESCE(MAX(p.timestampSec), 0.0) FROM PoseData p " +
+           "WHERE p.session.id = :sessionId AND p.createdAt = :sessionAnchor")
+    double findMaxTimestampSecBySessionId(@Param("sessionId") Long sessionId,
+                                          @Param("sessionAnchor") LocalDateTime sessionAnchor);
 
     /**
      * 세션의 <b>rep 단위</b> 평균 sync_rate 목록 (이슈 #75).
@@ -68,9 +91,10 @@ public interface PoseDataRepository extends JpaRepository<PoseData, Long> {
      * DB 에서 한 번에 접으려면 파생 테이블(native)이 필요한데, 그 대가로 얻는 게 없다.
      */
     @Query("SELECT AVG(p.syncRate) FROM PoseData p " +
-           "WHERE p.session.id = :sessionId AND p.repNumber > 0 " +
+           "WHERE p.session.id = :sessionId AND p.createdAt = :sessionAnchor AND p.repNumber > 0 " +
            "GROUP BY p.repNumber ORDER BY p.repNumber")
-    List<Double> findRepAverageSyncRates(@Param("sessionId") Long sessionId);
+    List<Double> findRepAverageSyncRates(@Param("sessionId") Long sessionId,
+                                         @Param("sessionAnchor") LocalDateTime sessionAnchor);
 
     // 회원 탈퇴 시 pose_data 참조무결성 대체(FK CASCADE 제거로 인한 애플리케이션 정리).
     // PoseDataCleanupService에서 afterCommit 이후 비동기로 호출됨.

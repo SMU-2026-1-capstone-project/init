@@ -98,7 +98,7 @@ class SessionReattachTest {
                             LocalDateTime endTime, LocalDateTime lastActiveAt) {
         return sessionRepository.saveAndFlush(Session.builder()
                 .member(member).exercise(exercise)
-                .startTime(startTime).status(status).endTime(endTime)
+                .startTime(startTime.withNano(0)).status(status).endTime(endTime)
                 .lastActiveAt(lastActiveAt)
                 .totalReps(0).difficultyLevel(1).build());
     }
@@ -258,7 +258,7 @@ class SessionReattachTest {
         void 프레임없음_0() {
             Session s = inProgressSession();
 
-            assertThat(poseDataRepository.findMaxRepNumberBySessionId(s.getId())).isZero();
+            assertThat(poseDataRepository.findMaxRepNumberBySessionId(s.getId(), s.getStartTime())).isZero();
         }
 
         @Test
@@ -273,7 +273,7 @@ class SessionReattachTest {
             poseDataService.savePoseDataBatch(s.getId(), List.of(
                     frame(3, 2.1, 90.0)));
 
-            assertThat(poseDataRepository.findMaxRepNumberBySessionId(s.getId())).isEqualTo(3);
+            assertThat(poseDataRepository.findMaxRepNumberBySessionId(s.getId(), s.getStartTime())).isEqualTo(3);
         }
 
         @Test
@@ -286,7 +286,7 @@ class SessionReattachTest {
                             .setTimestampSec(0.1).setJointCoordinates("{}")
                             .setSyncRate(70.0).setFeedbackMessage("ok").build()));
 
-            assertThat(poseDataRepository.findMaxRepNumberBySessionId(s.getId())).isZero();
+            assertThat(poseDataRepository.findMaxRepNumberBySessionId(s.getId(), s.getStartTime())).isZero();
         }
 
         @Test
@@ -297,8 +297,8 @@ class SessionReattachTest {
             poseDataService.savePoseDataBatch(mine.getId(), List.of(frame(2, 0.1, 70.0)));
             poseDataService.savePoseDataBatch(other.getId(), List.of(frame(9, 0.1, 70.0)));
 
-            assertThat(poseDataRepository.findMaxRepNumberBySessionId(mine.getId())).isEqualTo(2);
-            assertThat(poseDataRepository.findMaxRepNumberBySessionId(other.getId())).isEqualTo(9);
+            assertThat(poseDataRepository.findMaxRepNumberBySessionId(mine.getId(), mine.getStartTime())).isEqualTo(2);
+            assertThat(poseDataRepository.findMaxRepNumberBySessionId(other.getId(), other.getStartTime())).isEqualTo(9);
         }
     }
 }

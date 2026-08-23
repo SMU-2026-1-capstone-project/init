@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -138,7 +139,7 @@ class ReportServiceTest {
         assertThat(result.getRepTrend())
                 .extracting(RepSyncRateDto::getRepNumber).containsExactly(1, 2);
         // 추이를 응답에 넣으면서 pose_data 스캔이 되살아나지 않았는지가 이 테스트의 핵심이다
-        verify(poseDataRepository, never()).findFramesBySessionId(anyLong());
+        verify(poseDataRepository, never()).findFramesBySessionId(anyLong(), any());
         verify(sessionAnalysisCalculator, never()).calculate(any(), any());
         verify(sessionAnalysisCalculator, never()).calculateRepTrend(any());
     }
@@ -157,7 +158,7 @@ class ReportServiceTest {
         when(reportRepository.findBySessionId(SESSION_ID)).thenReturn(Optional.of(report));
 
         List<PoseFrameProjection> frames = List.of(new PoseFrameProjection(0.0, 50.0, 1, 100.0));
-        when(poseDataRepository.findFramesBySessionId(SESSION_ID)).thenReturn(frames);
+        when(poseDataRepository.findFramesBySessionId(eq(SESSION_ID), any())).thenReturn(frames);
         WorstSectionDto recomputed = new WorstSectionDto();
         recomputed.setReason("재계산됨");
         when(sessionAnalysisCalculator.calculate(session, frames)).thenReturn(recomputed);
@@ -168,7 +169,7 @@ class ReportServiceTest {
 
         assertThat(result.getWorstSection().getReason()).isEqualTo("재계산됨");
         assertThat(result.getRepTrend()).hasSize(1);
-        verify(poseDataRepository, times(1)).findFramesBySessionId(SESSION_ID);
+        verify(poseDataRepository, times(1)).findFramesBySessionId(eq(SESSION_ID), any());
     }
 
     @Test
@@ -177,7 +178,7 @@ class ReportServiceTest {
         report.setDetailedAnalysis(null); // 시드 데이터처럼 precompute 이전 상태
         when(reportRepository.findBySessionId(SESSION_ID)).thenReturn(Optional.of(report));
         List<PoseFrameProjection> frames = List.of(new PoseFrameProjection(0.0, 50.0, 1, 100.0));
-        when(poseDataRepository.findFramesBySessionId(SESSION_ID)).thenReturn(frames);
+        when(poseDataRepository.findFramesBySessionId(eq(SESSION_ID), any())).thenReturn(frames);
         WorstSectionDto recomputed = new WorstSectionDto();
         recomputed.setReason("재계산됨");
         when(sessionAnalysisCalculator.calculate(session, frames)).thenReturn(recomputed);
@@ -185,7 +186,7 @@ class ReportServiceTest {
         SessionReportResponseDto result = reportService.getSessionReport(SESSION_ID, MEMBER_ID);
 
         assertThat(result.getWorstSection().getReason()).isEqualTo("재계산됨");
-        verify(poseDataRepository, times(1)).findFramesBySessionId(SESSION_ID);
+        verify(poseDataRepository, times(1)).findFramesBySessionId(eq(SESSION_ID), any());
     }
 
     @Test
@@ -194,7 +195,7 @@ class ReportServiceTest {
         report.setDetailedAnalysis("{이건 JSON이 아님");
         when(reportRepository.findBySessionId(SESSION_ID)).thenReturn(Optional.of(report));
         List<PoseFrameProjection> frames = List.of(new PoseFrameProjection(0.0, 50.0, 1, 100.0));
-        when(poseDataRepository.findFramesBySessionId(SESSION_ID)).thenReturn(frames);
+        when(poseDataRepository.findFramesBySessionId(eq(SESSION_ID), any())).thenReturn(frames);
         WorstSectionDto recomputed = new WorstSectionDto();
         recomputed.setReason("재계산됨");
         when(sessionAnalysisCalculator.calculate(session, frames)).thenReturn(recomputed);
@@ -204,7 +205,7 @@ class ReportServiceTest {
         // 파싱 실패 시 예외를 삼키고 끝나는 게 아니라, 실제로 pose_data 재계산까지 수행됐는지 검증
         // (CodeRabbit 지적 — 예전엔 calculate()가 null을 반환해도 통과하는 부실한 테스트였음)
         assertThat(result.getWorstSection().getReason()).isEqualTo("재계산됨");
-        verify(poseDataRepository, times(1)).findFramesBySessionId(SESSION_ID);
+        verify(poseDataRepository, times(1)).findFramesBySessionId(eq(SESSION_ID), any());
         verify(sessionAnalysisCalculator).calculate(session, frames);
     }
 
@@ -213,7 +214,7 @@ class ReportServiceTest {
     void previousSessionPresent_fillsComparison() {
         report.setDetailedAnalysis(null);
         when(reportRepository.findBySessionId(SESSION_ID)).thenReturn(Optional.of(report));
-        when(poseDataRepository.findFramesBySessionId(SESSION_ID)).thenReturn(List.of());
+        when(poseDataRepository.findFramesBySessionId(eq(SESSION_ID), any())).thenReturn(List.of());
 
         Session lastSession = Session.builder()
                 .id(9L).member(session.getMember()).exercise(session.getExercise())
