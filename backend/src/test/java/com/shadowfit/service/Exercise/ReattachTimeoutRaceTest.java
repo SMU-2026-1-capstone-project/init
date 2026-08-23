@@ -94,7 +94,7 @@ class ReattachTimeoutRaceTest {
                 .plusSeconds(3);
         return sessionRepository.saveAndFlush(Session.builder()
                 .member(owner).exercise(exercise)
-                .startTime(startTime.withNano(0)).status(Status.IN_PROGRESS).endTime(null)
+                .startTime(startTime).status(Status.IN_PROGRESS).endTime(null)
                 .totalReps(0).difficultyLevel(1).build());
     }
 

@@ -98,7 +98,7 @@ class SessionReattachTest {
                             LocalDateTime endTime, LocalDateTime lastActiveAt) {
         return sessionRepository.saveAndFlush(Session.builder()
                 .member(member).exercise(exercise)
-                .startTime(startTime.withNano(0)).status(status).endTime(endTime)
+                .startTime(startTime).status(status).endTime(endTime)
                 .lastActiveAt(lastActiveAt)
                 .totalReps(0).difficultyLevel(1).build());
     }

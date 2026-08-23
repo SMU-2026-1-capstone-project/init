@@ -39,6 +39,14 @@ public class Session {
     @Column(length = 500)
     private String referenceSource;
 
+    /**
+     * 세션 시작 시각. <b>초 이하가 없다</b> — {@link #normalizeStartTime()} 이 저장 직전에 자른다.
+     *
+     * <p>이 값은 시작 시각이면서 동시에 <b>{@code pose_data} 의 멱등 앵커이자 파티션 키</b>다
+     * (#188 · #392). {@code PoseDataService} 가 이 값을 그대로 {@code created_at} 에 넣고,
+     * 리포트·재부착 조회는 <b>등호</b>로 그 값을 찾는다 — 즉 «메모리의 값» 과 «저장된 값» 이
+     * 정확히 같아야 조회가 성립한다.
+     */
     @Column(nullable = false)
     private LocalDateTime startTime;
 
@@ -212,5 +220,35 @@ public class Session {
         this.status = Status.FAILED;
         this.endTime = at;
         return true;
+    }
+
+    /**
+     * 저장 직전에 {@code startTime} 의 초 이하를 버린다 (#446).
+     *
+     * <p><b>왜 엔티티가 하나</b>: 이 불변식을 지키던 곳이 {@code SessionService.createSession}
+     * <b>한 곳뿐</b>이었다. 엔티티를 직접 짓는 경로는 전부 빠져나갔고, 실제로 테스트 픽스처
+     * <b>24곳</b>이 나노초를 그대로 넣고 있었다. 호출자마다 기억하게 하는 방식은 이미 세 번
+     * 실패했다 — #392 작업에서 같은 함정에 세 번 물렸고, 매번 증상이 «앵커가 안 맞는다» 가
+     * 아니라 엉뚱한 단언(«집계가 0», «rep 수가 0», «max_sync_rate 가 틀리다»)으로 나타나
+     * 원인까지 가는 데 시간이 들었다. 그래서 <b>지킬 수 있는 유일한 자리</b>로 옮긴다.
+     *
+     * <p><b>값을 바꾸는 것이 맞나</b>: 저장소가 이미 하고 있는 일이다. {@code start_time} 은
+     * MySQL 에서 정밀도 0 이라({@code V1__baseline.sql}: {@code DATETIME}) 초 이하가
+     * <b>버림이 아니라 반올림</b>으로 사라진다. 즉 안 자르면 «메모리의 값» 과 «저장된 값» 이
+     * 애초에 다르고, 그 차이가 위 등호 조회를 조용히 0행으로 만든다. 여기서 자르는 것은
+     * 정밀도를 <b>버리는</b> 게 아니라 <b>이미 버려지던 것을 명시</b>하는 일이다.
+     *
+     * <p>⚠️ {@code endTime}·{@code lastActiveAt} 은 <b>안 건드린다.</b> 같은 컬럼 정밀도지만
+     * 등호로 조회되지 않아(부등호 비교뿐) 같은 함정이 없다. 그런 조회가 생기면 그때 같이 본다.
+     *
+     * <p>⚠️ H2(테스트)는 {@code timestamp(6)} 이라 나노초를 살려 둔다 — 이 훅이 없으면
+     * <b>테스트에서만</b> 재현되는 종류의 실패가 된다. 프로덕션에서 안 난다고 안전한 게 아니다.
+     */
+    @PrePersist
+    @PreUpdate
+    void normalizeStartTime() {
+        if (this.startTime != null) {
+            this.startTime = this.startTime.withNano(0);
+        }
     }
 }
