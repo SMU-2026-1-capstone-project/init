@@ -352,10 +352,42 @@ nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py \
 | 배열 | **5×5 라틴 방격 + 버림 1 = 26판.** 각 팔이 **각 위치에 정확히 한 번** 온다 — 재기동이 −24%, 판 순서가 −6.4% 를 흔들기 때문(설계 §9-4) |
 | ⏱ 소요 | 판당 120초면 **52분**, 160초면 **69분** — `setup`(160세션 여는 시간)이 미측정이라 **버림판이 처음 준다.** 인스턴스 1.5시간 |
 | 🔴 **안 읽는 값** | `handler_concurrency` — 부하기가 동거해서 **절대값이 다친다.** R10-b(2대)의 몫이다(§7) |
-| 러너 | `run_all.sh` 를 **안 쓴다.** 프레임 경로 phase 가 아직 없다([#400](https://github.com/Shadowfit/init/issues/400) ①) — 회수는 손으로 |
+| 러너 | 🟢 **`PHASES="framepath collect"` 로 돈다** — 아래 「무인으로 돌리려면」. 위 손 명령도 그대로 유효하다(회수만 손으로) |
 
 ⚠️ **이 절차로 실제로 띄워 본 적은 없다.** ROLE 은 `bash -n` 과 역할 분기 검증만 거쳤고,
 위 판은 rig 의 `parse_arm` 으로 파싱·라틴 방격만 검산했다.
+
+#### 무인으로 돌리려면 — `PHASES="framepath collect"`
+
+```bash
+cd /root/init
+S3_BASE=s3://내버킷/shadowfit \
+FP_PLAN="<설계 §13 의 문자열>" \
+PHASES="framepath collect" \
+  nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+```
+
+🔴 **`FP_PLAN` 은 기본값이 없다.** 안 주면 게이트가 막는다 — 격자의 정본은 설계 §13 이고,
+러너에 예시를 박아두면 **그 예시가 조용히 정본이 된다**(2026-08-23 에 실제로 격자가 두 벌이
+된 적이 있다). `FP_SESSIONS`·`FP_DUR`·`FP_POOL`(160·90·201)은 **재현 대상이 있는 값**이라
+기본을 둔다.
+
+**게이트가 보는 것 다섯** — 넷은 «환경 결함이 측정 결과로 위장하는» 자리다:
+
+| | 왜 |
+|---|---|
+| venv 가 **3.12** 인가 | 아니면 GIL 거동이 다른 기계다 — 이 판의 주 질문이 그 노브다 |
+| `FP_PLAN` | 위 |
+| `frames.json` | 이 박스에서 못 만든다(mediapipe 필요) |
+| 🔴 **8100/8685 가 비었나** | 전 판 서버가 안 죽어 있으면 **팔이 조용히 안 바뀐다.** 기존 서버가 응답하므로 판은 정상으로 보인다 |
+| `/proc` | 도커가 없어 `docker stats` 가 없다. CPU 축의 유일한 수단([#400](https://github.com/Shadowfit/init/issues/400) ⑤) |
+
+**끝나고 보는 것**(막지 않는다 — 판정은 사람이 한다): `nolease>0`(풀 소진 → 그 판 무효) ·
+`setup_fail>0` · **계측 ON 판이 하나라도 있나**(없으면 구간·`lease` 가 통째로 빈다) ·
+스냅샷 회수 실패 · `cpu.error`.
+
+산출물은 `<OUTDIR>/framepath/` — `arms_<tag>.json` · `raw_*.tsv` · `server_*.log` ·
+`run_arms.log` · `ai_venv_conditions.txt`(부트스트랩이 만든 것을 복사한다).
 
 ## 설정
 
