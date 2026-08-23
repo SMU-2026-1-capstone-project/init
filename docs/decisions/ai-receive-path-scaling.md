@@ -557,7 +557,11 @@ GIL 구간의 일부) · keep-alive 무효까지 **하나로 설명된다.**
 > 박스(`c7i.xlarge`)에 있을 때** 난 관측이고, 현 rig 은 부하기를 대상 박스에 올린다 —
 > 부하기 몫이 **평균 0.5 · 피크 1.0~1.4 vCPU**(§T 실측)라 **설명하려는 6.5 vCPU 의 8~22%** 다.
 > 판정선 넷 중 `handler_concurrency`(절대값) 하나가 거기서 다친다.
-> 트레이드오프·자원 분석: [`r10-loadgen-topology.md`](r10-loadgen-topology.md) — **미결정**.
+> 🟢 **2026-08-23: 그 분기가 닫혔다 (사용자 confirm)** — [`r10-loadgen-topology.md` §7](r10-loadgen-topology.md):
+> **쪼갠다. R10-a(1대 동거)를 먼저 돌리고, `handler_concurrency` 는 R10-b(2대)로 미룬다.**
+> R10-a 가 쓰는 판정선은 상대값 셋(`GIL_SWITCH_INTERVAL` 팔 · 구간 비율 · `lease`)뿐이다 —
+> 위 표의 「동시 처리 수 카운터」 칸은 **이 판에서 안 읽는다.**
+> 🔴 **박스는 그대로 `c7i.4xlarge` 1대**이고, **EC2 실행은 아직 0판**이다.
 
 | 계측 | 무엇을 답하나 | 구현 |
 |---|---|---|
