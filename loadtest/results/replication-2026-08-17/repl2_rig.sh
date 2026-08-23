@@ -621,7 +621,27 @@ semisync_install() {
   if [ "$SRC_PREFIX" = rpl_semi_sync_source ]; then so_src=semisync_source.so; so_rep=semisync_replica.so
   else so_src=semisync_master.so; so_rep=semisync_slave.so; fi
   SDB -e "INSTALL PLUGIN $SRC_PREFIX SONAME '$so_src';" >/dev/null 2>&1
-  RDB -e "INSTALL PLUGIN $REP_PREFIX SONAME '$so_rep';" >/dev/null 2>&1
+
+  # 🔴 리플리카는 `harden_replica` 가 이미 `super_read_only=ON` 을 걸어둔 상태다.
+  #    `INSTALL PLUGIN` 은 `mysql.plugin` 테이블에 **쓰기**라 그 플래그에 막힌다:
+  #      ERROR 1290 ... running with the --super-read-only option
+  #    그래서 리플리카 쪽 플러그인이 영영 안 깔리고, 소스의 status 도 ON 이 못 된다
+  #    (반동기는 양쪽이 다 있어야 성립한다). G2 에는 「status 가 ON 이 안 된다」로만
+  #    보여서 원인이 안 드러났다 — 2026-08-22 스모크가 실제로 여기서 막혔다.
+  #
+  #    설치 동안만 내렸다 **반드시 다시 올린다.** 세 문장으로 나눈 이유가 그것이다 —
+  #    한 배치로 묶으면 가운데가 실패했을 때 마지막 문장이 안 돌아 리플리카가
+  #    `super_read_only=OFF` 인 채로 남는다. 그 상태로 판을 돌리면 무대가 오염된다.
+  #    ⚠️ `read_only` 는 안 건드린다. root 는 어차피 그걸 무시하므로 설치에는 지장이 없고,
+  #       내려야 할 최소한만 내리는 편이 안전하다.
+  RDB -e "SET GLOBAL super_read_only = OFF;"                      >/dev/null 2>&1
+  RDB -e "INSTALL PLUGIN $REP_PREFIX SONAME '$so_rep';"           >/dev/null 2>&1
+  RDB -e "SET GLOBAL super_read_only = ON;"                       >/dev/null 2>&1
+
+  # 되돌아갔는지 확인한다. 안 돌아갔으면 **멈춘다** — 리플리카에 쓰기가 열린 채로 재는 것은
+  # 「복제의 성질」이 아니라 「무대의 결함」이다.
+  local sro; sro=$(RDBQ "SELECT @@super_read_only;" 2>/dev/null)
+  [ "$sro" = "1" ] || die "리플리카 super_read_only 가 안 돌아왔다 (현재 '$sro') — 이 상태로는 어떤 판도 조건이 성립하지 않는다"
 }
 
 semisync_off() {
