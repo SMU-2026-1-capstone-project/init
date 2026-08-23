@@ -203,17 +203,29 @@ printf 'arm\tn\tdiscard\tflush\tsync_binlog\tms\trows\tcommit\tlog_write_req\tlo
 # 4×4 라틴 방격 + 버림 1. 각 팔이 각 위치에 정확히 한 번 온다 —
 # 판 순서가 팔에 얹히면 안 된다([[feedback_measure_design_needs_repeats]]).
 SQUARE=("A B C D" "B C D A" "C D A B" "D A B C")
+
 echo; echo "──── 버림판 ────"
 run_round A 0 1
 
 i=0
-for ((r=0; r<REPEATS && r<${#SQUARE[@]}; r++)); do
-  echo; echo "──── 블록 $((r+1)) : ${SQUARE[$r]} ────"
-  for arm in ${SQUARE[$r]}; do
+if [ -n "${PLAN:-}" ]; then
+  # 🔴 PLAN 은 «본 라운드» 가 아니다. 방격을 우회하므로 위치 균형이 없다 —
+  #    산포 측정(A 팔만 반복)처럼 **팔 간 비교를 안 하는** 용도로만 쓸 것.
+  echo; echo "──── PLAN 모드 : $PLAN ────"
+  echo "  🔴 라틴 방격을 안 쓴다 — 팔 간 비교에는 쓰지 말 것"
+  for arm in ${PLAN//,/ }; do
     i=$((i+1))
     run_round "$arm" "$i" 0
   done
-done
+else
+  for ((r=0; r<REPEATS && r<${#SQUARE[@]}; r++)); do
+    echo; echo "──── 블록 $((r+1)) : ${SQUARE[$r]} ────"
+    for arm in ${SQUARE[$r]}; do
+      i=$((i+1))
+      run_round "$arm" "$i" 0
+    done
+  done
+fi
 
 echo; echo "──── 요약 ────"
 python - "$LOG" "$SUM" <<'PY'
