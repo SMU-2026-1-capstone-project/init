@@ -12,6 +12,12 @@
 #   S3_BASE=s3://버킷/프리픽스 nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 #
 # ⚠️ nohup 없이 & 만 붙이면 SSH 가 끊길 때 같이 죽는다.
+#
+# 🔴 **끝나면 인스턴스를 스스로 끈다** (AUTO_SHUTDOWN 기본 1, 2026-08-24). 단 **업로드가
+#    성공했을 때만**이고, 정지까지 SHUTDOWN_DELAY_MIN(기본 5)분의 유예가 있다.
+#    박스를 남기려면 `AUTO_SHUTDOWN=0` 을 넘길 것.
+#    ⚠️ 이것이 도는 것은 **이 스크립트로 돈 판**뿐이다. rig 을 SSH 로 직접 부르면
+#       (예: run_arms.py 를 손으로) 아무것도 안 끈다 — 그때는 사람이 꺼야 한다.
 
 set -uo pipefail
 
@@ -135,7 +141,23 @@ if [ -z "$OUTDIR" ]; then
 fi
 
 SYNC_SEC=${SYNC_SEC:-300}
-AUTO_SHUTDOWN=${AUTO_SHUTDOWN:-0}
+
+# 🔴 **기본이 «켜짐» 이다 (2026-08-24 사용자 결정 — «측정 다하면 EC2 자동으로 끄는걸로»).**
+#    예전 기본값은 0 이었고, 그래서 «끄는 것» 이 사람의 기억에만 달려 있었다.
+#    그 기억은 사람만의 것도 아니다 — 무인 라운드에서 «끝나면 내가 끄겠다» 고 말하는 주체가
+#    세션이라, 그 세션이 죽으면 아무도 안 끈다. 반대 방향의 사고는 이미 한 번 났다(#445 ⑤).
+#
+#    ⚠️ 이 값이 1 이어도 **업로드가 실패하면 안 끈다** — 아래 마무리 절이 FINAL_OK 를 본다.
+#       인스턴스 안에만 있는 결과를 끄는 것은 측정을 통째로 버리는 것과 같다.
+#
+#    끄려면(박스를 남기고 싶으면): AUTO_SHUTDOWN=0 을 넘긴다.
+#    이미 돌고 있는 판을 취소하려면: pkill -f 'shutdown'  (아래 유예 안에)
+AUTO_SHUTDOWN=${AUTO_SHUTDOWN:-1}
+
+# 정지까지의 유예(분). 기본이 «켜짐» 이 되면서 60초는 짧다 — 박스를 넘겨받거나 들여다볼
+# 사람이 SSH 로 들어와 취소할 시간이 필요하다. c7i.4xlarge 기준 5분은 약 $0.06 이고,
+# **끄는 것을 잊어 밤새 켜두는 쪽이 훨씬 비싸다**(~$17/일).
+SHUTDOWN_DELAY_MIN=${SHUTDOWN_DELAY_MIN:-5}
 
 PW=${PW:-1234}
 DB_NAME=${DB_NAME:-shadowfit}
@@ -1574,14 +1596,14 @@ if [ "$AUTO_SHUTDOWN" = "1" ] && [ "$FINAL_OK" = "1" ]; then
   #    결과는 이미 S3 에 올라갔고(FINAL_OK) 리플리카에는 산출물이 없으므로 꺼도 잃을 것이 없다.
   #    ⚠️ 업로드가 실패한 판(아래 elif)에서는 리플리카도 안 끈다 — 무대를 들여다볼 수 있어야 한다.
   if [ -n "$REPLICA_HOST" ]; then
-    if $REPLICA_SSH "shutdown -h +1 '측정 종료 — run_all.sh (소스가 껐다)'" >/dev/null 2>&1; then
-      note "리플리카($REPLICA_HOST)에 정지를 걸었다 — 60초 후"
+    if $REPLICA_SSH "shutdown -h +$SHUTDOWN_DELAY_MIN '측정 종료 — run_all.sh (소스가 껐다)'" >/dev/null 2>&1; then
+      note "리플리카($REPLICA_HOST)에 정지를 걸었다 — ${SHUTDOWN_DELAY_MIN}분 후"
     else
       note "🔴 리플리카($REPLICA_HOST)를 못 껐다 — **직접 정지할 것.** 소스만 꺼지면 그 박스는 켜진 채 요금이 붙는다"
     fi
   fi
-  note "60초 후 정지한다 (취소: pkill -f 'shutdown')"
-  shutdown -h +1 "측정 종료 — run_all.sh"
+  note "${SHUTDOWN_DELAY_MIN}분 후 정지한다 (취소: pkill -f 'shutdown')"
+  shutdown -h +"$SHUTDOWN_DELAY_MIN" "측정 종료 — run_all.sh"
 elif [ "$AUTO_SHUTDOWN" = "1" ]; then
   note "⚠️ 자동 정지가 켜져 있지만 업로드가 실패해서 **끄지 않는다.** 결과가 이 인스턴스에만 있다"
   if [ -n "$REPLICA_HOST" ]; then

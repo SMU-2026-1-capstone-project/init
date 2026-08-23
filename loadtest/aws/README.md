@@ -25,8 +25,20 @@
    P6 의 대상이 c7i.4xlarge 로 고정된 이유는 값 비교다 — 08-14 의 「동시 156세션」이 나온
    박스가 아니면 **팔 A 가 기준선 구실을 못 한다**
    ([`../../docs/decisions/ai-coresidency-capacity.md`](../../docs/decisions/ai-coresidency-capacity.md) §10).
-4. **종료 동작 확인** — `InstanceInitiatedShutdownBehavior` 가 `stop` 인지 본다.
-   `terminate` 면 **EBS 까지 날아간다.** 🔴 **이 줄은 오래 「확인한다」만 적고 방법이 없었다.**
+4. **종료 동작 확인** — `InstanceInitiatedShutdownBehavior` 를 본다.
+   🔴 **이 줄은 오래 「확인한다」만 적고 방법이 없었다.**
+
+   > 🔑 **2026-08-24 사용자 결정 — «측정 다하면 EC2 자동으로 끄는걸로».**
+   > 그래서 `run_all.sh` 의 `AUTO_SHUTDOWN` **기본값이 1 이 됐고**, 이 속성의 **의도된 값은
+   > `terminate`** 다. 이유는 «끄는 것» 의 뜻이다 — `stop` 은 컴퓨트만 멈추고 **EBS 요금은
+   > 계속 나가며**, 무엇보다 **꺼진 채 잊힌다.** 실제로 도는 박스 둘 다 이미 `terminate` 였다.
+   >
+   > ⚠️ **그래서 아래의 「EBS 가 날아간다」는 경고가 사라진 게 아니라 «받아들인 대가» 다.**
+   > 그것이 안전한 이유는 하나뿐이다 — **`run_all.sh` 는 S3 업로드가 성공했을 때만 끈다**
+   > (`FINAL_OK`). 업로드가 실패하면 박스를 남긴다. 그 가드가 없으면 이 결정은 위험하다.
+   >
+   > 🔴 **손으로 도는 판은 이 보호가 없다.** rig 을 SSH 로 직접 부르면(`run_arms.py` 등)
+   > `run_all.sh` 를 안 거치므로 **아무것도 안 끄고, 아무것도 안 지킨다.** 그때는 사람이 끈다.
 
    **⚠️ 먼저 — 이 속성은 «OS 안에서 끈 경우» 에만 적용된다:**
 
@@ -45,11 +57,14 @@
    aws ec2 describe-instance-attribute      --instance-id i-xxxxxxxx --attribute instanceInitiatedShutdownBehavior
    # → {"InstanceInitiatedShutdownBehavior": {"Value": "stop"}}
 
-   # ② 띄울 때 아예 박아둔다 (기본값이 stop 이지만 명시하는 편이 낫다)
-   aws ec2 run-instances ... --instance-initiated-shutdown-behavior stop
+   # ② 띄울 때 아예 박아둔다 (AWS 기본은 stop 이므로 **반드시 명시**한다)
+   aws ec2 run-instances ... --instance-initiated-shutdown-behavior terminate
 
    # ③ 바꾸기 (실행 중에도 된다)
-   aws ec2 modify-instance-attribute      --instance-id i-xxxxxxxx --instance-initiated-shutdown-behavior stop
+   aws ec2 modify-instance-attribute      --instance-id i-xxxxxxxx --instance-initiated-shutdown-behavior terminate
+
+   # ⚠️ 박스를 남기며 들여다볼 라운드라면 반대로 stop 을 넣고 AUTO_SHUTDOWN=0 을 같이 쓴다.
+   #    둘 중 하나만 바꾸면 «자동으로 꺼지는데 볼륨이 남는다» 같은 어중간한 상태가 된다.
    ```
 
    콘솔이면 **인스턴스 → 작업 → 인스턴스 설정 → 종료 동작 변경**.
@@ -401,7 +416,8 @@ PHASES="framepath collect" \
 | `REPL_AZ_MODE` | (없음) | P4 — 조건 칸에 그대로 들어간다. 비면 경고(막지는 않는다) |
 | `REPL_SESSIONS` | `13334` | P4 무대 = 1,000만 행 |
 | `TIMEOUT_REPL_GATE` / `TIMEOUT_REPL` | `10800` / `14400` | 3시간 / 4시간 |
-| `AUTO_SHUTDOWN` | `0` | `1` 이면 **업로드 성공 시에만** 정지 |
+| `AUTO_SHUTDOWN` | **`1`** | **업로드 성공 시에만** 정지. 기본이 켜짐(2026-08-24 결정) — 박스를 남기려면 `0` |
+| `SHUTDOWN_DELAY_MIN` | `5` | 정지까지의 유예(분). 취소: 박스 안에서 `pkill -f 'shutdown'` |
 | `SYNC_SEC` | `300` | S3 주기 업로드 간격 |
 | `WRITER_MAX_SEC` | `14400` | ⚠️ rig 기본은 5,400. 아래 참고 |
 | `TIMEOUT_DDL` | `43200` | 12시간 (로컬 추정 5.9시간 × 2) |
