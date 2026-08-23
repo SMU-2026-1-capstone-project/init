@@ -37,6 +37,10 @@ cd "$(dirname "$0")/.."
 set -a; . ./.env; set +a
 
 LEVELS=${LEVELS:-"8 16 32"}       # ghz 동시성
+# 🔴 상한 팔 (#276 ②, 2026-08-23 추가). 비어 있으면 «상한을 안 건드린다» — 배포 기본값 그대로 돌고
+#    컨테이너를 다시 띄우지도 않는다(1차·2차 라운드와 같은 동작).
+#    값을 주면 팔마다 백엔드를 그 상한으로 **다시 띄운다**(shadowfit.pose.deadlock.max-retries).
+RETRY_ARMS=${RETRY_ARMS:-""}
 REQS=${REQS:-500}                 # 판당 요청 수 (레벨 사이 공통 — 일의 양을 맞춘다)
 BLOCKS=${BLOCKS:-4}               # 첫 블록은 버린다
 SESSIONS=${SESSIONS:-901-1000}    # 대상 세션 (DB 에 있어야 한다)
@@ -112,6 +116,28 @@ python3 loadtest/ghz/gen_batch_multi.py --sessions "$SESSIONS" --reps "$REPS" \
   --out "$DATA" --duplicate-keys || die "페이로드 생성 실패"
 printf '{"authorization":"Bearer %s"}' "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN 이 .env 에 없다}" > "$SC/meta.json"
 
+# 상한을 바꾼다 = 백엔드를 그 값으로 다시 띄운다. 🔴 그리고 **실제로 그 값이 붙었는지 단언한다** —
+# 「바꿨다고 생각했는데 안 바뀐」 판이 이 저장소의 대표 실패 모양이다(rig 의 uk_pose_event 단언과 같은 이유).
+set_retry_ceiling(){ # $1=상한
+  local want="$1"
+  echo "  [상한 $want] 백엔드 재기동"
+  POSE_DEADLOCK_MAX_RETRIES="$want" docker compose up -d --no-deps --force-recreate shadowfit-backend >/dev/null 2>&1     || { echo "🔴 백엔드 재기동 실패"; return 1; }
+  # 액추에이터가 답할 때까지 기다린다(«준비됐나» 는 ping 이 아니라 응답으로 본다 — #275 ②와 같은 결).
+  local i
+  for i in $(seq 1 60); do
+    metrics_raw >/dev/null 2>&1 && break
+    sleep 5
+  done
+  metrics_raw >/dev/null 2>&1 || { echo "🔴 재기동 후 액추에이터 무응답"; return 1; }
+  # 환경변수가 실제로 컨테이너에 붙었는지 확인한다. 프로퍼티 자체를 되읽는 엔드포인트가
+  # 없으므로(env 엔드포인트는 whitelist 밖) 여기까지가 이 rig 이 볼 수 있는 한계다.
+  local got
+  got=$(docker exec shadowfit-backend printenv SHADOWFIT_POSE_DEADLOCK_MAX_RETRIES 2>/dev/null | tr -d "[:space:]")
+  [ "$got" = "$want" ] || { echo "🔴 컨테이너 환경변수가 $got 다 (기대 $want)"; return 1; }
+  echo "  [상한 $want] SHADOWFIT_POSE_DEADLOCK_MAX_RETRIES=$got ✅"
+  return 0
+}
+
 run_one(){ # $1=level $2=block → "level block ok internal other retried recovered exhausted rows"
   local c="$1" blk="$2"
   # 🔴 판마다 무대를 되돌린다. 안 지우면 2판째는 «첫 요청부터 중복» 인 다른 조건이 된다.
@@ -141,21 +167,38 @@ PY
   read -r ok internal other <<<"$dist"
 
   local rows; rows=$(DB -e "SELECT COUNT(*) FROM pose_data WHERE session_id BETWEEN $LO AND $HI;" | tr -d '[:space:]')
-  echo "$c $blk $ok $internal $other $((r1-r0)) $((c1-c0)) $((e1-e0)) ${rows:-0}"
+  echo "${CEILING:--} $c $blk $ok $internal $other $((r1-r0)) $((c1-c0)) $((e1-e0)) ${rows:-0}"
 }
 
 echo
-echo "## [2] 스윕 — 레벨 «$LEVELS» × ${BLOCKS}블록(첫 블록 버림) · 판당 $REQS 요청 · 라틴 방격"
-echo "level block ok internal other retried recovered exhausted rows" > "$SC/raw.txt"
+echo "## [2] 스윕 — ${RETRY_ARMS:+상한 «$RETRY_ARMS» × }레벨 «$LEVELS» × ${BLOCKS}블록(첫 블록 버림) · 판당 $REQS 요청 · 라틴 방격"
+echo "ceiling level block ok internal other retried recovered exhausted rows" > "$SC/raw.txt"
 lv=($LEVELS); n=${#lv[@]}
+arms=(${RETRY_ARMS:-}); an=${#arms[@]}
+CEILING="-"
+
 for ((b=0;b<BLOCKS;b++)); do
   echo "  --- 블록 $b$([ "$b" = 0 ] && echo ' (버림)')"
-  for ((k=0;k<n;k++)); do
-    # 라틴 방격 — 블록마다 레벨 순서를 한 칸 회전시켜 «레벨» 과 «판 순서» 를 분리한다.
-    line=$(run_one "${lv[$(((k+b)%n))]}" "$b")
-    echo "$line" >> "$SC/raw.txt"
-    echo "    $line"
-  done
+  if [ "$an" -gt 0 ]; then
+    # 상한 팔이 있는 판 — 팔마다 백엔드를 다시 띄우고, 그 안에서 레벨을 돈다.
+    # 라틴 방격은 **상한** 쪽에 건다(그게 이 라운드의 팔이다).
+    for ((k=0;k<an;k++)); do
+      CEILING=${arms[$(((k+b)%an))]}
+      set_retry_ceiling "$CEILING" || { echo "🔴 상한 $CEILING 을 못 세웠다 — 이 판을 건너뛴다"; continue; }
+      for ((m=0;m<n;m++)); do
+        line=$(run_one "${lv[$m]}" "$b")
+        echo "$line" >> "$SC/raw.txt"
+        echo "    $line"
+      done
+    done
+  else
+    for ((k=0;k<n;k++)); do
+      # 라틴 방격 — 블록마다 레벨 순서를 한 칸 회전시켜 «레벨» 과 «판 순서» 를 분리한다.
+      line=$(run_one "${lv[$(((k+b)%n))]}" "$b")
+      echo "$line" >> "$SC/raw.txt"
+      echo "    $line"
+    done
+  fi
 done
 
 echo
@@ -163,29 +206,44 @@ echo "## [3] 집계"
 {
 echo "# #276 ② 앱 경로 재시도 — 생성 표 (판정은 [README.md](./README.md) 에)"
 echo
-echo "ghz → Spring gRPC \`SavePoseDataBatch\` → \`savePoseDataBatchWithDeadlockRetry\`(상한 **2**, 간격 0)."
+echo "ghz → Spring gRPC \`SavePoseDataBatch\` → \`savePoseDataBatchWithDeadlockRetry\`(간격 0)."
 echo "페이로드는 **중복 조건**(\`--duplicate-keys\`, rep_number 고정) · 세션 $SESSIONS · 배치당 $REPS 프레임."
-echo "판당 **$REQS 요청** · 레벨 \`$LEVELS\` · ${BLOCKS}블록(첫 블록 버림) · **라틴 방격** · 판마다 대상 세션 행 삭제."
+echo "판당 **$REQS 요청** · 레벨 \`$LEVELS\` · ${BLOCKS}블록(첫 블록 버림) · 판마다 대상 세션 행 삭제."
+if [ -n "${RETRY_ARMS:-}" ]; then
 echo
-echo "| 동시성 | 블록 | OK | Internal | 그 외 | retried | recovered | **exhausted** | 저장된 행 |"
-echo "|---|---|---|---|---|---|---|---|---|"
-awk 'NR>1 {printf "| %s | %s | %s | %s | %s | %s | %s | **%s** | %s |%s\n",
-     $1,$2,$3,$4,$5,$6,$7,$8,$9, ($2==0?" ← 버림":"")}' "$SC/raw.txt"
+echo "🔴 **상한 팔**: \`$RETRY_ARMS\` — 팔마다 백엔드를 그 값으로 다시 띄웠고(\`shadowfit.pose.deadlock.max-retries\`),"
+echo "붙었는지 컨테이너 환경변수로 단언했다. **라틴 방격은 상한 쪽에 걸었다.**"
+fi
 echo
-echo "**레벨별 중앙값(첫 블록 제외)**"
+echo "| 상한 | 동시성 | 블록 | OK | Internal | 그 외 | retried | recovered | **exhausted** | 저장된 행 |"
+echo "|---|---|---|---|---|---|---|---|---|---|"
+awk 'NR>1 {printf "| %s | %s | %s | %s | %s | %s | %s | %s | **%s** | %s |%s\n",
+     $1,$2,$3,$4,$5,$6,$7,$8,$9,$10, ($3==0?" ← 버림":"")}' "$SC/raw.txt"
 echo
-echo "| 동시성 | Internal 중앙값 | 잔여 실패율 | exhausted 중앙값 | retried 중앙값 |"
-echo "|---|---|---|---|---|"
-for c in $LEVELS; do
-  awk -v c="$c" -v n="$REQS" 'NR>1 && $1==c && $2>0 {print $4, $8, $6}' "$SC/raw.txt" \
-  | sort -n | awk -v c="$c" -v n="$REQS" '
+
+# 팔이 있으면 상한별로, 없으면 레벨별로 접는다.
+if [ -n "${RETRY_ARMS:-}" ]; then
+  echo "**상한별 중앙값(첫 블록 제외)**"
+  echo
+  echo "| 상한 | Internal 중앙값 | 잔여 실패율 | exhausted 중앙값 | retried 중앙값 |"
+  echo "|---|---|---|---|---|"
+  KEYS="$RETRY_ARMS"; COL=1
+else
+  echo "**레벨별 중앙값(첫 블록 제외)**"
+  echo
+  echo "| 동시성 | Internal 중앙값 | 잔여 실패율 | exhausted 중앙값 | retried 중앙값 |"
+  echo "|---|---|---|---|---|"
+  KEYS="$LEVELS"; COL=2
+fi
+for key in $KEYS; do
+  awk -v k="$key" -v col="$COL" 'NR>1 && $col==k && $3>0 {print $5, $9, $7}' "$SC/raw.txt"   | sort -n | awk -v k="$key" -v n="$REQS" '
       {i[NR]=$1; e[NR]=$2; r[NR]=$3}
       END{
-        if (NR==0) { printf "| %s | — (유효 판 0) | — | — | — |\n", c; exit }
+        if (NR==0) { printf "| %s | — (유효 판 0) | — | — | — |\n", k; exit }
         m=(NR%2)? i[(NR+1)/2] : (i[NR/2]+i[NR/2+1])/2
         me=(NR%2)? e[(NR+1)/2] : (e[NR/2]+e[NR/2+1])/2
         mr=(NR%2)? r[(NR+1)/2] : (r[NR/2]+r[NR/2+1])/2
-        printf "| %s | %.1f | %.2f%% | %.1f | %.1f |\n", c, m, (m/n)*100, me, mr }'
+        printf "| %s | %.1f | %.2f%% | %.1f | %.1f |\n", k, m, (m/n)*100, me, mr }'
 done
 } | tee "$OUT/summary.md"
 
