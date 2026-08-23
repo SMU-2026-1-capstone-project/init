@@ -44,6 +44,17 @@ import urllib.request
 
 LOCK = threading.Lock()
 ROWS: list[tuple[float, int, float, str]] = []
+# ⑥ 연결 수립 시간(ms). `ai-process-ceiling-cause.md` §12-3 이 물은 값이다.
+# 🔴 `urlopen` 은 **요청마다 새 TCP 연결**을 연다 — 354 RPS 면 초당 354개 연결인데
+#    그 비용이 지금 아무 데도 안 잡힌다. 여기서 처음 뗀다.
+CONNECT_MS: list[float] = []
+# urllib(현행 기준선) | new(http.client, 매번 새 연결) | keepalive(http.client, 재사용)
+#
+# 🔑 **팔이 셋인 이유가 있다.** urllib ↔ keepalive 만 두면 «라이브러리 차이» 와 «연결 재사용
+#    차이» 가 섞인다. 가운데에 `new` 를 두면 갈린다:
+#      urllib ↔ new       라이브러리만 다르다  (같아야 정상)
+#      new    ↔ keepalive **재사용만 다르다**  ← 답을 내는 대조
+TRANSPORT = "urllib"
 SETUP_FAIL: list[str] = []
 STOP = threading.Event()
 
@@ -116,8 +127,64 @@ def open_sessions(grpc_addr, internal_token, session_ids, exercise_id):
     return opened
 
 
+class HttpConn:
+    """`http.client` 로 직접 말한다. **연결 수립을 요청에서 떼어 따로 잰다.**
+
+    🔴 예전 keep-alive 시도(`ai-receive-path-scaling.md` §2-4)는 **rig 을 통째로 복사**해서
+    쟀고, 그 사본이 세션을 못 붙여 38,400 요청 중 38,347 이 `nolease` 로 났다 —
+    「480 RPS」는 처리량이 아니라 **빨리 실패한 것**이었다. 그래서 이번엔 **사본을 안 만든다.**
+    같은 rig 의 **팔**로 넣어 `open_sessions()` 경로를 그대로 물려받는다.
+    """
+
+    def __init__(self, host, port, reuse):
+        self.host, self.port, self.conn = host, port, None
+        self.reuse = reuse      # False 면 요청마다 닫는다 — 연결 수립 비용이 매번 든다
+
+    def _connect(self):
+        import http.client
+        t = time.monotonic()
+        c = http.client.HTTPConnection(self.host, self.port, timeout=30)
+        c.connect()
+        ms = (time.monotonic() - t) * 1000.0
+        with LOCK:
+            CONNECT_MS.append(ms)
+        return c
+
+    def post(self, path, body, headers):
+        data = json.dumps(body).encode()
+        h = {"Content-Type": "application/json"}
+        h.update(headers)
+        for attempt in (0, 1):      # 서버가 연결을 닫았으면 한 번 다시 연다
+            if self.conn is None:
+                self.conn = self._connect()
+            try:
+                self.conn.request("POST", path, body=data, headers=h)
+                r = self.conn.getresponse()
+                out = (r.status, r.read().decode("utf-8", "replace"))
+                if not self.reuse:
+                    try:
+                        self.conn.close()
+                    finally:
+                        self.conn = None
+                return out
+            except Exception as e:
+                try:
+                    self.conn.close()
+                except Exception:
+                    pass
+                self.conn = None
+                if attempt:
+                    return 0, repr(e)
+        return 0, "unreachable"
+
+
 def worker(idx, sid, ai, token, frames, fps, t0):
     hdr = {"Authorization": "Bearer " + token}
+    ka = None
+    if TRANSPORT != "urllib":
+        from urllib.parse import urlparse
+        u = urlparse(ai)
+        ka = HttpConn(u.hostname, u.port or 80, reuse=(TRANSPORT == "keepalive"))
     interval = 1.0 / fps
     i = 0
     while not STOP.is_set():
@@ -129,7 +196,10 @@ def worker(idx, sid, ai, token, frames, fps, t0):
             "timestamp_sec": i * interval,
         }
         s = time.monotonic()
-        status, text = http(ai + "/api/v1/pose", "POST", payload, hdr)
+        if ka is not None:
+            status, text = ka.post("/api/v1/pose", payload, hdr)
+        else:
+            status, text = http(ai + "/api/v1/pose", "POST", payload, hdr)
         ms = (time.monotonic() - s) * 1000.0
         with LOCK:
             ROWS.append((round(s - t0, 3), idx, round(ms, 2), classify(status, text)))
@@ -169,7 +239,14 @@ def main():
     ap.add_argument("--exercise-id", type=int, default=1, dest="exercise_id")
     ap.add_argument("--label", default="")
     ap.add_argument("--out", default="")
+    ap.add_argument("--transport", default="urllib",
+                    choices=("urllib", "new", "keepalive"),
+                    help="urllib=현행 기준선 · new=http.client 로 매번 새 연결 · "
+                         "keepalive=http.client 재사용. §12 의 팔이다 — "
+                         "urllib↔new 가 라이브러리 차이, new↔keepalive 가 재사용 차이다")
     a = ap.parse_args()
+    global TRANSPORT
+    TRANSPORT = a.transport
 
     # 🔴 프로세스가 시작한 시각. 아래 t0(= 부하 시작)와의 차이를 `setup_sec` 로 돌려준다 —
     #    밖에서 도는 CPU 샘플러는 «이 프로세스가 뜬 때» 를 기준으로 재므로, 세션을 여는
@@ -230,6 +307,17 @@ def main():
         "mean_ms": round(statistics.mean(lat), 1) if lat else None,
         "outcomes": outcomes,
         "setup_fail": SETUP_FAIL,
+        # ⑥ 연결 수립(§12-3). `new` 는 요청마다, `keepalive` 는 스레드당 한 번(+재연결)이다.
+        # 🔑 **횟수 자체가 값이다** — `new` 에서 이 수가 요청 수와 같으면 「초당 N개 연결」이
+        #    확인되고, `keepalive` 에서 세션 수 근처면 재사용이 실제로 됐다는 뜻이다.
+        "transport": a.transport,
+        "connect": {
+            "n": len(CONNECT_MS),
+            "p50_ms": round(pct(sorted(CONNECT_MS), 0.50), 3) if CONNECT_MS else None,
+            "p95_ms": round(pct(sorted(CONNECT_MS), 0.95), 3) if CONNECT_MS else None,
+            "max_ms": round(max(CONNECT_MS), 3) if CONNECT_MS else None,
+            "sum_ms": round(sum(CONNECT_MS), 1) if CONNECT_MS else None,
+        },
     }
     print(json.dumps(summary, ensure_ascii=False))
 
