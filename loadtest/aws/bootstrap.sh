@@ -34,6 +34,8 @@ DB_NAME=${DB_NAME:-shadowfit}
 #   db        (기본) — MySQL + 스키마 + percona-toolkit. 기존 라운드 그대로. **동작 불변**
 #   p6-target        — 위 + Spring·AI 빌드/기동 + 토큰·캡 + 세션 시드 (측정 대상 박스)
 #   p6-loader        — python·ghz·페이로드 (부하를 거는 박스. run_all.sh 가 여기서 돈다)
+#   ai-venv          — AI 를 **venv 로** 띄울 준비 (從 R10). 도커·MySQL·Spring 없다 —
+#                      컨테이너로 띄우면 계측 노브가 안 넘어가서다(#399)
 ROLE=${ROLE:-db}
 
 # p6-target 전용. 값의 근거는 아래 각 자리에 적는다 — 근거 없는 숫자를 .env 에 박지 않는다.
@@ -51,6 +53,11 @@ BACKEND_CPUS=${BACKEND_CPUS:-4}
 AI_PUBLIC_TOKEN=${AI_PUBLIC_TOKEN:-}
 INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
 
+# ai-venv 전용. 🔴 **버전이 측정 조건이다** — ai-server/Dockerfile 이 python:3.12-slim 이고
+#   R10 이 재는 것이 GIL 거동이라, 다른 버전으로 재면 비교가 성립하지 않는다.
+AI_PY_VERSION=${AI_PY_VERSION:-3.12}
+AI_PY=${AI_PY:-}                         # 인터프리터를 직접 줄 때 (배포판에 3.12 가 없는 경우)
+
 # p6-loader 전용
 GHZ_VERSION=${GHZ_VERSION:-0.120.0}
 GHZ_SESSIONS=${GHZ_SESSIONS:-901-1900}   # seed-multi-sessions.sql 과 **같은 범위여야** 한다
@@ -60,6 +67,14 @@ step() { echo; echo "──── $* ────"; }
 die()  { echo; echo "🔴 부트스트랩 중단 — $*" >&2; exit 1; }
 
 [ "$(id -u)" = "0" ] || die "root 로 돌려야 한다 (sudo -i). 위 주석의 docker 그룹 함정 참고"
+
+# 🔴 모르는 ROLE 은 **여기서 멈춘다.** 예전에는 오타가 조용히 기본값(db)으로 떨어져서,
+#    「왜 AI 가 아니라 MySQL 박스지」를 10분 뒤에 알게 되는 자리였다. 역할이 넷이 되면서
+#    그 확률이 올라간다.
+case "$ROLE" in
+  db|p6-target|p6-loader|ai-venv) ;;
+  *) die "모르는 ROLE 이다: '$ROLE' — db · p6-target · p6-loader · ai-venv 중 하나여야 한다" ;;
+esac
 
 # ── 패키지 ───────────────────────────────────────────────────────────────
 step "패키지"
@@ -221,6 +236,110 @@ if [ "$ROLE" = "p6-loader" ]; then
   PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \\
     nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 
+  ⚠️ nohup 없이 & 만 붙이면 SSH 가 끊길 때 같이 죽는다.
+EOF
+  exit 0
+fi
+
+# ── AI 를 venv 로 (ai-venv) ───────────────────────────────────────────────
+#
+# 🔴 從 R10(프레임 경로 계측)이 쓰는 모양이다. **도커가 아니라 venv 인 이유는 하나** —
+#    컨테이너로 띄우면 계측 노브(`FRAME_PATH_METRICS`·`GIL_SWITCH_INTERVAL`)가 안 넘어간다(#399).
+#    MySQL·스키마·Spring 은 필요 없다. rig 이 uvicorn 을 직접 띄우고 gRPC 로 세션을 연다.
+#
+# 🔴 **파이썬 버전은 측정 조건이다.** 기준 관측(「346 RPS 에 9.5 vCPU」)이 난 컨테이너는
+#    `python:3.12-slim`(ai-server/Dockerfile)이고, R10 이 재려는 것이 **GIL 거동**이다.
+#    3.9 나 3.11 로 재면 «다른 인터프리터의 GIL» 을 재는 것이라 비교가 안 된다.
+#    그래서 **못 맞추면 조용히 내려가지 않고 멈춘다** — 손으로 고르려면 `AI_PY` 로 준다.
+if [ "$ROLE" = "ai-venv" ]; then
+  step "파이썬 $AI_PY_VERSION — 버전이 측정 조건이다"
+
+  AI_PY_BIN=${AI_PY:-}
+  if [ -z "$AI_PY_BIN" ]; then
+    AI_PY_BIN=$(command -v "python$AI_PY_VERSION" 2>/dev/null || true)
+  fi
+  if [ -z "$AI_PY_BIN" ]; then
+    echo "  python$AI_PY_VERSION 이 없다 — 배포판 패키지로 시도한다"
+    if command -v dnf >/dev/null 2>&1; then
+      dnf -y install "python$AI_PY_VERSION" "python$AI_PY_VERSION-devel" >/dev/null 2>&1 || true
+    else
+      apt-get install -y -qq "python$AI_PY_VERSION" "python$AI_PY_VERSION-venv" "python$AI_PY_VERSION-dev" >/dev/null 2>&1 || true
+    fi
+    AI_PY_BIN=$(command -v "python$AI_PY_VERSION" 2>/dev/null || true)
+  fi
+  [ -n "$AI_PY_BIN" ] || die "python$AI_PY_VERSION 을 못 구했다.
+   🔴 **다른 버전으로 대신 돌리지 않는다** — 기준 관측이 python:3.12-slim 컨테이너의 것이고
+      R10 이 재는 것이 GIL 거동이라, 버전이 다르면 비교 자체가 성립하지 않는다.
+   손으로 깔았으면 AI_PY=/경로/python3.12 로 줄 것.
+   (Ubuntu 22.04 기본 저장소엔 3.12 가 없다 — deadsnakes PPA 또는 pyenv 가 필요하다)"
+  echo "  $AI_PY_BIN → $("$AI_PY_BIN" -V 2>&1)"
+
+  # OpenCV 런타임 의존성. Dockerfile 이 libgl1·libglib2.0-0 을 까는 자리와 같다.
+  # ⚠️ 패키지 이름이 배포판마다 다르다 — AL2023 은 mesa-libGL·glib2 다.
+  step "OpenCV 런타임 의존성"
+  if command -v dnf >/dev/null 2>&1; then
+    dnf -y install mesa-libGL glib2 >/dev/null || die "mesa-libGL/glib2 설치 실패"
+  else
+    apt-get install -y -qq libgl1 libglib2.0-0 >/dev/null || die "libgl1/libglib2.0-0 설치 실패"
+  fi
+
+  # 🔴 자리가 고정이다 — rig(`run_arms.py`)이 `ai-server/.venv/{bin,Scripts}` 를 찾는다.
+  step "venv — $WORKDIR/ai-server/.venv"
+  AI_VENV="$WORKDIR/ai-server/.venv"
+  if [ ! -x "$AI_VENV/bin/python" ]; then
+    "$AI_PY_BIN" -m venv "$AI_VENV" || die "venv 생성 실패 (Ubuntu 면 python$AI_PY_VERSION-venv 가 필요하다)"
+  fi
+  "$AI_VENV/bin/python" -m pip install -q --upgrade pip >/dev/null 2>&1 || true
+
+  step "의존성 — requirements.txt (mediapipe 때문에 3~8분)"
+  "$AI_VENV/bin/python" -m pip install -q -r "$WORKDIR/ai-server/requirements.txt" \
+    || die "pip install 실패"
+
+  # proto 스텁. 저장소에 커밋본이 있지만 **Dockerfile 은 매번 다시 만든다** — 설치된
+  # grpcio-tools 와 어긋난 스텁은 import 는 되고 런타임에 깨진다. 같은 자리를 그대로 따른다.
+  step "proto 스텁 재생성"
+  ( cd "$WORKDIR/ai-server" && "$AI_VENV/bin/python" -m grpc_tools.protoc \
+      -I./app/proto --python_out=. --grpc_python_out=. ./app/proto/exercise.proto ) \
+    || die "protoc 실패"
+
+  # 여기까지 왔는데 import 가 깨지면 rig 이 «판이 시작된 뒤» 죽는다. 지금 확인한다.
+  step "확인 — import 와 버전"
+  ( cd "$WORKDIR/ai-server" && "$AI_VENV/bin/python" - <<'PY'
+import sys, mediapipe, cv2, numpy, grpc
+sys.path.insert(0, ".")
+import exercise_pb2, exercise_pb2_grpc          # noqa: F401
+print(f"  python     {sys.version.split()[0]}")
+print(f"  mediapipe  {mediapipe.__version__}")
+print(f"  opencv     {cv2.__version__}")
+print(f"  numpy      {numpy.__version__}")
+print(f"  grpcio     {grpc.__version__}")
+PY
+  ) || die "의존성 import 실패 — 위 오류를 볼 것"
+
+  # rig 이 쓰는 프레임 자산은 **커밋본**이다(408KB) — 이 박스에서 만들 수 없다.
+  [ -f "$WORKDIR/loadtest/results/coresidency-2026-08-15/frames.json" ] \
+    || die "frames.json 이 저장소에 없다 — rig 이 부하를 못 만든다"
+
+  step "AI venv 준비됨 (從 R10-a)"
+  cat <<EOF
+  작업 디렉터리 : $WORKDIR
+  커밋          : $(git -C "$WORKDIR" rev-parse --short HEAD) ($REF)
+  인터프리터    : $AI_VENV/bin/python
+  frames.json   : ✅ 커밋본
+
+  다음 — R10-a(1대 동거). 무대 결정은 docs/decisions/r10-loadgen-topology.md §7:
+  cd $WORKDIR && \
+  nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py \
+    --sessions 160 --dur 90 --pool 201 \
+    --plan "A,A@0.001,A,A@0.001" --discard 1 \
+    --out loadtest/results/frame-path-r10a-\$(date +%F) > /root/r10a.log 2>&1 &
+
+  🔴 규모는 **기존 라운드와 같은 조건**이라야 비교가 된다 — 160세션 · 90초 · 풀 201
+     (ai-receive-path-scaling.md §8-2 표 · 풀 201 은 §「그러면 이게 결함 신호다」).
+     rig 기본은 8세션 · 45초 · 풀=세션+4 라 **안 주면 다른 판이 된다.**
+
+  🔴 ON/OFF 앵커 판 한 장을 끼울 것 — 계측 대가(≤2.4%)를 이 박스에서도 확인하는 자리다.
+  🔴 handler_concurrency 는 이 판의 판정선이 아니다 — 부하기가 동거해서 절대값이 다친다(§7).
   ⚠️ nohup 없이 & 만 붙이면 SSH 가 끊길 때 같이 죽는다.
 EOF
   exit 0
