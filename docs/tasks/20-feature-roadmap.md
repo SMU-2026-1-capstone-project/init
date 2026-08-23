@@ -11,6 +11,7 @@
 > | 프레임 송신 — 🟥 카메라 프레임 송신 X | ✅ `exercise.tsx:175` — `aiService.detectPose` (AI 직결, 분기 H2). 🔴 그 경로에 [#134](https://github.com/Shadowfit/init/issues/134) 결함 있음 |
 > | 결과 표시 — 🟥 표시 X | ✅ `frontend/app/report/[id].tsx` 존재 |
 > | 데이터 계층 (`services/`·`types/`) | ✅ **7개 전부 존재** — [`../handoff/frontend-data-layer.md`](../handoff/frontend-data-layer.md) 완료 |
+> | worst 구간 — «채우는 서비스 로직은 **확인 필요**» | ✅ **채운다** (2026-08-23 확인). `SessionService.precomputeReport()` → `sessionAnalysisCalculator.calculate()` → `reports.detailed_analysis`. 🔴 **새 사실이 아니다** — [`27-implementation-gaps.md:9`](./27-implementation-gaps.md) 가 **2026-07-24 에 이미 «완료»** 로 적었고, 이 표만 한 달 낡아 있었다. 남은 것은 로직이 아니라 **해상도 결정**([#78](https://github.com/Shadowfit/init/issues/78) ㄹ안 — 대표 프레임이 아직 «그냥 가운데») |
 > | 관리자 페이지 «대부분 미구현» (§1-4) | ✅ **백엔드는 닫혔다** (2026-08-08). 관리자 **프론트**는 미착수 — [`28-remaining-work-plan.md`](./28-remaining-work-plan.md) §3 |
 >
 > **여전히 맞는 것** (확인함):
@@ -74,7 +75,7 @@
 | 주간 운동 요약 통계 | 검정 | `SessionService.getWeeklyActivity` ✅ | 🟨 동일 | 프론트 — 데이터 연동 |
 | 실시간 자세 피드백 | 회색 | feedback_message 컬럼 + AI rep 단위 ✅ | 🟥 표시 X | 프론트 — 실시간 자막/TTS |
 | 이전 운동 기록 비교 | 회색 | `Report.comparison_with_previous` JSON ✅ | 🟥 비교 화면 X | 프론트 — 차트·표 |
-| 운동 worst 구간 선정 | 회색 | `WorstSectionDto`, `SessionReportResponseDto` 있음, 채우는 서비스 로직은 확인 필요 | 🟥 표시 X | Backend 로직 보강 + 프론트 차트 |
+| 운동 worst 구간 선정 | 회색 | ✅ **채운다 — 2026-08-23 코드 확인.** `SessionService.precomputeReport()` 가 `sessionAnalysisCalculator.calculate()` 로 worst 구간·rep 추세를 계산해 `reports.detailed_analysis` 에 저장하고(`applyComplete` 에서 호출), 읽기 경로는 저장된 값을 그대로 읽는다([설계 §232](../decisions/worst-section-rep-resolution.md)) | 🟥 표시 X | **프론트 차트.** 백엔드에 남은 것은 «로직 부재» 가 아니라 **해상도 결정**이다 — 대표 프레임이 아직 `worstFrames.get(size/2)`(그냥 가운데)이고 rep 해상도(ㄹ안)는 미착수([#78](https://github.com/Shadowfit/init/issues/78)) |
 | AI 리포트 자동 생성 | 회색 | 🟥 (`OpenAI_API_KEY` env 만 있음, GPT 호출 코드 미작성) | 🟥 | Backend — `GptFeedbackService` 신설 (Anthropic Claude API 또는 OpenAI) |
 | 데이터 기반 개인화 루틴 추천 | 회색 | 🟥 | 🟥 | **큰 작업** — 데이터 분석 + 추천 알고리즘 |
 | 운동 목표 달성현황 | 회색 | 🟥 (목표 엔티티 없음) | 🟥 | 새 스키마 + UI |
@@ -114,7 +115,7 @@
 |------|------|------|
 | 🟡 | 백엔드 프록시 `POST /exercises/sessions/{id}/frame` | 분기 H1 채택 시 — WebClient 로 AI `/pose` 전달 |
 | 🟡 | GPT/Claude 연동 (`GptFeedbackService`) | AI 리포트 자동 생성. `OPENAI_API_KEY` env 이미 준비됨 |
-| 🟡 | worst 구간 선정 로직 보강 | DTO 있음, 채우는 서비스 메서드 확인 필요 |
+| 🟡 | worst 구간 **해상도** 결정 ([#78](https://github.com/Shadowfit/init/issues/78) ㄹ안) | 🔴 **«로직 보강» 이 아니다 — 채우는 코드는 있다**(`SessionService.precomputeReport`, 2026-08-23 확인). 남은 것은 대표 프레임이 `worstFrames.get(size/2)`(그냥 가운데)라는 것이고, 그건 **결정 항목**이다 |
 | 🟢 | 운동 목표 엔티티·API (`GoalController`) | 새 도메인 |
 | 🟢 | 카테고리 관리 CRUD | 운영자용 |
 | 🟢 | 사용자 운동 패턴 분석 API | 큰 작업 |
