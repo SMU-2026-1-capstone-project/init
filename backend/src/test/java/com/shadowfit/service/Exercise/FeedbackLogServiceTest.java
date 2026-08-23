@@ -236,4 +236,71 @@ class FeedbackLogServiceTest {
 
         assertThat(feedbackLogRepository.findBySessionIdOrderByOccurredAtAsc(session.getId())).isEmpty();
     }
+
+    /**
+     * {@code occurred_at} 은 {@code rep_number} 와 <b>같은 뿌리</b>인데 막히지 않고 있었다 (#288).
+     *
+     * <p>다만 이쪽은 메시지 타입이라 «미설정» 을 <b>물어볼 수 있다</b>(has-bit). 안 물어보면
+     * {@code Timestamps.toMillis} 가 0 을 돌려주고 그게 <b>1970-01-01</b> 로 저장된다.
+     * 컬럼이 {@code NOT NULL} 이라 NULL 로 남길 수도 없어 「안 보냈다」가 「1970 에 일어났다」로 굳는다.
+     */
+    @Test
+    @DisplayName("#288 occurred_at 이 비면 저장하지 않고 INVALID_INPUT_VALUE — 1970 으로 굳지 않도록")
+    void saveBatch_missingOccurredAt_isRejected() {
+        FeedbackBatchRequest request = batch(
+                FeedbackEvent.newBuilder()          // occurred_at 을 안 채운다
+                        .setFeedbackType("KNEE_OUT")
+                        .setRepNumber(1)
+                        .setSyncRateAtTrigger(50.0)
+                        .build());
+
+        assertThatThrownBy(() -> feedbackLogService.saveBatch(request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        assertThat(feedbackLogRepository.findBySessionIdOrderByOccurredAtAsc(session.getId())).isEmpty();
+    }
+
+    /**
+     * {@code sync_rate_at_trigger} 는 퍼센트이고 컬럼은 {@code DECIMAL(5,2)} 다 (#288).
+     * 범위 밖이 그대로 가면 strict mode 에서 <b>INSERT 문 전체</b>가 죽고(이벤트 하나가 배치를
+     * 끌고 나간다), 비-strict 면 999.99 로 <b>조용히</b> 잘린다. 둘 다 «보내는 쪽이 틀렸다» 인데
+     * 증상은 «우리가 아프다» 로 보인다.
+     */
+    @Test
+    @DisplayName("#288 sync_rate 가 퍼센트 범위 밖이면 저장하지 않고 INVALID_INPUT_VALUE")
+    void saveBatch_syncRateOutOfRange_isRejected() {
+        for (double bad : new double[] {-0.01, 100.01, 1000.0, Double.NaN}) {
+            FeedbackBatchRequest request = batch(event("KNEE_OUT", 1, 1000, bad));
+
+            assertThatThrownBy(() -> feedbackLogService.saveBatch(request))
+                    .describedAs("sync_rate=%s 는 거절돼야 한다", bad)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        assertThat(feedbackLogRepository.findBySessionIdOrderByOccurredAtAsc(session.getId())).isEmpty();
+    }
+
+    /**
+     * 🔴 <b>이 테스트는 «막지 못하는 것» 을 박제한다</b> (#288).
+     *
+     * <p>{@code sync_rate_at_trigger} 는 proto3 {@code double} 이라 «미설정» 과 «진짜 0.00» 을
+     * 구분할 수 없다. {@code rep_number} 는 1-based 라 0 을 «미설정» 으로 읽을 수 있었지만
+     * 싱크율 0% 는 유효한 값이다. 그래서 <b>0.0 은 통과한다</b> — 그게 지금의 계약이다.
+     *
+     * <p>가르려면 proto 를 {@code optional double} 로 바꿔야 하고(크로스 레포), 그건 감지기(#228)가
+     * 이 필드를 실제로 채우게 될 때 같이 볼 일이다. 그때 이 테스트가 <b>바뀌어야 할 자리</b>를 가리킨다.
+     */
+    @Test
+    @DisplayName("#288 sync_rate 0.0 은 통과한다 — «미설정» 과 «진짜 0%» 를 못 가르는 것이 지금의 한계")
+    void saveBatch_syncRateZero_isAcceptedByDesign() {
+        int inserted = feedbackLogService.saveBatch(batch(event("KNEE_OUT", 1, 1000, 0.0)));
+
+        assertThat(inserted).isEqualTo(1);
+        assertThat(feedbackLogRepository.findBySessionIdOrderByOccurredAtAsc(session.getId()))
+                .hasSize(1);
+    }
 }
