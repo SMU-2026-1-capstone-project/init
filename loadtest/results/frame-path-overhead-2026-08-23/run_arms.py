@@ -172,6 +172,9 @@ class CpuSampler(threading.Thread):
         super().__init__(daemon=True)
         self.interval = interval
         self.roots: dict[str, int] = {}
+        # 🔑 스레드까지 쪼갤 루트. 「이벤트 루프 스레드가 1코어에 붙었나」를 보는 자리다
+        #    (설계: docs/decisions/per-process-ceiling-cause.md 축 1).
+        self.thread_roots: dict[str, int] = {}
         self.samples: list[dict] = []
         self.error = None
         # 🔴 이름이 `_stop` 이면 안 된다 — `threading.Thread._stop()` 을 덮어써서
@@ -198,6 +201,27 @@ class CpuSampler(threading.Thread):
                 rest = raw[raw.rindex(")") + 2:].split()
                 out[int(name)] = (int(rest[1]), int(rest[11]) + int(rest[12]))
             except (ValueError, IndexError):
+                continue
+        return out
+
+    @staticmethod
+    def _threads(pid):
+        """{tid: ticks} — 그 프로세스의 스레드별 utime+stime.
+
+        읽는 중 죽는 스레드는 건너뛴다(워커풀은 계속 뜨고 진다).
+        """
+        out = {}
+        try:
+            tids = os.listdir(f"/proc/{pid}/task")
+        except OSError:
+            return out
+        for tid in tids:
+            try:
+                with open(f"/proc/{pid}/task/{tid}/stat", "rb") as f:
+                    raw = f.read().decode("utf-8", "replace")
+                rest = raw[raw.rindex(")") + 2:].split()
+                out[int(tid)] = int(rest[11]) + int(rest[12])
+            except (OSError, ValueError, IndexError):
                 continue
         return out
 
@@ -230,8 +254,17 @@ class CpuSampler(threading.Thread):
         return res
 
     # ── 수명 ────────────────────────────────────────────────────────────
-    def track(self, name, pid):
+    def track(self, name, pid, threads=False):
+        """`threads=True` 면 그 프로세스의 **스레드별** CPU 도 쪼갠다.
+
+        🔑 **메인 스레드는 tid == pid 다**(리눅스 보장). uvicorn 은 `--workers` 없이
+        이벤트 루프를 **메인 스레드에서** 돌리므로, 그 한 줄이 곧 «루프가 얼마나 쓰나» 다.
+        CPython 은 OS 스레드 이름을 안 붙이는 경우가 많아 `comm` 으로는 못 가른다 —
+        **tid == pid 가 유일하게 믿을 수 있는 표식**이다.
+        """
         self.roots[name] = pid
+        if threads:
+            self.thread_roots[name] = pid
 
     def stop(self):
         self._done.set()
@@ -243,6 +276,7 @@ class CpuSampler(threading.Thread):
             return
         try:
             prev_p, prev_b, prev_t = self._procs(), self._box_busy(), time.monotonic()
+            prev_th = {n: self._threads(pid) for n, pid in self.thread_roots.items()}
         except Exception as e:                 # noqa: BLE001
             self.error = repr(e)
             return
@@ -261,6 +295,24 @@ class CpuSampler(threading.Thread):
             for name in self.roots:
                 row[name] = round(max(0, b.get(name, 0) - a.get(name, 0)) / self._clk / dt, 3)
             row["box"] = round(max(0, cur_b - prev_b) / self._clk / dt, 3)
+
+            # 🔑 스레드 분해 — 「이벤트 루프(메인)가 1코어에 붙었나」
+            cur_th = {}
+            for name, pid in self.thread_roots.items():
+                cur_th[name] = self._threads(pid)
+                p0, p1 = prev_th.get(name, {}), cur_th[name]
+                main = worker = 0
+                for tid, t1 in p1.items():
+                    d = max(0, t1 - p0.get(tid, t1))   # 새로 뜬 스레드는 0 으로 센다
+                    if tid == pid:
+                        main += d                       # 🔑 tid == pid = 메인 = 이벤트 루프
+                    else:
+                        worker += d
+                row[f"{name}_main"] = round(main / self._clk / dt, 3)
+                row[f"{name}_workers"] = round(worker / self._clk / dt, 3)
+                row[f"{name}_nthreads"] = len(p1)
+            prev_th = cur_th
+
             self.samples.append(row)
             prev_p, prev_b, prev_t = cur_p, cur_b, cur_t
 
@@ -289,6 +341,13 @@ class CpuSampler(threading.Thread):
                "n": len(kept), "ncpu": os.cpu_count()}
         for name in list(self.roots) + ["box"]:
             out[name] = stat(name)
+        # 🔑 스레드 분해 — 설계 §2 축 1 의 판정선 ㄱ 이 읽는 자리다.
+        #    메인(=이벤트 루프)이 1.0 vCPU 근처에 평평하면 «루프가 천장» 지지.
+        for name in self.thread_roots:
+            th = {k: stat(f"{name}_{k}") for k in ("main", "workers")}
+            nt = [s2[f"{name}_nthreads"] for s2 in kept if f"{name}_nthreads" in s2]
+            th["nthreads_max"] = max(nt) if nt else None
+            out[f"{name}_threads"] = th
         out["series"] = kept
         return out
 
@@ -404,7 +463,7 @@ def main():
                 continue
             # CPU 샘플러는 **헬스 통과 뒤** 시작한다 — 기동·모델 로드는 이 판의 부하가 아니다.
             sampler = CpuSampler(a.cpu_interval)
-            sampler.track("ai", p.pid)
+            sampler.track("ai", p.pid, threads=True)   # 🔑 루프/워커를 쪼갠다
             sampler.start()
             r = run_load(arm, rn, a.sessions, a.fps, a.dur, a.warmup, sampler)
             sampler.stop()
