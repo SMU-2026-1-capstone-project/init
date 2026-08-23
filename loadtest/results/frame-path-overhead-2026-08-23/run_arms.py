@@ -66,6 +66,7 @@ VENV_CANDIDATES = (
 
 # 포트·주소·인터프리터는 main() 이 정한다(박스마다 다르다).
 PY = None
+RESPONSE_MODE = "model"   # main() 이 --response-mode 로 덮는다
 HTTP_PORT = 8100          # 8000 은 08-23 로컬 박스에서 이미 쓰이고 있었다
 GRPC_PORT = 8685
 AI = None
@@ -305,6 +306,10 @@ def boot(arm, pool, bind):
         "AI_GRPC_PORT": str(GRPC_PORT),
         "FRAME_PATH_METRICS": "true" if metrics else "false",
         "GIL_SWITCH_INTERVAL": str(gil),
+        # 응답 생성 방식(`ai-process-ceiling-cause.md` §11 의 팔). 기본은 현행 `model`.
+        # 🔴 판마다 바꾸려면 **재기동이 필요하다** — `response_model` 이 데코레이터 시점에
+        #    굳기 때문이다. 이 rig 은 어차피 판마다 uvicorn 을 다시 띄우므로 맞물린다.
+        "RESPONSE_MODE": RESPONSE_MODE,
         "PYTHONUNBUFFERED": "1",
     })
     log = open(os.path.join(OUT, f"server_{TAG}.log"), "ab")
@@ -344,7 +349,7 @@ def run_load(arm, round_no, sessions, fps, dur, warmup, sampler=None):
 
 
 def main():
-    global OUT, TAG, PY, AI, HTTP_PORT, GRPC_PORT
+    global OUT, TAG, PY, AI, HTTP_PORT, GRPC_PORT, RESPONSE_MODE
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)))
     ap.add_argument("--sessions", type=int, default=8)
@@ -364,6 +369,10 @@ def main():
                          "예: B,A,B,B,A,B,A,A,B  또는  A,A@0.001,A,A@0.001")
     ap.add_argument("--discard", type=int, default=DISCARD_FIRST,
                     help="앞에서 버릴 판 수")
+    ap.add_argument("--response-mode", default="model", dest="response_mode",
+                    choices=("model", "dict", "json"),
+                    help="응답 생성 방식 — model(현행) · dict(검증 제거) · json(JSONResponse 직접). "
+                         "§11 의 팔이다. 🔴 dict·json 은 **응답 계약을 바꾼다**(측정용)")
     ap.add_argument("--settle", type=float, default=3.0,
                     help="판 사이 대기(초) — 포트·검출기 정리 여유")
     ap.add_argument("--warmup", type=float, default=5.0,
@@ -375,6 +384,7 @@ def main():
     HTTP_PORT, GRPC_PORT = a.http_port, a.grpc_port
     AI = f"http://127.0.0.1:{HTTP_PORT}"
     PY = resolve_python(a.python_bin)
+    RESPONSE_MODE = a.response_mode
     plan = [t.strip() for t in a.plan.split(",") if t.strip()]
     for tok in plan:
         parse_arm(tok)                      # 🔴 한 판이라도 돌기 전에 팔 표기를 다 검증한다
@@ -434,7 +444,8 @@ def main():
     with open(path, "w", encoding="utf-8") as f:
         json.dump({"plan": plan, "discard_first": a.discard,
                    "sessions": a.sessions, "fps": a.fps, "dur": a.dur,
-                   "pool": pool, "bind": a.bind, "python": PY,
+                   "pool": pool,
+        "response_mode": RESPONSE_MODE, "bind": a.bind, "python": PY,
                    "results": results}, f, ensure_ascii=False, indent=2)
     print("\n결과:", path)
     return 0
