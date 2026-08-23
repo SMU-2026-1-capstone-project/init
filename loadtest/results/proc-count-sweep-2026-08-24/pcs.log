@@ -1,0 +1,36 @@
+── 박스 보정 ──
+  박스   : 16 vCPU · 물리 8 · Intel(R) Xeon(R) Platinum 8488C
+  스택   : python 3.9.25 · 커밋 d7999db
+  cpu    : 13,953,755.1 iter/s  (0.215s)
+  infer  : 🔴 건너뜀 — ModuleNotFoundError("No module named 'cv2'")
+  🔴 판정에 안 쓰더라도 결과 디렉터리에 남길 것 (#255 축 0)
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+W0000 00:00:1787508729.879772   33580 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787508729.908188   33580 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787508729.922764   33580 landmark_projection_calculator.cc:186] Using NORM_RECT without IMAGE_DIMENSIONS is only supported for the square ROI. Provide IMAGE_DIMENSIONS or use PROJECTION_MATRIX.
+── 박스 보정 ──
+  박스   : 16 vCPU · 물리 8 · Intel(R) Xeon(R) Platinum 8488C
+  스택   : python 3.12.13 · 커밋 d7999db
+  cpu    : 18,977,927.0 iter/s  (0.1581s)
+  infer  :       72.1 fps  (1.3866s)
+  🔴 판정에 안 쓰더라도 결과 디렉터리에 남길 것 (#255 축 0)
+──── [1/17] 팔 A = 1프로세스 × 160세션 × 풀202  tag=t0_A (버림) ────
+──── [2/17] 팔 A = 1프로세스 × 160세션 × 풀202  tag=t1_A  ────
+──── [3/17] 팔 B = 2프로세스 × 80세션 × 풀101  tag=t2_B  ────
+──── [4/17] 팔 C = 3프로세스 × 53세션 × 풀68  tag=t3_C  ────
+──── [5/17] 팔 D = 4프로세스 × 40세션 × 풀51  tag=t4_D  ────
+──── [6/17] 팔 D = 4프로세스 × 40세션 × 풀51  tag=t5_D  ────
+──── [7/17] 팔 C = 3프로세스 × 53세션 × 풀68  tag=t6_C  ────
+──── [8/17] 팔 B = 2프로세스 × 80세션 × 풀101  tag=t7_B  ────
+──── [9/17] 팔 A = 1프로세스 × 160세션 × 풀202  tag=t8_A  ────
+──── [10/17] 팔 B = 2프로세스 × 80세션 × 풀101  tag=t9_B  ────
+──── [11/17] 팔 A = 1프로세스 × 160세션 × 풀202  tag=t10_A  ────
+──── [12/17] 팔 D = 4프로세스 × 40세션 × 풀51  tag=t11_D  ────
+──── [13/17] 팔 C = 3프로세스 × 53세션 × 풀68  tag=t12_C  ────
+──── [14/17] 팔 C = 3프로세스 × 53세션 × 풀68  tag=t13_C  ────
+──── [15/17] 팔 D = 4프로세스 × 40세션 × 풀51  tag=t14_D  ────
+──── [16/17] 팔 A = 1프로세스 × 160세션 × 풀202  tag=t15_A  ────
+──── [17/17] 팔 B = 2프로세스 × 80세션 × 풀101  tag=t16_B  ────
+──── 게이트 ────
+🟢 게이트 통과 — 17판 · 에러 0 · nolease 0 · 프로브·바닥·rig 수 정상
