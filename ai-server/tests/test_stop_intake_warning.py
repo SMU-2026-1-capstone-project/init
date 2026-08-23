@@ -28,6 +28,16 @@ from app.grpc.session_state import get_registry
 _REF = [[90.0, 170.0], [80.0, 165.0]]
 
 
+class _NoPool:
+    """검출기 풀 대역. 🔴 진짜 풀은 «컨테이너 메모리 한도도 POSE_DETECTOR_POOL_SIZE 도 없으면»
+    크기를 정하길 거부한다(`mediapipe_detector.get_pool`) — 근거 없는 기본값을 박지 않겠다는
+    설계라 그 자체가 옳다. 그래서 **CI 의 맨 러너에서는 StopAnalysis 가 풀에서 먼저 죽는다.**
+    이 파일이 보는 것은 풀이 아니라 stop 경로이므로 자리만 채운다."""
+
+    def release(self, _session_id):
+        return False
+
+
 class _Ctx:
     """StopAnalysis 는 컨텍스트를 안 건드리지만, 시그니처를 채워야 부를 수 있다."""
 
@@ -52,6 +62,7 @@ def _arm_callback(monkeypatch):
         fired.set()
 
     monkeypatch.setattr(servicer_mod, "_send_complete_analysis", _fake)
+    monkeypatch.setattr(servicer_mod, "get_pool", lambda: _NoPool())
     return fired, seen
 
 
