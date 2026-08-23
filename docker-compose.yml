@@ -80,6 +80,10 @@ services:
       # r276-ceiling-sweep-aws-2026-08-23: 상한 2 는 14.0% · 3 은 6.2% 를 남긴다).
       # 이 줄은 **측정용 손잡이**이기도 하다 — 팔을 바꿔 돌릴 때 재빌드를 안 하려고 둔다.
       SHADOWFIT_POSE_DEADLOCK_MAX_RETRIES: ${POSE_DEADLOCK_MAX_RETRIES:-3}
+      # 재시도 간격 (#276 ③ 후속). 기본 0 = 즉시 재시도 — 지금까지의 모든 실측이 그 조건이다.
+      # 이것도 측정용 손잡이다: 위쪽 상한이 «더 던지는데 안 벌리는» 이유 후보를 재려면 팔이 필요하다.
+      SHADOWFIT_POSE_DEADLOCK_BACKOFF_MS: ${POSE_DEADLOCK_BACKOFF_MS:-0}
+      SHADOWFIT_POSE_DEADLOCK_BACKOFF_JITTER: ${POSE_DEADLOCK_BACKOFF_JITTER:-false}
     depends_on:
       mysql:
         condition: service_healthy

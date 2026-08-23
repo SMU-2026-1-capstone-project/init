@@ -167,6 +167,36 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
     @Value("${shadowfit.pose.deadlock.max-retries:3}")
     private int deadlockMaxRetries = 3;   // 초기값도 둔다 — Spring 밖에서 만들면 0 이 되고, 그 0 은 «재시도 없음» 이다
 
+
+    /**
+     * 데드락 재시도 <b>간격</b>(ms). 기본 <b>0</b> — 지금까지 쟀던 모든 판이 «즉시 재시도» 였고,
+     * 그 동작을 그대로 둔다.
+     *
+     * <p>🔴 <b>이 손잡이의 목적은 튜닝이 아니라 측정이다.</b> 상한 스윕
+     * ({@code loadtest/results/r276-ceiling-sweep-aws-2026-08-23/})에서 위쪽 상한이
+     * <b>더 던지는데 잔여는 안 줄어드는</b> 현상이 나왔다(상한 4·5 의 retried 539·551 대 3 의 331).
+     * 후보 설명 중 하나가 «간격 0 이라 재시도가 상대의 커밋 전에 다시 부딪힌다» 인데,
+     * 그건 <b>아무도 안 쟀다</b>. 재려면 팔이 필요하고, 상수면 팔을 못 만든다.
+     *
+     * <p>두 힘이 반대 방향이라 결과를 미리 못 정한다 — 기다리면 상대가 커밋할 시간을 주지만,
+     * 요청이 더 오래 살아 그 순간의 동시성을 올린다(08-20 라운드가 같은 이유로 안 쟀다).
+     *
+     * <p>⚠️ <b>대가를 알고 넣는다</b>: 이 sleep 은 gRPC 워커 스레드를 잡는다. 간격이 크면
+     * 그 스레드가 노는 시간이 늘고, 유입이 밀린다. 값을 채택하려면 그 대가까지 봐야 한다.
+     */
+    @Value("${shadowfit.pose.deadlock.backoff-ms:0}")
+    private long deadlockBackoffMs = 0L;
+
+    /**
+     * 간격에 <b>지터</b>를 줄지. 기본 <b>false</b>.
+     *
+     * <p>고정 간격은 부딪힌 둘을 <b>같은 시각으로</b> 다시 보낸다 — 그래서 경합 문제에서는
+     * 흔히 지터가 고정 간격보다 낫다고 말한다. 그 말이 <b>이 조건에서도</b> 맞는지는 안 쟀다.
+     * 켜면 {@code [0, backoff-ms)} 에서 균등하게 뽑는다(full jitter).
+     */
+    @Value("${shadowfit.pose.deadlock.backoff-jitter:false}")
+    private boolean deadlockBackoffJitter = false;
+
     /**
      * pose_data 배치 저장을 데드락에 한해 다시 던진다.
      *
@@ -218,8 +248,10 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                 }
                 retries++;
                 sessionMetrics.poseBatchDeadlockRetry("retried");
-                log.warn("세션 {} : 배치 INSERT 데드락 — {}/{}회째 다시 던진다 (#276)",
-                        request.getSessionId(), retries, deadlockMaxRetries);
+                log.warn("세션 {} : 배치 INSERT 데드락 — {}/{}회째 다시 던진다 (#276, 간격 {}ms{})",
+                        request.getSessionId(), retries, deadlockMaxRetries,
+                        deadlockBackoffMs, deadlockBackoffJitter ? " 지터" : "");
+                sleepBeforeRetry();
             }
         }
     }
@@ -377,5 +409,29 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
         responseObserver.onError(status
                 .withDescription(e.getErrorCode().name() + ": " + e.getErrorCode().getMessage())
                 .asRuntimeException());
+    }
+
+    /**
+     * 재시도 전 대기. 기본값(0)에서는 <b>아무 일도 하지 않는다</b> — 지금까지의 모든 실측이 그 조건이다.
+     *
+     * <p>인터럽트가 오면 <b>삼키지 않고</b> 플래그를 되살린 뒤 그대로 나간다. 종료 중이면
+     * 재시도를 계속하는 것보다 포기가 맞고, 그 판단은 위층(종료 정책 #208)의 몫이다.
+     */
+    private void sleepBeforeRetry() {
+        if (deadlockBackoffMs <= 0) {
+            return;
+        }
+        long millis = deadlockBackoffJitter
+                ? java.util.concurrent.ThreadLocalRandom.current().nextLong(deadlockBackoffMs)
+                : deadlockBackoffMs;
+        if (millis <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("데드락 재시도 대기 중 인터럽트 — 재시도를 포기한다", ie);
+        }
     }
 }
