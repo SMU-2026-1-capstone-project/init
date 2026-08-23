@@ -35,6 +35,19 @@ public final class CorrelationIds {
     /** 로그 패턴에서 {@code %X{sessionId}} 로 참조하는 MDC 키. */
     public static final String SESSION_MDC_KEY = "sessionId";
 
+    /**
+     * 로그 패턴에서 {@code %X{actor}} 로 참조하는 MDC 키 — <b>인증된 요청의 주체</b>.
+     *
+     * <p>[왜 필요한가] 관리자 쓰기 5개({@code AdminExerciseController})가 남기는 로그는
+     * <b>무엇이 바뀌었는지</b>는 잘 적는데({@code updateThresholds} 는 before → after 를 페르소나
+     * 4개 전부 찍는다) <b>누가</b> 가 없었다. 그 값이 사용자 점수 판정에 직접 들어가는
+     * 임계값이라, 「지난주 리포트 점수가 왜 낮았나」에 답하려면 주체가 필요하다(이슈 #395).
+     *
+     * <p>[왜 MDC 인가] cid 를 넣을 때와 같은 이유다 — 기존 {@code log.info(...)} 호출을
+     * <b>한 줄도 고치지 않고</b> 모든 로그 줄이 주체를 갖는다.
+     */
+    public static final String ACTOR_MDC_KEY = "actor";
+
     /** HTTP 진입점에서 수용/반환하는 헤더명. */
     public static final String HTTP_HEADER = "X-Request-Id";
 
@@ -91,6 +104,19 @@ public final class CorrelationIds {
     /** 운동 세션 식별자를 MDC에 얹는다. cid와 함께 찍혀 "같은 세션, 다른 흐름"을 드러낸다. */
     public static Scope withSession(Long sessionId) {
         return put(SESSION_MDC_KEY, sessionId == null ? null : String.valueOf(sessionId));
+    }
+
+    /**
+     * 인증된 요청 주체를 MDC에 얹는다. {@code null}이면 키를 지우므로 <b>인증 없는 요청은
+     * 자연히 빈 값</b>이 되고, 로그에는 {@code ·} 로 찍힌다.
+     *
+     * <p>🔴 <b>인자가 {@code Long memberId} 인 것은 의도다 — 이메일을 넣지 않는다.</b>
+     * 로그는 유출 표면이고(이슈 #411 이 정확히 그 자리에서 나왔다), 이메일은 그 자체로
+     * 개인정보다. {@code member_id} 는 되짚을 수 있으면서 로그만 새어도 신원이 바로 드러나지
+     * 않는다. 타입을 {@code Long} 으로 좁혀 <b>이메일이 실수로 들어올 수 없게</b> 했다.
+     */
+    public static Scope withActor(Long memberId) {
+        return put(ACTOR_MDC_KEY, memberId == null ? null : String.valueOf(memberId));
     }
 
     /**
