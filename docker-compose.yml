@@ -71,6 +71,7 @@ services:
       DB_HOST: shadowfit-mysql
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      # 필수 여부는 AI 서비스 쪽 같은 키에 걸어 뒀다 (#430 주석 참고).
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
       AI_SERVER_HOST: shadowfit-ai
       AI_SERVER_GRPC_PORT: 8585
@@ -123,7 +124,16 @@ services:
     environment:
       DEBUG: "false"
       TZ: Asia/Seoul
-      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+      # 🔴 `:?`(필수)를 건다 (#430). config.py 의 _assert_tokens_separated 가
+      #    *"빈 값은 여기서 막지 않는다 … 운영 필수화는 compose 의 `:?` 가 맡는다"* 라고
+      #    적어두고 있었는데, **정작 이 줄에 그 가드가 없었다.** 설계가 compose 에 위임한
+      #    일을 compose 가 안 하고 있던 셈이다.
+      #    비면 gRPC 서버 스레드가 죽고, 그 상태로 컨테이너는 계속 healthy 였다.
+      #
+      #    ⚠️ #427 과 반대 방향인 것은 의도다 — 거긴 `profiles: ["obs"]` 로 **안 켜는**
+      #    서비스라 필수화가 무관한 명령까지 막았고, 여기는 프로파일이 없는 **핵심 서비스**다.
+      #    (변수 하나에 `:?` 가 한 번이라도 있으면 전체가 필수가 되므로 74행에는 안 겹쳐 적는다.)
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN 미설정 — AI gRPC 가 안 뜬다 (.env.example 참고)}
       # 프론트 → AI HTTP 직결 전용. 앱 번들에 배포되는 값이라 위 내부 토큰과 분리한다
       # (이슈 #134, decisions/ai-auth-token-flow.md ㄱ). 프론트는 같은 값을
       # EXPO_PUBLIC_AI_PUBLIC_TOKEN 으로 갖는다.
