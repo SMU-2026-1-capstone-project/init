@@ -165,7 +165,9 @@
       8 vCPU 박스로도, 로컬 물리 2코어로도 **못 잰다**(후자는 R6 이 확인한 벽).
       🟢 **막던 둘은 닫혔다 (2026-08-23)** — rig 이식([#396](https://github.com/Shadowfit/init/pull/396):
       리눅스 인터프리터·규모·GIL 팔)과 무대 결정([§7](../docs/decisions/r10-loadgen-topology.md):
-      **쪼갠다, R10-a 먼저**). **남은 것은 박스 하나다.**
+      **쪼갠다, R10-a 먼저**). 🔴 **남은 것은 박스 하나 + 배선 하나다** —
+      `bootstrap.sh` 에 **AI 를 venv 로 띄우는 `ROLE` 이 없다**([#400](https://github.com/Shadowfit/init/issues/400) §2).
+      컨테이너로 띄우면 계측 노브가 안 넘어간다([#399](https://github.com/Shadowfit/init/issues/399)).
       **소요 ~30분** · **1대**(부하기 동거) · 도커·MySQL·시딩 **불필요**(venv + `frames.json` + 부하기).
       계측은 켜도 된다(대가 ≤2.4%, `results/frame-path-overhead-2026-08-23/`) — **ON/OFF 앵커 판 한 장**은 끼울 것.
       🔴 **`handler_concurrency` 는 안 읽는다** — 그건 R10-b(2대)의 몫이다.
