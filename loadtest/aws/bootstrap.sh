@@ -62,6 +62,9 @@ AI_PY=${AI_PY:-}                         # 인터프리터를 직접 줄 때 (�
 GHZ_VERSION=${GHZ_VERSION:-0.120.0}
 GHZ_SESSIONS=${GHZ_SESSIONS:-901-1900}   # seed-multi-sessions.sql 과 **같은 범위여야** 한다
 GHZ_REPS=${GHZ_REPS:-25}
+# 🔴 k6 버전은 측정 조건이다 — 읽기축 판(2026-08-23)과 쓰기축 판을 같은 표에 놓으려면
+#    같은 버전이어야 한다. 그 판이 쓴 것이 v2.1.0 이다.
+K6_VERSION=${K6_VERSION:-2.1.0}
 
 step() { echo; echo "──── $* ────"; }
 die()  { echo; echo "🔴 부트스트랩 중단 — $*" >&2; exit 1; }
@@ -234,6 +237,21 @@ if [ "$ROLE" = "p6-loader" ]; then
   fi
   echo "  ghz → $("$GHZ_BIN" --version 2>&1 | head -1)"
 
+  # k6 — HTTP 축(읽기·쓰기 p99)용. ghz 는 gRPC 만 걸 수 있어서 HTTP 판을 못 만든다.
+  K6_BIN=/usr/local/bin/k6
+  if [ ! -x "$K6_BIN" ]; then
+    case "$(uname -m)" in
+      x86_64)  K6_ARCH=amd64 ;;
+      aarch64) K6_ARCH=arm64 ;;
+      *) die "k6 릴리스에 없는 아키텍처: $(uname -m)" ;;
+    esac
+    K6_DIR="k6-v${K6_VERSION}-linux-${K6_ARCH}"
+    curl -fsSL "https://github.com/grafana/k6/releases/download/v${K6_VERSION}/${K6_DIR}.tar.gz"       -o /tmp/k6.tgz || die "k6 내려받기 실패 (버전 $K6_VERSION)"
+    tar -xzf /tmp/k6.tgz -C /tmp "${K6_DIR}/k6" || die "k6 압축 해제 실패"
+    install -m 0755 "/tmp/${K6_DIR}/k6" "$K6_BIN" || die "k6 설치 실패"
+  fi
+  echo "  k6  → $("$K6_BIN" version 2>&1 | head -1)"
+
   # 從 부하 페이로드. 🔴 커밋돼 있지 않다(~54MB, .gitignore) — 여기서 만든다.
   #    세션 범위는 대상 박스의 시드와 **같아야** 한다. 다르면 전 요청이 FK 로 실패하는데
   #    ghz 표는 정상으로 보인다.
@@ -253,6 +271,7 @@ if [ "$ROLE" = "p6-loader" ]; then
   작업 디렉터리 : $WORKDIR
   커밋          : $(git -C "$WORKDIR" rev-parse --short HEAD) ($REF)
   ghz           : $GHZ_BIN
+  k6            : $K6_BIN
   페이로드      : /root/batch_multi.json
 
   다음 — 대상 박스로 붙을 SSH 키를 이 박스에 두고(예: /root/.ssh/measure.pem, chmod 600),

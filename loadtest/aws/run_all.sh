@@ -38,6 +38,11 @@ S3_DEST="${S3_BASE%/}/$RUN_ID"
 #     🔴 `backup_real` 은 반드시 `backup` **뒤**다 — 무대(`pose_data_scale`)를 real 로 다시
 #        세우므로 순서가 뒤집히면 1억 행 본 측정이 다른 무대 위에서 돈다.
 #
+#   HTTP 쓰기 p99 라운드 (從, slo-baseline §4-2 의 빈 절반):
+#     TARGET_HOST=10.0.0.5 PHASES="httpwrite collect"
+#     🔴 **부하기 박스에서** 돌린다(ROLE=p6-loader). 대상과 같은 박스면 이 라운드의
+#        존재 이유(판정선 대면)가 사라져서 단계가 스스로 멈춘다.
+#
 #   P6 동거 용량 라운드 (主-P6):
 #     TARGET_HOST=10.0.0.5 AI_PUBLIC_TOKEN=... \
 #     PHASES="coresidency_preflight coresidency_rehearsal coresidency collect"
@@ -91,6 +96,7 @@ if [ -z "$OUTDIR" ]; then
       coresidency*)                        _r=coresidency ;;
       r276)                                _r=r276-newkeys ;;
       r276app)                             _r=r276-app-retry ;;
+      httpwrite)                           _r=http-write-p99 ;;
       ukbp)                                _r=uk-bufferpool ;;
       framepath*)                          _r=frame-path ;;
       *)                                   continue ;;   # preflight·ridealong·collect 는 라운드를 안 정한다
@@ -204,6 +210,21 @@ UKBP_POOL_MB=${UKBP_POOL_MB:-128}
 UKBP_SEED_ROWS=${UKBP_SEED_ROWS:-3000000}
 UKBP_INSERT_ROWS=${UKBP_INSERT_ROWS:-100000}
 UKBP_BLOCKS=${UKBP_BLOCKS:-4}
+
+# ── HTTP 쓰기 p99 (從) ───────────────────────────────────────────────────
+#
+# slo-baseline §4-2 의 「세션 쓰기 p99 ≤ 300ms」에 대응하는 실측이 0 이다. 읽기 절반은
+# 2026-08-23 로컬 판이 채웠지만, 그 판은 스스로 «부하기까지 동거라 판정선에 대면 안 된다»
+# 고 적었다. 이 단계가 그 자리를 EC2 에서 채운다 — **부하기는 이 박스, 대상은 TARGET_HOST**.
+#
+# 🔴 팔은 VU 가 아니라 **가정 피크 배수**다(rig 머리 참고). ×1 = 0.075 세션시작/초.
+TIMEOUT_HTTPWRITE=${TIMEOUT_HTTPWRITE:-5400}
+HTTPW_MULTS=${HTTPW_MULTS:-"60 180 360"}   # 표본 수로 고른 값 — rig 머리 참고
+HTTPW_DUR=${HTTPW_DUR:-120s}
+HTTPW_BLOCKS=${HTTPW_BLOCKS:-4}
+HTTPW_ACCOUNTS=${HTTPW_ACCOUNTS:-64}
+HTTPW_EXERCISE_ID=${HTTPW_EXERCISE_ID:-1}
+HTTPW_PORT=${HTTPW_PORT:-8080}
 
 # ── 동거 용량 (主 P6) ────────────────────────────────────────────────────
 #
@@ -1342,6 +1363,43 @@ phase_ukbp() {
   return 0
 }
 
+phase_httpwrite() {
+  local out=$OUTDIR/httpwrite
+  mkdir -p "$out"
+
+  # 🔴 이 단계는 **부하기에서** 돈다 — 대상이 원격이어야 판정선에 댈 수 있다.
+  #    TARGET_HOST 가 없으면 localhost 를 치게 되는데, 그러면 읽기축 로컬 판을
+  #    비싸게 되풀이하는 것뿐이라 여기서 멈춘다.
+  if [ -z "$TARGET_HOST" ]; then
+    note "🔴 TARGET_HOST 가 없다 — 이 단계의 존재 이유가 «부하기와 대상 분리» 다. 멈춘다"
+    return 1
+  fi
+
+  if ! command -v k6 >/dev/null 2>&1 && [ ! -x /usr/local/bin/k6 ]; then
+    note "🔴 k6 가 없다 — ROLE=p6-loader 부트스트랩을 안 거친 박스다 (bootstrap.sh 가 깐다)"
+    return 1
+  fi
+
+  timeout $TIMEOUT_HTTPWRITE env       BASE="http://$TARGET_HOST:$HTTPW_PORT"       MULTS="$HTTPW_MULTS" DUR="$HTTPW_DUR" BLOCKS="$HTTPW_BLOCKS"       ACCOUNTS="$HTTPW_ACCOUNTS" EXERCISE_ID="$HTTPW_EXERCISE_ID"       K6_BIN="$(command -v k6 || echo /usr/local/bin/k6)" OUT="$out"       bash "$ROOT/loadtest/measure_http_write_p99.sh" > "$out/run.log" 2>&1
+  local rc=$?
+
+  # 대상의 백엔드 로그도 걷는다 — 지연이 튄 자리가 앱 쪽 사건과 겹치는지 볼 유일한 근거다.
+  # 지표 한 장도 같이 걷는다: 이 판은 시작마다 AI 로 비동기 gRPC 를, 종료마다 outbox 를 만든다.
+  # 높은 배수에서 서킷이 열렸거나 outbox 가 적체됐으면 그 팔의 p99 는 «그 상태의 값» 이라
+  # 그렇게 적어야 한다(rig 머리 참고). 관리 포트라 대상 안에서만 보인다.
+  if [ -n "$TARGET_SSH" ]; then
+    $TARGET_SSH "docker logs --tail 2000 shadowfit-backend 2>&1" > "$out/target-backend.log" 2>&1 || true
+    $TARGET_SSH "curl -s --max-time 10 http://127.0.0.1:9090/actuator/prometheus"       > "$out/target-prometheus.txt" 2>/dev/null || true
+  fi
+
+  if [ $rc -ne 0 ]; then
+    note "🔴 HTTP 쓰기 p99 라운드 rc=$rc — run.log 를 볼 것 (게이트가 막았을 수 있다)"
+    return 1
+  fi
+  note "HTTP 쓰기 p99 라운드 완료 — 배수 «$HTTPW_MULTS» · 판당 $HTTPW_DUR"
+  return 0
+}
+
 # 조건 기록. «조건 없는 수치는 인용 불가» 라 이 파일이 없으면 측정도 반쪽이다.
 phase_collect() {
   local m=$OUTDIR/MANIFEST.txt
@@ -1519,6 +1577,7 @@ for p in $PHASES; do
     r276)      run_phase r276      phase_r276 ;;
     r276app)   run_phase r276app   phase_r276app ;;
     ukbp)      run_phase ukbp      phase_ukbp ;;
+    httpwrite) run_phase httpwrite phase_httpwrite ;;
     ridealong) run_phase ridealong phase_ridealong ;;
     collect)   run_phase collect   phase_collect ;;
     *)         note "알 수 없는 단계 '$p' — 건너뛴다" ;;
