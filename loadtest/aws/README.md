@@ -298,18 +298,22 @@ ROLE=ai-venv bash bootstrap.sh
 cd /root/init
 nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py \
   --sessions 160 --dur 90 --pool 201 \
-  --plan "B,A,B,A@0.001,B@0.001,B@0.001,A@0.001,B,A" --discard 1 \
+  --plan "A,A,B,A@0.0005,A@0.05,B,A,A@0.05,A@0.0005,A@0.0005,A@0.05,A,B,A@0.05,A@0.0005,B,A" \
+  --discard 1 \
   --out loadtest/results/frame-path-r10a-$(date +%F) > /root/r10a.log 2>&1 &
 ```
 
 | | |
 |---|---|
 | 규모 | **160세션 · 90초 · 풀 201** — 기존 라운드와 같은 조건이라야 비교가 된다([설계 §8-2](../../docs/decisions/ai-receive-path-scaling.md)). rig 기본은 8세션·45초·풀=세션+4 라 **안 주면 다른 판**이다 |
-| 팔 | `@<초>` 가 `GIL_SWITCH_INTERVAL` 이다. **ON/OFF 앵커 판 한 장**을 끼울 것 — 계측 대가(≤2.4%)를 이 박스에서도 확인하는 자리 |
+| 팔 | **넷** — `A`(계측 OFF·GIL 기본) · `B`(계측 ON) · `A@0.0005` · `A@0.05`. GIL 을 **양방향**으로 흔든다. 정본은 [설계 §13](../../docs/decisions/ai-receive-path-scaling.md) 이고 위 문자열은 거기서 옮긴 것이다 |
+| 배열 | **4×4 라틴 방격 + 버림 1 = 17판.** 각 팔이 **각 위치에 정확히 한 번** 온다 — 재기동이 −24%, 판 순서가 −6.4% 를 흔들기 때문(설계 §9-4) |
+| 🔴 소요 | **못 박는다.** `setup`(160세션 여는 시간)이 미측정이고 **버림판이 그 값을 처음 준다.** 판당 120초면 34분 · 160초면 45분 — **인스턴스는 1시간으로 잡고 버림판 뒤에 다시 계산할 것** |
 | 🔴 **안 읽는 값** | `handler_concurrency` — 부하기가 동거해서 **절대값이 다친다.** R10-b(2대)의 몫이다(§7) |
 | 러너 | `run_all.sh` 를 **안 쓴다.** 프레임 경로 phase 가 아직 없다([#400](https://github.com/Shadowfit/init/issues/400) ①) — 회수는 손으로 |
 
-⚠️ **이 절차로 실제로 띄워 본 적은 없다.** ROLE 은 `bash -n` 과 역할 분기 검증만 거쳤다.
+⚠️ **이 절차로 실제로 띄워 본 적은 없다.** ROLE 은 `bash -n` 과 역할 분기 검증만 거쳤고,
+위 판은 rig 의 `parse_arm` 으로 파싱·라틴 방격만 검산했다.
 
 ## 설정
 
