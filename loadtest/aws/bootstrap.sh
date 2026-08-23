@@ -112,8 +112,16 @@ else
   die "지원하는 패키지 관리자를 못 찾았다 (dnf/apt 만 안다)"
 fi
 
-systemctl enable --now docker >/dev/null 2>&1 || die "docker 데몬을 못 띄웠다"
-docker info >/dev/null 2>&1 || die "docker 가 응답하지 않는다"
+# 🔴 ai-venv 는 데몬을 **안 띄운다.** 그 박스가 답해야 하는 질문이 하필 「16 vCPU 중 얼마를
+#    쓰나」이고, dockerd 는 **재려는 것과 같은 CPU 를 문다.** 이 역할은 컨테이너를 하나도
+#    안 띄우므로(§ai-venv) 띄울 이유도 없다 — 조건에 안 적힌 상주 프로세스를 남기지 않는다.
+if [ "$ROLE" = "ai-venv" ]; then
+  systemctl disable --now docker >/dev/null 2>&1 || true
+  echo "  ROLE=ai-venv — docker 데몬을 안 띄운다 (이 박스의 CPU 가 측정 대상이다)"
+else
+  systemctl enable --now docker >/dev/null 2>&1 || die "docker 데몬을 못 띄웠다"
+  docker info >/dev/null 2>&1 || die "docker 가 응답하지 않는다"
+fi
 
 # ── 저장소 ───────────────────────────────────────────────────────────────
 step "저장소 — $REPO @ $REF"
@@ -283,6 +291,20 @@ if [ "$ROLE" = "ai-venv" ]; then
     apt-get install -y -qq libgl1 libglib2.0-0 >/dev/null || die "libgl1/libglib2.0-0 설치 실패"
   fi
 
+  # 🔴 CPU 샘플러 — 이 역할은 도커가 없어서 `docker stats` 가 **없다.** 기준 관측
+  #    「346 RPS 에 8.69 vCPU」가 그 명령으로 걷힌 값이라, 대체 수단이 없으면 라운드가
+  #    구간 비율만 답하고 **제목의 숫자를 못 만진다**(#400 ⑤). pidstat 을 미리 깔아 둔다 —
+  #    라운드 중에 깔면 그것부터가 조건에 안 적힌 작업이다.
+  #    ⚠️ **깔기만 한다. 걷는 것은 rig 의 몫이고 아직 없다.**
+  if command -v dnf >/dev/null 2>&1; then
+    dnf -y install sysstat >/dev/null 2>&1 || true
+  else
+    apt-get install -y -qq sysstat >/dev/null 2>&1 || true
+  fi
+  command -v pidstat >/dev/null 2>&1 \
+    && echo "  pidstat ✅ $(command -v pidstat)" \
+    || echo "  🔴 pidstat 이 없다 — AI CPU 를 걷을 수단이 이 박스에 없다(#400 ⑤)"
+
   # 🔴 자리가 고정이다 — rig(`run_arms.py`)이 `ai-server/.venv/{bin,Scripts}` 를 찾는다.
   step "venv — $WORKDIR/ai-server/.venv"
   AI_VENV="$WORKDIR/ai-server/.venv"
@@ -297,10 +319,13 @@ if [ "$ROLE" = "ai-venv" ]; then
 
   # proto 스텁. 저장소에 커밋본이 있지만 **Dockerfile 은 매번 다시 만든다** — 설치된
   # grpcio-tools 와 어긋난 스텁은 import 는 되고 런타임에 깨진다. 같은 자리를 그대로 따른다.
+  # 🔴 protoc 를 여기서 직접 부르지 않는다 — #132 가 «저장소 어디에도 protoc 호출이 없어서
+  #    재생성 방법이 아는 사람만 아는 것» 을 고치면서 진입점을 하나로 줄였다(gen_proto.sh).
+  #    호출부가 둘이 되면 한쪽만 바뀌는 자리가 다시 생긴다 — 그 스크립트가 산출물 위치가
+  #    «취향이 아니라 import 규약의 결과» 라는 것까지 들고 있다.
   step "proto 스텁 재생성"
-  ( cd "$WORKDIR/ai-server" && "$AI_VENV/bin/python" -m grpc_tools.protoc \
-      -I./app/proto --python_out=. --grpc_python_out=. ./app/proto/exercise.proto ) \
-    || die "protoc 실패"
+  ( cd "$WORKDIR/ai-server" && VENV_PY="$AI_VENV/bin/python" bash scripts/gen_proto.sh ) \
+    || die "protoc 실패 (ai-server/scripts/gen_proto.sh)"
 
   # 여기까지 왔는데 import 가 깨지면 rig 이 «판이 시작된 뒤» 죽는다. 지금 확인한다.
   step "확인 — import 와 버전"
@@ -320,12 +345,39 @@ PY
   [ -f "$WORKDIR/loadtest/results/coresidency-2026-08-15/frames.json" ] \
     || die "frames.json 이 저장소에 없다 — rig 이 부하를 못 만든다"
 
+  # 🔴 위 «확인» 단계가 버전을 찍지만 그건 **콘솔로 흘러간다.** 이 ROLE 이 생긴 이유가
+  #    「손으로 깔면 무엇을 깔았는지가 라운드 조건에서 빠진다」(#407)라, 결과 디렉터리에
+  #    **같이 넣을 수 있는 파일**로 한 벌 남긴다. 기준 라운드도 같은 것을 남겼다
+  #    (`results/ai-scaling-aws-2026-08-17/conditions.txt` — lscpu + 스택 버전).
+  step "라운드 조건 기록"
+  AI_COND=${AI_COND:-/root/ai_venv_conditions.txt}
+  {
+    echo "생성   : $(date -u +%FT%TZ) UTC"
+    echo "커밋   : $(git -C "$WORKDIR" rev-parse HEAD) ($REF)"
+    echo "박스   : $(nproc) vCPU · $(awk '/MemTotal/{printf "%.1f", $2/1048576}' /proc/meminfo)GB"
+    lscpu 2>/dev/null | grep -E 'Model name|Thread\(s\) per core|Core\(s\) per socket' | sed 's/^ */         /'
+    echo "python : $("$AI_VENV/bin/python" -V 2>&1) ($AI_VENV/bin/python)"
+    echo "도커   : 데몬 미기동 (ROLE=ai-venv)"
+    echo "샘플러 : $(command -v pidstat 2>/dev/null || echo '없음')"
+    echo "--- pip freeze ---"
+    "$AI_VENV/bin/python" -m pip freeze 2>/dev/null
+  } > "$AI_COND"
+  echo "  $AI_COND — 🔴 **결과 디렉터리에 같이 넣을 것**"
+
+  # 검출기 메모리는 실측값으로 미리 보여준다. 판정이 아니라 대조용이다 —
+  # 풀을 얼마로 띄울지는 rig 인자(`--pool`)이고 이 스크립트가 안 정한다.
+  awk -v mem="$(awk '/MemTotal/{print $2}' /proc/meminfo)" 'BEGIN{
+    printf "  검출기 98.7MB/개(실측) → 풀 201 이면 %.1fGB · 이 박스 RAM %.1fGB\n",
+           201*98.7/1024, mem/1048576 }'
+
   step "AI venv 준비됨 (從 R10-a)"
   cat <<EOF
   작업 디렉터리 : $WORKDIR
   커밋          : $(git -C "$WORKDIR" rev-parse --short HEAD) ($REF)
   인터프리터    : $AI_VENV/bin/python
   frames.json   : ✅ 커밋본
+  조건 파일     : $AI_COND  ← 결과 디렉터리에 같이 넣을 것
+  CPU 샘플러    : $(command -v pidstat 2>/dev/null || echo '🔴 없다')  (도커가 없어 docker stats 를 못 쓴다, #400 ⑤)
 
   다음 — R10-a(1대 동거). 무대 결정은 docs/decisions/r10-loadgen-topology.md §7:
   cd $WORKDIR && \
