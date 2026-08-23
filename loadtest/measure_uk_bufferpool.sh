@@ -101,10 +101,9 @@ if [ "$OWN_CONTAINER" = "1" ]; then
 
   # 스키마는 원본 컨테이너에서 DDL 을 떠 온다 — 파티션·PK 가 그대로 와야 조건이 같다.
   echo "  스키마: $SRC_CONTAINER 의 pose_data DDL 을 그대로 옮긴다"
-  # 🔴 `--raw` 가 필요하다 — 기본 출력은 개행을 «
-» 문자로 이스케이프해서 DDL 이 한 줄로
-  #    뭉치고, 그대로 실행하면 문법 오류가 난다(파티션 절이 통째로 문자열이 된다).
-  docker exec -i -e MYSQL_PWD="$PW" "$SRC_CONTAINER" mysql -uroot -N --raw "$DB_NAME" \n    -e "SHOW CREATE TABLE pose_data" 2>/dev/null | cut -f2 > "$SC/ddl.sql"
+  # 🔴 --raw 가 필요하다. 기본 출력은 개행을 이스케이프해서 DDL 이 한 줄로 뭉치고,
+  #    그대로 실행하면 파티션 절이 통째로 문자열이 되어 문법 오류가 난다.
+  docker exec -i -e MYSQL_PWD="$PW" "$SRC_CONTAINER" mysql -uroot -N --raw "$DB_NAME" -e "SHOW CREATE TABLE pose_data" 2>/dev/null | cut -f2 > "$SC/ddl.sql"
   grep -q "CREATE TABLE" "$SC/ddl.sql" || die "원본 pose_data DDL 을 못 읽었다 — Flyway 가 돌았는지 볼 것"
   # 🔴 백틱은 큰따옴표 안에서 명령 치환이라 이스케이프한다 — 안 하면 셸이 pose_data 를 실행하려 든다.
   sed -i "s/CREATE TABLE \`pose_data\`/CREATE TABLE IF NOT EXISTS \`$TABLE\`/" "$SC/ddl.sql"
