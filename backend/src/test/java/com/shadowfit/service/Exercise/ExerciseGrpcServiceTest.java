@@ -71,12 +71,14 @@ class ExerciseGrpcServiceTest {
     }
 
     @Test
-    @DisplayName("savePoseDataBatch 실패 — 서비스 예외는 INTERNAL로 매핑")
+    @DisplayName("savePoseDataBatch 실패 — **예상 못한** 예외만 INTERNAL 로 (#209)")
     void savePoseDataBatch_serviceThrows_mapsToInternal() {
         PoseDataBatchRequest request = PoseDataBatchRequest.newBuilder().setSessionId(1L).build();
         @SuppressWarnings("unchecked")
         StreamObserver<PoseDataResponse> obs = mock(StreamObserver.class);
-        doThrow(new BusinessException(ErrorCode.SESSION_NOT_FOUND))
+        // 🔵 2026-08-23: 대상을 BusinessException → **예상 못한 예외**로 바꿨다 (#209).
+        //    세션 소멸은 이제 NOT_FOUND 다(아래 별도 테스트). INTERNAL 은 «정말 우리가 아플 때» 만 남는다.
+        doThrow(new IllegalStateException("커넥션 풀이 죽었다"))
                 .when(poseDataService).savePoseDataBatch(anyLong(), anyList());
 
         grpcService.savePoseDataBatch(request, obs);
@@ -112,6 +114,29 @@ class ExerciseGrpcServiceTest {
     }
 
     @Test
+    @DisplayName("savePoseDataBatch — 세션 소멸은 INTERNAL 이 아니라 NOT_FOUND 다 (#209)")
+    void savePoseDataBatch_sessionNotFound_mapsToNotFound() {
+        PoseDataBatchRequest request = PoseDataBatchRequest.newBuilder().setSessionId(1L).build();
+        @SuppressWarnings("unchecked")
+        StreamObserver<PoseDataResponse> obs = mock(StreamObserver.class);
+        doThrow(new BusinessException(ErrorCode.SESSION_NOT_FOUND))
+                .when(poseDataService).savePoseDataBatch(anyLong(), anyList());
+
+        grpcService.savePoseDataBatch(request, obs);
+
+        // 🔴 INTERNAL 은 「내가 아프다」다. 세션이 사라진 것은 그게 아니고, 상대는 그 둘을 갈라
+        //    다르게 처리한다(사라진 세션에는 재전송하지 않는다).
+        ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+        verify(obs).onError(captor.capture());
+        StatusRuntimeException ex = (StatusRuntimeException) captor.getValue();
+        assertThat(ex.getStatus().getCode()).isEqualTo(Status.Code.NOT_FOUND);
+        // 설명이 없으면 상대 로그에 «왜» 가 안 남는다 (#209 §1)
+        assertThat(ex.getStatus().getDescription()).contains("SESSION_NOT_FOUND");
+        // 영구 실패는 재시도 대상이 아니다 — 한 번만 부른다
+        verify(poseDataService, times(1)).savePoseDataBatch(anyLong(), anyList());
+    }
+
+    @Test
     @DisplayName("savePoseDataBatch 데드락 — **실사용에서 오는 타입**(CannotAcquireLock)도 재시도한다 (#416)")
     void savePoseDataBatch_deadlockRetriesOnTranslatedType() {
         PoseDataBatchRequest request = PoseDataBatchRequest.newBuilder().setSessionId(1L).build();
@@ -138,7 +163,7 @@ class ExerciseGrpcServiceTest {
     }
 
     @Test
-    @DisplayName("savePoseDataBatch 데드락 — 상한을 다 쓰면 INTERNAL 로 넘겨 AI 재전송에 맡긴다 (#276)")
+    @DisplayName("savePoseDataBatch 데드락 — 상한을 다 쓰면 ABORTED 로 넘겨 AI 재전송에 맡긴다 (#276 ③)")
     void savePoseDataBatch_deadlockExhausted() {
         PoseDataBatchRequest request = PoseDataBatchRequest.newBuilder().setSessionId(1L).build();
         @SuppressWarnings("unchecked")
@@ -155,8 +180,11 @@ class ExerciseGrpcServiceTest {
         verify(poseDataService, times(4)).savePoseDataBatch(anyLong(), anyList());
         ArgumentCaptor<Throwable> deadlockCaptor = ArgumentCaptor.forClass(Throwable.class);
         verify(obs).onError(deadlockCaptor.capture());
-        assertThat(((StatusRuntimeException) deadlockCaptor.getValue()).getStatus().getCode())
-                .isEqualTo(Status.Code.INTERNAL);
+        // 🔵 2026-08-23: INTERNAL → **ABORTED** (#276 ③). 「우리가 아프다」가 아니라 「경합에 졌다」이고,
+        //    AI 의 재전송이 이 코드에서만 돈다 — INTERNAL 이면 상대가 영구 실패와 구분하지 못한다.
+        StatusRuntimeException deadlockEx = (StatusRuntimeException) deadlockCaptor.getValue();
+        assertThat(deadlockEx.getStatus().getCode()).isEqualTo(Status.Code.ABORTED);
+        assertThat(deadlockEx.getStatus().getDescription()).contains("DEADLOCK_RETRY_EXHAUSTED");
         verify(sessionMetrics).poseBatchDeadlockRetry("exhausted");
     }
 
@@ -191,12 +219,13 @@ class ExerciseGrpcServiceTest {
     }
 
     @Test
-    @DisplayName("completeAnalysis 실패 — 서비스 예외는 INTERNAL로 매핑")
+    @DisplayName("completeAnalysis 실패 — **예상 못한** 예외만 INTERNAL 로 (#209)")
     void completeAnalysis_serviceThrows_mapsToInternal() {
         SessionCompleteRequest request = SessionCompleteRequest.newBuilder().setSessionId(1L).build();
         @SuppressWarnings("unchecked")
         StreamObserver<SessionCompleteResponse> obs = mock(StreamObserver.class);
-        doThrow(new BusinessException(ErrorCode.SESSION_NOT_FOUND)).when(sessionService).completeSession(any());
+        // 🔵 2026-08-23: 같은 이유로 «예상 못한 예외» 로 바꿨다 (#209).
+        doThrow(new IllegalStateException("커넥션 풀이 죽었다")).when(sessionService).completeSession(any());
 
         grpcService.completeAnalysis(request, obs);
 

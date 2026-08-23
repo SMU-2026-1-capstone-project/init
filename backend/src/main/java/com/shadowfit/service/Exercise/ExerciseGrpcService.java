@@ -96,11 +96,25 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                 responseObserver.onError(io.grpc.Status.CANCELLED
                         .withDescription(e.getMessage())
                         .asRuntimeException());
+            } catch (com.shadowfit.global.error.BusinessException e) {
+                // 세션 소멸·상태 위반은 «우리가 아픈 것» 이 아니다 (#209).
+                rejectWith("pose 배치", request.getSessionId(), e, responseObserver);
+            } catch (PessimisticLockingFailureException e) {
+                // 🔴 여기 오는 것은 «재시도 상한을 다 쓴 데드락» 이다(#276 ②). 우리가 아픈 게 아니라
+                //    **경합에 졌다** 는 뜻이고, 상대가 잠시 뒤 다시 던지면 대개 성공한다 —
+                //    gRPC 규약의 ABORTED 가 정확히 그 자리다(«transaction abort» 계열).
+                //    INTERNAL 로 보내면 상대는 이것을 «영구 실패» 와 구분할 수 없다.
+                log.warn("세션 {} : 데드락 재시도 소진 — ABORTED 로 돌려준다 (#276 ②)", request.getSessionId());
+                responseObserver.onError(io.grpc.Status.ABORTED
+                        .withDescription("DEADLOCK_RETRY_EXHAUSTED: " + e.getMessage())
+                        .asRuntimeException());
             } catch (Exception e) {
                 // 🔴 클래스명을 같이 찍는다. 예전엔 메시지만 찍었는데, 그 탓에 «데드락인데 재시도가
                 //    안 돌았다» 를 로그 한 줄로 못 닫고 라운드를 하나 태워서야 알았다 (#416).
                 log.error("저장 실패: {} — {}", e.getClass().getSimpleName(), e.getMessage());
-                responseObserver.onError(io.grpc.Status.INTERNAL.asRuntimeException());
+                responseObserver.onError(io.grpc.Status.INTERNAL
+                        .withDescription(e.getClass().getSimpleName() + ": " + e.getMessage())
+                        .asRuntimeException());
             }
         }
     }
@@ -233,8 +247,10 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
             responseObserver.onNext(extractResponse);
             responseObserver.onCompleted();
             log.info("기준 좌표 저장 완료 - 운동 ID: {}", request.getExerciseId());
+        } catch (com.shadowfit.global.error.BusinessException e) {
+            rejectWith("기준 좌표 저장", request.getExerciseId(), e, responseObserver);
         } catch (Exception e) {
-            log.error("기준 좌표 저장 중 에러: {}", e.getMessage());
+            log.error("기준 좌표 저장 중 에러: {} — {}", e.getClass().getSimpleName(), e.getMessage());
             responseObserver.onError(io.grpc.Status.INTERNAL
                     .withDescription("DB 저장 실패: " + e.getMessage())
                     .asRuntimeException());
@@ -273,9 +289,13 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                 responseObserver.onError(io.grpc.Status.CANCELLED
                         .withDescription(e.getMessage())
                         .asRuntimeException());
+            } catch (com.shadowfit.global.error.BusinessException e) {
+                rejectWith("세션 종료", request.getSessionId(), e, responseObserver);
             } catch (Exception e) {
-                log.error("세션 종료 gRPC 처리 중 에러: {}", e.getMessage());
-                responseObserver.onError(io.grpc.Status.INTERNAL.asRuntimeException());
+                log.error("세션 종료 gRPC 처리 중 에러: {} — {}", e.getClass().getSimpleName(), e.getMessage());
+                responseObserver.onError(io.grpc.Status.INTERNAL
+                        .withDescription(e.getClass().getSimpleName() + ": " + e.getMessage())
+                        .asRuntimeException());
             }
         }
     }
@@ -311,15 +331,10 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                 //
                 // SESSION_NOT_FOUND 는 NOT_FOUND 가 맞기도 하다 — INVALID_ARGUMENT 는
                 // 「클라이언트가 잘못된 인자를 보냈다」는 뜻인데, 세션이 사라진 것은 AI 잘못이 아니다.
-                io.grpc.Status status =
-                        e.getErrorCode() == com.shadowfit.global.error.ErrorCode.SESSION_NOT_FOUND
-                                ? io.grpc.Status.NOT_FOUND
-                                : io.grpc.Status.INVALID_ARGUMENT;
-                log.warn("피드백 batch 거부 - session={}, code={}, grpcStatus={}",
-                        request.getSessionId(), e.getErrorCode().name(), status.getCode());
-                responseObserver.onError(status
-                        .withDescription(e.getErrorCode().name() + ": " + e.getErrorCode().getMessage())
-                        .asRuntimeException());
+                // 🔵 2026-08-23: 손으로 가르던 것을 공용 매핑으로 옮겼다 (#209). **동작은 같다** —
+                //    SESSION_NOT_FOUND 는 404 라 NOT_FOUND, 나머지 입력 오류는 400 이라 INVALID_ARGUMENT.
+                //    같은 규칙을 네 핸들러가 나눠 쓰게 되면서, 아래 주석이 말하던 «계약» 이 실제로 계약이 됐다.
+                rejectWith("피드백 batch", request.getSessionId(), e, responseObserver);
             } catch (Exception e) {
                 log.error("피드백 batch 처리 중 에러: {}", e.getMessage());
                 responseObserver.onError(io.grpc.Status.INTERNAL
@@ -327,5 +342,40 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
                         .asRuntimeException());
             }
         }
+    }
+
+    /**
+     * {@link com.shadowfit.global.error.BusinessException} → gRPC 상태코드. <b>매핑을 새로
+     * 정하지 않는다</b> — {@code ErrorCode} 가 이미 들고 있는 HTTP 상태를 표준 대응으로 옮길 뿐이다
+     * (400→INVALID_ARGUMENT · 401→UNAUTHENTICATED · 403→PERMISSION_DENIED · 404→NOT_FOUND ·
+     * 409→ABORTED · 429→RESOURCE_EXHAUSTED · 그 외→INTERNAL).
+     *
+     * <p><b>왜 필요한가</b>(#209): {@code INTERNAL} 은 「내가 아프다」는 뜻이다. 요청이 틀려서
+     * 거절한 것까지 그렇게 보고하면 <b>상대는 우리 잘못과 자기 잘못을 구분할 수 없다.</b>
+     * 우리는 이 구분이 왜 필요한지 이미 안다 — 우리가 클라이언트일 때 서킷브레이커가
+     * {@code INVALID_ARGUMENT} 를 집계에서 뺀다({@code ExerciseAnalysisService.isClientRejection}).
+     * 우리가 서버일 때는 상대가 그 규칙을 쓸 수 없었다. 코드를 안 갈라줬기 때문이다.
+     */
+    private static io.grpc.Status grpcStatusOf(com.shadowfit.global.error.BusinessException e) {
+        switch (e.getErrorCode().getStatus()) {
+            case 400: return io.grpc.Status.INVALID_ARGUMENT;
+            case 401: return io.grpc.Status.UNAUTHENTICATED;
+            case 403: return io.grpc.Status.PERMISSION_DENIED;
+            case 404: return io.grpc.Status.NOT_FOUND;
+            case 409: return io.grpc.Status.ABORTED;
+            case 429: return io.grpc.Status.RESOURCE_EXHAUSTED;
+            default:  return io.grpc.Status.INTERNAL;
+        }
+    }
+
+    /** 상태코드 + 설명을 실어 거절한다. 설명이 없으면 상대 로그에 «왜» 가 안 남는다(#209 §1). */
+    private void rejectWith(String handler, long id, com.shadowfit.global.error.BusinessException e,
+                            io.grpc.stub.StreamObserver<?> responseObserver) {
+        io.grpc.Status status = grpcStatusOf(e);
+        log.warn("{} 거부 - id={}, code={}, grpcStatus={}",
+                handler, id, e.getErrorCode().name(), status.getCode());
+        responseObserver.onError(status
+                .withDescription(e.getErrorCode().name() + ": " + e.getErrorCode().getMessage())
+                .asRuntimeException());
     }
 }
