@@ -91,6 +91,7 @@ if [ -z "$OUTDIR" ]; then
       coresidency*)                        _r=coresidency ;;
       r276)                                _r=r276-newkeys ;;
       r276app)                             _r=r276-app-retry ;;
+      ukbp)                                _r=uk-bufferpool ;;
       framepath*)                          _r=frame-path ;;
       *)                                   continue ;;   # preflight·ridealong·collect 는 라운드를 안 정한다
     esac
@@ -190,6 +191,19 @@ R276APP_SESSIONS=${R276APP_SESSIONS:-901-1000}
 R276APP_RETRY_ARMS=${R276APP_RETRY_ARMS:-""}
 # 백오프 팔 (#276 ③ 후속). RETRY_ARMS 와 동시에 주면 rig 이 막는다.
 R276APP_BACKOFF_ARMS=${R276APP_BACKOFF_ARMS:-""}
+
+# ── 유니크 키 대가 @ 버퍼풀 초과 (從 R8 후속) ───────────────────────────
+#
+# R8 은 `Innodb_buffer_pool_reads` 가 양쪽 다 0 인 판이었다 — 인덱스가 메모리에 다 들어가
+# **디스크를 안 쳤다.** 그래서 「change buffer 를 못 쓰는 대가」를 사실상 안 쟀다.
+# 이 단계는 버퍼풀을 줄여 그 체제를 만들고, 팔 셋(없음/비유니크/유니크)으로 잰다.
+#
+# 🔴 시딩(수백만 행)과 팔마다의 ADD INDEX 가 붙어 **다른 단계보다 오래 걸린다.**
+TIMEOUT_UKBP=${TIMEOUT_UKBP:-10800}
+UKBP_POOL_MB=${UKBP_POOL_MB:-128}
+UKBP_SEED_ROWS=${UKBP_SEED_ROWS:-3000000}
+UKBP_INSERT_ROWS=${UKBP_INSERT_ROWS:-100000}
+UKBP_BLOCKS=${UKBP_BLOCKS:-4}
 
 # ── 동거 용량 (主 P6) ────────────────────────────────────────────────────
 #
@@ -1305,6 +1319,29 @@ phase_r276app() {
   return 0
 }
 
+# 從 R8 후속 — 유니크 키의 대가를 «버퍼풀을 넘긴 규모» 에서 (재고표 2번)
+phase_ukbp() {
+  local out=$OUTDIR/ukbp
+  mkdir -p "$out"
+
+  timeout $TIMEOUT_UKBP env \
+      POOL_MB="$UKBP_POOL_MB" SEED_ROWS="$UKBP_SEED_ROWS" \
+      INSERT_ROWS="$UKBP_INSERT_ROWS" BLOCKS="$UKBP_BLOCKS" \
+      CONTAINER="$CONTAINER" DB_NAME="$DB_NAME" PW="$PW" OUT="$out" \
+      bash "$ROOT/loadtest/measure_uk_bufferpool.sh" > "$out/run.log" 2>&1
+  local rc=$?
+
+  # 🔴 게이트 결과를 단계 로그에도 올린다 — summary.md 안에만 있으면 «표가 있으니 됐다» 로 읽힌다.
+  grep -E "게이트|성립 안 함" "$out/run.log" | tail -5 | while read -r l; do note "  $l"; done
+
+  if [ $rc -ne 0 ]; then
+    note "🔴 uk-bufferpool 라운드 rc=$rc — run.log 를 볼 것"
+    return 1
+  fi
+  note "uk-bufferpool 라운드 완료 — 풀 ${UKBP_POOL_MB}MB · 무대 ${UKBP_SEED_ROWS}행 · 판당 ${UKBP_INSERT_ROWS}행"
+  return 0
+}
+
 # 조건 기록. «조건 없는 수치는 인용 불가» 라 이 파일이 없으면 측정도 반쪽이다.
 phase_collect() {
   local m=$OUTDIR/MANIFEST.txt
@@ -1481,6 +1518,7 @@ for p in $PHASES; do
       } ;;
     r276)      run_phase r276      phase_r276 ;;
     r276app)   run_phase r276app   phase_r276app ;;
+    ukbp)      run_phase ukbp      phase_ukbp ;;
     ridealong) run_phase ridealong phase_ridealong ;;
     collect)   run_phase collect   phase_collect ;;
     *)         note "알 수 없는 단계 '$p' — 건너뛴다" ;;
