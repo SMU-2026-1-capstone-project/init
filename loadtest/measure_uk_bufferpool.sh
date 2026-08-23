@@ -49,6 +49,11 @@
 #   · 직접 SQL 이다(앱 경로 아님). 묻는 것이 InnoDB 의 인덱스 유지 비용이라 그게 맞지만,
 #     Spring 경로의 수치로 인용하면 안 된다
 #   · 절대 처리량은 이 박스의 값이다. 신뢰할 것은 **팔 간 상대**뿐이다
+#   · 🔴 **삽입이 흩어져야 한다.** 세션이 하나면 세컨더리 인덱스 삽입이 오른쪽 끝에 순차로
+#     붙어(rep_number 단조 증가) 같은 페이지만 뜨거워지고, **랜덤 읽기가 안 생긴다** —
+#     그러면 change buffer 가 값을 할 자리 자체가 없다. 4차 판이 정확히 그랬다
+#     (판당 bp_reads 210 뿐). 실사용은 동시 세션이 여럿이라 session_id 가 흩어지므로,
+#     이 rig 도 session_id 를 SESSIONS 범위에서 무작위로 고른다.
 #   · 🔴 **무대가 판마다 커진다** — 판이 INSERT_ROWS 만큼 행을 남기므로 뒤쪽 블록은 더 큰
 #     테이블에서 잰다. 라틴 방격이 팔 사이에서 그 표류를 **균형**시키지만 없애지는 않는다.
 #     그래서 원시 표에 판마다 **시작 행 수**를 같이 찍는다 — 표류가 눈에 보이게 두는 것이
@@ -72,6 +77,7 @@ POOL_MB=${POOL_MB:-128}             # 버퍼풀을 이만큼으로 줄인다
 SEED_ROWS=${SEED_ROWS:-3000000}     # 무대 크기 (인덱스가 풀을 넘도록)
 INSERT_ROWS=${INSERT_ROWS:-100000}  # 판마다 새로 넣는 행 수 (이게 측정 대상이다)
 BATCH=${BATCH:-500}                 # INSERT 문당 행 수
+SESSIONS=${SESSIONS:-1000000}       # session_id 공간 — 삽입을 인덱스 전체에 흩는다(위 🔴)
 TABLE=pose_data_ukbp
 OUT=${OUT:-loadtest/results/uk-bufferpool-$(date +%Y-%m-%d)}
 SC=$(mktemp -d)
@@ -122,7 +128,7 @@ if [ "${have:-0}" -lt "$SEED_ROWS" ]; then
   echo "  시딩: 배가로 $SEED_ROWS 행까지 채운다 (키 충돌 없게 rep_number 를 오프셋한다)"
   DB -e "INSERT INTO $TABLE (session_id, rep_number, timestamp_sec, joint_coordinates,
                              sync_rate, smoothed_knee_angle, feedback_message, created_at)
-         SELECT 901, seq, seq * 0.001, JSON_OBJECT('k', seq), 45.0, 90.0, '', '2026-05-28 10:00:00'
+         SELECT FLOOR(1 + RAND() * $SESSIONS), seq, seq * 0.001, JSON_OBJECT('k', seq), 45.0, 90.0, '', '2026-05-28 10:00:00'
          FROM (SELECT 1 seq UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) t;" >/dev/null
   while :; do
     n=$(DB -e "SELECT COUNT(*) FROM $TABLE;" | tr -d '[:space:]')
@@ -130,14 +136,18 @@ if [ "${have:-0}" -lt "$SEED_ROWS" ]; then
     # rep_number 를 현재 행 수만큼 밀어 새 키를 만든다 — 같은 세션·같은 파티션에 쌓인다
     DB -e "INSERT INTO $TABLE (session_id, rep_number, timestamp_sec, joint_coordinates,
                                sync_rate, smoothed_knee_angle, feedback_message, created_at)
-           SELECT session_id, rep_number + $n, timestamp_sec + $n * 0.001, joint_coordinates,
+           SELECT FLOOR(1 + RAND() * $SESSIONS), rep_number + $n, timestamp_sec + $n * 0.001, joint_coordinates,
                   sync_rate, smoothed_knee_angle, feedback_message, created_at
            FROM $TABLE LIMIT $(( SEED_ROWS - n ));" >/dev/null || die "시딩 실패"
     echo "    ... $(DB -e "SELECT COUNT(*) FROM $TABLE;" | tr -d '[:space:]') 행"
   done
 fi
 SEEDED=$(DB -e "SELECT COUNT(*) FROM $TABLE;" | tr -d '[:space:]')
-echo "  무대 완성: $SEEDED 행"
+DISTINCT_SESS=$(DB -e "SELECT COUNT(DISTINCT session_id) FROM $TABLE;" | tr -d '[:space:]')
+echo "  무대 완성: $SEEDED 행 · 서로 다른 session_id $DISTINCT_SESS 개"
+# 🔴 흩어졌는지 단언한다. 하나면 인덱스 삽입이 오른쪽 끝 append 가 되고, 그 판은 이 질문에
+#    답하지 못한다(4차가 정확히 그랬다). 「흩는다고 적었는데 안 흩어진」 판을 여기서 막는다.
+[ "${DISTINCT_SESS:-0}" -gt 1000 ] || die "session_id 가 $DISTINCT_SESS 개뿐이다 — 삽입이 안 흩어진다"
 
 echo
 echo "## [1] 버퍼풀 확인"
@@ -187,7 +197,7 @@ set_arm(){ # $1 = none|nonunique|unique
 counter(){ DB -e "SHOW GLOBAL STATUS LIKE '$1';" | cut -f2 | tr -d '[:space:]'; }
 
 run_one(){ # $1=arm $2=block → "arm block rows_before sec rows_per_sec bp_reads bp_read_req data_reads"
-  local arm="$1" blk="$2" base i
+  local arm="$1" blk="$2" base i sid
   set_arm "$arm" >&2
   base=$(DB -e "SELECT IFNULL(MAX(rep_number),0) FROM $TABLE;" | tr -d '[:space:]')
 
@@ -199,7 +209,10 @@ run_one(){ # $1=arm $2=block → "arm block rows_before sec rows_per_sec bp_read
     for ((i=0;i<BATCH && n<INSERT_ROWS;i++)); do
       n=$(( n + 1 ))
       [ -n "$vals" ] && vals+=","
-      vals+="(901,$(( base + n )),$(( base + n )).001,'{\"k\":$n}',45.0,90.0,'','2026-05-28 10:00:00')"
+      # session_id 를 흩어야 세컨더리 인덱스 삽입이 흩어진다(오른쪽 끝 append 가 아니게).
+      # $RANDOM 은 0..32767 이라 둘을 엮어 SESSIONS 범위를 덮는다.
+      sid=$(( (RANDOM * 32768 + RANDOM) % SESSIONS + 1 ))
+      vals+="($sid,$(( base + n )),$(( base + n )).001,'{\"k\":$n}',45.0,90.0,'','2026-05-28 10:00:00')"
     done
     echo "INSERT INTO $TABLE (session_id,rep_number,timestamp_sec,joint_coordinates,sync_rate,smoothed_knee_angle,feedback_message,created_at) VALUES $vals;" >> "$SC/ins.sql"
   done
@@ -250,7 +263,7 @@ echo "## [4] 집계"
 {
 echo "# 유니크 키 대가 @ 버퍼풀 초과 — 생성 표 (판정은 [README.md](./README.md) 에)"
 echo
-echo "격리 테이블 \`$TABLE\` · 무대 **$SEEDED 행** · 버퍼풀 **$NOW_POOL bytes** · 세컨더리 인덱스 **$IDX bytes**"
+echo "격리 테이블 \`$TABLE\` · 무대 **$SEEDED 행**(서로 다른 session_id **$DISTINCT_SESS**) · 버퍼풀 **$NOW_POOL bytes** · 세컨더리 인덱스 **$IDX bytes**"
 echo "판당 **$INSERT_ROWS 행**(문당 $BATCH) · 팔 \`$ARMS\` · ${BLOCKS}블록(첫 블록 버림) · 라틴 방격"
 echo
 echo "게이트(디스크를 쳤는가): $([ "$GATE_OK" = 1 ] && echo '✅ 통과' || echo '🔴 실패 — 아래 표를 «버퍼풀 초과» 로 인용 금지')"
