@@ -1,0 +1,53 @@
+# 측정 조건 — ec2-20260822-155952
+생성          : 2026-08-22T17:23:17+00:00
+커밋          : e2fbe6c7b19d0190eed1d5834b0d970799009040 (HEAD)
+인스턴스 타입 : c7i.2xlarge
+인스턴스 ID   : i-02174f51067f61e3f
+AZ / 리전     : ap-northeast-2a / ap-northeast-2
+vCPU / RAM    : 8 / 15GB
+커널          : 6.1.180-225.360.amzn2023.x86_64
+디스크        : 100G 여유 76G
+MySQL         : 8.0.46
+버퍼풀        : 2147483648
+WRITER_MAX_SEC: 14400
+S3 결과       : s3://shadowfit-measure-055447613012/shadowfit/ec2-20260822-155952
+
+# 리플리카 박스 (위 블록은 «소스» 다)
+호스트        : 172.31.3.221
+AZ 구성(라벨) : same-az(ap-northeast-2a)
+인스턴스 타입 : c7i.2xlarge
+AZ            : ap-northeast-2a
+vCPU / RAM    : 8 15GB
+MySQL         : 8.0.46
+server_id     : 소스=1 / 리플리카=2
+왕복·초기화   : repl/rtt.txt · repl/replica_build.txt 참조
+⚠️ 두 박스의 타입이 다르면 이 라운드의 지연 값은 **복제 구조의 값이 아니다**
+
+# 단계
+phase	status	seconds	started_at
+repl_preflight	OK	2	2026-08-22T15:59:52+00:00
+repl_gate	OK	214	2026-08-22T15:59:54+00:00
+repl	OK	4784	2026-08-22T16:03:31+00:00
+ridealong	OK	0	2026-08-22T17:23:16+00:00
+
+⚠️ 절대 소요 시간을 «운영에서 N분» 으로 인용 금지 — 하드웨어 종속(설계 §5)
+⚠️ rehearsal/ 의 수치는 측정값이 아니다 — 경로 점검용 축소 판
+
+# 단계 (최종)
+phase	status	seconds	started_at
+repl_preflight	OK	2	2026-08-22T15:59:52+00:00
+repl_gate	OK	214	2026-08-22T15:59:54+00:00
+repl	OK	4784	2026-08-22T16:03:31+00:00
+ridealong	OK	0	2026-08-22T17:23:16+00:00
+collect	OK	1	2026-08-22T17:23:17+00:00
+
+# 요금 (청구액은 나중에 채운다)
+인스턴스 타입   : c7i.2xlarge
+리전            : ap-northeast-2
+태그            : 
+인스턴스 가동   : 1.85시간 (부팅부터 지금까지 — 요금 대상은 이쪽)
+러너 소요       : 1.39시간
+루트 볼륨       :  100G disk
+실제 청구액     : (미기입) — Cost Explorer 에서 태그 Project=shadowfit-measure 로 필터해 채울 것
+
+⚠️ 인스턴스를 끈 뒤에도 **볼륨이 남으면 요금이 계속 나간다.** 삭제까지 확인할 것
