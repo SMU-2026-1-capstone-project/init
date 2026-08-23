@@ -259,6 +259,41 @@ rig 과 손잡이·산출물은 [`../results/replication-2026-08-17/REPL2-RIG.md
 ⚠️ **여기 적힌 절차로 2대를 실제로 띄워 본 적은 없다.** 포트·키 경로는 rig 코드에서 읽은 것이다.
 첫 실행은 `REPL_SESSIONS=134 PHASES="repl_preflight repl_gate"` 로 끊어서 보는 편이 싸다.
 
+### R10-a — 1대 구성 (프레임 경로 계측)
+
+무대 결정은 [`r10-loadgen-topology.md` §7](../../docs/decisions/r10-loadgen-topology.md):
+**쪼갠다, R10-a(1대 동거)를 먼저.** 대상 **`c7i.4xlarge`(16 vCPU) 한 대**뿐이고 부하기 박스가 없다.
+
+🔴 **MySQL·Spring·도커 스택을 안 쓴다.** rig 이 uvicorn 을 직접 띄우고 gRPC 로 세션을 연다.
+**도커로 띄우면 안 된다** — 계측 노브(`FRAME_PATH_METRICS`·`GIL_SWITCH_INTERVAL`)가
+compose 를 안 넘어간다([#399](https://github.com/Shadowfit/init/issues/399)). 그래서 ROLE 이 따로 있다.
+
+```bash
+# 대상 박스 하나 — venv·의존성·proto 스텁까지 세운다 (mediapipe 때문에 3~8분)
+ROLE=ai-venv bash bootstrap.sh
+```
+
+🔴 **파이썬은 3.12 다. 못 맞추면 부트스트랩이 멈춘다** — 기준 관측(「346 RPS 에 9.5 vCPU」)이
+`python:3.12-slim` 컨테이너의 것이고 R10 이 재는 것이 **GIL 거동**이라, 다른 버전으로 재면
+비교가 성립하지 않는다. 배포판에 3.12 가 없으면 손으로 깔고 `AI_PY=/경로/python3.12` 로 준다
+(Ubuntu 22.04 기본 저장소엔 없다).
+
+**실행 — 같은 박스에서**
+
+```bash
+cd /root/init
+nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py   --sessions 160 --dur 90 --pool 201   --plan "A,A@0.001,A,A@0.001" --discard 1   --out loadtest/results/frame-path-r10a-$(date +%F) > /root/r10a.log 2>&1 &
+```
+
+| | |
+|---|---|
+| 규모 | **160세션 · 90초 · 풀 201** — 기존 라운드와 같은 조건이라야 비교가 된다([설계 §8-2](../../docs/decisions/ai-receive-path-scaling.md)). rig 기본은 8세션·45초·풀=세션+4 라 **안 주면 다른 판**이다 |
+| 팔 | `@<초>` 가 `GIL_SWITCH_INTERVAL` 이다. **ON/OFF 앵커 판 한 장**을 끼울 것 — 계측 대가(≤2.4%)를 이 박스에서도 확인하는 자리 |
+| 🔴 **안 읽는 값** | `handler_concurrency` — 부하기가 동거해서 **절대값이 다친다.** R10-b(2대)의 몫이다(§7) |
+| 러너 | `run_all.sh` 를 **안 쓴다.** 프레임 경로 phase 가 아직 없다([#400](https://github.com/Shadowfit/init/issues/400) ①) — 회수는 손으로 |
+
+⚠️ **이 절차로 실제로 띄워 본 적은 없다.** ROLE 은 `bash -n` 과 역할 분기 검증만 거쳤다.
+
 ## 설정
 
 | 변수 | 기본 | 비고 |
