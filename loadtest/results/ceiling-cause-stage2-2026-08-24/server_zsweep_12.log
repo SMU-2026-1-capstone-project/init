@@ -1,0 +1,656 @@
+2026-08-23 15:58:00,562 [WARNING] [·] app.main: 🔬 프레임 경로 계측 ON — 표본 4096. 이 계측 자체가 GIL 을 잡는다. 절대값을 인용하려면 계측 OFF 판과의 대조가 선행이다
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+2026-08-23 15:58:00,576 [INFO] [·] app.main: gRPC 서버 백그라운드 스레드 시작
+2026-08-23 15:58:00,577 [WARNING] [·] app.main: 🔬 스레드풀·루프 샘플러 ON — 20ms 주기
+2026-08-23 15:58:00,577 [WARNING] [·] app.main: 🔬 널 핸들러 팔 ON — POST /pose 가 즉시 반환한다 (측정 전용)
+2026-08-23 15:58:00,577 [INFO] [·] app.observability.frame_path: 🔬 GIL 지연 프로브 시작 — 1.0ms 주기
+2026-08-23 15:58:00,582 [INFO] [·] app.grpc.server: ShadowFit AI gRPC Server 시작 (port=8685)
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+W0000 00:00:1787500680.629012  193624 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500680.660988  193624 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,742 [INFO] [·] app.observability.frame_path: 프레임 경로 계측 초기화
+2026-08-23 15:58:04,841 [INFO] [ai-in-c3f26428f934] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900001, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,842 [WARNING] [ai-in-c3f26428f934] app.grpc.exercise_servicer: 세션 900001에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:04,842 [INFO] [ai-in-c3f26428f934] app.core.mediapipe_detector: 검출기 풀 크기 = 201 (설정값, 메모리 상한 None)
+2026-08-23 15:58:04,842 [WARNING] [ai-in-c3f26428f934] app.core.mediapipe_detector: ⚠️ 이 상한은 «검출기만» 계산한 값이다. 프레임 버퍼·파이썬 힙은 미측정이라 포함되지 않았다. 컨테이너 한도에 여유를 둘 것.
+2026-08-23 15:58:04,850 [INFO] [ai-in-c4b1e9de0265] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900002, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,850 [WARNING] [ai-in-c4b1e9de0265] app.grpc.exercise_servicer: 세션 900002에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:04,859 [INFO] [ai-in-65feba6b24ec] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900003, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,859 [WARNING] [ai-in-65feba6b24ec] app.grpc.exercise_servicer: 세션 900003에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:04,868 [INFO] [ai-in-a438bf58a71d] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900004, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,868 [WARNING] [ai-in-a438bf58a71d] app.grpc.exercise_servicer: 세션 900004에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:04,877 [INFO] [ai-in-9555ea2bf243] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900005, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,877 [WARNING] [ai-in-9555ea2bf243] app.grpc.exercise_servicer: 세션 900005에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:04,885 [INFO] [ai-in-2c1e81d34311] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900006, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,885 [WARNING] [ai-in-2c1e81d34311] app.grpc.exercise_servicer: 세션 900006에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:04,894 [INFO] [ai-in-5024998b5479] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900007, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,894 [WARNING] [ai-in-5024998b5479] app.grpc.exercise_servicer: 세션 900007에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:04,903 [INFO] [ai-in-b12f19b7f14e] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900008, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,903 [WARNING] [ai-in-b12f19b7f14e] app.grpc.exercise_servicer: 세션 900008에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500684.909935  193692 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,912 [INFO] [ai-in-2478b36f64dd] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900009, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,912 [WARNING] [ai-in-2478b36f64dd] app.grpc.exercise_servicer: 세션 900009에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500684.921109  193681 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,922 [INFO] [ai-in-935f02b629db] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900010, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,922 [WARNING] [ai-in-935f02b629db] app.grpc.exercise_servicer: 세션 900010에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500684.923096  193708 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500684.930922  193724 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,931 [INFO] [ai-in-5f4a5a225ace] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900011, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,932 [WARNING] [ai-in-5f4a5a225ace] app.grpc.exercise_servicer: 세션 900011에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500684.940298  193738 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,941 [INFO] [ai-in-57d1d4eb51ad] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900012, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,941 [WARNING] [ai-in-57d1d4eb51ad] app.grpc.exercise_servicer: 세션 900012에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500684.951912  193757 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,953 [INFO] [ai-in-ec729beaa21c] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900013, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,953 [WARNING] [ai-in-ec729beaa21c] app.grpc.exercise_servicer: 세션 900013에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500684.954441  193695 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,962 [INFO] [ai-in-5d099c4ebd0c] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900014, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,963 [WARNING] [ai-in-5d099c4ebd0c] app.grpc.exercise_servicer: 세션 900014에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500684.964569  193724 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500684.965527  193678 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500684.965990  193718 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500684.968183  193783 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,972 [INFO] [ai-in-a3e5ce18ac45] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900015, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,972 [WARNING] [ai-in-a3e5ce18ac45] app.grpc.exercise_servicer: 세션 900015에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500684.977109  193789 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500684.978685  193742 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,981 [INFO] [ai-in-d30571f01274] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900016, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,982 [WARNING] [ai-in-d30571f01274] app.grpc.exercise_servicer: 세션 900016에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500684.991306  193757 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,992 [INFO] [ai-in-003c7f03293f] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900017, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:04,992 [WARNING] [ai-in-003c7f03293f] app.grpc.exercise_servicer: 세션 900017에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500684.993258  193804 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:04,999 [INFO] [ai-in-82eac122e6cf] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900018, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,000 [WARNING] [ai-in-82eac122e6cf] app.grpc.exercise_servicer: 세션 900018에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.009629  193821 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,009 [INFO] [ai-in-b2ff87e20554] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900019, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,010 [WARNING] [ai-in-b2ff87e20554] app.grpc.exercise_servicer: 세션 900019에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.010493  193835 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.012694  193783 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.013963  193797 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.015070  193850 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,019 [INFO] [ai-in-1685b5a4b02f] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900020, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,019 [WARNING] [ai-in-1685b5a4b02f] app.grpc.exercise_servicer: 세션 900020에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.028083  193868 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,029 [INFO] [ai-in-6b4e43853c31] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900021, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,029 [WARNING] [ai-in-6b4e43853c31] app.grpc.exercise_servicer: 세션 900021에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.038652  193804 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,044 [INFO] [ai-in-30ff202d300f] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900022, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,044 [WARNING] [ai-in-30ff202d300f] app.grpc.exercise_servicer: 세션 900022에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.044467  193882 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,051 [INFO] [ai-in-a0d07da0d433] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900023, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,051 [WARNING] [ai-in-a0d07da0d433] app.grpc.exercise_servicer: 세션 900023에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.054758  193819 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.057573  193899 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.057639  193842 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.057661  193854 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,060 [INFO] [ai-in-aa1f128b0f73] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900024, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,061 [WARNING] [ai-in-aa1f128b0f73] app.grpc.exercise_servicer: 세션 900024에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.064312  193917 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.070729  193872 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.070997  193930 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,072 [INFO] [ai-in-c9ac7867fce1] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900025, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,072 [WARNING] [ai-in-c9ac7867fce1] app.grpc.exercise_servicer: 세션 900025에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.080614  193947 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,083 [INFO] [ai-in-034f3734e747] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900026, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,083 [WARNING] [ai-in-034f3734e747] app.grpc.exercise_servicer: 세션 900026에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.085815  193964 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,090 [INFO] [ai-in-792a051bbb25] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900027, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,090 [WARNING] [ai-in-792a051bbb25] app.grpc.exercise_servicer: 세션 900027에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.090947  193882 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.103332  193980 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.103504  193898 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,103 [INFO] [ai-in-069623c395b7] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900028, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,103 [WARNING] [ai-in-069623c395b7] app.grpc.exercise_servicer: 세션 900028에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.107943  193915 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,113 [INFO] [ai-in-e2129d4701c9] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900029, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,114 [WARNING] [ai-in-e2129d4701c9] app.grpc.exercise_servicer: 세션 900029에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.114848  193996 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.117709  194027 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.121505  193949 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.121693  193931 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.123069  194011 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,123 [INFO] [ai-in-73acf1dd427b] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900030, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,123 [WARNING] [ai-in-73acf1dd427b] app.grpc.exercise_servicer: 세션 900030에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.129268  193964 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,138 [INFO] [ai-in-e03087a699b9] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900031, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,138 [WARNING] [ai-in-e03087a699b9] app.grpc.exercise_servicer: 세션 900031에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.144869  194043 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.145566  193980 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,148 [INFO] [ai-in-b1b14fd5f837] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900032, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,148 [WARNING] [ai-in-b1b14fd5f837] app.grpc.exercise_servicer: 세션 900032에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.150453  193996 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.153482  194060 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.158167  194027 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.160831  194074 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.162245  194011 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.163145  194090 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,163 [INFO] [ai-in-345ca5872e1f] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900033, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,163 [WARNING] [ai-in-345ca5872e1f] app.grpc.exercise_servicer: 세션 900033에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:05,174 [INFO] [ai-in-2547742a4de9] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900034, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,174 [WARNING] [ai-in-2547742a4de9] app.grpc.exercise_servicer: 세션 900034에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.179079  194106 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,183 [INFO] [ai-in-5d0091237384] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900035, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,183 [WARNING] [ai-in-5d0091237384] app.grpc.exercise_servicer: 세션 900035에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:05,192 [INFO] [ai-in-09e96aecbc6e] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900036, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,192 [WARNING] [ai-in-09e96aecbc6e] app.grpc.exercise_servicer: 세션 900036에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.192863  194049 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.196889  194124 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.197485  194060 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,201 [INFO] [ai-in-62b59f99339a] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900037, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,201 [WARNING] [ai-in-62b59f99339a] app.grpc.exercise_servicer: 세션 900037에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.202031  194074 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.205473  194092 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.209203  194138 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,210 [INFO] [ai-in-e140a3c26a19] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900038, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,210 [WARNING] [ai-in-e140a3c26a19] app.grpc.exercise_servicer: 세션 900038에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.219780  194155 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,221 [INFO] [ai-in-5be85bd1dc9e] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900039, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,221 [WARNING] [ai-in-5be85bd1dc9e] app.grpc.exercise_servicer: 세션 900039에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.224872  194106 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,228 [INFO] [ai-in-d3428e38f017] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900040, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,228 [WARNING] [ai-in-d3428e38f017] app.grpc.exercise_servicer: 세션 900040에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:05,235 [INFO] [ai-in-55b0b72016a6] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900041, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,235 [WARNING] [ai-in-55b0b72016a6] app.grpc.exercise_servicer: 세션 900041에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.236614  194129 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.236929  194192 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.239924  194172 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,251 [INFO] [ai-in-4b6f4c325dfa] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900042, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,252 [WARNING] [ai-in-4b6f4c325dfa] app.grpc.exercise_servicer: 세션 900042에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.252448  194203 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.253274  194148 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.259416  194156 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,261 [INFO] [ai-in-5aaf9c3f121f] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900043, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,261 [WARNING] [ai-in-5aaf9c3f121f] app.grpc.exercise_servicer: 세션 900043에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.267224  194234 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.269415  194252 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.270354  194219 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,274 [INFO] [ai-in-250d45771ec9] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900044, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,274 [WARNING] [ai-in-250d45771ec9] app.grpc.exercise_servicer: 세션 900044에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.280647  194192 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.284253  194170 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,284 [INFO] [ai-in-82e460dd6824] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900045, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,284 [WARNING] [ai-in-82e460dd6824] app.grpc.exercise_servicer: 세션 900045에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.290060  194282 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,293 [INFO] [ai-in-955232f2417b] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900046, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,293 [WARNING] [ai-in-955232f2417b] app.grpc.exercise_servicer: 세션 900046에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.295883  194203 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,302 [INFO] [ai-in-7eba3dac1857] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900047, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,302 [WARNING] [ai-in-7eba3dac1857] app.grpc.exercise_servicer: 세션 900047에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.302968  194266 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.304060  194298 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.310381  194221 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,311 [INFO] [ai-in-cad6412be658] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900048, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,311 [WARNING] [ai-in-cad6412be658] app.grpc.exercise_servicer: 세션 900048에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.314726  194315 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.315027  194239 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,320 [INFO] [ai-in-adbb4ec70ad8] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900049, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,320 [WARNING] [ai-in-adbb4ec70ad8] app.grpc.exercise_servicer: 세션 900049에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.322024  194255 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.331258  194291 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,332 [INFO] [ai-in-d954c3e93a68] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900050, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,332 [WARNING] [ai-in-d954c3e93a68] app.grpc.exercise_servicer: 세션 900050에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.333356  194330 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.339438  194348 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.341178  194362 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,343 [INFO] [ai-in-b3f3846c6dbb] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900051, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,343 [WARNING] [ai-in-b3f3846c6dbb] app.grpc.exercise_servicer: 세션 900051에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.349982  194298 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.350187  194266 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,352 [INFO] [ai-in-b830c759c4bf] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900052, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,352 [WARNING] [ai-in-b830c759c4bf] app.grpc.exercise_servicer: 세션 900052에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.360513  194319 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.361019  194379 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,361 [INFO] [ai-in-60b33056162d] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900053, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,361 [WARNING] [ai-in-60b33056162d] app.grpc.exercise_servicer: 세션 900053에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:05,369 [INFO] [ai-in-4402ff020963] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900054, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,370 [WARNING] [ai-in-4402ff020963] app.grpc.exercise_servicer: 세션 900054에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.373592  194394 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.375258  194330 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,378 [INFO] [ai-in-47348ea7b39c] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900055, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,379 [WARNING] [ai-in-47348ea7b39c] app.grpc.exercise_servicer: 세션 900055에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.380538  194410 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.380961  194349 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.384797  194367 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,388 [INFO] [ai-in-80a1fea10a73] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900056, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,389 [WARNING] [ai-in-80a1fea10a73] app.grpc.exercise_servicer: 세션 900056에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:05,395 [INFO] [ai-in-a43a2823214f] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900057, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,396 [WARNING] [ai-in-a43a2823214f] app.grpc.exercise_servicer: 세션 900057에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.397457  194442 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.406355  194381 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.406829  194427 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,407 [INFO] [ai-in-86b196590914] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900058, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,407 [WARNING] [ai-in-86b196590914] app.grpc.exercise_servicer: 세션 900058에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:05,417 [INFO] [ai-in-3c77ef1bf999] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900059, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,417 [WARNING] [ai-in-3c77ef1bf999] app.grpc.exercise_servicer: 세션 900059에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.417609  194394 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.419659  194474 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.420858  194459 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.423962  194413 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,426 [INFO] [ai-in-3b3c64dd8f4b] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900060, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,426 [WARNING] [ai-in-3b3c64dd8f4b] app.grpc.exercise_servicer: 세션 900060에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.432736  194491 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,436 [INFO] [ai-in-7ff8af0c3ea3] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900061, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,436 [WARNING] [ai-in-7ff8af0c3ea3] app.grpc.exercise_servicer: 세션 900061에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.442921  194507 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.444933  194448 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.445598  194522 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,448 [INFO] [ai-in-f0a17f51601c] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900062, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,448 [WARNING] [ai-in-f0a17f51601c] app.grpc.exercise_servicer: 세션 900062에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.454788  194427 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.456000  194538 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,458 [INFO] [ai-in-807de0b0f724] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900063, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,458 [WARNING] [ai-in-807de0b0f724] app.grpc.exercise_servicer: 세션 900063에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.461610  194474 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.463632  194459 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.466317  194554 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,467 [INFO] [ai-in-3a8c896f69d6] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900064, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,468 [WARNING] [ai-in-3a8c896f69d6] app.grpc.exercise_servicer: 세션 900064에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.474514  194570 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,481 [INFO] [ai-in-98ab58265dce] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900065, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,481 [WARNING] [ai-in-98ab58265dce] app.grpc.exercise_servicer: 세션 900065에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.482789  194497 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.487596  194523 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.489238  194586 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.490980  194509 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,492 [INFO] [ai-in-ef697e0b0005] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900066, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,492 [WARNING] [ai-in-ef697e0b0005] app.grpc.exercise_servicer: 세션 900066에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.496360  194602 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.499725  194540 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,502 [INFO] [ai-in-8e53e6a2b359] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900067, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,502 [WARNING] [ai-in-8e53e6a2b359] app.grpc.exercise_servicer: 세션 900067에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.503699  194618 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.504982  194563 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,513 [INFO] [ai-in-45edcbc2ebc5] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900068, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,513 [WARNING] [ai-in-45edcbc2ebc5] app.grpc.exercise_servicer: 세션 900068에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.515362  194634 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.522289  194570 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,523 [INFO] [ai-in-98121ecda7fd] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900069, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,523 [WARNING] [ai-in-98121ecda7fd] app.grpc.exercise_servicer: 세션 900069에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.531896  194666 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,532 [INFO] [ai-in-cd981d0cc525] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900070, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,532 [WARNING] [ai-in-cd981d0cc525] app.grpc.exercise_servicer: 세션 900070에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.534253  194592 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.540981  194602 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.541339  194618 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,541 [INFO] [ai-in-4e1597719176] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900071, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,541 [WARNING] [ai-in-4e1597719176] app.grpc.exercise_servicer: 세션 900071에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.542463  194650 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,549 [INFO] [ai-in-01b8efd5fb1f] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900072, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,549 [WARNING] [ai-in-01b8efd5fb1f] app.grpc.exercise_servicer: 세션 900072에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.553859  194683 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,558 [INFO] [ai-in-64adeb327255] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900073, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,558 [WARNING] [ai-in-64adeb327255] app.grpc.exercise_servicer: 세션 900073에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.560477  194643 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.569379  194700 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,571 [INFO] [ai-in-16565e15d7a9] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900074, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,571 [WARNING] [ai-in-16565e15d7a9] app.grpc.exercise_servicer: 세션 900074에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.573358  194727 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.577936  194732 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.579655  194668 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.580289  194747 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,583 [INFO] [ai-in-7f59ae5eca68] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900075, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,583 [WARNING] [ai-in-7f59ae5eca68] app.grpc.exercise_servicer: 세션 900075에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.587520  194650 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,593 [INFO] [ai-in-d8adc3af5dd3] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900076, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,593 [WARNING] [ai-in-d8adc3af5dd3] app.grpc.exercise_servicer: 세션 900076에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.594568  194763 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.596116  194683 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,603 [INFO] [ai-in-4791d5e47e02] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900077, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,603 [WARNING] [ai-in-4791d5e47e02] app.grpc.exercise_servicer: 세션 900077에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:05,613 [INFO] [ai-in-eff24bb17556] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900078, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,613 [WARNING] [ai-in-eff24bb17556] app.grpc.exercise_servicer: 세션 900078에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.617166  194727 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.617260  194795 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.619372  194779 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,622 [INFO] [ai-in-a4cbfcb9fdac] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900079, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,622 [WARNING] [ai-in-a4cbfcb9fdac] app.grpc.exercise_servicer: 세션 900079에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.622806  194700 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.625628  194750 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.629295  194732 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,632 [INFO] [ai-in-af736e4a2f3e] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900080, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,632 [WARNING] [ai-in-af736e4a2f3e] app.grpc.exercise_servicer: 세션 900080에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.633600  194812 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.634199  194827 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.636416  194763 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,640 [INFO] [ai-in-b95a919f7cd3] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900081, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,641 [WARNING] [ai-in-b95a919f7cd3] app.grpc.exercise_servicer: 세션 900081에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:05,648 [INFO] [ai-in-a45cb117a8a2] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900082, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,648 [WARNING] [ai-in-a45cb117a8a2] app.grpc.exercise_servicer: 세션 900082에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.650010  194843 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,658 [INFO] [ai-in-bd92bea997bb] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900083, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,658 [WARNING] [ai-in-bd92bea997bb] app.grpc.exercise_servicer: 세션 900083에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.659152  194859 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,668 [INFO] [ai-in-6a879f8ca068] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900084, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,668 [WARNING] [ai-in-6a879f8ca068] app.grpc.exercise_servicer: 세션 900084에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.671034  194785 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.671266  194836 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.671859  194800 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.675986  194812 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.678409  194875 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,678 [INFO] [ai-in-efacd1880f50] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900085, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,678 [WARNING] [ai-in-efacd1880f50] app.grpc.exercise_servicer: 세션 900085에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.679253  194907 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.682038  194891 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,688 [INFO] [ai-in-7e95cb3ed48a] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900086, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,688 [WARNING] [ai-in-7e95cb3ed48a] app.grpc.exercise_servicer: 세션 900086에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.693435  194843 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,698 [INFO] [ai-in-511c6ab2bbc8] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900087, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,698 [WARNING] [ai-in-511c6ab2bbc8] app.grpc.exercise_servicer: 세션 900087에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.707919  194860 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.709641  194924 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.710217  194939 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,713 [INFO] [ai-in-856e432a17c1] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900088, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,713 [WARNING] [ai-in-856e432a17c1] app.grpc.exercise_servicer: 세션 900088에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.718216  194875 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.718237  194955 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.719438  194894 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.721910  194907 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,724 [INFO] [ai-in-de1c8629b991] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900089, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,724 [WARNING] [ai-in-de1c8629b991] app.grpc.exercise_servicer: 세션 900089에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.733335  194972 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,734 [INFO] [ai-in-46beb5b7d73a] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900090, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,734 [WARNING] [ai-in-46beb5b7d73a] app.grpc.exercise_servicer: 세션 900090에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.741902  195003 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,744 [INFO] [ai-in-798572c3a4bb] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900091, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,744 [WARNING] [ai-in-798572c3a4bb] app.grpc.exercise_servicer: 세션 900091에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.745808  194939 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.749001  194987 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,754 [INFO] [ai-in-413d4db4314f] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900092, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,755 [WARNING] [ai-in-413d4db4314f] app.grpc.exercise_servicer: 세션 900092에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.755279  194924 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.762998  195035 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.763038  195021 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,768 [INFO] [ai-in-9b95f847a60e] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900093, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,768 [WARNING] [ai-in-9b95f847a60e] app.grpc.exercise_servicer: 세션 900093에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.771440  194972 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.775055  195051 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.777317  194957 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,779 [INFO] [ai-in-2056a3401609] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900094, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,779 [WARNING] [ai-in-2056a3401609] app.grpc.exercise_servicer: 세션 900094에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.785300  195005 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.791890  195067 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,792 [INFO] [ai-in-986bd011f7eb] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900095, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,792 [WARNING] [ai-in-986bd011f7eb] app.grpc.exercise_servicer: 세션 900095에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.797746  194987 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,800 [INFO] [ai-in-ce9caf91cf5a] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900096, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,800 [WARNING] [ai-in-ce9caf91cf5a] app.grpc.exercise_servicer: 세션 900096에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.804998  195035 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.806190  195022 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,809 [INFO] [ai-in-feccaffedd41] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900097, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,809 [WARNING] [ai-in-feccaffedd41] app.grpc.exercise_servicer: 세션 900097에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.809890  195083 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.814679  195051 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.816274  195100 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,821 [INFO] [ai-in-c5cf920f604d] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900098, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,821 [WARNING] [ai-in-c5cf920f604d] app.grpc.exercise_servicer: 세션 900098에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.822316  195116 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,828 [INFO] [ai-in-d99db68dedce] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900099, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,828 [WARNING] [ai-in-d99db68dedce] app.grpc.exercise_servicer: 세션 900099에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:05,836 [INFO] [ai-in-99fd9142950b] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900100, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,836 [WARNING] [ai-in-99fd9142950b] app.grpc.exercise_servicer: 세션 900100에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.837516  195147 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.839412  195131 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.840708  195069 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,846 [INFO] [ai-in-373c06de82bd] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900101, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,846 [WARNING] [ai-in-373c06de82bd] app.grpc.exercise_servicer: 세션 900101에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.855978  195086 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,856 [INFO] [ai-in-e9133fa1824e] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900102, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,856 [WARNING] [ai-in-e9133fa1824e] app.grpc.exercise_servicer: 세션 900102에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.860831  195163 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.862849  195102 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.866576  195116 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,868 [INFO] [ai-in-c3c24da1649b] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900103, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,869 [WARNING] [ai-in-c3c24da1649b] app.grpc.exercise_servicer: 세션 900103에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.869561  195180 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.878084  195200 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,878 [INFO] [ai-in-97248261c098] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900104, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,879 [WARNING] [ai-in-97248261c098] app.grpc.exercise_servicer: 세션 900104에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.879610  195149 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.886602  195139 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,888 [INFO] [ai-in-89f9fa0b4c73] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900105, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,888 [WARNING] [ai-in-89f9fa0b4c73] app.grpc.exercise_servicer: 세션 900105에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.894896  195229 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.895839  195212 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.898165  195165 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,900 [INFO] [ai-in-7d5852007ed8] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900106, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,900 [WARNING] [ai-in-7d5852007ed8] app.grpc.exercise_servicer: 세션 900106에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.900859  195244 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.907695  195184 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,911 [INFO] [ai-in-353798042522] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900107, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,911 [WARNING] [ai-in-353798042522] app.grpc.exercise_servicer: 세션 900107에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.914172  195259 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,921 [INFO] [ai-in-5137d5af0efe] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900108, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,921 [WARNING] [ai-in-5137d5af0efe] app.grpc.exercise_servicer: 세션 900108에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.923739  195195 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.927426  195291 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.929699  195275 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,933 [INFO] [ai-in-8b7cba837f29] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900109, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,933 [WARNING] [ai-in-8b7cba837f29] app.grpc.exercise_servicer: 세션 900109에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.941499  195244 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.943100  195213 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.943933  195229 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,944 [INFO] [ai-in-9e37b97d32d8] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900110, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,944 [WARNING] [ai-in-9e37b97d32d8] app.grpc.exercise_servicer: 세션 900110에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.950721  195308 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,954 [INFO] [ai-in-cc1dacec9e99] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900111, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,955 [WARNING] [ai-in-cc1dacec9e99] app.grpc.exercise_servicer: 세션 900111에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.955270  195259 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.955489  195326 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,964 [INFO] [ai-in-af5c9a6323a9] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900112, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,965 [WARNING] [ai-in-af5c9a6323a9] app.grpc.exercise_servicer: 세션 900112에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.966177  195293 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.966724  195342 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,974 [INFO] [ai-in-c561ac13592d] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900113, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,974 [WARNING] [ai-in-c561ac13592d] app.grpc.exercise_servicer: 세션 900113에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.976585  195277 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.982871  195356 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,984 [INFO] [ai-in-3be3aeddb51e] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900114, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,984 [WARNING] [ai-in-3be3aeddb51e] app.grpc.exercise_servicer: 세션 900114에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.988035  195309 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500685.989559  195326 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:05,994 [INFO] [ai-in-ac4021bfc36f] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900115, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:05,994 [WARNING] [ai-in-ac4021bfc36f] app.grpc.exercise_servicer: 세션 900115에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500685.998028  195373 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.000182  195389 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,004 [INFO] [ai-in-51bc09de08b6] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900116, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,004 [WARNING] [ai-in-51bc09de08b6] app.grpc.exercise_servicer: 세션 900116에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.008978  195403 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.014927  195345 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,014 [INFO] [ai-in-898523b60098] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900117, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,015 [WARNING] [ai-in-898523b60098] app.grpc.exercise_servicer: 세션 900117에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.020636  195357 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.023557  195435 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,025 [INFO] [ai-in-0a8590431243] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900118, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,025 [WARNING] [ai-in-0a8590431243] app.grpc.exercise_servicer: 세션 900118에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:06,035 [INFO] [ai-in-a014d314aeaf] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900119, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,035 [WARNING] [ai-in-a014d314aeaf] app.grpc.exercise_servicer: 세션 900119에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.037309  195419 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.041025  195372 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.041731  195451 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.046718  195398 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,047 [INFO] [ai-in-a9c7284cc026] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900120, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,047 [WARNING] [ai-in-a9c7284cc026] app.grpc.exercise_servicer: 세션 900120에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.052438  195492 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.056985  195405 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,057 [INFO] [ai-in-cc52d321d474] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900121, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,057 [WARNING] [ai-in-cc52d321d474] app.grpc.exercise_servicer: 세션 900121에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.060327  195468 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.062960  195444 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.067952  195500 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.068215  195515 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,068 [INFO] [ai-in-99c07c38c172] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900122, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,068 [WARNING] [ai-in-99c07c38c172] app.grpc.exercise_servicer: 세션 900122에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:06,076 [INFO] [ai-in-abf948e553b9] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900123, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,076 [WARNING] [ai-in-abf948e553b9] app.grpc.exercise_servicer: 세션 900123에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.076886  195421 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,086 [INFO] [ai-in-d6d83185a445] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900124, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,086 [WARNING] [ai-in-d6d83185a445] app.grpc.exercise_servicer: 세션 900124에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.091613  195451 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.094835  195492 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,096 [INFO] [ai-in-d914698fffd6] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900125, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,096 [WARNING] [ai-in-d914698fffd6] app.grpc.exercise_servicer: 세션 900125에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.098137  195532 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.099890  195547 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.106874  195521 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,108 [INFO] [ai-in-4ca05e611398] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900126, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,108 [WARNING] [ai-in-4ca05e611398] app.grpc.exercise_servicer: 세션 900126에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.110358  195470 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.115328  195506 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,118 [INFO] [ai-in-b6dd6ce10073] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900127, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,118 [WARNING] [ai-in-b6dd6ce10073] app.grpc.exercise_servicer: 세션 900127에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.122882  195563 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,128 [INFO] [ai-in-c5b43e1c7070] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900128, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,129 [WARNING] [ai-in-c5b43e1c7070] app.grpc.exercise_servicer: 세션 900128에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.132175  195547 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.132359  195579 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,138 [INFO] [ai-in-c590aa324fbf] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900129, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,138 [WARNING] [ai-in-c590aa324fbf] app.grpc.exercise_servicer: 세션 900129에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.144116  195627 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.147023  195611 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.147195  195595 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.147720  195533 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,149 [INFO] [ai-in-1fe7e2574a58] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900130, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,149 [WARNING] [ai-in-1fe7e2574a58] app.grpc.exercise_servicer: 세션 900130에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:06,160 [INFO] [ai-in-d18dab664a8a] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900131, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,160 [WARNING] [ai-in-d18dab664a8a] app.grpc.exercise_servicer: 세션 900131에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.168306  195660 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.168806  195563 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,173 [INFO] [ai-in-e65aa125bc3c] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900132, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,173 [WARNING] [ai-in-e65aa125bc3c] app.grpc.exercise_servicer: 세션 900132에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.176321  195581 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.177896  195643 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.180097  195635 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,182 [INFO] [ai-in-fd73210a9692] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900133, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,183 [WARNING] [ai-in-fd73210a9692] app.grpc.exercise_servicer: 세션 900133에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.187265  195678 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,191 [INFO] [ai-in-2a8f7638d118] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900134, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,191 [WARNING] [ai-in-2a8f7638d118] app.grpc.exercise_servicer: 세션 900134에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.191386  195692 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.194628  195612 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.196057  195708 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.197733  195595 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,201 [INFO] [ai-in-0069f38c8ad8] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900135, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,201 [WARNING] [ai-in-0069f38c8ad8] app.grpc.exercise_servicer: 세션 900135에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:06,211 [INFO] [ai-in-00b42fa8fe92] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900136, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,211 [WARNING] [ai-in-00b42fa8fe92] app.grpc.exercise_servicer: 세션 900136에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.218239  195723 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.218767  195644 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.219255  195662 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,221 [INFO] [ai-in-1335949ee1ff] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900137, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,221 [WARNING] [ai-in-1335949ee1ff] app.grpc.exercise_servicer: 세션 900137에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:06,231 [INFO] [ai-in-2a31a3aeaf5e] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900138, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,231 [WARNING] [ai-in-2a31a3aeaf5e] app.grpc.exercise_servicer: 세션 900138에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.232725  195739 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.233451  195687 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.235110  195755 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.235239  195708 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.236991  195695 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.240249  195773 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,243 [INFO] [ai-in-cdc33cc578d2] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900139, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,243 [WARNING] [ai-in-cdc33cc578d2] app.grpc.exercise_servicer: 세션 900139에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+2026-08-23 15:58:06,253 [INFO] [ai-in-469b7e82c286] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900140, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,253 [WARNING] [ai-in-469b7e82c286] app.grpc.exercise_servicer: 세션 900140에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.257410  195789 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,262 [INFO] [ai-in-f25f2ee026bc] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900141, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,262 [WARNING] [ai-in-f25f2ee026bc] app.grpc.exercise_servicer: 세션 900141에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.269490  195725 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.276969  195810 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.278127  195739 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,279 [INFO] [ai-in-d8ead43e590d] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900142, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,279 [WARNING] [ai-in-d8ead43e590d] app.grpc.exercise_servicer: 세션 900142에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.280619  195820 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.281094  195773 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.282683  195835 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.284757  195758 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.287881  195852 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,289 [INFO] [ai-in-b14a861ea870] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900143, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,290 [WARNING] [ai-in-b14a861ea870] app.grpc.exercise_servicer: 세션 900143에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.298122  195793 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,301 [INFO] [ai-in-1944fbfd7904] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900144, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,301 [WARNING] [ai-in-1944fbfd7904] app.grpc.exercise_servicer: 세션 900144에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.311220  195884 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.311642  195868 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.311699  195810 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,311 [INFO] [ai-in-6a3a43f35b57] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900145, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,312 [WARNING] [ai-in-6a3a43f35b57] app.grpc.exercise_servicer: 세션 900145에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.317395  195835 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,322 [INFO] [ai-in-d3a52a58cc72] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900146, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,322 [WARNING] [ai-in-d3a52a58cc72] app.grpc.exercise_servicer: 세션 900146에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.329156  195899 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.330018  195820 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,332 [INFO] [ai-in-5a46f978937a] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900147, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,332 [WARNING] [ai-in-5a46f978937a] app.grpc.exercise_servicer: 세션 900147에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.336822  195853 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,347 [INFO] [ai-in-a277e9058e39] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900148, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,347 [WARNING] [ai-in-a277e9058e39] app.grpc.exercise_servicer: 세션 900148에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.347671  195916 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.354883  195885 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,357 [INFO] [ai-in-f0f90d2dd10c] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900149, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,357 [WARNING] [ai-in-f0f90d2dd10c] app.grpc.exercise_servicer: 세션 900149에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.358092  195867 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.362944  195932 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.364529  195948 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,367 [INFO] [ai-in-7231873b638d] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900150, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,367 [WARNING] [ai-in-7231873b638d] app.grpc.exercise_servicer: 세션 900150에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.369031  195899 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,377 [INFO] [ai-in-8115cc875141] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900151, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,377 [WARNING] [ai-in-8115cc875141] app.grpc.exercise_servicer: 세션 900151에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.378778  195979 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.381047  195964 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.387003  195924 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,387 [INFO] [ai-in-264704427780] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900152, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,387 [WARNING] [ai-in-264704427780] app.grpc.exercise_servicer: 세션 900152에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.394921  195997 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,397 [INFO] [ai-in-6b7b21f46df2] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900153, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,397 [WARNING] [ai-in-6b7b21f46df2] app.grpc.exercise_servicer: 세션 900153에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.400768  196012 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.404231  195932 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,407 [INFO] [ai-in-d983ca6b014d] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900154, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,408 [WARNING] [ai-in-d983ca6b014d] app.grpc.exercise_servicer: 세션 900154에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.410946  195951 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,418 [INFO] [ai-in-353bddce4fcd] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900155, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,418 [WARNING] [ai-in-353bddce4fcd] app.grpc.exercise_servicer: 세션 900155에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.419830  195986 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.420861  196029 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.422617  195964 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,428 [INFO] [ai-in-525a5bac4fe9] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900156, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,428 [WARNING] [ai-in-525a5bac4fe9] app.grpc.exercise_servicer: 세션 900156에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.434393  196044 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.438029  195997 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,439 [INFO] [ai-in-bd6e602d1743] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900157, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,440 [WARNING] [ai-in-bd6e602d1743] app.grpc.exercise_servicer: 세션 900157에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.446317  196014 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.446727  196061 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,449 [INFO] [ai-in-bbfc2b3271fb] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900158, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,449 [WARNING] [ai-in-bbfc2b3271fb] app.grpc.exercise_servicer: 세션 900158에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.455804  196075 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.459048  196039 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,459 [INFO] [ai-in-935b369b0ce2] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900159, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,459 [WARNING] [ai-in-935b369b0ce2] app.grpc.exercise_servicer: 세션 900159에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.465620  196110 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:58:06,468 [INFO] [ai-in-829fa5c5657c] app.grpc.exercise_servicer: [Spring → AI] StartAnalysis 수신 (session=900160, exercise=1, persona=BEGINNER, reference_frames=0)
+2026-08-23 15:58:06,469 [WARNING] [ai-in-829fa5c5657c] app.grpc.exercise_servicer: 세션 900160에 reference 각도 시퀀스가 비어 있음 — sync_rate는 0으로 계산됨
+W0000 00:00:1787500686.472959  196044 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.474422  196093 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.486313  196070 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.488449  196124 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.501148  196077 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.503147  196140 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.505050  196110 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.508962  196156 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.514107  196172 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.514818  196093 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.528691  196203 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.534703  196123 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.538382  196188 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.546788  196148 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.551487  196173 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.552250  196159 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.558161  196220 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.563276  196203 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.575273  196194 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787500686.590414  196220 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+2026-08-23 15:59:06,983 [INFO] [·] app.observability.frame_path: 🔬 GIL 지연 프로브 종료
+2026-08-23 15:59:06,983 [INFO] [·] app.grpc.server: ShadowFit AI gRPC Server 종료
+2026-08-23 15:59:07,571 [WARNING] [·] app.main: 종료 시 활성 세션 160 개가 끊겼다 — 검출기 정리 완료
