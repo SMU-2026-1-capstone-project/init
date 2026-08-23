@@ -1,5 +1,17 @@
 version: 2
+
+# 이 저장소는 서비스가 셋이다. 항목이 하나(gradle)뿐이던 동안 frontend·ai-server 는
+# **경고는 뜨는데 상향 PR 이 안 왔다** (이슈 #406).
+#
+# 🔴 경고(alerts)와 상향 PR 은 다른 기능이다. 경고는 의존성 그래프만 있으면 설정 없이도
+#    뜬다. 이 파일을 읽는 것은 **PR 쪽**이고, 여기 없는 생태계는 조용히 빠진다.
+#    그 결손의 비용이 #405 에서 실증됐다 — protobuf 경고가 4개월 열려 있는 동안 아무 PR 도
+#    안 왔고, 발견 경로가 「사람이 push 하다 원격 메시지를 우연히 봄」이었다.
+
 updates:
+  # ══════════════════════════════════════════════════════════════════════════
+  # backend (Spring)
+  # ══════════════════════════════════════════════════════════════════════════
   - package-ecosystem: "gradle"
     directory: "/backend"
     schedule:
@@ -26,4 +38,109 @@ updates:
       - dependency-name: "org.springdoc:springdoc-openapi-starter-webmvc-ui"
         update-types: ["version-update:semver-major"]
       - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # ai-server (Python)
+  # ══════════════════════════════════════════════════════════════════════════
+  #
+  # 운영 표면이 분명하다 — ai-server/Dockerfile:10-11 이 requirements.txt 를 prod
+  # 이미지에 **그대로 설치**한다. 백엔드와 같은 무게로 봐야 하는 이유다.
+  - package-ecosystem: "pip"
+    directory: "/ai-server"
+    schedule:
+      interval: "weekly"
+    groups:
+      ai-server-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # 🔴 protobuf 메이저를 막는 이유는 gradle 쪽 springdoc 과 **정확히 같은 모양**이다 —
+    #    프레임워크 핀에 걸려 «지금은 받을 수 없는» 상향이다.
+    #
+    #    requirements.txt 는 protobuf==4.25.8 인데, 이건 임의 핀이 아니라 **천장**이다:
+    #      grpcio-tools 1.62.3  →  Requires-Dist: protobuf <5.0dev,>=4.21.6
+    #    (설치본 METADATA 로 확인. 그래서 grpcio 는 1.81.0 인데 grpcio-tools 만 1.62.3 으로
+    #     갈려 있다 — protobuf 핀이 pip 백트래킹으로 그쪽을 되돌린 모양이다)
+    #
+    #    즉 protobuf 5.x 는 **단독으로 못 받는다.** grpcio-tools 동반 상향 → proto 재생성 →
+    #    백엔드 Java 쪽 영향 확인이 한 묶음이다(이슈 #405 §4-ㄱ).
+    #
+    # 🔴 gRPC 스택을 올리는 날 이 항목을 먼저 지울 것. 막는 것과 잊는 것은 다르다.
+    ignore:
+      - dependency-name: "protobuf"
+        update-types: ["version-update:semver-major"]
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # frontend (Expo / React Native)
+  # ══════════════════════════════════════════════════════════════════════════
+  #
+  # ── 넣기 전에 분류부터 했다 (이슈 #406 §5 의 선행 조건) ─────────────────────
+  #
+  # 열린 npm 경고 22건은 **전부 트랜지티브**다 — package.json 직접 의존성에 하나도 없다.
+  # package-lock.json 에서 요구자(parent)를 되짚은 결과:
+  #
+  #   brace-expansion (7) ← minimatch            빌드체인 (glob)
+  #   postcss         (4) ← @expo/metro-config   빌드체인 (번들러 설정)
+  #   undici          (3) ← @expo/cli            빌드체인 (Node 측 HTTP)
+  #   image-size      (2) ← metro                빌드체인 (번들러)   ⚠️ 패치 없음
+  #   js-yaml         (2) ← @expo/xcpretty, @istanbuljs/load-nyc-config  빌드체인
+  #   tar             (1) ← @expo/cli            빌드체인
+  #   uuid            (1) ← xcode                빌드체인 (pbxproj 조작)
+  #   ─────────────────────────────────────────────────────────────────────
+  #   nanoid          (2) ← expo-router, @react-navigation/{core,native,routers}
+  #                                              🔴 **런타임 — 앱 번들에 실린다**
+  #
+  # ⚠️ Dependabot 이 22건을 전부 scope=runtime 으로 표시하는데 **그대로 읽으면 안 된다.**
+  #    Expo 는 CLI·번들러를 devDependencies 가 아니라 dependencies 에 둔다. 그래서
+  #    lockfile 의 dev 플래그로는 «번들에 실리는 것»과 «빌드할 때만 쓰는 것»이 안 갈린다.
+  #    위 분류는 dev 플래그가 아니라 **요구자 사슬**로 한 것이다.
+  #
+  # 📌 nanoid 2건(CVE-2026-67213 · 67214)은 「size 가 0/음수면 무한 루프」다. 호출부를
+  #    전수로 봤더니 expo-router·react-navigation 이 전부 **인자 없는 nanoid()**(기본 21)로
+  #    부른다 — 취약 경로가 앱에서 안 닿는다. 그 판단은 이 파일이 아니라 경고 쪽에서
+  #    처리할 사안이다.
+  #
+  # ── 그래서 무엇을 기대하나 ─────────────────────────────────────────────────
+  #
+  # 🔴 **이 항목이 위 22건을 닫아주지 않는다.** 전부 트랜지티브라 상향하려면
+  #    package.json 에 overrides 를 걸어야 하고, 그건 별개 판단이다. 이 항목의 값어치는
+  #    ① 직접 의존성의 보안 패치가 PR 로 오는 것 ② 앞으로 생길 경고가 **조용히 묻히지
+  #    않는 것** 이다 — #405 가 4개월 묻혔던 그 자리를 막는다.
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    groups:
+      frontend-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # 🔴 Expo SDK 가 관리하는 패키지의 메이저를 막는다. gradle 의 springdoc·wrapper 와
+    #    같은 이유다 — SDK 54 가 이 묶음의 조합을 고정하고 있어서, 하나만 올리면
+    #    «컴파일은 되는데 지원 조합이 아닌» 상태가 된다. 이 묶음의 상향은 Dependabot 이
+    #    아니라 `npx expo install --check` / SDK 업그레이드가 하는 일이다.
+    #
+    # 🔴 SDK 를 올리는 날 이 항목들을 먼저 지울 것. 막는 것과 잊는 것은 다르다.
+    #
+    # ⚠️ minor/patch 는 안 막는다 — 위 그룹으로 묶여서 한 PR 로 온다. Expo 가 `~` 로
+    #    핀한 것들은 애초에 minor 가 잘 안 뜨고, 뜨면 봐야 하는 것이 맞다.
+    ignore:
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "expo-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@expo/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
