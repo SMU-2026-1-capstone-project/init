@@ -33,11 +33,25 @@ scrape_configs:
         labels:
           application: shadowfit
 
+  # AI 서버. 2026-08-23 추가 (#151) — 아래 🔴 블록이 "붙이지 않은 채 타깃만 적으면 안 된다" 고
+  # 적어둔 그 자리인데, 계측을 붙였으므로 이제 타깃이 산다.
+  #
+  # 🔴 포트는 8000(앱 포트)이다. Spring 처럼 관리 포트를 따로 두지 않았으므로 «안 새는 근거» 도
+  #    다르다 — Spring 은 포트 경계, AI 는 **네트워크 경계**다(prod compose 가 이 포트를 호스트에
+  #    매핑하지 않고, 스크레이프는 같은 도커 네트워크 안에서만 풀린다).
+  # ⚠️ /metrics 는 AI 의 인증 미들웨어에서 열려 있다(PUBLIC_PATHS). 안 열면 401 이라 타깃이
+  #    영원히 DOWN 이 되는데, 그게 아래 블록이 경고하던 상태다.
+  - job_name: shadowfit-ai
+    static_configs:
+      - targets: ["shadowfit-ai:8000"]
+        labels:
+          application: shadowfit
+
 # 🔴 여기 없는 것 (의도적)
 #
-# - ai-server (FastAPI): Python 쪽에 지표 계측이 없다. prometheus-client 를 붙이는
-#   것은 별도 작업이고, 붙이지 않은 채 타깃만 적으면 영원히 DOWN 인 타깃이 하나
-#   생겨서 "관측 스택이 고장난 것처럼" 보인다.
+# - ~~ai-server (FastAPI)~~ → **2026-08-23 에 들어왔다** (#151). 계측이 0줄이라 뺐던 것인데,
+#   `prometheus-client` 와 /metrics 가 붙어 조건이 사라졌다. 남은 주의사항은 위 job 주석에 있다.
+#   ⚠️ 이 타깃도 obs 프로파일과 무관하게 **AI 컨테이너가 떠 있어야** UP 이다.
 #
 # 🔄 여기 있었다가 뒤집힌 것 — mysqld_exporter (2026-08-09)
 #
