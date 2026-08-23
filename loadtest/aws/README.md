@@ -296,7 +296,10 @@ ROLE=ai-venv bash bootstrap.sh
 
 ```bash
 cd /root/init
-nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py   --sessions 160 --dur 90 --pool 201   --plan "A,A@0.001,A,A@0.001" --discard 1   --out loadtest/results/frame-path-r10a-$(date +%F) > /root/r10a.log 2>&1 &
+nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py \
+  --sessions 160 --dur 90 --pool 201 \
+  --plan "B,A,B,A@0.001,B@0.001,B@0.001,A@0.001,B,A" --discard 1 \
+  --out loadtest/results/frame-path-r10a-$(date +%F) > /root/r10a.log 2>&1 &
 ```
 
 | | |

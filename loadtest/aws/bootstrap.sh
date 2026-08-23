@@ -331,14 +331,17 @@ PY
   cd $WORKDIR && \
   nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py \
     --sessions 160 --dur 90 --pool 201 \
-    --plan "A,A@0.001,A,A@0.001" --discard 1 \
+    --sessions 160 --dur 90 --pool 201     --plan "B,A,B,A@0.001,B@0.001,B@0.001,A@0.001,B,A" --discard 1 \
     --out loadtest/results/frame-path-r10a-\$(date +%F) > /root/r10a.log 2>&1 &
 
   🔴 규모는 **기존 라운드와 같은 조건**이라야 비교가 된다 — 160세션 · 90초 · 풀 201
      (ai-receive-path-scaling.md §8-2 표 · 풀 201 은 §「그러면 이게 결함 신호다」).
      rig 기본은 8세션 · 45초 · 풀=세션+4 라 **안 주면 다른 판이 된다.**
 
-  🔴 ON/OFF 앵커 판 한 장을 끼울 것 — 계측 대가(≤2.4%)를 이 박스에서도 확인하는 자리다.
+  🔴 팔 표기: A = 계측 OFF · B = 계측 ON · @<초> = GIL 스위치 간격.
+     위 판은 4칸(A · B · A@0.001 · B@0.001) × 2반복 + 버림 1 이고 **위치 합이 맞다.**
+     구간 비율·lease 는 B 에서만 걷힌다 — A 만으로 돌리면 판정선 셋 중 둘이 빈다.
+  🔴 규모를 안 주면 rig 기본(8세션·45초·풀=세션+4)으로 도는데, 그건 **다른 판**이다.
   🔴 handler_concurrency 는 이 판의 판정선이 아니다 — 부하기가 동거해서 절대값이 다친다(§7).
   ⚠️ nohup 없이 & 만 붙이면 SSH 가 끊길 때 같이 죽는다.
 EOF
