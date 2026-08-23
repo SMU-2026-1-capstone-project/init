@@ -1,6 +1,6 @@
 # AI 수평 확장 — 세션 상태를 누가 갖는가
 
-작성: 2026-08-23
+작성: 2026-08-23 · 갱신: 2026-08-23 (§5-5·§6-1 의 선결 [#206](https://github.com/Shadowfit/init/issues/206) 이 같은 날 닫혔다 — 값을 «예산» 으로 정하는 일만 남았다)
 상태: **분석/추천 — 결정 미확정** (결정 ✅ 는 사용자 confirm 후)
 범위: **AI 서버를 2대 이상으로 만드는 것**이 무엇을 요구하는지. Spring·DB 의 증설은 이 문서 밖이다(§6-3 에 경계만 적는다)
 연관: [`./ai-load-budget.md`](./ai-load-budget.md)(용량 가정과 실측 천장) · [`./ai-receive-path-scaling.md`](./ai-receive-path-scaling.md)(한 대 안에서의 천장 — **이 문서는 그 다음 칸이다**) · [`./session-resume-and-ai-state.md`](./session-resume-and-ai-state.md)(재부착 = 여기서 복구 원시함수로 승격된다) · [`./redis-adoption.md`](./redis-adoption.md)(«Redis 의 자리는 캐시가 아니라 상태» — 그 판단과 이어진다) · [`./ai-coresidency-capacity.md`](./ai-coresidency-capacity.md)
@@ -146,7 +146,7 @@ L4 로드밸런서 뒤에서는 **요청이 아니라 커넥션 단위로** 붙�
 | 2 | **세션 id 를 라우팅 키로 승격** | 어피니티는 그 위에 얹으면 된다(예: 프록시의 ring-hash). gRPC 쪽은 **메타데이터**에 실으면 되고, 그 배선은 이미 있다(correlation id 를 메타데이터로 흘린다) |
 | 3 | 🔴 **프레임 경로는 gRPC 가 아니다** | 프론트→AI 는 **HTTP POST** 이고, 지금 `sessionId` 가 **본문(JSON)** 에 있다. L7 해싱을 하려면 **헤더나 경로로 올려야** 한다 — 작지만 API 변경이고, 프론트와 같이 움직여야 한다 |
 | 4 | **«주소 하나» 가정을 깬다** | [#285](https://github.com/Shadowfit/init/issues/285) 가 정리한 `AI_SERVER_HOST` 는 한 곳을 가리킨다. N대가 되면 디스커버리 문제로 바뀐다 — 코드보다 설정 쪽 면적이다 |
-| 5 | **선결: [#206](https://github.com/Shadowfit/init/issues/206)(deadline 미전파)** | 홉이 하나 늘면 예산 미전파의 대가가 커진다. 프록시가 재시도하면 **뒤에서 일이 두 번 돈다** — 지금도 문제지만 그때는 증폭된다 |
+| 5 | ~~선결: [#206](https://github.com/Shadowfit/init/issues/206)(deadline 미전파)~~ → ✅ **닫혔다 (2026-08-23)** | 홉이 하나 늘면 예산 미전파의 대가가 커진다 — 프록시가 재시도하면 **뒤에서 일이 두 번 돈다**. 이제 AI→Spring 에 데드라인이 걸리고([#462](https://github.com/Shadowfit/init/pull/462)) 서버는 취소를 본다. 🔶 **다만 그 5초는 «hang 을 잡는 그물» 이지 «예산» 이 아니다** — 앱 경로 실측 p95 가 213ms 인데 5초는 그 20배가 넘는다. 프록시가 끼는 시점에 **예산으로 다시 정해야 한다**(그때 이 표의 이 줄이 다시 열린다) |
 
 ---
 
@@ -154,7 +154,8 @@ L4 로드밸런서 뒤에서는 **요청이 아니라 커넥션 단위로** 붙�
 
 ### 6-1. 선결 — 라우팅을 넣기 전에
 
-- [ ] [#206](https://github.com/Shadowfit/init/issues/206) gRPC 예산 전파 (§5-5)
+- [x] ~~[#206](https://github.com/Shadowfit/init/issues/206) gRPC 예산 전파~~ → ✅ **2026-08-23 닫힘**(A: [#462](https://github.com/Shadowfit/init/pull/462) · B 는 이미 닫혀 있었다).
+      🔶 남은 것은 «값을 예산으로 정하는 일» 이다 — §5-5 참고. 프록시 도입 시점에 다시 연다
 - [ ] `sessionId` 를 프레임 요청의 **헤더/경로**로 올리기 (§5-3) — 프론트 동반 변경
 - [ ] 재부착을 «앱 재시작» 용에서 **«인스턴스 사망» 복구**로 확장할 때 무엇이 더 필요한지 조사
       ([`session-resume-and-ai-state.md`](./session-resume-and-ai-state.md) §6-1 의 갈림길 7건 위에 얹는다)
