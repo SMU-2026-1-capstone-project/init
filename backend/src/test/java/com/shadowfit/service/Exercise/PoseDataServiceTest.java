@@ -438,13 +438,15 @@ class PoseDataServiceTest {
         // 세션이 파티션 경계에서 쪼개지지 않는 이유다.
         assertThat(rows).hasSize(1);
 
-        // 초 단위로 비교하는 것은 편의가 아니라 **DB 컬럼 정밀도** 때문이다. 운영 MySQL 의
-        // created_at 은 TIMESTAMP(소수 이하 0자리)이고 H2 는 마이크로초까지 잡는데, 자바
-        // LocalDateTime.now() 는 나노초를 갖는다. 어느 쪽이든 잘림은 **결정론적**이라 멱등에는
-        // 무해하다 — 재전송 때도 같은 값이 저장된다.
-        assertThat(((java.sql.Timestamp) rows.get(0).get("CREATED_AT")).toLocalDateTime()
-                        .truncatedTo(java.time.temporal.ChronoUnit.SECONDS))
-                .isEqualTo(session.getStartTime().truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
+        // 🔴 **정확히 같아야 한다** — 예전에는 여기서 초 단위로 잘라 비교했다. 운영 MySQL 의
+        // created_at 이 TIMESTAMP(소수 이하 0자리)인데 H2 는 마이크로초를 잡고 자바
+        // LocalDateTime.now() 는 나노초를 갖기 때문이었다.
+        //
+        // 이제 Session 의 @PrePersist 가 startTime 의 초 이하를 잘라(#446) 저장소가 무엇이든
+        // 값이 하나로 맞는다. 절삭 비교를 그대로 두면 «앵커가 어긋나도 통과하는» 단언이라,
+        // 정작 #392 의 등호 조회가 기대는 성질을 안 지킨다.
+        assertThat(((java.sql.Timestamp) rows.get(0).get("CREATED_AT")).toLocalDateTime())
+                .isEqualTo(session.getStartTime());
     }
 
     @Test

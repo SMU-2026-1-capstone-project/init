@@ -67,7 +67,7 @@ class SessionSyncStatsTest {
                 .analysisSupported(true).build());
         session = sessionRepository.saveAndFlush(Session.builder()
                 .member(member).exercise(exercise)
-                .startTime(LocalDateTime.now().withNano(0).minusMinutes(10))
+                .startTime(LocalDateTime.now().minusMinutes(10))
                 .status(Status.IN_PROGRESS).build());
     }
 

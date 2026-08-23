@@ -72,10 +72,10 @@ class PoseDataCleanupServiceTest {
         exerciseId = exercise.getId();
 
         targetSession = sessionRepository.saveAndFlush(Session.builder()
-                .member(member).exercise(exercise).startTime(LocalDateTime.now().withNano(0))
+                .member(member).exercise(exercise).startTime(LocalDateTime.now())
                 .status(Status.COMPLETED).totalReps(5).build());
         otherSession = sessionRepository.saveAndFlush(Session.builder()
-                .member(member).exercise(exercise).startTime(LocalDateTime.now().withNano(0))
+                .member(member).exercise(exercise).startTime(LocalDateTime.now())
                 .status(Status.COMPLETED).totalReps(5).build());
 
         poseDataRepository.saveAndFlush(PoseData.builder()
