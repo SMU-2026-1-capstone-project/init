@@ -263,23 +263,63 @@ if [ "$ROLE" = "ai-venv" ]; then
   step "파이썬 $AI_PY_VERSION — 버전이 측정 조건이다"
 
   AI_PY_BIN=${AI_PY:-}
+  if [ -n "$AI_PY_BIN" ] && [ ! -x "$AI_PY_BIN" ]; then
+    die "AI_PY 가 가리키는 것을 실행할 수 없다: $AI_PY_BIN"
+  fi
   if [ -z "$AI_PY_BIN" ]; then
     AI_PY_BIN=$(command -v "python$AI_PY_VERSION" 2>/dev/null || true)
   fi
+
+  _pyerr=""
   if [ -z "$AI_PY_BIN" ]; then
     echo "  python$AI_PY_VERSION 이 없다 — 배포판 패키지로 시도한다"
+
+    # 🔴 **인터프리터와 -devel 을 따로 깐다.** dnf·apt 는 트랜잭션이라 한 묶음으로 주면
+    #    부속 패키지가 없는 배포판에서 **인터프리터까지 같이 실패한다.**
+    #    2026-08-23 에 실제로 그랬다 — AL2023 저장소에 `python3.12` 가 **있는데도**
+    #    `python3.12-devel` 이 같이 묶여 있어서 둘 다 안 깔렸다.
+    # 🔴 **그리고 출력을 버리지 않는다.** 예전엔 `>/dev/null 2>&1 || true` 라 «왜 실패했는지»가
+    #    사라졌고, 게이트는 「손으로 깔아라」라고 말하는데 **정작 저장소엔 있었다.**
+    #    값이 아니라 사유를 들고 멈춰야 한다.
+    _pyerr=$(mktemp)
     if command -v dnf >/dev/null 2>&1; then
-      dnf -y install "python$AI_PY_VERSION" "python$AI_PY_VERSION-devel" >/dev/null 2>&1 || true
+      dnf -y install "python$AI_PY_VERSION" >"$_pyerr" 2>&1 || true
     else
-      apt-get install -y -qq "python$AI_PY_VERSION" "python$AI_PY_VERSION-venv" "python$AI_PY_VERSION-dev" >/dev/null 2>&1 || true
+      apt-get install -y -qq "python$AI_PY_VERSION" >"$_pyerr" 2>&1 || true
     fi
     AI_PY_BIN=$(command -v "python$AI_PY_VERSION" 2>/dev/null || true)
+
+    # 부속은 **있으면 좋은 것**이라 따로 깔고, 실패해도 넘어간다 — 다만 성격이 다르다:
+    #   · dnf 의 `-devel` : 휠이 없는 패키지를 소스 빌드할 때만 필요하다
+    #     (지금 requirements 는 mediapipe·opencv·numpy·grpcio 전부 cp312 휠이 있다)
+    #   · apt 의 `-venv`   : 없으면 **`-m venv` 자체가 안 돈다.** 이쪽은 사실상 필수다
+    if [ -n "$AI_PY_BIN" ]; then
+      if command -v dnf >/dev/null 2>&1; then
+        dnf -y install "python$AI_PY_VERSION-devel" >/dev/null 2>&1           || echo "  ⚠️ python$AI_PY_VERSION-devel 은 못 깔았다 — 휠로만 설치되면 문제없다"
+      else
+        apt-get install -y -qq "python$AI_PY_VERSION-venv" "python$AI_PY_VERSION-dev" >/dev/null 2>&1           || echo "  ⚠️ python$AI_PY_VERSION-venv/-dev 를 못 깔았다 — 아래 venv 생성이 실패하면 이것부터 볼 것"
+      fi
+    fi
   fi
+
+  if [ -z "$AI_PY_BIN" ] && [ -n "$_pyerr" ] && [ -s "$_pyerr" ]; then
+    echo >&2
+    echo "  ── 패키지 설치가 뱉은 것 (마지막 20줄) ─────────────────" >&2
+    tail -20 "$_pyerr" >&2
+    echo "  ────────────────────────────────────────────────────" >&2
+  fi
+  [ -z "$_pyerr" ] || rm -f "$_pyerr"
+
   [ -n "$AI_PY_BIN" ] || die "python$AI_PY_VERSION 을 못 구했다.
    🔴 **다른 버전으로 대신 돌리지 않는다** — 기준 관측이 python:3.12-slim 컨테이너의 것이고
       R10 이 재는 것이 GIL 거동이라, 버전이 다르면 비교 자체가 성립하지 않는다.
+   🔴 **위 «패키지 설치가 뱉은 것» 을 먼저 볼 것** — 저장소에 있는데 다른 이유로 실패했을 수 있다.
+      \`dnf list available 'python3.1*'\` (또는 \`apt-cache search '^python3\.1'\`) 로 확인한다.
    손으로 깔았으면 AI_PY=/경로/python3.12 로 줄 것.
-   (Ubuntu 22.04 기본 저장소엔 3.12 가 없다 — deadsnakes PPA 또는 pyenv 가 필요하다)"
+   (Ubuntu 22.04 기본 저장소엔 3.12 가 없다 — deadsnakes PPA·pyenv·uv 중 하나가 필요하다.
+    uv 면: curl -LsSf https://astral.sh/uv/install.sh | sh && uv python install 3.12
+    ⚠️ uv 는 python-build-standalone 을 준다 — 버전은 3.12 로 같지만 **빌드가 다르다.**
+       결과 문서 조건 칸에 \`python -VV\` 출력을 그대로 적을 것)"
   echo "  $AI_PY_BIN → $("$AI_PY_BIN" -V 2>&1)"
 
   # OpenCV 런타임 의존성. Dockerfile 이 libgl1·libglib2.0-0 을 까는 자리와 같다.
