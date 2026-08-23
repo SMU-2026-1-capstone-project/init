@@ -1,5 +1,9 @@
 package com.shadowfit.global.security.jwt;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.shadowfit.global.observability.CorrelationIds;
 import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.UserRole;
@@ -14,7 +18,11 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -43,6 +51,12 @@ class JwtAuthFilterTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        MDC.clear();
+    }
+
+    /** 체인 실행 «도중» 의 MDC actor 값을 잡아 두는 가짜 체인 — 필터가 끝난 뒤에는 지워지므로. */
+    private static FilterChain capturingActor(AtomicReference<String> sink) {
+        return (req, res) -> sink.set(MDC.get(CorrelationIds.ACTOR_MDC_KEY));
     }
 
     private CustomUserDetails userDetails() {
@@ -153,5 +167,120 @@ class JwtAuthFilterTest {
 
         verify(jwtUtil, never()).isValidToken(org.mockito.ArgumentMatchers.anyString());
         verify(chain, times(1)).doFilter(request, response);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // actor MDC (이슈 #395) · 토큰·이메일 로그 제거 (이슈 #411)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("인증되면 체인이 도는 동안 MDC actor 에 member_id 가 들어 있다 (#395)")
+    void authenticated_putsMemberIdInMdcDuringChain() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("PATCH", "/admin/exercises/1/thresholds");
+        request.addHeader("Authorization", "Bearer valid-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        AtomicReference<String> seen = new AtomicReference<>();
+
+        when(jwtUtil.isValidToken("valid-token")).thenReturn(true);
+        when(jwtUtil.getUserEmail("valid-token")).thenReturn("test@test.com");
+        when(customUserDetailsService.loadUserByUsername("test@test.com")).thenReturn(userDetails());
+
+        filter.doFilter(request, response, capturingActor(seen));
+
+        // member_id 다. 이메일이 아니다 — 로그는 유출 표면이라 되짚을 수만 있으면 된다.
+        assertThat(seen.get()).isEqualTo("1");
+        assertThat(seen.get()).doesNotContain("@");
+    }
+
+    @Test
+    @DisplayName("요청이 끝나면 MDC actor 가 지워진다 — 톰캣 워커 재사용으로 다음 요청에 새면 안 됨")
+    void afterRequest_actorIsCleared() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/sessions/1");
+        request.addHeader("Authorization", "Bearer valid-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(jwtUtil.isValidToken("valid-token")).thenReturn(true);
+        when(jwtUtil.getUserEmail("valid-token")).thenReturn("test@test.com");
+        when(customUserDetailsService.loadUserByUsername("test@test.com")).thenReturn(userDetails());
+
+        filter.doFilter(request, response, mock(FilterChain.class));
+
+        // 이게 깨지면 워커에 남은 actor 가 다음 요청 로그에 찍힌다 — SecurityConfig 가
+        // MODE_INHERITABLETHREADLOCAL 을 거부한 것과 같은 종류의 오염이다.
+        assertThat(MDC.get(CorrelationIds.ACTOR_MDC_KEY)).isNull();
+    }
+
+    @Test
+    @DisplayName("인증 안 된 요청은 actor 가 비어 있다 — 로그인·회원가입 경로의 정상 동작")
+    void unauthenticated_hasNoActor() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/member/login");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        AtomicReference<String> seen = new AtomicReference<>("sentinel");
+
+        filter.doFilter(request, response, capturingActor(seen));
+
+        assertThat(seen.get()).isNull();
+    }
+
+    @Test
+    @DisplayName("이전 요청의 actor 가 남아 있어도 인증 없는 요청이 그 값을 물려받지 않는다")
+    void unauthenticated_doesNotInheritStaleActor() throws Exception {
+        // 워커 재사용 상황을 직접 만든다: MDC 에 이전 요청 값이 남아 있는 채로 시작.
+        MDC.put(CorrelationIds.ACTOR_MDC_KEY, "999");
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/member/signup");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        AtomicReference<String> seen = new AtomicReference<>("sentinel");
+
+        filter.doFilter(request, response, capturingActor(seen));
+
+        // 체인이 도는 동안에는 지워져 있어야 한다 (withActor(null) 이 키를 remove 한다)...
+        assertThat(seen.get()).isNull();
+        // ...끝나면 원래 값으로 복원된다. Scope 의 계약이 «지운다» 가 아니라 «되돌린다» 라서다.
+        assertThat(MDC.get(CorrelationIds.ACTOR_MDC_KEY)).isEqualTo("999");
+    }
+
+    @Test
+    @DisplayName("인증 경로 로그에 토큰 원문도 이메일도 남지 않는다 (#411)")
+    void authLogs_containNeitherTokenNorEmail() throws Exception {
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        Logger filterLogger = (Logger) LoggerFactory.getLogger(JwtAuthFilter.class);
+        filterLogger.addAppender(appender);
+        appender.start();
+
+        try {
+            // 성공 · 무효 토큰 · 예외 — 로그가 나올 수 있는 세 갈래를 모두 태운다.
+            MockHttpServletRequest ok = new MockHttpServletRequest("GET", "/sessions/1");
+            ok.addHeader("Authorization", "Bearer valid-token");
+            when(jwtUtil.isValidToken("valid-token")).thenReturn(true);
+            when(jwtUtil.getUserEmail("valid-token")).thenReturn("test@test.com");
+            when(customUserDetailsService.loadUserByUsername("test@test.com")).thenReturn(userDetails());
+            filter.doFilter(ok, new MockHttpServletResponse(), mock(FilterChain.class));
+
+            MockHttpServletRequest bad = new MockHttpServletRequest("GET", "/sessions/1");
+            bad.addHeader("Authorization", "Bearer bad-token");
+            when(jwtUtil.isValidToken("bad-token")).thenReturn(false);
+            filter.doFilter(bad, new MockHttpServletResponse(), mock(FilterChain.class));
+
+            MockHttpServletRequest boom = new MockHttpServletRequest("GET", "/sessions/1");
+            boom.addHeader("Authorization", "Bearer boom-token");
+            when(jwtUtil.isValidToken("boom-token"))
+                    .thenThrow(new IllegalStateException("token=boom-token 이 섞인 예외 메시지"));
+            filter.doFilter(boom, new MockHttpServletResponse(), mock(FilterChain.class));
+
+            String logged = appender.list.stream()
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .reduce("", (a, b) -> a + " | " + b);
+
+            // 토큰 조각이 어디에도 없어야 한다 — 예외 메시지를 그대로 찍던 자리 포함.
+            assertThat(logged).doesNotContain("valid-token")
+                    .doesNotContain("bad-token")
+                    .doesNotContain("boom-token")
+                    .doesNotContain("Bearer");
+            // 이메일도 마찬가지.
+            assertThat(logged).doesNotContain("test@test.com").doesNotContain("@");
+        } finally {
+            filterLogger.detachAppender(appender);
+        }
     }
 }
