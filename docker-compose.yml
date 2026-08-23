@@ -76,10 +76,10 @@ services:
       AI_SERVER_GRPC_PORT: 8585
       JWT_SECRET: ${JWT_SECRET:-shadowfit-prod-secret-key-change-this}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      # 데드락 재시도 상한 (#276 ②). 🔴 기본값 2 는 실측으로 정한 값이고, 이 줄은 **측정용 손잡이**다 —
-      # 앱 경로에서 2 가 14~20% 를 남긴다는 것이 나왔고(r276-app-retry2-aws-2026-08-23) 3·4·5 를
-      # 재려면 재빌드 없이 팔을 바꿀 수 있어야 한다. 값을 바꾸는 것은 측정 조건이지 채택이 아니다.
-      SHADOWFIT_POSE_DEADLOCK_MAX_RETRIES: ${POSE_DEADLOCK_MAX_RETRIES:-2}
+      # 데드락 재시도 상한 (#276 ②). 기본 3 은 앱 경로 스윕으로 정한 값이다(2026-08-23 사용자 confirm,
+      # r276-ceiling-sweep-aws-2026-08-23: 상한 2 는 14.0% · 3 은 6.2% 를 남긴다).
+      # 이 줄은 **측정용 손잡이**이기도 하다 — 팔을 바꿔 돌릴 때 재빌드를 안 하려고 둔다.
+      SHADOWFIT_POSE_DEADLOCK_MAX_RETRIES: ${POSE_DEADLOCK_MAX_RETRIES:-3}
     depends_on:
       mysql:
         condition: service_healthy

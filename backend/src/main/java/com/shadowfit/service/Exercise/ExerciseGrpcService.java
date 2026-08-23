@@ -127,11 +127,31 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
      * 그런데 상수라 3·4·5 를 재려면 재빌드가 필요했고, 그 재빌드가 실험 자체를 막고 있었다
      * ({@code PoseDataService} 의 다운샘플 창이 같은 이유로 설정이 됐다).
      *
-     * <p>⚠️ 값을 바꾸는 것은 <b>측정 조건</b>이지 채택이 아니다. 기본 2 는 위 실측 그대로이고,
-     * 바꾸려면 앱 경로 스윕의 결과와 사용자 confirm 이 있어야 한다.
+     * <p>🔵 <b>2026-08-23: 기본값을 2 → 3 으로 올렸다</b>(사용자 confirm). 앱 경로에서 상한을
+     * 팔로 돌린 결과가 근거다({@code loadtest/results/r276-ceiling-sweep-aws-2026-08-23/} —
+     * 상한 4팔 × 4블록, 라틴 방격, 동시성 16):
+     *
+     * <pre>
+     *   상한 2   잔여 14.0%   retried 350      ← 옛 값
+     *   상한 3   잔여  6.2%   retried 331      ← 채택
+     *   상한 4   잔여  7.4%   retried 539
+     *   상한 5   잔여  4.2%   retried 551
+     * </pre>
+     *
+     * <b>뚜렷한 계단은 2→3 하나뿐이고</b>(절반 이하로 떨어진다), 3 은 추가 시도 수가 2 와
+     * 비슷하다(331 vs 350) — 즉 <b>공짜에 가까운 개선</b>이다. 4·5 는 눈에 띄게 더 던지는데
+     * (539·551) 잔여는 그만큼 안 줄어, 위쪽에서는 던지는 만큼 벌지 못한다.
+     *
+     * <p>🔶 <b>3·4·5 의 순위는 못 낸 상태다</b> — 팔당 3판이라 상한 4 의 산포(18·37·37)가 3 의
+     * 구간(30~36)과 겹친다. 잔여를 더 줄여야 하면 5 가 후보이고(21·21·22 로 가장 낮고 안정적),
+     * 그때는 DB 일이 1.7배가 되는 것을 받아들이는 결정이다.
+     *
+     * <p>🔴 <b>어느 값도 잔여를 0 으로 만들지 못한다.</b> 남는 것은 위층 — AI 재전송 3회 —
+     * 이 받는다. 사용자에게 유실이 되려면 <b>두 겹이 모두</b> 소진돼야 하고, 그 결합 확률은
+     * 아직 재지 않았다.
      */
-    @Value("${shadowfit.pose.deadlock.max-retries:2}")
-    private int deadlockMaxRetries = 2;   // 초기값도 둔다 — Spring 밖에서 만들면 0 이 되고, 그 0 은 «재시도 없음» 이다
+    @Value("${shadowfit.pose.deadlock.max-retries:3}")
+    private int deadlockMaxRetries = 3;   // 초기값도 둔다 — Spring 밖에서 만들면 0 이 되고, 그 0 은 «재시도 없음» 이다
 
     /**
      * pose_data 배치 저장을 데드락에 한해 다시 던진다.

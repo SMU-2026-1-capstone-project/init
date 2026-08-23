@@ -148,8 +148,11 @@ class ExerciseGrpcServiceTest {
 
         grpcService.savePoseDataBatch(request, obs);
 
-        // 첫 시도 + 재시도 2회 = 3. 그 이상 던지지 않는다
-        verify(poseDataService, times(3)).savePoseDataBatch(anyLong(), anyList());
+        // 첫 시도 + 재시도 **3회** = 4. 그 이상 던지지 않는다.
+        // 🔵 상한은 2026-08-23 에 2 → 3 으로 올라갔다(사용자 confirm) — 앱 경로 스윕에서
+        //    2 는 잔여 14.0%, 3 은 6.2% 였고 추가 시도 수는 비슷했다
+        //    (loadtest/results/r276-ceiling-sweep-aws-2026-08-23/).
+        verify(poseDataService, times(4)).savePoseDataBatch(anyLong(), anyList());
         ArgumentCaptor<Throwable> deadlockCaptor = ArgumentCaptor.forClass(Throwable.class);
         verify(obs).onError(deadlockCaptor.capture());
         assertThat(((StatusRuntimeException) deadlockCaptor.getValue()).getStatus().getCode())
