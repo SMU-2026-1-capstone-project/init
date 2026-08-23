@@ -185,8 +185,15 @@ public class ExerciseAnalysisService {
      *
      * @param sessionNonce {@code null} 이 아니다. 이 경로로 만들어진 세션은 항상 값을 갖는다
      *                     (NULL 인 것은 이 기능 배포 전에 시작된 세션뿐, V8 참조)
+     * @param startTime <b>저장된 값</b>이다 (#467). 예전엔 이 필드가 없어서 컨트롤러가 응답을
+     *                  만들며 {@code LocalDateTime.now()} 를 <b>새로 읽어</b> 실었고, 그러면
+     *                  세션이 저장된 시각과 클라가 받는 시각이 다른 {@code now()} 호출이 되어
+     *                  초 경계에서 1초 어긋났다(2026-08-23 실측: 응답 13:21:04 · DB 13:21:05).
+     *                  <p>표시용 시각이 아니라서 아프다 — 이 값은 {@code pose_data} 의 멱등
+     *                  앵커이자 파티션 키이고(#188 · #392), 리포트·재부착 조회가 <b>등호</b>로
+     *                  찾는 바로 그 값이다. 「받은 시각 = 저장된 시각」이 성립해야 한다.
      */
-    public record StartedSession(Long sessionId, String sessionNonce) {}
+    public record StartedSession(Long sessionId, String sessionNonce, LocalDateTime startTime) {}
 
     /**
      * [STEP 2: 운동 분석 시작 - Entry Point]
@@ -226,7 +233,11 @@ public class ExerciseAnalysisService {
                 }
         );
 
-        return new StartedSession(sessionId, savedSession.getSessionNonce());
+        // startTime 은 **저장된 엔티티에서** 꺼낸다 (#467). 여기서 now() 를 새로 읽으면
+        // 클라가 받는 값이 DB 와 갈린다 — Session 의 @PrePersist 가 초 이하를 자르므로(#446)
+        // 이 값은 이미 DB 에 박힌 것과 같은 값이다.
+        return new StartedSession(sessionId, savedSession.getSessionNonce(),
+                savedSession.getStartTime());
     }
 
     /**

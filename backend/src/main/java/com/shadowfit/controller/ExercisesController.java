@@ -15,7 +15,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 
 @Tag(name = "운동 분석", description = "운동 분석 및 세션 관리 API")
 @Slf4j
@@ -74,7 +73,11 @@ public class ExercisesController {
         ExercisesResponseDto response = ExercisesResponseDto.builder()
                 .sessionId(started.sessionId())
                 .exerciseId(dto.getExerciseId())
-                .startTime(LocalDateTime.now())
+                // 🔴 저장된 값을 그대로 싣는다 (#467). 예전엔 여기서 LocalDateTime.now() 를
+                //    **새로 읽었다** — 세션을 저장한 시각과 다른 now() 호출이라, 초 경계를
+                //    넘으면 클라가 받는 시각이 DB 와 1초 갈렸다(실측: 응답 13:21:04 · DB 05).
+                //    표시용 값이 아니라 pose_data 의 멱등 앵커라서(#188 · #392) 어긋나면 안 된다.
+                .startTime(started.startTime())
                 .status(Status.IN_PROGRESS)
                 .sessionNonce(started.sessionNonce())
                 .build();
