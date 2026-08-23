@@ -1,6 +1,6 @@
 # 프로덕션 레벨 점수를 올리려면 — 축별 작업 목록
 
-작성: 2026-08-09 12:42 · 갱신: 2026-08-09 (같은 날 2차 — **작성 3시간 만에 §4 의 1번이 닫혔다**, §2-1) · **2026-08-23 3차** (보안/운영 축 재점검 — §3-1 의 이슈 링크를 잇고 «닫혔는데 표에 안 반영된» 두 줄을 고쳤다. **점수는 안 건드렸다**)
+작성: 2026-08-09 12:42 · 갱신: 2026-08-09 (같은 날 2차 — **작성 3시간 만에 §4 의 1번이 닫혔다**, §2-1) · **2026-08-23 3차** (보안/운영 축 재점검 — §3-1 의 이슈 링크를 잇고, «닫혔는데 표에 안 반영된» 두 줄을 고치고, **표에 아예 없던 항목 셋**(#395·#405·#406)을 더했다. 그 셋 때문에 §3-1 머리의 «새로 찾을 것이 없다» 도 정정했다. **점수는 안 건드렸다**)
 상태: **분석/추천 — 미결정** (착수 순서·채택은 사용자 confirm 후 §6)
 범위: 프로젝트 전체(Spring·AI·프론트·배포). Spring 잔여 «기능» 은 [`28-remaining-work-plan.md`](./28-remaining-work-plan.md), AI 잔여는 [`30-ai-remaining-work.md`](./30-ai-remaining-work.md) 가 다룬다. **이 문서는 «기능» 이 아니라 «프로덕션으로서의 완성도» 를 다룬다**
 연관: [`../decisions/production-signal-checklist.md`](../decisions/production-signal-checklist.md)(기법 8개 적용 가능성) · [`../19-deployment.md`](../19-deployment.md) · [`../decisions/reverse-proxy-and-tls.md`](../decisions/reverse-proxy-and-tls.md) · [`../decisions/slo-baseline.md`](../decisions/slo-baseline.md)
@@ -70,7 +70,9 @@
 
 ### 3-1. 🔴 보안/인증 — 2 → 8 (가장 값싸고 가장 크게 움직인다)
 
-**전부 이미 이슈로 열려 있다. 새로 찾을 것이 없다.**
+~~**전부 이미 이슈로 열려 있다. 새로 찾을 것이 없다.**~~
+
+🔄 **2026-08-23 정정 — 그 문장이 틀렸다.** 재점검에서 **표에 없던 항목이 셋 나왔다**([#395](https://github.com/Shadowfit/init/issues/395) 감사 추적 · [#405](https://github.com/Shadowfit/init/issues/405) protobuf · [#406](https://github.com/Shadowfit/init/issues/406) Dependabot 커버리지). 원문이 틀린 이유가 뚜렷하다 — **재고표를 «이슈» 에서만 봤다.** 감사 추적은 애초에 아무 데도 없었고, 뒤 둘은 **경고(Dependabot alerts)에만 있었다.** 이슈가 재고표의 전부가 아니다.
 
 | | 항목 | 왜 |
 |:--:|---|---|
@@ -82,6 +84,8 @@
 | 🔶 | [#149](https://github.com/Shadowfit/init/issues/149) CORS `*` + credentials | **절반만 닫혔다 (2026-08-09).** PATCH 누락(버그)은 닫혔고 **오리진 하드닝은 열려 있다** — `WebConfig.java:13-16` 이 아직 `allowedOriginPatterns("*")` + `allowCredentials(true)` 다(2026-08-23 재확인). ⚠️ 심각도는 §2-1 의 근거대로 낮게 잡는다 — 인증이 `Authorization: Bearer` 고 backend main 에 `Cookie` 사용이 0건이라 **«지금 뚫린다» 가 아니라 «쿠키를 쓰는 순간 뚫린다»** 다. 🔴 하드닝 쪽은 열린 이슈가 없다 |
 | 🔶 | [#394](https://github.com/Shadowfit/init/issues/394) Rate limit | 🔄 **이슈로 등록됨 (2026-08-23)** — 그전까지 이 표에만 있고 재고표 밖이었다. [`../19-deployment.md`](../19-deployment.md) §6 `TODO`. 리버스 프록시를 넣으면 앱 코드 없이 닫힌다([`../decisions/reverse-proxy-and-tls.md`](../decisions/reverse-proxy-and-tls.md) §4) — ⚠️ 다만 **그 해법은 호스트 결정에 종속**이라, 이슈는 «호스트 무관» 인 앱 레벨을 먼저 추천한다. 값(N회/분)은 근거가 없어 이슈에서도 비워뒀다 |
 | 🔴 | [#395](https://github.com/Shadowfit/init/issues/395) 관리자 변경에 **감사 추적이 없다** | 🆕 **2026-08-23 신규.** 관리자 쓰기 5개(`AdminExerciseController`)가 남기는 것이 stdout 한 줄이고 **그 줄에 «누가» 가 없다** — MDC 키가 `cid`·`sessionId` 둘뿐이고 `BaseTimeEntity` 에 `@CreatedBy` 도 없다. 급소는 `thresholds` — [#234](https://github.com/Shadowfit/init/issues/234) 가 «정답지가 흔들리면 점수 ±1.3» 을 재놓은 그 값이다. §3-3 의 로그 집계 결손과 **같은 구멍**이다 |
+| 🔴 | [#406](https://github.com/Shadowfit/init/issues/406) **Dependabot 이 3개 중 backend 하나만 덮는다** | 🆕 **2026-08-23 신규.** 열린 경고 **33건**(high 21) 중 **23건이 frontend(npm 22)·ai-server(pip 1)** 인데 `.github/dependabot.yml` 의 `updates` 항목은 gradle 하나뿐이라 **상향 PR 이 안 온다.** [#151](https://github.com/Shadowfit/init/issues/151) 「관측이 Spring 하나만 덮는다」와 **같은 구조**다. ⚠️ 33건의 도달 가능성은 안 봤다 — 이 항목이 말하는 것은 「자동 경로가 없다」까지 |
+| 🔴 | [#405](https://github.com/Shadowfit/init/issues/405) **protobuf CVE-2026-0994 가 열려 있다** | 🆕 **2026-08-23 신규.** [#6](https://github.com/Shadowfit/init/issues/6) 이 닫히며 `protobuf==4.25.8` 이 들어갔는데 **그 시각 경고는 둘이었고 4.25.8 은 하나만 끈다.** 남은 쪽은 `< 5.29.6` 이라 **4.x 백포트가 없고**, `grpcio-tools 1.62.3` 이 `protobuf <5.0dev` 를 요구해 **gRPC 스택 동반 상향**이 된다. 🔴 다만 취약 경로가 JSON 파싱이라 **이 서비스가 밟는지 먼저 확인**하는 것이 추천이다 |
 | 🔶 | 시크릿 매니저 | 평문 `.env` → Vault/AWS Secrets Manager. **배포 호스트 결정에 종속** |
 
 > 📌 **8이 상한인 이유**: 침투 테스트를 받은 적도, 실제 공격을 겪은 적도 없다. 위를 다 닫아도 *"알려진 구멍이 없다"* 까지이고 *"검증됐다"* 는 아니다.
@@ -161,7 +165,7 @@
 |:--:|---|---|
 | ~~**1**~~ | ~~[#138](https://github.com/Shadowfit/init/issues/138)~~ | ✅ **닫힘 (`1b73ed2`)** — 예측(보안 2→5)이 맞았다 |
 | **1** | 배포 호스트 결정 | **작업이 아니라 결정**인데, 배포/운영 축 9항목 중 7개가 여기에 묶여 있다. 상한 대비 가장 많이 남은 축(1.5 → 7)이고 관측성 3항목도 여기 종속이다. 가장 오래 걸리는 건 여전히 코드가 아니라 결정이다 |
-| ~~**2**~~ | ~~#135·#137·#136~~ | ✅ **셋 다 닫힘 (2026-08-10)** — [`../decisions/token-lifecycle.md`](../decisions/token-lifecycle.md) §5. «같은 토큰 수명 영역이라 한 번에 보는 게 싸다» 는 예측이 맞았다: #135 를 넣고 나서야 #137 의 네 번째 선택지(«저장하지 않는다»)가 생겼고, #136 은 코드가 아니라 **정책 확정**으로 닫혔다.<br>🔶 **점수 재판정은 사용자 몫** — 이 축의 남은 항목은 #134(내부 토큰 앱 번들)·#149 오리진 하드닝·rate limit·시크릿 매니저이고, 뒤 둘은 **호스트 결정에 종속**이라 5 → 8 을 지금 다 채울 수는 없다.<br>🔄 **2026-08-23 갱신** — 이 문장 이후 #134 가 닫혔고, rate limit 은 [#394](https://github.com/Shadowfit/init/issues/394) 로, 새로 나온 감사 추적 공백은 [#395](https://github.com/Shadowfit/init/issues/395) 로 등록됐다. **점수는 여전히 안 건드린다** — 재판정은 사용자 몫이라는 위 문장 그대로다 |
+| ~~**2**~~ | ~~#135·#137·#136~~ | ✅ **셋 다 닫힘 (2026-08-10)** — [`../decisions/token-lifecycle.md`](../decisions/token-lifecycle.md) §5. «같은 토큰 수명 영역이라 한 번에 보는 게 싸다» 는 예측이 맞았다: #135 를 넣고 나서야 #137 의 네 번째 선택지(«저장하지 않는다»)가 생겼고, #136 은 코드가 아니라 **정책 확정**으로 닫혔다.<br>🔶 **점수 재판정은 사용자 몫** — 이 축의 남은 항목은 #134(내부 토큰 앱 번들)·#149 오리진 하드닝·rate limit·시크릿 매니저이고, 뒤 둘은 **호스트 결정에 종속**이라 5 → 8 을 지금 다 채울 수는 없다.<br>🔄 **2026-08-23 갱신** — 이 문장 이후 #134 가 닫혔고, rate limit 은 [#394](https://github.com/Shadowfit/init/issues/394) 로, 새로 나온 것 셋은 [#395](https://github.com/Shadowfit/init/issues/395)(감사 추적)·[#405](https://github.com/Shadowfit/init/issues/405)(protobuf)·[#406](https://github.com/Shadowfit/init/issues/406)(Dependabot 커버리지)로 등록됐다.<br>🔴 **남은 항목이 «5 → 8» 을 세울 때보다 늘었다** — 그때 셋(#134·#149 하드닝·rate limit·시크릿)이던 것이 지금 여섯이다. **점수는 여전히 안 건드린다**(재판정은 사용자 몫). 다만 재판정할 때 **분모가 달라졌다는 것**은 같이 볼 것 |
 | **3** | 아웃박스 실패 주입 테스트 | 포폴 서사가 «exactly-once» 를 말하는데 그걸 지탱하는 게 지금 주석뿐이다. **면접 답변이 바뀌는 항목** |
 | **4** | #148 · `application-prod.yml` 신설 | 호스트 없이도 지금 고칠 수 있는 배포 항목 둘. 특히 후자는 **`profiles.active: prod` 가 기본인데 파일이 없어 dev 설정으로 돈다** |
 | **5** | SLO 기준선 | 지표를 늘리기 전에 «얼마면 나쁜가» 가 먼저다. 순서가 뒤집히면 #151 을 채워도 판정에 못 쓴다 |
