@@ -22,6 +22,19 @@ CHURN=${CHURN:-25000}    # holed 팔이 넣었다 지우는 양
 KEEP_K=${KEEP_K:-8}      # 1/8 이 남아 구멍이 된다
 TARGET=${TARGET:-pholed} # 이 판에서 DROP 할 파티션 하나 (순서 교락 제거)
 
+# ── 잡음 줄이기 노브 (기본 끔 — 켜야만 동작이 바뀐다) ─────────────────────
+#
+# 🔴 2026-08-24 조용한 EC2 판(팔당 8)에서 **블록 안 «먼저 돈 판» 이 1.64배 느렸다.**
+#    팔 효과(중앙값 비 1.43x)보다 큰 잡음이라, 라틴 방격으로 편향은 막아도 **분산이 남아**
+#    n=8 에서 부호검정 p=0.29 로 못 갈랐다. 아래 둘이 그 잡음을 겨냥한다.
+#
+#   WARM_DROP=1  측정 전에 **빈 pmax 를 먼저 DROP** 한다. 그 판의 첫 DDL 이 무는 몫
+#                (MDL 획득·딕셔너리·버퍼풀 정리)을 측정 대상에서 떼어낸다.
+#   SETTLE_SEC=N 무대를 세운 뒤 N초 기다린다. 12.5만 행을 넣고 지운 직후라
+#                퍼지·플러시가 아직 도는데, 그게 DROP 과 같은 디스크를 친다.
+WARM_DROP=${WARM_DROP:-0}
+SETTLE_SEC=${SETTLE_SEC:-0}
+
 DB(){ docker exec -i shadowfit-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit -N -e "$1" 2>/dev/null; }
 trap 'echo; echo "=== 정리 ==="; DB "DROP TABLE IF EXISTS pq_t; DROP TABLE IF EXISTS pq_nums;" >/dev/null; echo "  pq_t·pq_nums 제거"' EXIT
 
@@ -74,6 +87,15 @@ for p in pholed pclean; do
 done
 
 echo
+if [ "${SETTLE_SEC:-0}" != "0" ]; then
+  echo "## [2-b] 안정화 ${SETTLE_SEC}초 — 방금 넣고 지운 것의 뒷정리가 DROP 과 같은 디스크를 친다"
+  DB "SELECT SLEEP($SETTLE_SEC);" >/dev/null
+fi
+if [ "${WARM_DROP:-0}" != "0" ]; then
+  wms=$(DB "SET @t0=NOW(6); ALTER TABLE pq_t DROP PARTITION pmax; SELECT ROUND(TIMESTAMPDIFF(MICROSECOND,@t0,NOW(6))/1000,1);")
+  echo "## [2-c] 예열 DROP (빈 pmax) — ${wms} ms. 이 판의 «첫 DDL» 몫을 여기서 떼어낸다"
+fi
+
 echo "## [3] DROP PARTITION 소요 — **한 판에 하나만** 잰다"
 #
 # 🔴 초판은 한 판에서 둘을 연달아 DROP 했는데, 스모크에서 **순서가 부호를 뒤집었다**:
