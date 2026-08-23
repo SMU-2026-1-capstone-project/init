@@ -439,8 +439,47 @@ phase_preflight() {
   note "WRITER_MAX_SEC=$WRITER_MAX_SEC (기본 5400 에서 상향됨)"
 
   preflight_tags
+  calibrate_box
 
   return $ok
+}
+
+# ── 축 0: 박스 보정 (#255) ────────────────────────────────────────────────
+#
+# 🔴 이 라운드의 판정에 안 쓰더라도 **무조건 남긴다.**
+#
+# #255 는 같은 구성이 라운드를 건너 처리량 +17.7% 인데 **AI CPU 는 같았다** — 즉 같은 CPU 로
+# 일을 덜 했다. `docker stats` 의 CPU% 는 «시간» 이지 «일의 양» 이 아니라서, 물리 호스트의
+# 유효 클럭이 다르면 그 서명이 그대로 나온다. 그걸 가르려면 **박스가 초당 얼마나 일하는지**를
+# 앱과 무관하게 재둔 값이 있어야 한다.
+#
+# 🔴 지금 그 값이 **어느 라운드에도 없다.** P6 1·2라운드의 보정값은 영영 못 얻는다 — 그 박스는
+#    사라졌다. 그래서 처방이 «지금부터 모든 라운드가 들고 다니게» 다
+#    (설계: docs/decisions/round-to-round-nonreproducibility.md §3 축 0).
+#
+# 비용은 라운드당 **10~20초**다. 실패해도 라운드를 막지 않는다 — 값이 없는 것과 라운드가
+# 죽는 것은 다른 일이다.
+calibrate_box() {
+  local py=python3 script=$ROOT/loadtest/calibrate_box.py
+  [ -x "$ROOT/ai-server/.venv/bin/python" ] && py=$ROOT/ai-server/.venv/bin/python
+  [ -f "$script" ] || { note "⚠️ 보정 스크립트가 없다 — 이 라운드는 축 0 이 빈다 (#255)"; return 0; }
+  mkdir -p "$OUTDIR"
+  local out=$OUTDIR/calibration.tsv before after
+  before=$( [ -f "$out" ] && wc -l < "$out" || echo 0 )
+  "$py" "$script" --tsv "$out" 2>&1 | sed 's/^/  /'
+  after=$( [ -f "$out" ] && wc -l < "$out" || echo 0 )
+
+  # 🔴 «돌았다» 와 «값이 생겼다» 는 다르다. 파이프 뒤 종료코드는 sed 의 것이고, 인터프리터가
+  #    아무것도 안 하고 0 으로 끝나는 경우도 있다(이 저장소의 로컬 박스에서 실제로 그랬다 —
+  #    `python3` 가 «Python» 한 줄만 찍고 종료). 그러면 「기록됨」이 거짓말이 된다.
+  #    **줄이 늘었는지로 판정한다.**
+  if [ "$after" -gt "$before" ]; then
+    note "축 0 기록됨 → $out ($((after-before))줄)"
+  else
+    note "⚠️ 보정이 값을 안 남겼다 ($py) — 값 없이 진행한다."
+    note "   🔴 **이 라운드는 비재현이 나와도 못 가른다** (#255 축 0)"
+  fi
+  return 0
 }
 
 # 축소 리허설. **여기서 실패하면 본 측정으로 넘어가지 않는다** — 그게 리허설의 존재 이유다.
