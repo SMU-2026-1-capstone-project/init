@@ -84,7 +84,7 @@ R10 이 읽으려는 것은 «CPU 총량과 그 분포» 다.
 P6 2라운드에서 **부하기만 `c7i.large`→`c7i.xlarge` 로 올렸더니 천장이 +17.7%** 움직였다.
 그런데 **AI CPU 는 869.3% → 869.0% 로 같았다** — 부하기 기아였다면 AI CPU 가 낮았어야 한다.
 **「부하기 CPU 포화는 아닌데 부하기 구성이 결과를 움직였다」**가 아직 안 풀린 채다
-([#255](https://github.com/Shadowfit/init/issues/255) · [P6-b §5](../../loadtest/results/coresidency-aws-b-2026-08-16/README.md)).
+([라운드 간 비재현](./round-to-round-nonreproducibility.md)([#498](https://github.com/Shadowfit/init/issues/498)) · [P6-b §5](../../loadtest/results/coresidency-aws-b-2026-08-16/README.md)).
 
 즉 이 프로젝트는 **부하기 구성이 결과를 움직인 전례를 갖고 있고, 그 기제를 모른다.**
 모르는 기제를 조작 변수로 새로 넣는 것이 1대 안의 실질적 비용이다.

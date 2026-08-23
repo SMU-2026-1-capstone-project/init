@@ -2,8 +2,9 @@
 
 작성일: 2026-08-23
 상태: **설계 — 미실행** (착수는 사용자 confirm 후)
-발단: [P6-b §5](../../loadtest/results/coresidency-aws-b-2026-08-16/README.md) · [#255](https://github.com/Shadowfit/init/issues/255) ·
-재고표 [AI 축 3번](./experiment-inventory.md)
+발단: [P6-b §5](../../loadtest/results/coresidency-aws-b-2026-08-16/README.md) · 재고표 [AI 축 3번](./experiment-inventory.md)
+추적: **[#498](https://github.com/Shadowfit/init/issues/498)**(설계 검토, OPEN) · [#496](https://github.com/Shadowfit/init/pull/496)(이 설계)
+🔴 **[#255](https://github.com/Shadowfit/init/issues/255) 는 이 문제가 아니다** — 같은 라운드에서 같이 나온 **부하기 샘플러 음수** 결함이고 **CLOSED** 다. 번호가 눌어붙어 여러 문서가 잘못 인용했다
 
 ---
 

@@ -131,7 +131,7 @@ loop_lag   p50 2.00 ms      ← 스케줄 대기
 ## 7. 정직하게 비어 있는 것
 
 - 🔴 **처리량이 R10-a 3fps 판(319.2 rps)보다 12.9% 높다**(360.3). 계측을 **켰는데** 더 빠르다 —
-  방향이 반대다. [#255](https://github.com/Shadowfit/init/issues/255)(라운드 간 비재현 +17.7%)의
+  방향이 반대다. [라운드 간 비재현](../../../docs/decisions/round-to-round-nonreproducibility.md)([#498](https://github.com/Shadowfit/init/issues/498), +17.7%)의
   크기와 같아서 **그것으로 보이지만 확인 못 했다.** 🔴 **판 간 절대값 비교는 여전히 못 한다**
 - **팔이 하나라 계측 ON/OFF 대조가 이 판에 없다.** R10-a 의 −1.27%(산포 이내)를 승계한다
 - **부하기가 동거한다** — R10-a 실측 0.24 vCPU

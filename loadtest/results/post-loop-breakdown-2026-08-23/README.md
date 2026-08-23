@@ -179,7 +179,7 @@ post_loop 20.32ms  /  클라 지연 443.6ms  =  4.6%
 - **응답 바디 크기를 안 남겼다** — 설계 §11-3 이 「같이 남긴다」로 적었는데 rig 에 안 넣었다.
   인코딩 비용이 거기 비례하므로 N↔J 해석의 근거가 하나 빈다
 - **`infer` 가 흔들린 것을 경합으로 읽었지만 안 쟀다**(§5)
-- **판 간 절대값 비교는 여전히 못 한다** — [#255](https://github.com/Shadowfit/init/issues/255)
+- **판 간 절대값 비교는 여전히 못 한다** — [라운드 간 비재현](../../../docs/decisions/round-to-round-nonreproducibility.md)([#498](https://github.com/Shadowfit/init/issues/498))
 
 ---
 
