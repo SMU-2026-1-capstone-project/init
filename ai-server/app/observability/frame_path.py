@@ -55,6 +55,25 @@ logger = logging.getLogger(__name__)
 #
 # ⚠️ `post` 는 **안 지운다** — R10-a 값과 비교가 되어야 하고, `post_app + post_loop = post` 가
 #    그 자체로 검산이다.
+# GIL 지연 히스토그램 경계(ms). 🔴 **바꾸면 과거 판과 비교가 끊긴다.**
+#
+# 🔑 요약값으로 못 하는 계산이 하나 있어서 있다:
+#
+#     P(대기 ≈ 바닥) = P(깰 때 GIL 이 놀고 있었다) = 1 − rho
+#
+# 그 여집합 `rho` 가 **모든 스레드의 GIL 총 점유율**이다. `main` 스레드 CPU 는 루프 몫만
+# 줘서 «하한» 인데, 이 비율은 **워커의 파이썬 몫까지** 포함한다 — `ai-receive-path-scaling.md`
+# §10-1 의 「1코어 상한에 붙었나」에 답하려면 그 총량이 필요하다.
+#
+# ⚠️ **평균으로는 못 한다.** 「대기 ~ uniform(0, switch interval)」 모델은 보유 구간이
+#    양자보다 짧으면 깨진다 — 짧은 파이썬 구간은 선점되기 전에 스스로 GIL 을 놓는다.
+#    비율은 보유 구간 길이와 **무관하게** 성립한다.
+#
+# 🔴 **이 값은 rho 의 «하한» 이다.** 오래 기다린 표본은 그만큼 표본을 적게 낳으므로
+#    (늦게 깨면 그 창의 표본 수가 준다) rho 가 낮게 나온다 —
+#    **높게 나오면 강한 증거, 낮게 나오면 약한 증거**다.
+GIL_BUCKETS_MS = (0.1, 0.15, 0.2, 0.3, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0)
+
 SPANS = (
     "wait", "decode", "lease", "infer",
     "post", "post_app", "post_loop",
@@ -123,6 +142,18 @@ class Recorder:
         # 이벤트 루프 지체 — 샘플러가 「자기가 늦게 깬 만큼」을 잰다(후보 ㄴ 보강).
         self.loop_lag_ms: list[float] = []
         self.loop_lag_max_ms = 0.0
+        # GIL 지연 프로브 — 「일 없는 스레드」가 깨어나기까지 (후보 ㄱ).
+        # `per-process-ceiling-cause.md` 축 5. 루프 지체와의 **차**가 요점이라 따로 담는다.
+        # 🔴 **링이다(먼저 온 것이 아니라 «최근» 을 남긴다).** 프로브는 초당 수백 번
+        #    찍어서 상한을 금방 채운다 — 「먼저 온 N개」로 두면 초기화 직후, 즉
+        #    **워밍업 구간**만 남고 정상 상태가 통째로 빠진다. `seen` 이 총 수다.
+        self.gil_lag_ms: list[float] = []
+        self._gil_pos = 0
+        # 🔑 히스토그램은 **링이 아니다** — 판 전체를 센다(링은 최근 창만 본다).
+        self.gil_hist = [0] * (len(GIL_BUCKETS_MS) + 1)
+        self.gil_lag_max_ms = 0.0
+        self.gil_samples = 0
+        self.gil_interval_ms = 0.0
 
     def record_pool(self, total: int, borrowed: int, waiting: int, lag_ms: float) -> None:
         """샘플러 전용. 요청 경로가 아니라 **주기 태스크**가 부른다."""
@@ -139,6 +170,23 @@ class Recorder:
                 self.loop_lag_max_ms = lag_ms
             if len(self.loop_lag_ms) < self._cap:
                 self.loop_lag_ms.append(lag_ms)
+
+    def record_gil(self, lag_ms: float, interval_sec: float) -> None:
+        """GIL 프로브 전용. **평범한 스레드**가 부른다(루프도 워커도 아니다)."""
+        with self._lock:
+            self.gil_samples += 1
+            self.gil_interval_ms = interval_sec * 1000.0
+            if lag_ms > self.gil_lag_max_ms:
+                self.gil_lag_max_ms = lag_ms
+            if len(self.gil_lag_ms) < self._cap:
+                self.gil_lag_ms.append(lag_ms)
+            else:                                   # 링 — 오래된 것부터 덮는다
+                self.gil_lag_ms[self._gil_pos] = lag_ms
+                self._gil_pos = (self._gil_pos + 1) % self._cap
+            b = 0
+            while b < len(GIL_BUCKETS_MS) and lag_ms > GIL_BUCKETS_MS[b]:
+                b += 1
+            self.gil_hist[b] += 1
 
     # --- 핫 경로 ---------------------------------------------------------
 
@@ -206,8 +254,27 @@ class Recorder:
             }
             lag = list(self.loop_lag_ms)
             lag_max = self.loop_lag_max_ms
+            gil = list(self.gil_lag_ms)
+            gil_max = self.gil_lag_max_ms
+            gil_seen = self.gil_samples
+            gil_iv = self.gil_interval_ms
+            gil_hist = list(self.gil_hist)
         out["loop_lag"] = _describe(lag, len(lag))
         out["loop_lag"]["max_ms"] = round(lag_max, 3)
+        # 🔴 `samples: 0` 이면 **프로브가 안 돈 것**이다 — 「GIL 대기 없음」이 아니다.
+        out["gil_lag"] = _describe(gil, gil_seen)
+        out["gil_lag"]["max_ms"] = round(gil_max, 3)
+        out["gil_lag"]["interval_ms"] = round(gil_iv, 3)
+        # 🔴 `n` 이 상한이면 분위수는 **최근 n개의 창**이지 판 전체가 아니다.
+        #    `seen` 과 다르면 그 사실을 명시한다 — 안 적으면 판 전체로 읽힌다.
+        out["gil_lag"]["windowed"] = gil_seen > len(gil)
+        # 🔑 히스토그램은 **판 전체**다(링과 달리 창이 아니다). 경계를 같이 낸다 —
+        #    숫자만 남기면 나중에 경계가 바뀌었을 때 조용히 어긋난다.
+        out["gil_lag"]["hist"] = {
+            "edges_ms": list(GIL_BUCKETS_MS),
+            "counts": gil_hist,
+            "total": sum(gil_hist),
+        }
         out["spans"] = {s: _describe(rings[s], seen[s]) for s in SPANS}
         return out
 
@@ -229,6 +296,11 @@ class Recorder:
             self.pool_samples = 0
             self.loop_lag_ms = []
             self.loop_lag_max_ms = 0.0
+            self.gil_lag_ms = []
+            self._gil_pos = 0
+            self.gil_hist = [0] * (len(GIL_BUCKETS_MS) + 1)
+            self.gil_lag_max_ms = 0.0
+            self.gil_samples = 0
 
 
 def _spans_of(tr: FrameTrace) -> dict[str, float]:
@@ -412,7 +484,40 @@ async def sample_pool(recorder: Recorder, interval: float = 0.02) -> None:
         )
 
 
+def probe_gil(recorder: Recorder, interval: float, stop: threading.Event) -> None:
+    """**일이 없는 평범한 스레드**에서 `sleep` 초과분을 잰다 (후보 ㄱ = GIL).
+
+    설계: `docs/decisions/per-process-ceiling-cause.md` 축 5.
+
+    🔑 왜 이게 GIL 을 가리키나 — 이 스레드는 깨어난 뒤 **아무 일도 안 한다.** 그래서
+       초과분에 남는 것은 (ㄱ) OS 타이머 해상도 + 스케줄 지연과 (ㄴ) **GIL 재획득 대기**
+       뿐이다. `sleep` 은 GIL 을 놓으므로, 다른 스레드가 GIL 을 오래 쥐면 그만큼 늦게 깬다.
+
+    ⚠️ **루프 지체(`sample_pool`)와의 차가 요점이다.** 루프는 «자기 일» 로도 늦는다 —
+       둘 다 늦으면 GIL, 루프만 늦으면 루프가 일이 많은 것이다. 한쪽만 보면 안 갈린다.
+
+    🔴 **무부하 바닥을 먼저 재야 한다.** (ㄱ)은 부하와 무관하게 깔려 있고, 리눅스에서
+       1ms `sleep` 은 놀아도 수십~수백 µs 늦는다. 그 값을 안 빼면 GIL 대기를 과대평가한다
+       — 판마다 「부하 전 N초」를 같은 프로브로 걷고 그 차를 보는 것이 계약이다.
+
+    🔑 **표본 수 자체가 두 번째 신호다.** 경합이 심하면 프로브가 굶어 덜 깬다 — 로컬 3초
+       검증에서 무부하 2,133회(평균 0.394ms) 대 GIL 경합 131회(평균 23.194ms)였다. 기대
+       표본(`구간초/interval`) 대비 모자란 만큼이 곧 「깨우지도 못했다」이므로, 평균만 보고
+       `n` 을 안 보면 심한 경합을 오히려 작게 읽는다.
+
+    ⚠️ 프로브 자신이 초당 `1/interval` 번 GIL 을 집는다. 그래서 이건 **별도 플래그**이고,
+       프로브 ON/OFF 대조로 자기 몫을 뺄 수 있게 뒀다(`GIL_PROBE_INTERVAL`).
+    """
+    logger.info("🔬 GIL 지연 프로브 시작 — %.1fms 주기", interval * 1000.0)
+    while not stop.is_set():
+        t0 = time.perf_counter()
+        time.sleep(interval)
+        lag_ms = max(0.0, (time.perf_counter() - t0 - interval) * 1000.0)
+        recorder.record_gil(lag_ms, interval)
+    logger.info("🔬 GIL 지연 프로브 종료")
+
 router = APIRouter(prefix="/diag", tags=["진단"])
+
 
 
 @router.get("/frame-path")

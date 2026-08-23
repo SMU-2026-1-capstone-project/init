@@ -16,7 +16,7 @@
 🔴 **두 세션이 2분 차로 각자 인스턴스를 띄웠다.** 중복이었고 비용도 두 배였다.
 결과적으로 **독립 반복 두 벌**이 생겼고, 그것이 정본 문서 §5 의 근거가 됐다 —
 **다섯 팔 전부에서 처리량이 +16.6~17.5% 갈렸는데 AI CPU 는 같았다.**
-[#255](https://github.com/Shadowfit/init/issues/255) 의 서명이 «같은 시각·다른 박스» 에서 재현된 것이다.
+[라운드 간 비재현](../../../docs/decisions/round-to-round-nonreproducibility.md)([#498](https://github.com/Shadowfit/init/issues/498)) 의 서명이 «같은 시각·다른 박스» 에서 재현된 것이다.
 
 ## 이 박스의 값 (요약)
 
