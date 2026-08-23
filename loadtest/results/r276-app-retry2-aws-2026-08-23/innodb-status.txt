@@ -1,0 +1,322 @@
+*************************** 1. row ***************************
+InnoDB
+
+
+=====================================
+2026-08-23 14:56:24 140380643202624 INNODB MONITOR OUTPUT
+=====================================
+Per second averages calculated from the last 18 seconds
+-----------------
+BACKGROUND THREAD
+-----------------
+srv_master_thread loops: 37 srv_active, 0 srv_shutdown, 161 srv_idle
+srv_master_thread log flush and writes: 0
+----------
+SEMAPHORES
+----------
+OS WAIT ARRAY INFO: reservation count 47134
+OS WAIT ARRAY INFO: signal count 34367
+RW-shared spins 0, rounds 0, OS waits 0
+RW-excl spins 0, rounds 0, OS waits 0
+RW-sx spins 0, rounds 0, OS waits 0
+Spin rounds per wait: 0.00 RW-shared, 0.00 RW-excl, 0.00 RW-sx
+------------------------
+LATEST DETECTED DEADLOCK
+------------------------
+2026-08-23 14:56:23 140382227158592
+*** (1) TRANSACTION:
+TRANSACTION 15333, ACTIVE 0 sec inserting
+mysql tables in use 1, locked 1
+LOCK WAIT 9 lock struct(s), heap size 1128, 6 row lock(s)
+MySQL thread id 29, OS thread handle 140382151616064, query id 68766 172.18.0.4 shadowfit update
+INSERT INTO pose_data (session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, smoothed_knee_angle, feedback_message, created_at) VALUES (993, 0, 0.0, '[{"x":0.3,"y":0.2,"z":-0.25,"visibility":0.85},{"x":0.3028,"y":0.2714,"z":-0.2045,"visibility":0.86155},{"x":0.3056,"y":0.3428,"z":-0.159,"visibility":0.8731},{"x":0.3084,"y":0.4142,"z":-0.1135,"visibility":0.88465},{"x":0.3112,"y":0.4856,"z":-0.068,"visibility":0.8962},{"x":0.314,"y":0.557,"z":-0.0225,"visibility":0.90775},{"x":0.3168,"y":0.6284,"z":0.023,"visibility":0.9193},{"x":0.3196,"y":0.6998,"z":0.0685,"visibility":0.93085},{"x":0.3224,"y":0.7712,"z":0.114,"visibility":0.9424},{"x":0.3252,"y":0.2426,"z":0.1595,"visibility":0.95395},{"x":0.328,"y":0.314,"z":0.205,"visibility":0.9655},{"x":0.3308,"y":0.3854,"z":-0.2495,"visibility":0.97705},{"x":0.3336,"y":0.4568,"z":-0.204,"visibility":0.9886},{"x":0.3364,"y":0.5282,"z":-0.1585,"visibility":0.85015},{"x":0.3392,"y":0.5996,"z":-0.113,"visibility":0.8617},{"x":0.342,"y":0.671,"z":-0.0675,"visibility":0.87325},{"x":0.3448,"y":0.7424,"z":-0.022,"visibility":0.8848},{"x":0.3476,"y":0.2138,"z":0.0235,"visibility":0.89635},{"x":0.3504,"y":0.2852,"z":0.069,"visibility":0.9079},{"x":0.3532,"y":0.3566,"z":0.1145,"visibility":0.91945},{"x":0.356,"y":0.428,"z":0.16,"visibility":0.931},{"x":0.3588,"y":0.4994,"z":0.2055,"visibility":0.94255},{"x":0.3616,"y":0.5708,"z":-0.249,"visibility":0.9541},{"x":0.3644,"y":0.6422,"z":-0.2035,"visibility":0.96565},{"x":0.3672,"y":0.7136,"z":-0.158,"visibility":0.9772},{"x":0.37,"y":0.785,"z":-0.1125,"visibility":0.98875},{"x":0.3728,"y":0.2564,"z":-0.067,"visibility":0.8503},{"x":0.3756,"y":0.3278,"z":-0.0215,"visibility":0.86185},{"x":0.3784,"y":0.3992,"z":0.024,"visibility":0.8734},{"x":0.3812,"y":0.4706,"z":0.0695,"visibility":0.88495},{"x":0.384,"y":0.542,"z":0.115,"visibility":0.8965},{"x":0.3868,"y":0.6134,"z":0.1605,"visibility":0.90805},{"x":0.3896,"y":0.6848,"z":0.206,"visibility":0.9196}]', 45.0, 0.0, '', '2026-05-28 10:00:00'),(993, 0, 0.5, '[{"x":0.362,"y":0.581,"z":-0.2425,"visibility":0.95575},{"x":0.3648,"y":0.6524,"z":-0.197,"visibility":0.9673},{"x":0.3676,"y":0.7238,"z":-0.1515,"visibility":0.97885},{"x":0.3704,"y":0.7952,"z":-0.106,"visibility":0.9904},{"x":0.3732,"y":0.2666,"z":-0.0605,"visibility":0.85195},{"x":0.376,"y":0.338,"z":-0.015,"visibility":0.8635},{"x":0.3788,"y":0.4094,"z":0.0305,"visibility":0.87505},{"x":0.3816,"y":0.4808,"z":0.076,"visibility":0.8866},{"x":0.3844,"y":0.5522,"z":0.1215,"visibility":0.89815},{"x":0.3872,"y":0.6236,"z":0.167,"visibility":0.9097},{"x":0.39,"y":0.695,"z":0.2125,"visibility":0.92125},{"x":0.3928,"y":0.7664,"z":-0.242,"visibility":0.9328},{"x":0.3956,"y":0.2378,"z":-0.1965,"visibility":0.94435},{"x":0.3984,"y":0.3092,"z":-0.151,"visibility":0.9559},{"x":0.4012,"y":0.3806,"z":-0.1055,"visibility":0.96745},{"x":0.404,"y":0.452,"z":-0.06,"visibility":0.979},{"x":0.4068,"y":0.5234,"z":-0.0145,"visibility":0.99055},{"x":0.4096,"y":0.5948,"z":0.031
+
+*** (1) HOLDS THE LOCK(S):
+RECORD LOCKS space id 12 page no 307 n bits 80 index PRIMARY of table `shadowfit`.`pose_data` /* Partition `p2026_05` */ trx id 15333 lock_mode X
+Record lock, heap no 1 PHYSICAL RECORD: n_fields 1; compact format; info bits 0
+ 0: len 8; hex 73757072656d756d; asc supremum;;
+
+
+*** (1) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 12 page no 307 n bits 80 index PRIMARY of table `shadowfit`.`pose_data` /* Partition `p2026_05` */ trx id 15333 lock_mode X insert intention waiting
+Record lock, heap no 1 PHYSICAL RECORD: n_fields 1; compact format; info bits 0
+ 0: len 8; hex 73757072656d756d; asc supremum;;
+
+
+*** (2) TRANSACTION:
+TRANSACTION 15310, ACTIVE 0 sec inserting
+mysql tables in use 1, locked 1
+LOCK WAIT 17 lock struct(s), heap size 3488, 7 row lock(s)
+MySQL thread id 38, OS thread handle 140380647429696, query id 68652 172.18.0.4 shadowfit update
+INSERT INTO pose_data (session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, smoothed_knee_angle, feedback_message, created_at) VALUES (973, 0, 0.0, '[{"x":0.3,"y":0.2,"z":-0.25,"visibility":0.85},{"x":0.3028,"y":0.2714,"z":-0.2045,"visibility":0.86155},{"x":0.3056,"y":0.3428,"z":-0.159,"visibility":0.8731},{"x":0.3084,"y":0.4142,"z":-0.1135,"visibility":0.88465},{"x":0.3112,"y":0.4856,"z":-0.068,"visibility":0.8962},{"x":0.314,"y":0.557,"z":-0.0225,"visibility":0.90775},{"x":0.3168,"y":0.6284,"z":0.023,"visibility":0.9193},{"x":0.3196,"y":0.6998,"z":0.0685,"visibility":0.93085},{"x":0.3224,"y":0.7712,"z":0.114,"visibility":0.9424},{"x":0.3252,"y":0.2426,"z":0.1595,"visibility":0.95395},{"x":0.328,"y":0.314,"z":0.205,"visibility":0.9655},{"x":0.3308,"y":0.3854,"z":-0.2495,"visibility":0.97705},{"x":0.3336,"y":0.4568,"z":-0.204,"visibility":0.9886},{"x":0.3364,"y":0.5282,"z":-0.1585,"visibility":0.85015},{"x":0.3392,"y":0.5996,"z":-0.113,"visibility":0.8617},{"x":0.342,"y":0.671,"z":-0.0675,"visibility":0.87325},{"x":0.3448,"y":0.7424,"z":-0.022,"visibility":0.8848},{"x":0.3476,"y":0.2138,"z":0.0235,"visibility":0.89635},{"x":0.3504,"y":0.2852,"z":0.069,"visibility":0.9079},{"x":0.3532,"y":0.3566,"z":0.1145,"visibility":0.91945},{"x":0.356,"y":0.428,"z":0.16,"visibility":0.931},{"x":0.3588,"y":0.4994,"z":0.2055,"visibility":0.94255},{"x":0.3616,"y":0.5708,"z":-0.249,"visibility":0.9541},{"x":0.3644,"y":0.6422,"z":-0.2035,"visibility":0.96565},{"x":0.3672,"y":0.7136,"z":-0.158,"visibility":0.9772},{"x":0.37,"y":0.785,"z":-0.1125,"visibility":0.98875},{"x":0.3728,"y":0.2564,"z":-0.067,"visibility":0.8503},{"x":0.3756,"y":0.3278,"z":-0.0215,"visibility":0.86185},{"x":0.3784,"y":0.3992,"z":0.024,"visibility":0.8734},{"x":0.3812,"y":0.4706,"z":0.0695,"visibility":0.88495},{"x":0.384,"y":0.542,"z":0.115,"visibility":0.8965},{"x":0.3868,"y":0.6134,"z":0.1605,"visibility":0.90805},{"x":0.3896,"y":0.6848,"z":0.206,"visibility":0.9196}]', 45.0, 0.0, '', '2026-05-28 10:00:00'),(973, 0, 0.5, '[{"x":0.362,"y":0.581,"z":-0.2425,"visibility":0.95575},{"x":0.3648,"y":0.6524,"z":-0.197,"visibility":0.9673},{"x":0.3676,"y":0.7238,"z":-0.1515,"visibility":0.97885},{"x":0.3704,"y":0.7952,"z":-0.106,"visibility":0.9904},{"x":0.3732,"y":0.2666,"z":-0.0605,"visibility":0.85195},{"x":0.376,"y":0.338,"z":-0.015,"visibility":0.8635},{"x":0.3788,"y":0.4094,"z":0.0305,"visibility":0.87505},{"x":0.3816,"y":0.4808,"z":0.076,"visibility":0.8866},{"x":0.3844,"y":0.5522,"z":0.1215,"visibility":0.89815},{"x":0.3872,"y":0.6236,"z":0.167,"visibility":0.9097},{"x":0.39,"y":0.695,"z":0.2125,"visibility":0.92125},{"x":0.3928,"y":0.7664,"z":-0.242,"visibility":0.9328},{"x":0.3956,"y":0.2378,"z":-0.1965,"visibility":0.94435},{"x":0.3984,"y":0.3092,"z":-0.151,"visibility":0.9559},{"x":0.4012,"y":0.3806,"z":-0.1055,"visibility":0.96745},{"x":0.404,"y":0.452,"z":-0.06,"visibility":0.979},{"x":0.4068,"y":0.5234,"z":-0.0145,"visibility":0.99055},{"x":0.4096,"y":0.5948,"z":0.031
+
+*** (2) HOLDS THE LOCK(S):
+RECORD LOCKS space id 12 page no 307 n bits 80 index PRIMARY of table `shadowfit`.`pose_data` /* Partition `p2026_05` */ trx id 15310 lock_mode X
+Record lock, heap no 1 PHYSICAL RECORD: n_fields 1; compact format; info bits 0
+ 0: len 8; hex 73757072656d756d; asc supremum;;
+
+
+*** (2) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 12 page no 307 n bits 80 index PRIMARY of table `shadowfit`.`pose_data` /* Partition `p2026_05` */ trx id 15310 lock_mode X insert intention waiting
+Record lock, heap no 1 PHYSICAL RECORD: n_fields 1; compact format; info bits 0
+ 0: len 8; hex 73757072656d756d; asc supremum;;
+
+*** WE ROLL BACK TRANSACTION (1)
+------------
+TRANSACTIONS
+------------
+Trx id counter 15336
+Purge done for trx's n:o < 15336 undo n:o < 0 state: running but idle
+History list length 106
+LIST OF TRANSACTIONS FOR EACH SESSION:
+---TRANSACTION 421860050439216, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050438408, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050437600, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050436792, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050435984, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050435176, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050434368, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050433560, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050432752, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050431944, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050431136, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050430328, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050429520, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050428712, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050427904, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050427096, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050426288, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421860050425480, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+--------
+FILE I/O
+--------
+I/O thread 0 state: waiting for completed aio requests (insert buffer thread)
+I/O thread 1 state: waiting for completed aio requests (read thread)
+I/O thread 2 state: waiting for completed aio requests (read thread)
+I/O thread 3 state: waiting for completed aio requests (read thread)
+I/O thread 4 state: waiting for completed aio requests (read thread)
+I/O thread 5 state: waiting for completed aio requests (write thread)
+I/O thread 6 state: waiting for completed aio requests (write thread)
+I/O thread 7 state: waiting for completed aio requests (write thread)
+I/O thread 8 state: waiting for completed aio requests (write thread)
+Pending normal aio reads: [0, 0, 0, 0] , aio writes: [0, 0, 0, 0] ,
+ ibuf aio reads:
+Pending flushes (fsync) log: 0; buffer pool: 0
+1318 OS file reads, 53774 OS file writes, 20541 OS fsyncs
+0.00 reads/s, 0 avg bytes/read, 1767.80 writes/s, 645.05 fsyncs/s
+-------------------------------------
+INSERT BUFFER AND ADAPTIVE HASH INDEX
+-------------------------------------
+Ibuf: size 1, free list len 0, seg size 2, 0 merges
+merged operations:
+ insert 0, delete mark 0, delete 0
+discarded operations:
+ insert 0, delete mark 0, delete 0
+Hash table size 553253, node heap has 4 buffer(s)
+Hash table size 553253, node heap has 1 buffer(s)
+Hash table size 553253, node heap has 2 buffer(s)
+Hash table size 553253, node heap has 1 buffer(s)
+Hash table size 553253, node heap has 1 buffer(s)
+Hash table size 553253, node heap has 1 buffer(s)
+Hash table size 553253, node heap has 1 buffer(s)
+Hash table size 553253, node heap has 1 buffer(s)
+2578.19 hash searches/s, 13772.68 non-hash searches/s
+---
+LOG
+---
+Log capacity                 104857600
+Log capacity used            104857600
+Log sequence number          181511370
+Log buffer assigned up to    181511370
+Log buffer completed up to   181511370
+Log written up to            181511370
+Log flushed up to            181511370
+Added dirty pages up to      181511370
+Pages flushed up to          158058139
+Last checkpoint at           145139111
+Log minimum file id is       33
+Log maximum file id is       55
+39321 log i/o's done, 1278.26 log i/o's/second
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+Total large memory allocated 0
+Dictionary memory allocated 941354
+Buffer pool size   131061
+Free buffers       128796
+Database pages     2253
+Old database pages 0
+Modified db pages  807
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 1293, created 974, written 11108
+0.00 reads/s, 2.72 creates/s, 350.22 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 2253, unzip_LRU len: 0
+I/O sum[79936]:cur[0], unzip sum[0]:cur[0]
+----------------------
+INDIVIDUAL BUFFER POOL INFO
+----------------------
+---BUFFER POOL 0
+Buffer pool size   16382
+Free buffers       16024
+Database pages     357
+Old database pages 0
+Modified db pages  135
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 266, created 96, written 1556
+0.00 reads/s, 0.00 creates/s, 47.84 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 357, unzip_LRU len: 0
+I/O sum[9992]:cur[0], unzip sum[0]:cur[0]
+---BUFFER POOL 1
+Buffer pool size   16384
+Free buffers       15938
+Database pages     444
+Old database pages 0
+Modified db pages  80
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 229, created 215, written 1351
+0.00 reads/s, 0.60 creates/s, 38.98 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 444, unzip_LRU len: 0
+I/O sum[9992]:cur[0], unzip sum[0]:cur[0]
+---BUFFER POOL 2
+Buffer pool size   16382
+Free buffers       16100
+Database pages     280
+Old database pages 0
+Modified db pages  73
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 68, created 212, written 1133
+0.00 reads/s, 0.00 creates/s, 33.82 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 280, unzip_LRU len: 0
+I/O sum[9992]:cur[0], unzip sum[0]:cur[0]
+---BUFFER POOL 3
+Buffer pool size   16383
+Free buffers       16232
+Database pages     150
+Old database pages 0
+Modified db pages  45
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 63, created 87, written 700
+0.00 reads/s, 0.22 creates/s, 22.83 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 150, unzip_LRU len: 0
+I/O sum[9992]:cur[0], unzip sum[0]:cur[0]
+---BUFFER POOL 4
+Buffer pool size   16382
+Free buffers       16185
+Database pages     196
+Old database pages 0
+Modified db pages  92
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 70, created 126, written 1379
+0.00 reads/s, 0.00 creates/s, 43.00 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 196, unzip_LRU len: 0
+I/O sum[9992]:cur[0], unzip sum[0]:cur[0]
+---BUFFER POOL 5
+Buffer pool size   16382
+Free buffers       16156
+Database pages     225
+Old database pages 0
+Modified db pages  108
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 162, created 66, written 1477
+0.00 reads/s, 0.00 creates/s, 45.94 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 225, unzip_LRU len: 0
+I/O sum[9992]:cur[0], unzip sum[0]:cur[0]
+---BUFFER POOL 6
+Buffer pool size   16382
+Free buffers       16109
+Database pages     272
+Old database pages 0
+Modified db pages  117
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 192, created 86, written 1802
+0.00 reads/s, 0.00 creates/s, 61.05 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 272, unzip_LRU len: 0
+I/O sum[9992]:cur[0], unzip sum[0]:cur[0]
+---BUFFER POOL 7
+Buffer pool size   16384
+Free buffers       16052
+Database pages     329
+Old database pages 0
+Modified db pages  157
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 243, created 86, written 1710
+0.00 reads/s, 1.90 creates/s, 56.76 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 329, unzip_LRU len: 0
+I/O sum[9992]:cur[0], unzip sum[0]:cur[0]
+--------------
+ROW OPERATIONS
+--------------
+0 queries inside InnoDB, 0 queries in queue
+0 read views open inside InnoDB
+Process ID=1, Main thread ID=140382195689024 , state=sleeping
+Number of rows inserted 7072, updated 3174, deleted 5500, read 55958
+222.21 inserts/s, 101.38 updates/s, 222.21 deletes/s, 2035.66 reads/s
+Number of system rows inserted 913, updated 1491, deleted 288, read 10110
+0.00 inserts/s, 0.00 updates/s, 0.00 deletes/s, 0.00 reads/s
+----------------------------
+END OF INNODB MONITOR OUTPUT
+============================
+
