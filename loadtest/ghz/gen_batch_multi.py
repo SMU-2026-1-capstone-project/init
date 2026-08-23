@@ -84,6 +84,14 @@ def main() -> None:
     ap.add_argument("--sessions", default="901-1900", help="세션 id 범위 lo-hi (DB 존재 필수)")
     ap.add_argument("--reps", type=int, default=25, help="batch 내 프레임 수 = R")
     ap.add_argument("--out", default="batch_multi.json")
+    # 🔴 #276 ② 전용. 기본값(끄기)이면 위 #271 설명 그대로 «요청마다 새 키» 다.
+    #    켜면 rep_number 를 0 으로 **고정**해서, 같은 세션으로 가는 요청이 바이트 단위로
+    #    같아진다 = 재전송이 원본과 겹치는 조건. 그게 데드락이 열리는 유일한 조건이라는 것이
+    #    2026-08-23 라운드의 판정이다(loadtest/results/r276-newkeys-aws-2026-08-23).
+    #    ⚠️ 이 페이로드로 잰 «저장된 행» 은 세션당 R 행에서 멈춘다 — 그게 정상이고,
+    #       #271 이 고친 «조용한 유실» 과 같은 모양이다. 여기서는 그것이 측정 대상이다.
+    ap.add_argument("--duplicate-keys", action="store_true",
+                    help="rep_number 를 0 으로 고정해 재전송(중복) 조건을 만든다 (#276 ②)")
     args = ap.parse_args()
 
     sessions = parse_sessions(args.sessions)
@@ -100,14 +108,18 @@ def main() -> None:
     # 레벨 1 이면 `mod .RequestNumber 1` = 0 이라 항상 첫 세션 — «단일 핫세션» 조건이
     # 특수 처리 없이 그대로 나온다.
     payload = payload.replace(f'"{SESSION_SLOT}"', f"{{{{ add {lo} (mod .RequestNumber {n}) }}}}")
-    payload = payload.replace(f'"{REPNUM_SLOT}"', "{{ .RequestNumber }}")
+    if args.duplicate_keys:
+        payload = payload.replace(f'"{REPNUM_SLOT}"', "0")
+    else:
+        payload = payload.replace(f'"{REPNUM_SLOT}"', "{{ .RequestNumber }}")
 
     with open(args.out, "w", encoding="utf-8") as fp:
         fp.write(payload)
 
     size_kb = len(payload.encode("utf-8")) / 1024
+    mode = "중복(rep_number 고정 0)" if args.duplicate_keys else "신규 키(rep_number = RequestNumber)"
     print(f"wrote {args.out}: sessions={n} ({sessions[0]}~{sessions[-1]}, 템플릿 라우팅) "
-          f"reps={args.reps} size={size_kb:.1f}KB")
+          f"reps={args.reps} size={size_kb:.1f}KB mode={mode}")
     print("  ⚠️ 이 파일은 JSON 이 아니라 ghz 템플릿이다 — json.load 로는 안 읽힌다(#271)")
 
 
