@@ -229,8 +229,11 @@ PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
 3. **SSH 키를 소스 박스에** (`/root/.ssh/measure.pem`, `chmod 600`) — 소스가 리플리카에
    사본을 붓고 컨테이너를 올린다
 4. 둘 다 `ROLE=db` 로 부트스트랩 — 이 라운드는 백엔드·AI 를 안 쓴다
-5. **AZ 를 정하고 라벨로 넘긴다** — 같은 AZ / 다른 AZ. 설계 §9-1 ② 가 「제일 중요한
-   미결정」이라 부른 항목이고, **이 선택이 Q2 의 답을 자릿수 단위로 바꾼다**
+5. **AZ 를 정하고 라벨로 넘긴다** — 같은 AZ / 다른 AZ. **이 선택이 Q2 의 답을 자릿수
+   단위로 바꾼다**(설계 §9-1 ②).
+   🟢 **08-22 라운드는 «같은 AZ» 로 정해서 돌았다**([결정](../../docs/decisions/replication-lag-and-semisync.md) §10-2 ㉯) — 그래서
+   그 결과에는 **「같은 AZ」 조건이 붙어 있고 다른 AZ 는 실측이 없다.**
+   🔴 **다음 라운드에도 이건 손잡이다** — 라벨(`REPL_AZ_MODE`)이 조건 칸에 그대로 박힌다
 
 **실행 — 소스 박스에서**
 
@@ -245,19 +248,30 @@ PHASES="repl_preflight repl_gate repl ridealong collect" \
   nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
 ```
 
-💡 **`OUTDIR` 을 명시하는 이유** — 안 줘도 [#366](https://github.com/Shadowfit/init/pull/366) 이후로는
-`PHASES` 에서 라운드를 추론하므로 **`online-ddl-…` 에 떨어지지는 않는다**([#358](https://github.com/Shadowfit/init/issues/358) 이 닫은 자리).
-다만 추론된 이름에는 `RUN_ID` 가 그대로 들어가 **`replication-aws-ec2-<타임스탬프>`** 가 된다
-(`run_all.sh:26` · `:107`). 기존 결과 디렉터리는 **`<라운드>-aws-<날짜>`** 로 서 있으므로
-(`coresidency-aws-2026-08-17` 등), 관례를 맞추려면 위처럼 **날짜로 직접 주는 편이 낫다.**
+💡 **`OUTDIR` 은 이제 안 줘도 된다 (2026-08-23).** [#366](https://github.com/Shadowfit/init/pull/366) 이
+`PHASES` 에서 라운드를 추론하게 했고, [#377](https://github.com/Shadowfit/init/pull/377) 이
+이름을 **`<라운드>-aws-<날짜>`** 로 맞췄다 — 같은 날 두 번째 판이면 `-b-`·`-c-` 로 가른다
+(`run_all.sh:107~130`). [#358](https://github.com/Shadowfit/init/issues/358) 은 그것으로 **닫혔다.**
+🔴 **08-22 라운드는 그 수정 전이라 위처럼 손으로 줬다** — 위 명령을 그대로 두는 이유는
+「그때 무엇을 밟았나」가 재현 절차이기 때문이다. 지금 돌리면 `OUTDIR` 줄을 빼도 된다.
+⚠️ 다만 **그 추론 경로는 EC2 에서 아직 안 밟혔다**(#377 미검증).
 
 `repl_gate` 가 무대를 세우고 게이트 G1~G3 을 본다. **실패하면 `repl` 을 건너뛴다** —
 계측(G3 양성 대조군)이 안 선 채로 잰 지연은 「복제의 성질」이 아니라 「무대의 결함」이다.
 
 rig 과 손잡이·산출물은 [`../results/replication-2026-08-17/REPL2-RIG.md`](../results/replication-2026-08-17/REPL2-RIG.md).
 
-⚠️ **여기 적힌 절차로 2대를 실제로 띄워 본 적은 없다.** 포트·키 경로는 rig 코드에서 읽은 것이다.
-첫 실행은 `REPL_SESSIONS=134 PHASES="repl_preflight repl_gate"` 로 끊어서 보는 편이 싸다.
+🟢 **이 절차로 2대를 실제로 돌렸다 — 2026-08-22** ([결과](../results/replication-aws-2026-08-22/README.md) · `c7i.2xlarge` 2대 ·
+같은 AZ · **10판 전부 유효 · 결함 0**). 소요는 **러너 1.39h**(`repl` 단계만 80분 —
+측정 30분 + **판 사이 따라잡기 50분**). 위 포트·키 경로는 그 라운드가 실제로 쓴 값이다.
+
+🟢 **그리고 「끊어서 먼저 보라」가 값을 했다.** `REPL_SESSIONS=134` 스모크를 앞에 태웠고
+**1회차가 G2 에서 막혔다** — `harden_replica` 가 건 `super_read_only=ON` 이
+`INSTALL PLUGIN` 을 막아 리플리카 쪽 반동기 플러그인이 안 깔렸다
+([#380](https://github.com/Shadowfit/init/pull/380)). **1,000만 행 시딩을 마친 뒤에야 만났을
+결함**이라, 다음 라운드에도 이 순서를 유지할 것.
+
+🔴 **안 밟은 것은 남아 있다** — **다른 AZ** 는 안 쟀고, 그건 인스턴스를 다시 띄우는 **새 라운드**다.
 
 ### R10-a — 1대 구성 (프레임 경로 계측)
 
@@ -365,8 +379,13 @@ loadtest/results/online-ddl-<RUN_ID>/
 - **主-P2**(다운샘플 다세션 재측정) — 백엔드 컨테이너와 ghz, `gen_batch_multi.py` 재생성이
   선행이라 단계로 안 넣었다. `PHASES` 에 추가하려면 그 준비부터 설계해야 한다
 - ~~**主-P3·P4**(백업/복구·복제) — 설계 문서부터 써야 한다~~
-  → P3 는 08-13 라운드로 돌았고, **P4 는 rig·단계까지 붙었다**(`repl_preflight`·`repl_gate`·`repl`).
-  다만 **아직 한 판도 안 돌았고 2대 절차를 실제로 밟아본 적이 없다** — 위 「P4 — 2대 구성」 참고
+  → ✅ **둘 다 돌았다.** P3 는 08-13 라운드, **P4 는 08-22 라운드**(2대 · 10판 전부 유효 ·
+  [결과](../results/replication-aws-2026-08-22/README.md)). 단계는 `repl_preflight`·`repl_gate`·`repl` 이고 절차는 위 「P4 — 2대 구성」.
+  🔴 **남은 것은 «안 잰 것» 하나 — 다른 AZ** 다
 - **從-R3**(3-way 조인) — `reports`·`exercise_sessions`·`users` 시딩이 선행. 지금은 사유만 기록한다
-- 이 러너 자체는 **한 번도 EC2 에서 안 돌았다.** 첫 실행은 `PHASES="preflight rehearsal"`
-  로 끊어서 확인하는 편이 싸다
+- ~~이 러너 자체는 **한 번도 EC2 에서 안 돌았다**~~ → 🔴 **낡은 문장이었다 (2026-08-23 정정).**
+  `MANIFEST.txt` 가 커밋된 EC2 라운드만 **여덟**이다 — `online-ddl-aws-2026-08-12` ·
+  `backup-restore-aws-2026-08-13`(+`-b-`) · `coresidency-aws-2026-08-15`·`-16`·`-b-16`·`-17` ·
+  `replication-aws-2026-08-22`.
+  ⚠️ **그래도 「끊어서 먼저 보라」는 유효하다** — 새 `PHASES` 조합의 첫 실행은 게이트까지만
+  끊는 편이 싸다. 08-22 스모크가 정확히 그렇게 G2 결함을 잡았다
