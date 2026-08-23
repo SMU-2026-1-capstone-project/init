@@ -67,6 +67,7 @@ VENV_CANDIDATES = (
 # 포트·주소·인터프리터는 main() 이 정한다(박스마다 다르다).
 PY = None
 RESPONSE_MODE = "model"   # main() 이 --response-mode 로 덮는다
+TRANSPORT = "urllib"      # main() 이 --transport 로 덮는다 (§12 의 팔)
 HTTP_PORT = 8100          # 8000 은 08-23 로컬 박스에서 이미 쓰이고 있었다
 GRPC_PORT = 8685
 AI = None
@@ -389,7 +390,8 @@ def run_load(arm, round_no, sessions, fps, dur, warmup, sampler=None):
         [PY, RIG, "--ai", AI, "--grpc", f"127.0.0.1:{GRPC_PORT}",
          "--token", PUBLIC_TOKEN, "--internal-token", INTERNAL_TOKEN,
          "--frames", FRAMES, "--sessions", str(sessions), "--fps", str(fps),
-         "--dur", str(dur), "--warmup", str(warmup), "--label", label, "--out", out_tsv],
+         "--dur", str(dur), "--warmup", str(warmup), "--label", label, "--out", out_tsv,
+         "--transport", TRANSPORT],
         cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding="utf-8",
     )
@@ -408,7 +410,7 @@ def run_load(arm, round_no, sessions, fps, dur, warmup, sampler=None):
 
 
 def main():
-    global OUT, TAG, PY, AI, HTTP_PORT, GRPC_PORT, RESPONSE_MODE
+    global OUT, TAG, PY, AI, HTTP_PORT, GRPC_PORT, RESPONSE_MODE, TRANSPORT
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)))
     ap.add_argument("--sessions", type=int, default=8)
@@ -432,6 +434,11 @@ def main():
                     choices=("model", "dict", "json"),
                     help="응답 생성 방식 — model(현행) · dict(검증 제거) · json(JSONResponse 직접). "
                          "§11 의 팔이다. 🔴 dict·json 은 **응답 계약을 바꾼다**(측정용)")
+    ap.add_argument("--transport", default="urllib",
+                    choices=("urllib", "new", "keepalive"),
+                    help="부하기 전송 방식(§12 의 팔). urllib=현행 · new=매번 새 연결 · "
+                         "keepalive=재사용. 🔴 사본을 만들지 않고 **같은 rig 의 팔**로 넣었다 — "
+                         "예전 시도가 사본이 세션을 못 붙여 무효였다")
     ap.add_argument("--settle", type=float, default=3.0,
                     help="판 사이 대기(초) — 포트·검출기 정리 여유")
     ap.add_argument("--warmup", type=float, default=5.0,
@@ -444,6 +451,7 @@ def main():
     AI = f"http://127.0.0.1:{HTTP_PORT}"
     PY = resolve_python(a.python_bin)
     RESPONSE_MODE = a.response_mode
+    TRANSPORT = a.transport
     plan = [t.strip() for t in a.plan.split(",") if t.strip()]
     for tok in plan:
         parse_arm(tok)                      # 🔴 한 판이라도 돌기 전에 팔 표기를 다 검증한다
@@ -504,7 +512,8 @@ def main():
         json.dump({"plan": plan, "discard_first": a.discard,
                    "sessions": a.sessions, "fps": a.fps, "dur": a.dur,
                    "pool": pool,
-        "response_mode": RESPONSE_MODE, "bind": a.bind, "python": PY,
+        "response_mode": RESPONSE_MODE,
+        "transport": TRANSPORT, "bind": a.bind, "python": PY,
                    "results": results}, f, ensure_ascii=False, indent=2)
     print("\n결과:", path)
     return 0
