@@ -1,0 +1,42 @@
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 1824    22.329367/s
+    checks_succeeded...: 100.00% 1824 out of 1824
+    checks_failed......: 0.00%   0 out of 1824
+
+    ✓ session 200
+    ✓ weekly 200
+    ✓ calendar 200
+    ✓ daily 200
+
+    CUSTOM
+    t_calendar.....................: avg=203.56ms p(50)=179.92ms p(95)=411.68ms p(99)=922.23ms max=1.11s
+    t_daily........................: avg=176.96ms p(50)=151.82ms p(95)=387.67ms p(99)=706.57ms max=1.08s
+    t_report_session...............: avg=271.6ms  p(50)=248.09ms p(95)=574.32ms p(99)=877.73ms max=1.23s
+    t_weekly_summary...............: avg=231.94ms p(50)=206.28ms p(95)=491.37ms p(99)=873.48ms max=1.58s
+
+    HTTP
+    http_req_duration..............: avg=221.34ms p(50)=190.67ms p(95)=485.85ms p(99)=871.03ms max=1.58s
+      { expected_response:true }...: avg=221.34ms p(50)=190.67ms p(95)=485.85ms p(99)=871.03ms max=1.58s
+    http_req_failed................: 0.00%  0 out of 1825
+    http_reqs......................: 1825   22.341609/s
+
+    EXECUTION
+    iteration_duration.............: avg=886.29ms p(50)=850.5ms  p(95)=1.6s     p(99)=2.18s    max=3.45s
+    iterations.....................: 456    5.582342/s
+    vus............................: 15     min=0         max=15
+    vus_max........................: 16     min=16        max=16
+
+    NETWORK
+    data_received..................: 1.4 MB 17 kB/s
+    data_sent......................: 630 kB 7.7 kB/s
+
+
+
+
+[exited with code 0]
