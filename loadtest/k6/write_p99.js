@@ -44,6 +44,12 @@ const DUR        = __ENV.DUR || '120s';
 const ACCOUNTS   = Number(__ENV.ACCOUNTS || '64');
 const EXERCISE_ID = Number(__ENV.EXERCISE_ID || '1');
 const PREFIX     = __ENV.ACCOUNT_PREFIX || 'k6w';        // 판마다 달라야 signup 이 충돌하지 않는다
+// 🔴 계정 생성을 rig 이 미리 해 뒀으면 0 으로 부른다. 이유는 **레이트리밋**이다 —
+//    `/member/signup`·`/member/login`·`/member/reissue` 는 IP당 60초에 60건이 상한이고
+//    (`AuthRateLimitFilter` · `application.yml` 의 `ip-per-window: 60`), 계정 64개를
+//    가입+로그인하면 128건이라 61번째에서 429 로 죽는다(2026-08-23 AWS 1차 판이 여기서 멈췄다).
+//    측정 대상 두 엔드포인트는 이 필터에 안 걸리므로 **판 자체는 영향이 없다.**
+const DO_SIGNUP  = (__ENV.SIGNUP || '1') !== '0';
 const PASSWORD   = __ENV.K6_PASSWORD || 'K6load!2026';
 const PREFERRED_URL = __ENV.PREFERRED_URL || 'https://www.youtube.com/watch?v=k6loadrig';
 
@@ -104,22 +110,32 @@ export function setup() {
   const tokens = [];
   for (let i = 1; i <= ACCOUNTS; i++) {
     const email = `${PREFIX}${i}@loadtest.local`;
-    // signup 은 멱등이 아니다 — 이미 있으면 실패하는데, 그건 «같은 PREFIX 로 또 돌렸다» 는 뜻이라
-    // 로그인만 하고 넘어간다(계정을 재사용해도 이 판이 재는 값은 안 바뀐다).
-    http.post(`${BASE}/member/signup`, JSON.stringify({
-      username: `${PREFIX}${i}`, email, password: PASSWORD, sex: 'MALE', role: 'USER',
-    }), json());
+    if (DO_SIGNUP) {
+      // signup 은 멱등이 아니다 — 이미 있으면 실패하는데, 그건 «같은 PREFIX 로 또 돌렸다» 는 뜻이라
+      // 로그인만 하고 넘어간다(계정을 재사용해도 이 판이 재는 값은 안 바뀐다).
+      http.post(`${BASE}/member/signup`, JSON.stringify({
+        username: `${PREFIX}${i}`, email, password: PASSWORD, sex: 'MALE', role: 'USER',
+      }), json());
+    }
 
     const lr = http.post(`${BASE}/member/login`,
                          JSON.stringify({ email, password: PASSWORD }), json());
+    if (lr.status === 429) {
+      throw new Error(`login 429(${email}) — 인증 레이트리밋(IP당 60초 60건)에 걸렸다. `
+        + `계정 수를 줄이거나, rig 이 계정을 미리 만들고 SIGNUP=0 으로 부를 것`);
+    }
     if (lr.status !== 200) throw new Error(`login 실패(${email}): ${lr.status} ${lr.body}`);
     const token = lr.json('accessToken');
 
     // preferredUrl 이 비면 startAnalysis 가 400(INVALID_INPUT_VALUE)을 던진다 —
     // 그러면 이 판은 «지연» 이 아니라 «400 을 얼마나 빨리 뱉나» 를 재게 된다.
-    const or = http.patch(`${BASE}/member/onboarding/${email}`,
-                          JSON.stringify({ preferredUrl: PREFERRED_URL }), json(token));
-    if (or.status !== 200) throw new Error(`onboarding 실패(${email}): ${or.status} ${or.body}`);
+    // (SIGNUP=0 이면 rig 의 준비 단계가 이미 해 뒀다. 온보딩은 레이트리밋 대상이 아니지만
+    //  판마다 되풀이할 이유가 없어 같이 건너뛴다.)
+    if (DO_SIGNUP) {
+      const or = http.patch(`${BASE}/member/onboarding/${email}`,
+                            JSON.stringify({ preferredUrl: PREFERRED_URL }), json(token));
+      if (or.status !== 200) throw new Error(`onboarding 실패(${email}): ${or.status} ${or.body}`);
+    }
 
     // 앞 판이 남긴 활성 세션이 있으면 지금 끝내 둔다 — 안 그러면 첫 iteration 이 409 로 시작한다.
     const ar = http.get(`${BASE}/sessions/active`, json(token));

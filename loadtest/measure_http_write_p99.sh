@@ -58,7 +58,16 @@ PEAK_RATE=${PEAK_RATE:-0.075}
 MULTS=${MULTS:-"60 180 360"}         # 가정 피크 배수 = 4.5 · 13.5 · 27 세션시작/초
 DUR=${DUR:-120s}
 BLOCKS=${BLOCKS:-4}                  # 블록 0 은 버린다(예열·JIT·캐시)
-ACCOUNTS=${ACCOUNTS:-64}
+# 🔴 계정 수는 «부하» 가 아니라 **레이트리밋**이 정한다.
+#    `/member/signup`·`/member/login` 은 IP당 60초에 60건이 상한이다(AuthRateLimitFilter ·
+#    application.yml `ip-per-window: 60`). 판마다 계정 수만큼 로그인하므로,
+#    **계정 수 < 60** 이어야 한 판의 로그인 묶음이 창 하나에 안 걸린다(판 간격이 120초라 묶음끼리는 안 겹친다).
+#    부하 쪽 요구는 훨씬 작다 — ×360(27/초)에 지연 500ms 여도 동시 VU 는 14 면 된다.
+ACCOUNTS=${ACCOUNTS:-32}
+PASSWORD=${K6_PASSWORD:-'K6load!2026'}
+PREFERRED_URL=${PREFERRED_URL:-https://www.youtube.com/watch?v=k6loadrig}
+# 준비 단계의 간격. 계정마다 보호 경로를 2건(가입·로그인) 쓰므로 2.5초면 분당 48건이다.
+PREP_SLEEP=${PREP_SLEEP:-2.5}
 EXERCISE_ID=${EXERCISE_ID:-1}
 PREFIX=${ACCOUNT_PREFIX:-k6w}
 OUT=${OUT:-$HERE/results/http-write-p99-$(date +%F)}
@@ -93,6 +102,28 @@ case "${PROBE%%|*}" in
   *)   echo "  🟡 401/403 이 아니다 — 보안 설정이 다르거나 다른 앱이다. 블록 0 을 보고 판단할 것" ;;
 esac
 
+echo
+echo "## [1-b] 계정 준비 — $ACCOUNTS 개 (레이트리밋 때문에 rig 이 미리 만든다)"
+echo "  가입·로그인은 IP당 60초 60건 상한이라 ${PREP_SLEEP}초 간격으로 만든다 (분당 48건)"
+prep_ok=0
+for i in $(seq 1 "$ACCOUNTS"); do
+  email="${PREFIX}${i}@loadtest.local"
+  curl -s -o /dev/null -m 30 -X POST "$BASE/member/signup" -H 'Content-Type: application/json'     -d "{\"username\":\"${PREFIX}${i}\",\"email\":\"$email\",\"password\":\"$PASSWORD\",\"sex\":\"MALE\",\"role\":\"USER\"}"
+  tok=$(curl -s -m 30 -X POST "$BASE/member/login" -H 'Content-Type: application/json'         -d "{\"email\":\"$email\",\"password\":\"$PASSWORD\"}"         | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+  if [ -z "$tok" ]; then
+    echo "  🔴 $email 로그인 실패 — 429(레이트리밋)면 PREP_SLEEP 을 올릴 것"
+    exit 1
+  fi
+  code=$(curl -s -o /dev/null -w '%{http_code}' -m 30 -X PATCH "$BASE/member/onboarding/$email"          -H 'Content-Type: application/json' -H "Authorization: Bearer $tok"          -d "{\"preferredUrl\":\"$PREFERRED_URL\"}")
+  [ "$code" = "200" ] || { echo "  🔴 $email 온보딩 실패 → $code (preferredUrl 이 비면 세션 시작이 400 이다)"; exit 1; }
+  prep_ok=$((prep_ok+1))
+  sleep "$PREP_SLEEP"
+done
+echo "  ✅ 계정 $prep_ok 개 준비됨 (가입·온보딩 완료)"
+# 🔴 준비의 마지막 요청과 첫 판의 로그인 묶음이 **같은 창**에 들면 또 429 다. 창 하나를 비운다.
+echo "  창 비우기 60초 대기"
+sleep 60
+
 # ── 한 판 ───────────────────────────────────────────────────────────────────
 run_one() {  # $1=배수  $2=블록
   local mult=$1 blk=$2 rate log sum
@@ -100,7 +131,7 @@ run_one() {  # $1=배수  $2=블록
   log="$OUT/logs/x${mult}-b${blk}.log"
   sum="$OUT/logs/x${mult}-b${blk}.row"
   BASE="$BASE" RATE="$rate" DUR="$DUR" ACCOUNTS="$ACCOUNTS" EXERCISE_ID="$EXERCISE_ID" \
-  ACCOUNT_PREFIX="$PREFIX" ARM_LABEL="x$mult" BLOCK="$blk" SUMMARY_OUT="$sum" \
+  ACCOUNT_PREFIX="$PREFIX" ARM_LABEL="x$mult" BLOCK="$blk" SUMMARY_OUT="$sum"   SIGNUP=0 K6_PASSWORD="$PASSWORD" \
     "$K6" run --quiet "$SCRIPT" > "$log" 2>&1
   if [ ! -s "$sum" ]; then
     echo "x$mult $blk $rate NA NA NA NA NA NA NA NA 0 NA NA NA"
