@@ -4,7 +4,7 @@ import com.shadowfit.dto.exercises.VideoRequestDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.SelectedPersona;
 import com.shadowfit.model.member.UserRole;
@@ -36,6 +36,7 @@ class SessionCreateConcurrencyTest {
     @Autowired private SessionRepository sessionRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
 
     @Test
     @DisplayName("같은 회원이 세션 두 개를 동시에 생성 시도하면 하나만 성공한다")
@@ -49,9 +50,10 @@ class SessionCreateConcurrencyTest {
                 .build());
         Long memberId = member.getId();
 
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         Exercise exercise = exercisesRepository.saveAndFlush(Exercise.builder()
                 .name("스쿼트")
-                .category(ExerciseCategory.LOWER)
+                .category(category)
                 .expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00"))

@@ -1,6 +1,5 @@
 package com.shadowfit.dto.admin;
 
-import com.shadowfit.model.exercise.ExerciseCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -29,8 +28,8 @@ public record ExerciseUpdateDto(
         @Size(max = 100, message = "운동명은 100자를 넘을 수 없습니다")
         String name,
 
-        @Schema(description = "부위 카테고리. 생략하면 안 바뀐다")
-        ExerciseCategory category,
+        @Schema(description = "부위 카테고리 ID. 생략하면 안 바뀐다")
+        Long categoryId,
 
         @Schema(description = "설명")
         String description,

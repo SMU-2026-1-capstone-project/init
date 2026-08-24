@@ -1,7 +1,6 @@
 package com.shadowfit.dto.admin;
 
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -26,8 +25,11 @@ public record AdminExerciseDetailDto(
         @Schema(description = "운동명", example = "스쿼트")
         String name,
 
-        @Schema(description = "부위 카테고리")
-        ExerciseCategory category,
+        @Schema(description = "부위 카테고리 ID")
+        Long categoryId,
+
+        @Schema(description = "부위 카테고리 이름")
+        String categoryName,
 
         @Schema(description = "설명")
         String description,
@@ -63,7 +65,8 @@ public record AdminExerciseDetailDto(
         return new AdminExerciseDetailDto(
                 e.getId(),
                 e.getName(),
-                e.getCategory(),
+                e.getCategory().getId(),
+                e.getCategory().getName(),
                 e.getDescription(),
                 e.getPreferredUrl(),
                 e.getTargetJoints(),

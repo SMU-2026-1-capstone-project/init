@@ -6,7 +6,7 @@ import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.grpc.FeedbackBatchRequest;
 import com.shadowfit.grpc.FeedbackEvent;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.ExerciseFeedbackTemplate;
 import com.shadowfit.model.exercise.FeedbackType;
 import com.shadowfit.model.exercise.Session;
@@ -53,6 +53,7 @@ class FeedbackTypeTemplateGuardTest {
     @Autowired private SessionFeedbackLogRepository feedbackLogRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private ExerciseFeedbackTemplateRepository templateRepository;
 
     private Member member;
@@ -66,8 +67,9 @@ class FeedbackTypeTemplateGuardTest {
 
     /** 운동 하나를 만들고, 주어진 유형들에만 멘트를 시드한다. */
     private Session sessionFor(String exerciseName, FeedbackType... seeded) {
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         Exercise exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name(exerciseName).category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                .name(exerciseName).category(category).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00")).build());
         for (FeedbackType type : seeded) {

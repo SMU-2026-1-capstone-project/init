@@ -8,8 +8,8 @@ import com.shadowfit.dto.report.detailreport.SessionReportResponseDto;
 import com.shadowfit.dto.report.detailreport.WorstSectionDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -67,7 +67,8 @@ class ReportServiceTest {
                 sessionAnalysisCalculator, new ObjectMapper());
 
         Member member = Member.builder().id(MEMBER_ID).email("t@t.com").username("u").password("p").build();
-        Exercise exercise = Exercise.builder().id(1L).name("스쿼트").category(ExerciseCategory.LOWER)
+        Category category = Category.builder().id(1L).name("LOWER").build();
+        Exercise exercise = Exercise.builder().id(1L).name("스쿼트").category(category)
                 .expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
                 .build();

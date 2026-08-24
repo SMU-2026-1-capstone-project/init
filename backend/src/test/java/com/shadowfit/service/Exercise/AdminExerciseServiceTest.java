@@ -9,7 +9,8 @@ import com.shadowfit.dto.admin.ThresholdUpdateDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
+import com.shadowfit.repository.exercise.CategoryRepository;
 import com.shadowfit.repository.exercise.ExerciseQueryRepository;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
@@ -41,19 +42,29 @@ class AdminExerciseServiceTest {
     @Mock private ExerciseQueryRepository exerciseQueryRepository;
     @Mock private SessionRepository sessionRepository;
     @Mock private ExerciseReferenceRepository exerciseReferenceRepository;
+    @Mock private CategoryRepository categoryRepository;
     private AdminExerciseService service;
 
     private static final Long EXERCISE_ID = 1L;
+    // Mockito 단위테스트라 실제로 저장하지 않는다 — id 를 직접 박아 "이미 존재하는 카테고리"를
+    // 흉내낸다. categoryRepository.findById 스텁이 이 id 로 되돌려준다(아래 setUp).
+    private static final Category category = Category.builder().id(10L).name("LOWER").build();
+    private static final Category categoryBack = Category.builder().id(20L).name("BACK").build();
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new AdminExerciseService(exercisesRepository, exerciseQueryRepository,
-                sessionRepository, exerciseReferenceRepository, new ObjectMapper());
+                sessionRepository, exerciseReferenceRepository, categoryRepository, new ObjectMapper());
+        // lenient — Update 쪽 일부 테스트는 categoryId 를 안 보내 이 스텁을 안 탄다.
+        org.mockito.Mockito.lenient().when(categoryRepository.findById(categoryBack.getId()))
+                .thenReturn(Optional.of(categoryBack));
+        org.mockito.Mockito.lenient().when(categoryRepository.findById(category.getId()))
+                .thenReturn(Optional.of(category));
     }
 
     private Exercise exercise() {
-        return Exercise.builder().id(EXERCISE_ID).name("스쿼트").category(ExerciseCategory.LOWER)
+        return Exercise.builder().id(EXERCISE_ID).name("스쿼트").category(category)
                 .expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
                 .syncThresholdDiet(new BigDecimal("70.00")).syncThresholdRehab(new BigDecimal("50.00"))
@@ -122,7 +133,7 @@ class AdminExerciseServiceTest {
         void create_analysisSupportedIsAlwaysFalse() {
             when(exercisesRepository.save(any(Exercise.class))).thenAnswer(inv -> inv.getArgument(0));
             ExerciseCreateDto dto = new ExerciseCreateDto(
-                    "데드리프트", ExerciseCategory.BACK, "설명", "https://y.com/x", null, null);
+                    "데드리프트", categoryBack.getId(), "설명", "https://y.com/x", null, null);
 
             AdminExerciseDetailDto result = service.createExercise(dto);
 
@@ -134,7 +145,7 @@ class AdminExerciseServiceTest {
         void create_nullDuration_keepsEntityDefault() {
             when(exercisesRepository.save(any(Exercise.class))).thenAnswer(inv -> inv.getArgument(0));
             ExerciseCreateDto dto = new ExerciseCreateDto(
-                    "데드리프트", ExerciseCategory.BACK, null, null, null, null);
+                    "데드리프트", categoryBack.getId(), null, null, null, null);
 
             AdminExerciseDetailDto result = service.createExercise(dto);
 
@@ -148,7 +159,7 @@ class AdminExerciseServiceTest {
         void create_thresholdsStartFromDefaults() {
             when(exercisesRepository.save(any(Exercise.class))).thenAnswer(inv -> inv.getArgument(0));
             ExerciseCreateDto dto = new ExerciseCreateDto(
-                    "데드리프트", ExerciseCategory.BACK, null, null, null, 20);
+                    "데드리프트", categoryBack.getId(), null, null, null, 20);
 
             AdminExerciseDetailDto result = service.createExercise(dto);
 
@@ -165,7 +176,7 @@ class AdminExerciseServiceTest {
         @DisplayName("targetJoints 가 JSON 이 아니면 INVALID_INPUT_VALUE — 저장 시도 자체를 안 함")
         void create_invalidJson_throwsBeforeSave() {
             ExerciseCreateDto dto = new ExerciseCreateDto(
-                    "데드리프트", ExerciseCategory.BACK, null, null, "{깨진", null);
+                    "데드리프트", categoryBack.getId(), null, null, "{깨진", null);
 
             assertThatThrownBy(() -> service.createExercise(dto))
                     .isInstanceOf(BusinessException.class)
@@ -192,7 +203,7 @@ class AdminExerciseServiceTest {
 
             assertThat(result.name()).isEqualTo("스쿼트(개선)");
             // category 를 안 보냈으니 그대로여야 한다 — null 로 덮으면 NOT NULL 위반이다
-            assertThat(result.category()).isEqualTo(ExerciseCategory.LOWER);
+            assertThat(result.categoryId()).isEqualTo(category.getId());
             assertThat(result.expectedDurationMinutes()).isEqualTo(15);
         }
 
@@ -266,7 +277,7 @@ class AdminExerciseServiceTest {
         @DisplayName("끌 때는 기준 좌표를 보지 않는다")
         void disable_doesNotCheckReferences() {
             Exercise exercise = exercise();
-            exercise.setAnalysisSupported(true);
+            exercise.changeAnalysisSupport(true);
             when(exercisesRepository.findById(EXERCISE_ID)).thenReturn(Optional.of(exercise));
 
             AdminExerciseDetailDto result = service.updateAnalysisSupport(EXERCISE_ID, false);

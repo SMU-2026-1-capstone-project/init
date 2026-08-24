@@ -1,7 +1,6 @@
 package com.shadowfit.global;
 
 import com.shadowfit.dto.report.record.Mood;
-import com.shadowfit.model.exercise.ExerciseCategory;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.SelectedPersona;
 import com.shadowfit.model.member.Sex;
@@ -60,12 +59,24 @@ class SchemaEnumConsistencyTest {
     private static final Map<String, Class<? extends Enum<?>>> MAPPING = new LinkedHashMap<>() {{
         put("users.sex", Sex.class);
         put("users.selected_persona", SelectedPersona.class);
-        put("exercises.category", ExerciseCategory.class);
         put("exercise_sessions.status", Status.class);
         put("daily_logs.mood", Mood.class);
         put("reports.report_type", ReportType.class);
         put("outbox_events.status", OutboxStatus.class);
     }};
+
+    /**
+     * {@code exercises.category} 는 V1 baseline 에서 ENUM 이었지만 V11 마이그레이션(BE-04)이
+     * 관리 가능한 {@code categories} 테이블 FK({@code category_id})로 승격시키며 이 컬럼 자체를
+     * DROP 했다 — 지금 실제 스키마엔 없다. 그런데 {@link #readSchemaLines()}는 <b>V1 baseline
+     * 만</b> 정적으로 읽고 이후 마이그레이션의 ALTER/DROP 을 적용하지 않으므로(클래스 주석의
+     * 설계), 이 파서는 앞으로도 계속 {@code exercises.category}를 ENUM 으로 "본다" — 거짓
+     * 양성이다. Java enum({@code ExerciseCategory})도 같이 삭제됐으니 매핑할 대상 자체가 없다.
+     * 매핑표에 없는 ENUM 컬럼을 실패로 다루는 이유("새 컬럼이 감시망을 빠져나가지 못하게")가
+     * 이 컬럼엔 적용되지 않는다 — 새로 생긴 게 아니라 이미 없어진 컬럼의 낡은 흔적이라, 여기
+     * 주석으로 남기고 예외 처리한다(클래스 주석이 안내하는 바로 그 경로).
+     */
+    private static final Set<String> STALE_ENUM_COLUMNS = Set.of("exercises.category");
 
     private static final Pattern CREATE_TABLE = Pattern.compile(
             "CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?`?(\\w+)`?", Pattern.CASE_INSENSITIVE);
@@ -103,9 +114,13 @@ class SchemaEnumConsistencyTest {
         assertThat(SCHEMA_ENUMS.keySet())
                 .as("schema.sql 에 ENUM 컬럼이 하나도 안 잡혔다면 파싱이 깨진 것이다")
                 .isNotEmpty();
+
+        Set<String> expected = new java.util.LinkedHashSet<>(MAPPING.keySet());
+        expected.addAll(STALE_ENUM_COLUMNS);
+
         assertThat(SCHEMA_ENUMS.keySet())
                 .as("매핑표에 없는 ENUM 컬럼 — 이 테스트에 추가하거나, Java enum 이 붙지 않는 컬럼이면 그 사실을 여기 주석으로 남길 것")
-                .containsExactlyInAnyOrderElementsOf(MAPPING.keySet());
+                .containsExactlyInAnyOrderElementsOf(expected);
     }
 
     /** {@code CREATE TABLE} 을 만나면 현재 테이블을 갱신하며 ENUM 컬럼을 모은다. */

@@ -4,7 +4,7 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.grpc.PoseDataRequest;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -51,6 +51,7 @@ class SessionReattachTest {
     @Autowired private PoseDataRepository poseDataRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
 
     // 재부착 판정이 실제로 읽는 값과 같은 프로퍼티를 테스트도 읽는다 — 기본값을 상수로 박아두면
     // 설정을 바꿨을 때 테스트만 조용히 옛 기준으로 통과한다.
@@ -74,8 +75,9 @@ class SessionReattachTest {
         stranger = memberRepository.saveAndFlush(Member.builder()
                 .email("reattach-stranger@test.com").username("stranger").password("dummy")
                 .selectedPersona(SelectedPersona.BEGINNER).role(UserRole.USER).build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER)
+                .name("스쿼트").category(category)
                 .expectedDurationMinutes(EXPECTED_DURATION_MINUTES)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00"))

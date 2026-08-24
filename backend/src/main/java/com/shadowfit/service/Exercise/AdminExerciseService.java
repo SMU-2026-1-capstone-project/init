@@ -13,7 +13,9 @@ import com.shadowfit.dto.admin.ThresholdUpdateDto;
 import com.shadowfit.dto.common.PageResponse;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Exercise;
+import com.shadowfit.repository.exercise.CategoryRepository;
 import com.shadowfit.repository.exercise.ExerciseQueryRepository;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
@@ -39,6 +41,7 @@ public class AdminExerciseService {
     private final ExerciseQueryRepository exerciseQueryRepository;
     private final SessionRepository sessionRepository;
     private final ExerciseReferenceRepository exerciseReferenceRepository;
+    private final CategoryRepository categoryRepository;
     private final ObjectMapper objectMapper;
 
     // ─── 조회 ──────────────────────────────────────────────────────────────────────
@@ -82,9 +85,11 @@ public class AdminExerciseService {
     public AdminExerciseDetailDto createExercise(ExerciseCreateDto dto) {
         validateJsonOrThrow(dto.targetJoints());
 
+        Category category = findCategoryOrThrow(dto.categoryId());
+
         Exercise exercise = Exercise.builder()
                 .name(dto.name())
-                .category(dto.category())
+                .category(category)
                 .description(dto.description())
                 .preferredUrl(dto.preferredUrl())
                 .targetJoints(dto.targetJoints())
@@ -92,13 +97,11 @@ public class AdminExerciseService {
 
         // 생략되면 엔티티의 @Builder.Default(15)가 그대로 남는다. 빌더에 null 을 넘기면 기본값을
         // 덮어써 NOT NULL 위반이 되므로, 값이 있을 때만 설정한다.
-        if (dto.expectedDurationMinutes() != null) {
-            exercise.setExpectedDurationMinutes(dto.expectedDurationMinutes());
-        }
+        exercise.applyExpectedDuration(dto.expectedDurationMinutes());
 
         Exercise saved = exercisesRepository.save(exercise);
         log.info("운동 종목 등록: id={}, name={}, category={} (analysisSupported=false 고정)",
-                saved.getId(), saved.getName(), saved.getCategory());
+                saved.getId(), saved.getName(), category.getName());
 
         return AdminExerciseDetailDto.fromEntity(saved);
     }
@@ -120,27 +123,18 @@ public class AdminExerciseService {
         Exercise exercise = findOrThrow(exerciseId);
 
         // name·category 는 DB NOT NULL 이라 "안 보내는 것"은 허용하고 "보낸 값이 빈 것"만 막는다.
-        if (dto.name() != null) {
-            if (!StringUtils.hasText(dto.name())) {
-                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-            }
-            exercise.setName(dto.name());
+        // 이 검증은 엔티티가 아니라 서비스 몫이다(applyUpdate 의 null 체크와 성격이 다르다).
+        if (dto.name() != null && !StringUtils.hasText(dto.name())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
-        if (dto.category() != null) {
-            exercise.setCategory(dto.category());
-        }
-        if (dto.description() != null) {
-            exercise.setDescription(dto.description());
-        }
-        if (dto.preferredUrl() != null) {
-            exercise.setPreferredUrl(dto.preferredUrl());
-        }
-        if (dto.targetJoints() != null) {
-            exercise.setTargetJoints(dto.targetJoints());
-        }
-        if (dto.expectedDurationMinutes() != null) {
-            exercise.setExpectedDurationMinutes(dto.expectedDurationMinutes());
-        }
+
+        // categoryId 가 안 왔으면(null) 카테고리를 안 바꾼다 — applyUpdate 의 null=유지 규약과
+        // 같은 자리라, 여기서 조회를 건너뛴다(조회 자체가 categoryId 필수인 findCategoryOrThrow
+        // 를 안 타야 "생략 = 유지"가 성립한다).
+        Category category = dto.categoryId() == null ? null : findCategoryOrThrow(dto.categoryId());
+
+        exercise.applyUpdate(dto.name(), category, dto.description(),
+                dto.preferredUrl(), dto.targetJoints(), dto.expectedDurationMinutes());
 
         log.info("운동 종목 수정: id={}, name={}", exerciseId, exercise.getName());
         return AdminExerciseDetailDto.fromEntity(exercise);
@@ -167,10 +161,7 @@ public class AdminExerciseService {
                 exercise.getSyncThresholdDiet(), dto.diet(),
                 exercise.getSyncThresholdRehab(), dto.rehab());
 
-        exercise.setSyncThresholdBeginner(dto.beginner());
-        exercise.setSyncThresholdAdvanced(dto.advanced());
-        exercise.setSyncThresholdDiet(dto.diet());
-        exercise.setSyncThresholdRehab(dto.rehab());
+        exercise.updateThresholds(dto.beginner(), dto.advanced(), dto.diet(), dto.rehab());
 
         return ExerciseThresholdResponseDto.fromEntity(exercise);
     }
@@ -213,8 +204,7 @@ public class AdminExerciseService {
             throw new BusinessException(ErrorCode.EXERCISE_ANALYSIS_ENABLE_BLOCKED);
         }
 
-        boolean before = Boolean.TRUE.equals(exercise.getAnalysisSupported());
-        exercise.setAnalysisSupported(supported);
+        boolean before = exercise.changeAnalysisSupport(supported);
 
         if (supported && !before) {
             // 켜는 것만 WARN 이다. ai-server 가 종목과 무관하게 스쿼트로 분석하므로, 스쿼트가
@@ -285,6 +275,11 @@ public class AdminExerciseService {
     private Exercise findOrThrow(Long exerciseId) {
         return exercisesRepository.findById(exerciseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.EXERCISE_NOT_FOUND));
+    }
+
+    private Category findCategoryOrThrow(Long categoryId) {
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
     }
 
     /**

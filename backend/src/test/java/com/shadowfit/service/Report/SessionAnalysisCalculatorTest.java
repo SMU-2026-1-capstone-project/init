@@ -4,7 +4,7 @@ import com.shadowfit.dto.report.PoseFrameProjection;
 import com.shadowfit.dto.report.detailreport.RepSyncRateDto;
 import com.shadowfit.dto.report.detailreport.WorstSectionDto;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,10 +36,11 @@ class SessionAnalysisCalculatorTest {
     void setUp() {
         calculator = new SessionAnalysisCalculator();
 
+        Category category = Category.builder().id(1L).name("LOWER").build();
         Exercise exercise = Exercise.builder()
                 .id(1L)
                 .name("스쿼트")
-                .category(ExerciseCategory.LOWER)
+                .category(category)
                 .expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00"))
