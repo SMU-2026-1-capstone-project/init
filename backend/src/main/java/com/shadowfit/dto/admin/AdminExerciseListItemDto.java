@@ -1,6 +1,5 @@
 package com.shadowfit.dto.admin;
 
-import com.shadowfit.model.exercise.ExerciseCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -25,8 +24,11 @@ public record AdminExerciseListItemDto(
         @Schema(description = "운동명", example = "스쿼트")
         String name,
 
-        @Schema(description = "부위 카테고리")
-        ExerciseCategory category,
+        @Schema(description = "부위 카테고리 ID")
+        Long categoryId,
+
+        @Schema(description = "부위 카테고리 이름")
+        String categoryName,
 
         @Schema(description = "AI 분석 지원 여부. false 면 이 종목으로 세션을 시작할 수 없다(W007)")
         Boolean analysisSupported,

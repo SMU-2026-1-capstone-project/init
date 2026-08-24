@@ -2,7 +2,7 @@ package com.shadowfit.service.Exercise;
 
 import com.shadowfit.grpc.PoseDataRequest;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -47,6 +47,7 @@ class SessionLastActiveTest {
     @Autowired private SessionRepository sessionRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private EntityManager entityManager;
 
     @Value("${exercise.session.timeout.idle-minutes:10}")
@@ -65,8 +66,9 @@ class SessionLastActiveTest {
         owner = memberRepository.saveAndFlush(Member.builder()
                 .email("last-active@test.com").username("owner").password("dummy")
                 .selectedPersona(SelectedPersona.BEGINNER).role(UserRole.USER).build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER)
+                .name("스쿼트").category(category)
                 .expectedDurationMinutes(EXPECTED_DURATION_MINUTES)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00"))

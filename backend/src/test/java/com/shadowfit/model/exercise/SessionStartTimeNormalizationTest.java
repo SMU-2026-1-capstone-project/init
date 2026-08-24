@@ -39,6 +39,7 @@ class SessionStartTimeNormalizationTest {
     @Autowired private SessionRepository sessionRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private PoseDataRepository poseDataRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -55,9 +56,10 @@ class SessionStartTimeNormalizationTest {
                 .selectedPersona(SelectedPersona.BEGINNER)
                 .role(UserRole.USER)
                 .build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
                 .name("스쿼트" + unique)
-                .category(ExerciseCategory.LOWER)
+                .category(category)
                 .expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00"))

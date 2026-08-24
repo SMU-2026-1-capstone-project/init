@@ -8,11 +8,11 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "exercises")
-@Getter @Setter
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString // 연관관계가 없으므로 exclude 없이 사용 가능
+@ToString // BE-04 — category 는 연관관계라 exclude(LAZY 를 트랜잭션 밖에서 찍으면 예외)
 public class Exercise {
 
     @Id
@@ -22,9 +22,11 @@ public class Exercise {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private ExerciseCategory category;
+    // BE-04 — 카테고리가 고정 enum 에서 관리 가능한 테이블로 승격됐다(V11 마이그레이션).
+    @ToString.Exclude
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -78,4 +80,43 @@ public class Exercise {
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    // ─── 전이 ────────────────────────────────────────────────────────────────
+    // 이슈 #174 — setter 를 전면 개방하는 대신 "무엇을 바꾸는가"에 이름을 준다.
+
+    /** 등록 시 예상 시간만 조건부로 덮어쓴다 — null 이면 {@code @Builder.Default}(15분)가 그대로 남는다. */
+    public void applyExpectedDuration(Integer minutes) {
+        if (minutes != null) this.expectedDurationMinutes = minutes;
+    }
+
+    /** 관리자 수정(PATCH) — 보낸 필드만 갱신한다. null 검증(공백 등)은 호출자(서비스) 몫이다. */
+    public void applyUpdate(String name, Category category, String description,
+                             String preferredUrl, String targetJoints, Integer expectedDurationMinutes) {
+        if (name != null) this.name = name;
+        if (category != null) this.category = category;
+        if (description != null) this.description = description;
+        if (preferredUrl != null) this.preferredUrl = preferredUrl;
+        if (targetJoints != null) this.targetJoints = targetJoints;
+        if (expectedDurationMinutes != null) this.expectedDurationMinutes = expectedDurationMinutes;
+    }
+
+    /** 싱크로율 임계값 4종을 한 번에 바꾼다. beginner&lt;advanced 검증은 호출자(DTO)가 이미 했다. */
+    public void updateThresholds(BigDecimal beginner, BigDecimal advanced, BigDecimal diet, BigDecimal rehab) {
+        this.syncThresholdBeginner = beginner;
+        this.syncThresholdAdvanced = advanced;
+        this.syncThresholdDiet = diet;
+        this.syncThresholdRehab = rehab;
+    }
+
+    /**
+     * 분석 지원 여부를 바꾼다.
+     *
+     * @return 바뀌기 <b>전</b> 값 — 호출자가 "꺼져 있다가 켜졌는지"(WARN 로그 분기)와
+     *         "이전 -> 이후"(INFO 로그) 를 둘 다 구성해야 해서, 판정을 미리 접지 않고 원값을 준다.
+     */
+    public boolean changeAnalysisSupport(boolean supported) {
+        boolean before = Boolean.TRUE.equals(this.analysisSupported);
+        this.analysisSupported = supported;
+        return before;
+    }
 }

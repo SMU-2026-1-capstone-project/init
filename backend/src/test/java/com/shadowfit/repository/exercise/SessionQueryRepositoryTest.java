@@ -5,7 +5,7 @@ import com.shadowfit.dto.admin.AdminSessionSearchCondition;
 import com.shadowfit.dto.admin.AdminSessionSortKey;
 import com.shadowfit.dto.common.PageResponse;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -54,6 +54,7 @@ class SessionQueryRepositoryTest {
     @Autowired private SessionRepository sessionRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private CategoryRepository categoryRepository;
 
     private Exercise squat;
     private Exercise pushup;
@@ -65,8 +66,10 @@ class SessionQueryRepositoryTest {
         exercisesRepository.deleteAll();
         sessionRepository.flush();
 
-        squat = saveExercise("스쿼트", ExerciseCategory.LOWER);
-        pushup = saveExercise("푸시업", ExerciseCategory.UPPER);
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
+        Category categoryUpper = categoryRepository.save(Category.builder().name("UPPER").build());
+        squat = saveExercise("스쿼트", category);
+        pushup = saveExercise("푸시업", categoryUpper);
     }
 
     @Nested
@@ -339,7 +342,7 @@ class SessionQueryRepositoryTest {
                 .build());
     }
 
-    private Exercise saveExercise(String name, ExerciseCategory category) {
+    private Exercise saveExercise(String name, Category category) {
         return exercisesRepository.save(Exercise.builder()
                 .name(name)
                 .category(category)

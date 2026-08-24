@@ -1,6 +1,5 @@
 package com.shadowfit.dto.admin;
 
-import com.shadowfit.model.exercise.ExerciseCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -19,7 +18,7 @@ public record AdminExerciseSearchCondition(
         @Schema(description = "검색어 — 운동명 부분일치", example = "스쿼")
         String keyword,
 
-        @Schema(description = "운동 부위 카테고리")
-        ExerciseCategory category
+        @Schema(description = "운동 부위 카테고리 ID")
+        Long categoryId
 ) {
 }

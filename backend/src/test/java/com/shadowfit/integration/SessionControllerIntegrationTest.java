@@ -3,7 +3,7 @@ package com.shadowfit.integration;
 import com.shadowfit.dto.login.CustomUserInfoDto;
 import com.shadowfit.global.security.jwt.JwtUtil;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -42,6 +42,7 @@ class SessionControllerIntegrationTest {
     @Autowired private JwtUtil jwtUtil;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private SessionRepository sessionRepository;
 
     private Member member;
@@ -53,8 +54,9 @@ class SessionControllerIntegrationTest {
         member = memberRepository.saveAndFlush(Member.builder()
                 .email("session-http@test.com").username("u").password("dummy")
                 .selectedPersona(SelectedPersona.BEGINNER).role(UserRole.USER).build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                .name("스쿼트").category(category).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
                 .build());
 

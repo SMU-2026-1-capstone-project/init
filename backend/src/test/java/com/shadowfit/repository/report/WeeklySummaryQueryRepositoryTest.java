@@ -2,7 +2,7 @@ package com.shadowfit.repository.report;
 
 import com.shadowfit.dto.report.weekly.WeeklyTotalsDto;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -43,6 +43,7 @@ class WeeklySummaryQueryRepositoryTest {
     @Autowired private WeeklySummaryQueryRepository repository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private SessionRepository sessionRepository;
 
     /** 2026-08-17(월) 00:00 ~ 08-24(월) 00:00 — 반열린 구간 */
@@ -61,8 +62,9 @@ class WeeklySummaryQueryRepositoryTest {
         otherMember = memberRepository.saveAndFlush(Member.builder()
                 .email("weekly-other@test.com").username("남").password("dummy")
                 .selectedPersona(SelectedPersona.BEGINNER).role(UserRole.USER).build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                .name("스쿼트").category(category).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00")).build());
     }

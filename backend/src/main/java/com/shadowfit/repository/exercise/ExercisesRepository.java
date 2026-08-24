@@ -18,4 +18,7 @@ public interface ExercisesRepository extends JpaRepository<Exercise,Long> {
     @Cacheable(cacheNames = "exercises", key = "#id")
     @Query("SELECT e FROM Exercise e WHERE e.id = :id")
     Optional<Exercise> findByIdCached(@Param("id") Long id);
+
+    // 카테고리 삭제 전 사용 여부 확인용 (AdminCategoryService, #CATEGORY_IN_USE).
+    boolean existsByCategoryId(Long categoryId);
 }

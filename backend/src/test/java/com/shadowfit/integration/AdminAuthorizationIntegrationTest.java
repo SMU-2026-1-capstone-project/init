@@ -5,7 +5,7 @@ import com.shadowfit.dto.admin.ThresholdUpdateDto;
 import com.shadowfit.dto.login.CustomUserInfoDto;
 import com.shadowfit.global.security.jwt.JwtUtil;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.UserRole;
 import com.shadowfit.repository.exercise.ExercisesRepository;
@@ -47,6 +47,7 @@ class AdminAuthorizationIntegrationTest {
     @Autowired private JwtUtil jwtUtil;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @MockitoBean private ExerciseAnalysisService analysisService; // 실제 gRPC/추출 로직 우회, 권한만 검증
 
     private Exercise exercise;
@@ -59,8 +60,9 @@ class AdminAuthorizationIntegrationTest {
                 .email("user@test.com").username("u").password("dummy").role(UserRole.USER).build());
         Member admin = memberRepository.saveAndFlush(Member.builder()
                 .email("admin@test.com").username("a").password("dummy").role(UserRole.ADMIN).build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                .name("스쿼트").category(category).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
                 .build());
 
