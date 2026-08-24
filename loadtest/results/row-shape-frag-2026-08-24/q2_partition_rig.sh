@@ -84,6 +84,15 @@ for p in pholed pclean; do
   read -r rc dl <<<"$(DB "SELECT CONCAT(table_rows,' ',data_length) FROM information_schema.PARTITIONS WHERE table_schema='shadowfit' AND table_name='pq_t' AND partition_name='$p';")"
   ac=$(DB "SELECT COUNT(*) FROM pq_t PARTITION ($p);")
   printf "    %-9s %-9s %-10s %-10s\n" "$p" "$ac" "$(( dl / 16384 ))" "$(( dl / 1048576 ))"
+  #
+  # 🔴 무대 게이트 — 2026-08-24 EC2 round1 이 **행 0 · 페이지 1** 인 파티션을 재고
+  #    **17.8·19.4 ms** 를 냈다. 그 값이 진짜 판(17.7·21.1 ms)과 구별이 안 돼서,
+  #    게이트가 없었으면 무효 판을 결과로 인용할 뻔했다.
+  #    러너를 안 거치고 이 rig 을 직접 부르는 판을 위해 **여기서도** 막는다.
+  if [ "$ac" != "$ROWS" ]; then
+    echo "🔴 무대가 안 섰다 — $p 의 행이 $ac (기대 $ROWS). 측정하지 않고 멈춘다." >&2
+    exit 2
+  fi
 done
 
 echo

@@ -1,0 +1,39 @@
++ S3=s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24
+++ seq 1 90
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ sleep 60
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ sleep 60
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ sleep 60
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ sleep 60
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ sleep 60
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ sleep 60
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ sleep 60
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ sleep 60
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ sleep 60
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ sleep 60
++ for i in $(seq 1 90)
++ '[' -f /root/DONE ']'
++ echo '판 종료 감지 (11분) — 산출물 최종 업로드 후 terminate'
+판 종료 감지 (11분) — 산출물 최종 업로드 후 terminate
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ aws s3 cp --quiet /root/watchdog.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/watchdog.log

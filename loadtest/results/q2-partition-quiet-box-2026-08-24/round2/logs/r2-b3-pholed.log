@@ -1,0 +1,13 @@
+=== Q2 — 구멍이 DROP PARTITION 을 바꾸는가 (파티션당 50000행 · 대상 pholed) ===
+## [1] pclean — 50000행 그대로
+## [2] pholed — 넣었다 지워 구멍을 만들고 최종 50000행으로 맞춘다
+
+    파티션 행       페이지  MB        
+    pholed    50000     16918      264       
+    pclean    50000     10032      156       
+
+## [3] DROP PARTITION 소요 — **한 판에 하나만** 잰다
+    pholed          80.7 ms   (이 판의 **첫** DROP)
+
+=== 정리 ===
+  pq_t·pq_nums 제거

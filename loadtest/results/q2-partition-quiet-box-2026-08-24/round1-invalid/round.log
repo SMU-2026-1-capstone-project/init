@@ -1,0 +1,1074 @@
++ SHA=9150b0e98e2e6c166b1d666587dcb6b4b3fa0369
++ S3=s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24
++ BLOCKS=9
++ curl -fsSL https://raw.githubusercontent.com/Shadowfit/init/9150b0e98e2e6c166b1d666587dcb6b4b3fa0369/loadtest/aws/bootstrap.sh -o /root/bootstrap.sh
++ grep -q p6-target /root/bootstrap.sh
++ ROLE=db
++ REF=9150b0e98e2e6c166b1d666587dcb6b4b3fa0369
++ bash /root/bootstrap.sh
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
+
+──── 패키지 ────
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
+  buildx 0.12.1 → 0.19.3 으로 올린다 (compose build 는 0.17+ 를 요구한다)
+
+──── 저장소 — https://github.com/Shadowfit/init.git @ 9150b0e98e2e6c166b1d666587dcb6b4b3fa0369 ────
+  커밋: 9150b0e
+
+──── .env ────
+/root/bootstrap.sh: line 146: compose: command not found
+/root/bootstrap.sh: line 146: shadowfit-ai: command not found
+/root/bootstrap.sh: line 146: INTERNAL_API_TOKEN:?: command not found
+/root/bootstrap.sh: line 146: MYSQL_EXPORTER_PASSWORD: command not found
+/root/bootstrap.sh: line 146: :?: command not found
+  MYSQL_ROOT_PASSWORD 를 rig 기본값과 맞췄다 (+ 해석만 되면 되는 변수들)
+  compose 해석 확인 ✅ (mysql 만 띄워도 파일 전체가 해석된다)
+
+──── MySQL 컨테이너 ────
+time="2026-08-23T17:34:47Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Image mysql:8.0 Pulling 
+ edf85873f64e Pulling fs layer 0B
+ 6ef6c7b50a93 Pulling fs layer 0B
+ e3e5d1ac74c1 Pulling fs layer 0B
+ 0d74d296605b Pulling fs layer 0B
+ 297d04cfe470 Pulling fs layer 0B
+ 4c8a3e0d4e4b Pulling fs layer 0B
+ a63160a5eda1 Pulling fs layer 0B
+ 7534d1db9f8d Pulling fs layer 0B
+ 49ec2dab01d9 Pulling fs layer 0B
+ ab24264a27e9 Pulling fs layer 0B
+ 96d30d9fbee8 Pulling fs layer 0B
+ 0d74d296605b Waiting 0B
+ 297d04cfe470 Waiting 0B
+ 4c8a3e0d4e4b Waiting 0B
+ a63160a5eda1 Waiting 0B
+ 7534d1db9f8d Waiting 0B
+ 49ec2dab01d9 Waiting 0B
+ ab24264a27e9 Waiting 0B
+ 96d30d9fbee8 Waiting 0B
+ e3e5d1ac74c1 Downloading 15.74kB
+ edf85873f64e Downloading 474.5kB
+ 6ef6c7b50a93 Downloading 884B
+ 6ef6c7b50a93 Verifying Checksum 0B
+ 6ef6c7b50a93 Download complete 0B
+ e3e5d1ac74c1 Downloading 783.6kB
+ e3e5d1ac74c1 Download complete 0B
+ edf85873f64e Verifying Checksum 0B
+ edf85873f64e Download complete 0B
+ edf85873f64e Extracting 491.5kB
+ edf85873f64e Extracting 5.898MB
+ edf85873f64e Extracting 9.339MB
+ edf85873f64e Extracting 17.69MB
+ edf85873f64e Extracting 26.54MB
+ 297d04cfe470 Downloading 2.607kB
+ 297d04cfe470 Verifying Checksum 0B
+ 297d04cfe470 Download complete 0B
+ 0d74d296605b Downloading 64.9kB
+ 0d74d296605b Verifying Checksum 0B
+ 0d74d296605b Download complete 0B
+ edf85873f64e Extracting 32.44MB
+ 4c8a3e0d4e4b Downloading 335B
+ 4c8a3e0d4e4b Verifying Checksum 0B
+ 4c8a3e0d4e4b Download complete 0B
+ edf85873f64e Extracting 42.76MB
+ edf85873f64e Extracting 44.24MB
+ edf85873f64e Extracting 47.31MB
+ edf85873f64e Pull complete 0B
+ 6ef6c7b50a93 Extracting 884B
+ 6ef6c7b50a93 Extracting 884B
+ 6ef6c7b50a93 Pull complete 0B
+ e3e5d1ac74c1 Extracting 32.77kB
+ e3e5d1ac74c1 Extracting 783.6kB
+ e3e5d1ac74c1 Extracting 783.6kB
+ e3e5d1ac74c1 Pull complete 0B
+ 0d74d296605b Extracting 65.54kB
+ 0d74d296605b Extracting 4.981MB
+ 0d74d296605b Extracting 6.173MB
+ 0d74d296605b Pull complete 0B
+ 297d04cfe470 Extracting 2.607kB
+ 297d04cfe470 Extracting 2.607kB
+ 297d04cfe470 Pull complete 0B
+ 4c8a3e0d4e4b Extracting 335B
+ 4c8a3e0d4e4b Extracting 335B
+ a63160a5eda1 Downloading 507.3kB
+ 4c8a3e0d4e4b Pull complete 0B
+ 7534d1db9f8d Downloading 316B
+ 7534d1db9f8d Verifying Checksum 0B
+ 7534d1db9f8d Download complete 0B
+ 49ec2dab01d9 Downloading 534kB
+ a63160a5eda1 Verifying Checksum 0B
+ a63160a5eda1 Download complete 0B
+ a63160a5eda1 Extracting 524.3kB
+ 49ec2dab01d9 Downloading 47.18MB
+ a63160a5eda1 Extracting 7.864MB
+ 49ec2dab01d9 Downloading 99.71MB
+ a63160a5eda1 Extracting 14.68MB
+ 49ec2dab01d9 Verifying Checksum 0B
+ 49ec2dab01d9 Download complete 0B
+ a63160a5eda1 Extracting 23.59MB
+ a63160a5eda1 Extracting 31.98MB
+ ab24264a27e9 Downloading 3.501kB
+ ab24264a27e9 Downloading 5.327kB
+ ab24264a27e9 Verifying Checksum 0B
+ ab24264a27e9 Download complete 0B
+ a63160a5eda1 Extracting 39.32MB
+ 96d30d9fbee8 Downloading 120B
+ 96d30d9fbee8 Verifying Checksum 0B
+ 96d30d9fbee8 Download complete 0B
+ a63160a5eda1 Extracting 47.19MB
+ a63160a5eda1 Extracting 49.93MB
+ a63160a5eda1 Pull complete 0B
+ 7534d1db9f8d Extracting 316B
+ 7534d1db9f8d Extracting 316B
+ 7534d1db9f8d Pull complete 0B
+ 49ec2dab01d9 Extracting 557.1kB
+ 49ec2dab01d9 Extracting 8.913MB
+ 49ec2dab01d9 Extracting 17.27MB
+ 49ec2dab01d9 Extracting 22.28MB
+ 49ec2dab01d9 Extracting 28.97MB
+ 49ec2dab01d9 Extracting 32.31MB
+ 49ec2dab01d9 Extracting 33.42MB
+ 49ec2dab01d9 Extracting 34.54MB
+ 49ec2dab01d9 Extracting 35.65MB
+ 49ec2dab01d9 Extracting 36.77MB
+ 49ec2dab01d9 Extracting 37.88MB
+ 49ec2dab01d9 Extracting 38.99MB
+ 49ec2dab01d9 Extracting 40.11MB
+ 49ec2dab01d9 Extracting 41.22MB
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
+ 49ec2dab01d9 Extracting 42.34MB
+ 49ec2dab01d9 Extracting 42.89MB
+ 49ec2dab01d9 Extracting 44.01MB
+ 49ec2dab01d9 Extracting 44.56MB
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
+ 49ec2dab01d9 Extracting 45.68MB
+ 49ec2dab01d9 Extracting 46.24MB
+ 49ec2dab01d9 Extracting 47.91MB
+ 49ec2dab01d9 Extracting 49.58MB
+ 49ec2dab01d9 Extracting 52.92MB
+ 49ec2dab01d9 Extracting 60.16MB
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
+ 49ec2dab01d9 Extracting 67.4MB
+ 49ec2dab01d9 Extracting 74.09MB
+ 49ec2dab01d9 Extracting 80.77MB
+ 49ec2dab01d9 Extracting 88.01MB
+ 49ec2dab01d9 Extracting 96.37MB
+ 49ec2dab01d9 Extracting 104.7MB
++ sleep 60
+ 49ec2dab01d9 Extracting 113.1MB
+ 49ec2dab01d9 Extracting 124.2MB
+ 49ec2dab01d9 Extracting 129.4MB
+ 49ec2dab01d9 Pull complete 0B
+ ab24264a27e9 Extracting 5.327kB
+ ab24264a27e9 Extracting 5.327kB
+ ab24264a27e9 Pull complete 0B
+ 96d30d9fbee8 Extracting 120B
+ 96d30d9fbee8 Extracting 120B
+ 96d30d9fbee8 Pull complete 0B
+ Image mysql:8.0 Pulled 
+ Network init_shadowfit-net Creating 
+ Volume init_mysql_data Creating 
+ Volume init_mysql_data Creating 
+ Network init_shadowfit-net Creating 
+ Volume init_mysql_data Created 
+ Volume init_mysql_data Created 
+ Network init_shadowfit-net Created 
+ Network init_shadowfit-net Created 
+ Container shadowfit-mysql Creating 
+ Container shadowfit-mysql Created 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-mysql Started 
+  준비 대기... — 떴다 (TCP 인증 질의 연속 2회)
+
+──── percona-toolkit 이미지 ────
+docker.io/percona/percona-toolkit:latest
+
+──── xtrabackup 이미지 (P3 백업 · P4 복제) — percona/percona-xtrabackup:8.0 ────
+docker.io/percona/percona-xtrabackup:8.0
+
+──── 스키마 — Flyway 마이그레이션 ────
+Unable to find image 'flyway/flyway:latest' locally
+latest: Pulling from flyway/flyway
+966c395d29cb: Pulling fs layer
+8db609f0511d: Pulling fs layer
+f0b0b9c8c3cd: Pulling fs layer
+e2acd1ddedbb: Pulling fs layer
+b31e784d031e: Pulling fs layer
+7230ad5f121a: Pulling fs layer
+f5bb5ead3a67: Pulling fs layer
+e2acd1ddedbb: Waiting
+7230ad5f121a: Waiting
+b31e784d031e: Waiting
+f5bb5ead3a67: Waiting
+8db609f0511d: Verifying Checksum
+8db609f0511d: Download complete
+966c395d29cb: Verifying Checksum
+966c395d29cb: Download complete
+f0b0b9c8c3cd: Verifying Checksum
+f0b0b9c8c3cd: Download complete
+e2acd1ddedbb: Verifying Checksum
+e2acd1ddedbb: Download complete
+b31e784d031e: Verifying Checksum
+b31e784d031e: Download complete
+7230ad5f121a: Verifying Checksum
+7230ad5f121a: Download complete
+966c395d29cb: Pull complete
+f5bb5ead3a67: Verifying Checksum
+f5bb5ead3a67: Download complete
+8db609f0511d: Pull complete
+f0b0b9c8c3cd: Pull complete
+e2acd1ddedbb: Pull complete
+b31e784d031e: Pull complete
+7230ad5f121a: Pull complete
+f5bb5ead3a67: Pull complete
+Digest: sha256:c748a1e82c40d4ee63b2f02a78295cf2460e8b4f1abae8abcd7ad5d6e879f959
+Status: Downloaded newer image for flyway/flyway:latest
+WARNING: Storing migrations in 'sql' is not recommended and default scanning of this location may be deprecated in a future release
+Flyway OSS Edition 13.3.0 by Redgate
+
+See release notes here: https://help.red-gate.com/help/flyway-cli13/help_3.aspx?topic=release-notes-and-older-versions/release-notes-for-flyway-engine
+Database: ******** (MySQL 8.0)
+Schema history table `shadowfit`.`flyway_schema_history` does not exist yet
+Successfully validated 9 migrations (execution time 00:00.090s)
+Creating Schema History table `shadowfit`.`flyway_schema_history` ...
+Current version of schema `shadowfit`: << Empty Schema >>
+Migrating schema `shadowfit` to version "1 - baseline"
+Migrating schema `shadowfit` to version "2 - seed master data"
+Migrating schema `shadowfit` to version "3 - add refresh token rotation"
+Migrating schema `shadowfit` to version "4 - seed squat reference"
+Migrating schema `shadowfit` to version "5 - feedback log rep key"
+Migrating schema `shadowfit` to version "6 - add pose data idempotency key"
+Migrating schema `shadowfit` to version "7 - hash refresh token"
+Migrating schema `shadowfit` to version "8 - add session nonce"
+Migrating schema `shadowfit` to version "9 - normalize pose created at"
+Successfully applied 9 migrations to schema `shadowfit`, now at version v9 (execution time 00:01.137s)
+  ✅ 스키마 생성됨 — 從 R1·R3 이 잴 대상이 생겼다
+
+──── 준비됨 ────
+  작업 디렉터리 : /root/init
+  커밋          : 9150b0e (9150b0e98e2e6c166b1d666587dcb6b4b3fa0369)
+  디스크 여유   : 34G
+  MySQL         : 8.0.46
+
+다음:
+  cd /root/init
+  S3_BASE=s3://<버킷>/<프리픽스> nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+
+  ⚠️ nohup 없이 & 만 붙이면 SSH 가 끊길 때 같이 죽는다.
++ echo BOOTSTRAP_RC=0
+BOOTSTRAP_RC=0
++ RIG=/root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
++ '[' -f /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh ']'
++ grep -q 'DROP PARTITION' /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
++ export MYSQL_ROOT_PASSWORD=1234
++ MYSQL_ROOT_PASSWORD=1234
++ echo 'block arm drop_ms pages_clean pages_holed'
+++ seq 0 8
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/q2-b0-pclean.log
++ TARGET=pclean
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b0-pclean.log
+++ awk '{print $2}'
+++ tail -1
++ ms=19.4
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b0-pclean.log
+++ tail -1
++ pc=ms
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b0-pclean.log
+++ tail -1
++ ph=1
++ echo '0 pclean 19.4 ms 1'
++ cat /root/q2-b0-pclean.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ for arm in $ORDER
++ log=/root/q2-b0-pholed.log
++ TARGET=pholed
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b0-pholed.log
+++ awk '{print $2}'
+++ tail -1
++ ms=17.8
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b0-pholed.log
+++ tail -1
++ pc=1
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b0-pholed.log
+++ tail -1
++ ph=ms
++ echo '0 pholed 17.8 1 ms'
++ cat /root/q2-b0-pholed.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 1 -eq 0 ']'
++ ORDER='pholed pclean'
++ for arm in $ORDER
++ log=/root/q2-b1-pholed.log
++ TARGET=pholed
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b1-pholed.log
+++ awk '{print $2}'
+++ tail -1
++ ms=44.9
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b1-pholed.log
+++ tail -1
++ pc=1
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b1-pholed.log
+++ tail -1
++ ph=ms
++ echo '1 pholed 44.9 1 ms'
++ cat /root/q2-b1-pholed.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for arm in $ORDER
++ log=/root/q2-b1-pclean.log
++ TARGET=pclean
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b1-pclean.log
+++ awk '{print $2}'
+++ tail -1
++ ms=18.1
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b1-pclean.log
+++ tail -1
++ pc=ms
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b1-pclean.log
+++ tail -1
++ ph=1
++ echo '1 pclean 18.1 ms 1'
++ cat /root/q2-b1-pclean.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/q2-b2-pclean.log
++ TARGET=pclean
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b2-pclean.log
+++ awk '{print $2}'
+++ tail -1
++ ms=23.1
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b2-pclean.log
+++ tail -1
++ pc=ms
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b2-pclean.log
+++ tail -1
++ ph=1
++ echo '2 pclean 23.1 ms 1'
++ cat /root/q2-b2-pclean.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for arm in $ORDER
++ log=/root/q2-b2-pholed.log
++ TARGET=pholed
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b2-pholed.log
+++ awk '{print $2}'
+++ tail -1
++ ms=20.7
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b2-pholed.log
+++ tail -1
++ pc=1
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b2-pholed.log
+++ tail -1
++ ph=ms
++ echo '2 pholed 20.7 1 ms'
++ cat /root/q2-b2-pholed.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 1 -eq 0 ']'
++ ORDER='pholed pclean'
++ for arm in $ORDER
++ log=/root/q2-b3-pholed.log
++ TARGET=pholed
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b3-pholed.log
+++ awk '{print $2}'
+++ tail -1
++ ms=19.9
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b3-pholed.log
+++ tail -1
++ pc=1
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b3-pholed.log
+++ tail -1
++ ph=ms
++ echo '3 pholed 19.9 1 ms'
++ cat /root/q2-b3-pholed.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for arm in $ORDER
++ log=/root/q2-b3-pclean.log
++ TARGET=pclean
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b3-pclean.log
+++ awk '{print $2}'
+++ tail -1
++ ms=16.1
+++ tail -1
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b3-pclean.log
++ pc=ms
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b3-pclean.log
+++ tail -1
++ ph=1
++ echo '3 pclean 16.1 ms 1'
++ cat /root/q2-b3-pclean.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/q2-b4-pclean.log
++ TARGET=pclean
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b4-pclean.log
+++ awk '{print $2}'
+++ tail -1
++ ms=16.0
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b4-pclean.log
+++ tail -1
++ pc=ms
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b4-pclean.log
+++ tail -1
++ ph=1
++ echo '4 pclean 16.0 ms 1'
++ cat /root/q2-b4-pclean.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for arm in $ORDER
++ log=/root/q2-b4-pholed.log
++ TARGET=pholed
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b4-pholed.log
+++ awk '{print $2}'
+++ tail -1
++ ms=19.2
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b4-pholed.log
+++ tail -1
++ pc=1
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b4-pholed.log
+++ tail -1
++ ph=ms
++ echo '4 pholed 19.2 1 ms'
++ cat /root/q2-b4-pholed.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 1 -eq 0 ']'
++ ORDER='pholed pclean'
++ for arm in $ORDER
++ log=/root/q2-b5-pholed.log
++ TARGET=pholed
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b5-pholed.log
+++ awk '{print $2}'
+++ tail -1
++ ms=17.7
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b5-pholed.log
+++ tail -1
++ pc=1
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b5-pholed.log
+++ tail -1
++ ph=ms
++ echo '5 pholed 17.7 1 ms'
++ cat /root/q2-b5-pholed.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for arm in $ORDER
++ log=/root/q2-b5-pclean.log
++ TARGET=pclean
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b5-pclean.log
+++ awk '{print $2}'
+++ tail -1
++ ms=18.5
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b5-pclean.log
+++ tail -1
++ pc=ms
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b5-pclean.log
+++ tail -1
++ ph=1
++ echo '5 pclean 18.5 ms 1'
++ cat /root/q2-b5-pclean.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/q2-b6-pclean.log
++ TARGET=pclean
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b6-pclean.log
+++ awk '{print $2}'
+++ tail -1
++ ms=17.5
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b6-pclean.log
+++ tail -1
++ pc=ms
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b6-pclean.log
+++ tail -1
++ ph=1
++ echo '6 pclean 17.5 ms 1'
++ cat /root/q2-b6-pclean.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for arm in $ORDER
++ log=/root/q2-b6-pholed.log
++ TARGET=pholed
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b6-pholed.log
+++ awk '{print $2}'
+++ tail -1
++ ms=17.0
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b6-pholed.log
+++ tail -1
++ pc=1
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b6-pholed.log
+++ tail -1
++ ph=ms
++ echo '6 pholed 17.0 1 ms'
++ cat /root/q2-b6-pholed.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 1 -eq 0 ']'
++ ORDER='pholed pclean'
++ for arm in $ORDER
++ log=/root/q2-b7-pholed.log
++ TARGET=pholed
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b7-pholed.log
+++ awk '{print $2}'
+++ tail -1
++ ms=16.3
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b7-pholed.log
+++ tail -1
++ pc=1
+++ tail -1
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b7-pholed.log
++ ph=ms
++ echo '7 pholed 16.3 1 ms'
++ cat /root/q2-b7-pholed.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for arm in $ORDER
++ log=/root/q2-b7-pclean.log
++ TARGET=pclean
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b7-pclean.log
+++ awk '{print $2}'
+++ tail -1
++ ms=19.3
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b7-pclean.log
+++ tail -1
++ pc=ms
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b7-pclean.log
+++ tail -1
++ ph=1
++ echo '7 pclean 19.3 ms 1'
++ cat /root/q2-b7-pclean.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/q2-b8-pclean.log
++ TARGET=pclean
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b8-pclean.log
+++ awk '{print $2}'
+++ tail -1
++ ms=17.2
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b8-pclean.log
+++ tail -1
++ pc=ms
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b8-pclean.log
+++ tail -1
++ ph=1
++ echo '8 pclean 17.2 ms 1'
++ cat /root/q2-b8-pclean.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ for arm in $ORDER
++ log=/root/q2-b8-pholed.log
++ TARGET=pholed
++ bash /root/init/loadtest/results/row-shape-frag-2026-08-24/q2_partition_rig.sh
+++ grep -oE '^\s+p(clean|holed)\s+[0-9.]+ ms' /root/q2-b8-pholed.log
+++ awk '{print $2}'
+++ tail -1
++ ms=17.9
+++ tail -1
+++ awk '$1=="pclean" && NF>=4 {print $3}' /root/q2-b8-pholed.log
++ pc=1
+++ awk '$1=="pholed" && NF>=4 {print $3}' /root/q2-b8-pholed.log
+++ tail -1
++ ph=ms
++ echo '8 pholed 17.9 1 ms'
++ cat /root/q2-b8-pholed.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b0-pclean.log
++ aws s3 cp --quiet /root/q2-b0-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b0-pclean.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b0-pholed.log
++ aws s3 cp --quiet /root/q2-b0-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b0-pholed.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b1-pclean.log
++ aws s3 cp --quiet /root/q2-b1-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b1-pclean.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b1-pholed.log
++ aws s3 cp --quiet /root/q2-b1-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b1-pholed.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b2-pclean.log
++ aws s3 cp --quiet /root/q2-b2-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b2-pclean.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b2-pholed.log
++ aws s3 cp --quiet /root/q2-b2-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b2-pholed.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b3-pclean.log
++ aws s3 cp --quiet /root/q2-b3-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b3-pclean.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b3-pholed.log
++ aws s3 cp --quiet /root/q2-b3-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b3-pholed.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b4-pclean.log
++ aws s3 cp --quiet /root/q2-b4-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b4-pclean.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b4-pholed.log
++ aws s3 cp --quiet /root/q2-b4-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b4-pholed.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b5-pclean.log
++ aws s3 cp --quiet /root/q2-b5-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b5-pclean.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b5-pholed.log
++ aws s3 cp --quiet /root/q2-b5-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b5-pholed.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b6-pclean.log
++ aws s3 cp --quiet /root/q2-b6-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b6-pclean.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b6-pholed.log
++ aws s3 cp --quiet /root/q2-b6-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b6-pholed.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b7-pclean.log
++ aws s3 cp --quiet /root/q2-b7-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b7-pclean.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b7-pholed.log
++ aws s3 cp --quiet /root/q2-b7-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b7-pholed.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b8-pclean.log
++ aws s3 cp --quiet /root/q2-b8-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b8-pclean.log
++ for f in /root/q2-b*.log
+++ basename /root/q2-b8-pholed.log
++ aws s3 cp --quiet /root/q2-b8-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/logs/q2-b8-pholed.log
++ echo done
++ push /root/DONE
+++ basename /root/DONE
++ aws s3 cp --quiet /root/DONE s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/DONE
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
++ push /root/q2-runs.log
+++ basename /root/q2-runs.log
++ aws s3 cp --quiet /root/q2-runs.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-runs.log
++ push /root/q2-raw.tsv
+++ basename /root/q2-raw.tsv
++ aws s3 cp --quiet /root/q2-raw.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/q2-raw.tsv
++ sleep 60
++ :
++ push /var/log/round.log
+++ basename /var/log/round.log
++ aws s3 cp --quiet /var/log/round.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round.log
