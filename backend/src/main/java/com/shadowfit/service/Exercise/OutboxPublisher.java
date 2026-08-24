@@ -10,13 +10,9 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -47,21 +43,11 @@ public class OutboxPublisher {
     private final OutboxEventRepository outboxRepository;
     private final ExerciseAnalysisService analysisService;
     private final SessionMetrics sessionMetrics;
-
-    // 자기 주입 — 아래 @Transactional 메서드들이 Spring 프록시를 거치게 한다. 자기호출(this.)은
-    // AOP 프록시를 우회해 @Transactional 이 조용히 무시된다(startAnalysis 에서 실제로 밟았던 함정).
-    // 생성자 주입으로는 자기 자신을 못 받는다(순환) — @Lazy 필드 주입이어야 한다.
-    @Lazy
-    @Autowired
-    private OutboxPublisher self;
-
-    /** 한 tick 에 처리할 최대 건수. 순차 송신이라 이 값 × AI 응답시간이 tick 소요의 상한이다. */
-    @Value("${outbox.publisher.batch-size:20}")
-    private int batchSize;
+    private final OutboxEventStore outboxEventStore;
 
     /**
-     * 선점 유효 시간. gRPC 데드라인(5초)보다 넉넉해야 한다 — 아직 송신 중인 행을 다른 발행기가
-     * "죽은 것"으로 보고 회수하면 불필요한 중복이 난다.
+     * 선점 유효 시간 — {@code owned()} 경고 로그에만 쓴다. 실제 선점·회수 판정은
+     * {@link OutboxEventStore} 가 같은 프로퍼티로 갖는다.
      */
     @Value("${outbox.publisher.lock-timeout-seconds:60}")
     private long lockTimeoutSeconds;
@@ -98,7 +84,7 @@ public class OutboxPublisher {
      */
     @PreDestroy
     void releaseLeaseOnShutdown() {
-        int released = self.releaseOwnedLeases(publisherId);
+        int released = outboxEventStore.releaseOwnedLeases(publisherId);
         if (released > 0) {
             log.info("종료 — 보유 lease {}건 반납(PENDING 복귀), publisherId={}", released, publisherId);
         }
@@ -120,8 +106,8 @@ public class OutboxPublisher {
                 // 두 번째 인자는 «이 행은 이미 한 번 나갔을 수 있다» 는 뜻이다(이슈 #152). 회수분은
                 // 이전 발행기가 송신 «도중» 죽었을 수 있어 중복 배달이 될 수 있는데, 그 사실이
                 // 지금까지 수신 결과를 해석하는 쪽에 전달되지 않았다.
-                dispatchBatch(self.claimStale(), true);
-                dispatchBatch(self.claimPending(), false);
+                dispatchBatch(outboxEventStore.claimStale(publisherId), true);
+                dispatchBatch(outboxEventStore.claimPending(publisherId), false);
             } catch (Exception e) {
                 // tick 하나가 죽어도 다음 tick 은 돌아야 한다. 여기서 안 잡으면 스케줄러가
                 // 해당 작업을 영구 중단시킨다.
@@ -156,7 +142,7 @@ public class OutboxPublisher {
         switch (outcome) {
             case SENT -> {
                 LocalDateTime now = LocalDateTime.now();
-                if (!owned(self.recordSent(event.getId(), publisherId, now), event)) {
+                if (!owned(outboxEventStore.recordSent(event.getId(), publisherId, now), event)) {
                     return;
                 }
                 sessionMetrics.outboxDispatch("sent");
@@ -166,7 +152,7 @@ public class OutboxPublisher {
             }
             case TERMINAL_FAILED -> {
                 // 재시도가 원리상 무의미한 실패 — 한도와 무관하게 즉시 종료 상태로 보낸다.
-                if (!owned(self.recordFailed(event.getId(), publisherId), event)) {
+                if (!owned(outboxEventStore.recordFailed(event.getId(), publisherId), event)) {
                     return;
                 }
                 sessionMetrics.outboxDispatch("failed");
@@ -176,7 +162,7 @@ public class OutboxPublisher {
             case RETRY -> {
                 int attempts = event.getRetryCount() + 1;
                 if (attempts > maxRetry) {
-                    if (!owned(self.recordFailed(event.getId(), publisherId), event)) {
+                    if (!owned(outboxEventStore.recordFailed(event.getId(), publisherId), event)) {
                         return;
                     }
                     sessionMetrics.outboxDispatch("failed");
@@ -185,7 +171,7 @@ public class OutboxPublisher {
                     return;
                 }
                 LocalDateTime nextAt = LocalDateTime.now().plusSeconds(backoffSeconds(attempts));
-                if (!owned(self.recordRetry(event.getId(), publisherId, nextAt), event)) {
+                if (!owned(outboxEventStore.recordRetry(event.getId(), publisherId, nextAt), event)) {
                     return;
                 }
                 sessionMetrics.outboxDispatch("retry");
@@ -215,62 +201,5 @@ public class OutboxPublisher {
     private long backoffSeconds(int attempts) {
         int exponent = Math.min(attempts - 1, 20);
         return Math.min(1L << exponent, maxBackoffSeconds);
-    }
-
-    // ---------------------------------------------------------------------
-    // 트랜잭션 경계 — self 를 거쳐 호출해야 프록시를 타고 @Transactional 이 적용된다.
-    // (자기호출은 AOP 프록시를 우회해 조용히 무시된다 — startAnalysis 에서 한 번 밟은 함정)
-    // ---------------------------------------------------------------------
-
-    /**
-     * 신규·재시도분 선점. 조회와 상태 전이가 <b>한 트랜잭션</b>이어야 한다 — SKIP LOCKED 로 잡은
-     * 락은 트랜잭션과 함께 풀리므로, 상태를 안 바꾸고 커밋하면 다른 발행기가 같은 행을 집는다.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public List<OutboxEvent> claimPending() {
-        return claim(outboxRepository.lockPendingBatch(LocalDateTime.now(), batchSize));
-    }
-
-    /** 선점 후 만료된 {@code PROCESSING} 회수 — 송신 도중 죽은 발행기가 남긴 행이다. */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public List<OutboxEvent> claimStale() {
-        List<OutboxEvent> stale = outboxRepository.lockStaleProcessingBatch(LocalDateTime.now(), batchSize);
-        if (!stale.isEmpty()) {
-            log.warn("만료된 선점 행 회수 - {}건 (이전 발행기가 송신 중 종료됐을 수 있음)", stale.size());
-        }
-        return claim(stale);
-    }
-
-    private List<OutboxEvent> claim(List<OutboxEvent> rows) {
-        if (rows.isEmpty()) {
-            return rows;
-        }
-        outboxRepository.markProcessing(
-                rows.stream().map(OutboxEvent::getId).toList(),
-                publisherId,
-                LocalDateTime.now().plusSeconds(lockTimeoutSeconds));
-        return rows;
-    }
-
-    /** @return 갱신된 행 수. 0 이면 소유권을 잃은 것({@link #owned} 참고). */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int recordSent(Long id, String lockedBy, LocalDateTime sentAt) {
-        return outboxRepository.markSent(id, lockedBy, sentAt);
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int recordRetry(Long id, String lockedBy, LocalDateTime nextRetryAt) {
-        return outboxRepository.markForRetry(id, lockedBy, nextRetryAt);
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int recordFailed(Long id, String lockedBy) {
-        return outboxRepository.markFailed(id, lockedBy);
-    }
-
-    /** @return 반납된 행 수. {@link #releaseLeaseOnShutdown} 전용 — self 를 거쳐 트랜잭션을 태운다. */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int releaseOwnedLeases(String lockedBy) {
-        return outboxRepository.releaseOwnedLeases(lockedBy);
     }
 }
