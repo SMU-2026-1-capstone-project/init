@@ -92,6 +92,16 @@ public class Session {
     @Column(length = 64)
     private String sessionNonce;
 
+    /**
+     * AI 인스턴스 수평확장 준비용 필드 — 아직 아무도 안 읽고 안 쓴다.
+     *
+     * <p>{@code docs/decisions/ai-sticky-routing.md} §5-2(㉯ 매핑 위치)의 추천을 스키마에
+     * 먼저 반영한 것뿐이다. AI 가 여전히 1 인스턴스인 동안은 항상 {@code null}이고,
+     * §8(㉠·㉮·㉰)이 confirm 되기 전까지는 이 필드를 채우거나 읽는 코드를 추가하지 않는다.
+     */
+    @Column(length = 128)
+    private String aiInstanceEndpoint;
+
     // 낙관적 락: FastAPI 완료 콜백과 스케줄러 타임아웃이 동시에 같은 세션을 갱신할 때 충돌 감지용.
     // Hibernate 가 관리하는 필드라 외부에서 쓰면 안 된다 — 이전에는 @Setter(AccessLevel.NONE) 으로
     // 이 필드만 막았지만, 지금은 클래스 전체에 setter 가 없어 그 방어가 기본값이 됐다.
