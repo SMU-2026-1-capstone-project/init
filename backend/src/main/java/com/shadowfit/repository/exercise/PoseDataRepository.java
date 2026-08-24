@@ -20,7 +20,7 @@ import java.util.Optional;
  * 다이브를 한 번씩 하고 있었다. {@code created_at} 을 같이 넘긴 판만 1파티션 · 다이브 1회로 준다.
  *
  * <p>넘길 값이 이미 손에 있다는 것이 핵심이다 — {@code created_at} 은 V6({@link
- * com.shadowfit.service.Exercise.PoseDataService} 멱등 앵커, #188)부터 «적재 시각» 이 아니라
+ * com.shadowfit.service.exercise.PoseDataService} 멱등 앵커, #188)부터 «적재 시각» 이 아니라
  * <b>세션 시작 시각</b>이라, 한 세션의 모든 행이 값 하나를 공유한다. 즉 호출부는
  * {@code session.getStartTime()} 하나로 파티션을 특정할 수 있고 <b>추가 조회가 필요 없다.</b>
  *

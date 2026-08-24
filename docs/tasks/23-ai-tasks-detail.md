@@ -48,7 +48,7 @@
 - ❌ YouTube 다운로드용 임시 디렉터리/캐시 정책 **없음**
 - 📁 기존 기준 자세 생성기: `ai-server/app/core/reference_builder.py` — **업로드된 로컬 영상**에서 rep 세그먼트 추출 후 평균화 (YouTube 미지원)
 - 📁 영상 처리: `ai-server/app/core/video_processor.py` — 로컬 파일 입력 받아 MediaPipe 좌표 추출
-- 📁 호출 경로 (Spring 측): `service/Exercise/ExerciseAnalysisService.java:extractReferencePoses` — 04-15 4eb153b 에서 추가됨. **현재는 호출하면 AI 가 빈 배열 줌**
+- 📁 호출 경로 (Spring 측): `service/exercise/ExerciseAnalysisService.java:extractReferencePoses` — 04-15 4eb153b 에서 추가됨. **현재는 호출하면 AI 가 빈 배열 줌**
 
 ### 만질 파일
 1. `ai-server/requirements.txt` — `yt-dlp` 추가 (`pytube`는 YouTube 차단 대응이 약함, `yt-dlp` 권장)

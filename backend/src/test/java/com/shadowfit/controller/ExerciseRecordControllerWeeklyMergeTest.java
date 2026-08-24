@@ -19,9 +19,9 @@ import com.shadowfit.dto.report.weekly.WeeklySummaryResponseDto;
 import com.shadowfit.dto.report.weekly.WeeklyTotalsDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.model.member.Member;
-import com.shadowfit.service.Report.DailyLogService;
-import com.shadowfit.service.Exercise.SessionActivityQueryService;
-import com.shadowfit.service.Report.WeeklySummaryService;
+import com.shadowfit.service.report.DailyLogService;
+import com.shadowfit.service.exercise.SessionActivityQueryService;
+import com.shadowfit.service.report.WeeklySummaryService;
 
 /**
  * 주간이 <b>한 응답</b>으로 나가는지 지킨다 (이슈 #352).

@@ -193,5 +193,5 @@
 - [`../decisions/load-test-strategy.md`](../decisions/load-test-strategy.md) — 부하 테스트 전략·측정값(§7), 용량 산정(§4)
 - [`../decisions/redis-introduction.md`](../decisions/redis-introduction.md) — Redis 도입 보류 결정 (안 하기로 한 결정)
 - [`../tasks/25-portfolio-strategy.md`](../tasks/25-portfolio-strategy.md) — 진로 전략 회고, 깊이 트랙 후보
-- 코드: `backend/.../service/Exercise/PoseDataService.java`(batch insert), `SessionTimeoutScheduler.java`(낙관적 락), `FeedbackLogService.java`(멱등성), `model/exercise/Session.java:66`(@Version)
+- 코드: `backend/.../service/exercise/PoseDataService.java`(batch insert), `SessionTimeoutScheduler.java`(낙관적 락), `FeedbackLogService.java`(멱등성), `model/exercise/Session.java:66`(@Version)
 - [`pattern-analysis-implementation.md`](../decisions/pattern-analysis-implementation.md) — §F(패턴 분석 API) 구현 계획 전체, 9세션 진행 기록

@@ -18,7 +18,7 @@ import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.report.DailyLogRepository;
 import com.shadowfit.repository.report.ReportRepository;
-import com.shadowfit.service.Member.MemberService;
+import com.shadowfit.service.member.MemberService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

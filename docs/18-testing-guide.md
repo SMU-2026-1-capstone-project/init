@@ -76,7 +76,7 @@ testRuntimeOnly 'com.h2database:h2'         // 2026-05-09 추가
 ```
 backend/src/test/java/com/shadowfit/
 ├── ShadowfitApplicationTests.java                          # 컨텍스트 로드 확인 (sanity)
-└── service/Exercise/SessionTimeoutSchedulerTest.java       # 단위 테스트
+└── service/exercise/SessionTimeoutSchedulerTest.java       # 단위 테스트
 ```
 
 ### 3.1 `SessionTimeoutSchedulerTest`

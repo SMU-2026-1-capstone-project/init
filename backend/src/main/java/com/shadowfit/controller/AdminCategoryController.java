@@ -3,7 +3,7 @@ package com.shadowfit.controller;
 import com.shadowfit.dto.admin.CategoryCreateDto;
 import com.shadowfit.dto.admin.CategoryResponseDto;
 import com.shadowfit.dto.admin.CategoryUpdateDto;
-import com.shadowfit.service.Exercise.AdminCategoryService;
+import com.shadowfit.service.exercise.AdminCategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

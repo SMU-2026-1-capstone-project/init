@@ -1223,14 +1223,14 @@ Speech.speak(message, { language: 'ko-KR', rate: userTtsSpeed });
 | **B. 페르소나 × 결함 16 row seed** ⭐ | ❌ 미구현 — 스쿼트 4 결함 × 4 페르소나 = 16 row (또는 단계적: BEGINNER 4 row 만 먼저) | `mysql/data.sql` | ~20줄 |
 | **— Endpoints / Service —** | | | |
 | `InternalFeedbackController.batch()` (`POST /internal/feedback/batch`) | ✅ 존재 — `X-Internal-Token` 검증 + `FeedbackLogService.saveBatch()` 호출 | `controller/InternalFeedbackController.java` | — |
-| `FeedbackLogService.saveBatch()` (= 당초 명명 `SessionFeedbackService.batchInsert`) | ✅ 존재 | `service/Exercise/FeedbackLogService.java` | — |
+| `FeedbackLogService.saveBatch()` (= 당초 명명 `SessionFeedbackService.batchInsert`) | ✅ 존재 | `service/exercise/FeedbackLogService.java` | — |
 | `FeedbackBatchRequestDto` | ✅ 존재 | `dto/exercises/feedback/FeedbackBatchRequestDto.java` | — |
 | 내부 토큰 검증 | ✅ inline 처리 (Controller 안) | 위 InternalFeedbackController | — |
 | `FeedbackTemplateController.list()` (`GET /exercises/{id}/feedback-templates`) | ⚠️ 존재하나 **페르소나 필터링 없음** — 운동별 전체 반환 | `controller/FeedbackTemplateController.java` | — |
-| **C. 페르소나 자동 필터 (Controller 갱신)** ⭐ | ❌ 미구현 — 토큰의 `selectedPersona` → repo `findByExerciseIdAndPersona` 필터 | `controller/FeedbackTemplateController.java`, `service/Exercise/FeedbackTemplateService.java`, repo | ~30줄 |
-| `PreferenceController.get/patch()` (`GET/PATCH /preferences/tts`) | ✅ 존재 — `members.tts_*` 직접 갱신 | `controller/PreferenceController.java`, `service/Member/PreferenceService.java` | — |
-| **D. `SessionController.end()`** (분기 2.A.ET 의 ET-A — `PATCH /sessions/{id}/end`) ⭐ | ❌ 미구현 — Session 엔티티에 `endTime` 컬럼은 있으나 endpoint 없음 | `controller/SessionController.java`, `service/Exercise/SessionService.java` | ~25줄 |
-| **E. `SessionFeedbackController.list/summary()`** (`GET /sessions/{id}/feedbacks`, `feedback-summary`) ⭐ | ❌ 미구현 | `controller/SessionFeedbackController.java`, `service/Exercise/SessionFeedbackQueryService.java` | ~60줄 |
+| **C. 페르소나 자동 필터 (Controller 갱신)** ⭐ | ❌ 미구현 — 토큰의 `selectedPersona` → repo `findByExerciseIdAndPersona` 필터 | `controller/FeedbackTemplateController.java`, `service/exercise/FeedbackTemplateService.java`, repo | ~30줄 |
+| `PreferenceController.get/patch()` (`GET/PATCH /preferences/tts`) | ✅ 존재 — `members.tts_*` 직접 갱신 | `controller/PreferenceController.java`, `service/member/PreferenceService.java` | — |
+| **D. `SessionController.end()`** (분기 2.A.ET 의 ET-A — `PATCH /sessions/{id}/end`) ⭐ | ❌ 미구현 — Session 엔티티에 `endTime` 컬럼은 있으나 endpoint 없음 | `controller/SessionController.java`, `service/exercise/SessionService.java` | ~25줄 |
+| **E. `SessionFeedbackController.list/summary()`** (`GET /sessions/{id}/feedbacks`, `feedback-summary`) ⭐ | ❌ 미구현 | `controller/SessionFeedbackController.java`, `service/exercise/SessionFeedbackQueryService.java` | ~60줄 |
 | 권한 가드 (본인·트레이너) | 기존 권한 모듈 재사용 | — | — |
 | `22-backend-tasks-detail.md` 에 BE 작업 항목 신설 | ❌ 미구현 (이 정정 진행 중) | 문서 | 1 작업 |
 

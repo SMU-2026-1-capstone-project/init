@@ -1,7 +1,7 @@
 # 리포트 집계 로직 결정 — BE-02 worst 구간·syncRateDetails·comparisonWithPrevious
 
 마지막 업데이트: 2026-05-25
-대상 코드: `backend/src/main/java/com/shadowfit/service/Report/ReportService.java` 의 `buildReportResponse` 3 메서드
+대상 코드: `backend/src/main/java/com/shadowfit/service/report/ReportService.java` 의 `buildReportResponse` 3 메서드
 연관: [`../tasks/22-backend-tasks-detail.md`](../tasks/22-backend-tasks-detail.md) BE-02, [`../tasks/21-task-assignment.md`](../tasks/21-task-assignment.md)
 
 ---

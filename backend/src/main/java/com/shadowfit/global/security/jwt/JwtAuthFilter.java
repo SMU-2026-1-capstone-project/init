@@ -2,7 +2,7 @@ package com.shadowfit.global.security.jwt;
 
 import com.shadowfit.global.observability.CorrelationIds;
 import com.shadowfit.global.security.auth.CustomUserDetails;
-import com.shadowfit.service.Member.CustomUserDetailsService;
+import com.shadowfit.service.member.CustomUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

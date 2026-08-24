@@ -3,7 +3,7 @@ package com.shadowfit.controller;
 import com.shadowfit.dto.exercises.feedback.SessionFeedbackEventDto;
 import com.shadowfit.dto.exercises.feedback.SessionFeedbackSummaryDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
-import com.shadowfit.service.Exercise.SessionFeedbackQueryService;
+import com.shadowfit.service.exercise.SessionFeedbackQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

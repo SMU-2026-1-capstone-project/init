@@ -2,7 +2,7 @@ package com.shadowfit.controller;
 
 import com.shadowfit.dto.report.detailreport.SessionReportResponseDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
-import com.shadowfit.service.Report.ReportService;
+import com.shadowfit.service.report.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

@@ -188,7 +188,7 @@ public void onNext(StopResponse value) {
 ~~AI가 재시작돼 세션을 잃은 상태에서 Stop이 도착하면 `success=false`가 오지만, Spring은 이걸 **정상 응답으로 처리하고 INFO 로그만 남긴다**. 결과는 영영 안 오는데 경보는 어디에도 안 뜬다.~~
 
 > ✅ **2026-08-11 확인 — 이 서술은 낡았다. §7-확정 ④ 의 선행 작업이 이미 반영돼 있다.**
-> [`ExerciseAnalysisService.java:478-500`](../../backend/src/main/java/com/shadowfit/service/Exercise/ExerciseAnalysisService.java) 은 지금
+> [`ExerciseAnalysisService.java:478-500`](../../backend/src/main/java/com/shadowfit/service/exercise/ExerciseAnalysisService.java) 은 지금
 > `success=false` 를 **분기해서 다룬다** — `sessionMetrics.aiStopResult("session-missing")` 으로 **지표에 집계**하고
 > `log.warn` 으로 남긴다(INFO 아님). 게다가 `possiblyRedelivered` 를 구분해 «회수분 재송신»(첫 송신이 이미
 > 처리됐을 수 있다)과 «진짜 유실»을 갈라 놨다([#152](https://github.com/Shadowfit/init/issues/152)).
@@ -405,7 +405,7 @@ FAILED 가 무한 누적되는 건 아니다 — 정상 운영에서 이 상태�
 
 #### (3) 검증 방식도 이미 깔려 있다
 
-`SessionMetricsRecordingTest`(2026-07-28, `service/Exercise/`)가 **진짜 `SimpleMeterRegistry`로 카운트를 assert하는 패턴**을 확립해 뒀다. outbox 지표도 같은 틀로 검증하면 된다 — 새로 만들 게 없다.
+`SessionMetricsRecordingTest`(2026-07-28, `service/exercise/`)가 **진짜 `SimpleMeterRegistry`로 카운트를 assert하는 패턴**을 확립해 뒀다. outbox 지표도 같은 틀로 검증하면 된다 — 새로 만들 게 없다.
 
 ---
 

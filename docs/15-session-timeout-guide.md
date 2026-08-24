@@ -440,11 +440,11 @@ JPA가 `@Entity` 에서 자동 스키마 생성하므로 ENUM/JSON 등 MySQL 전
 
 - **Model**: `com.shadowfit.model.exercise.Session` (`@Version` 포함)
 - **Enum**: `com.shadowfit.model.exercise.Status` (`FAILED` 포함)
-- **Scheduler**: `com.shadowfit.service.Exercise.SessionTimeoutScheduler`
-- **Service**: `com.shadowfit.service.Exercise.SessionService.completeSession` / `markAsFailedIfStillInProgress`
-- **Service**: `com.shadowfit.service.Exercise.ExerciseAnalysisService.completeSession`
+- **Scheduler**: `com.shadowfit.service.exercise.SessionTimeoutScheduler`
+- **Service**: `com.shadowfit.service.exercise.SessionService.completeSession` / `markAsFailedIfStillInProgress`
+- **Service**: `com.shadowfit.service.exercise.ExerciseAnalysisService.completeSession`
 - **Repository**: `com.shadowfit.repository.exercise.SessionRepository`
 - **Config**: `com.shadowfit.global.config.SchedulerConfig`
-- **Test**: `test/java/com/shadowfit/service/Exercise/SessionTimeoutSchedulerTest.java`
+- **Test**: `test/java/com/shadowfit/service/exercise/SessionTimeoutSchedulerTest.java`
 - **Test resources**: `src/test/resources/application.yml`
 

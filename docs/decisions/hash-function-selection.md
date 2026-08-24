@@ -148,7 +148,7 @@ MD5 쪽의 ±450 안팎 흔들림이 **정상**이고, CRC32 의 오차 0 이 �
 |---|---|:--:|---|
 | [`PasswordEncoderConfig.java:10`](../../backend/src/main/java/com/shadowfit/global/security/config/PasswordEncoderConfig.java) | **BCrypt** (Spring Security 기본 strength 10) | ④ | ✅ 적합 |
 | [`CorrelationIds.java:56`](../../backend/src/main/java/com/shadowfit/global/observability/CorrelationIds.java) | `UUID.randomUUID()` 앞 12자 | — | ✅ 해시가 아니라 난수. 추적용 식별자라 이게 맞다 |
-| [`OutboxPublisher.java:77`](../../backend/src/main/java/com/shadowfit/service/Exercise/OutboxPublisher.java) | `UUID.randomUUID()` 앞 8자 | — | ✅ 같음 (publisher 식별) |
+| [`OutboxPublisher.java:77`](../../backend/src/main/java/com/shadowfit/service/exercise/OutboxPublisher.java) | `UUID.randomUUID()` 앞 8자 | — | ✅ 같음 (publisher 식별) |
 | [`measure_admin_filter_explain.sh:134`](../../loadtest/measure_admin_filter_explain.sh) | **MD5** → `% 4` | ② (③을 빌림) | ✅ 공격자 없는 용도. §4 로 검증함 |
 
 **그 외에는 해시를 쓰지 않는다.** JWT 서명은 라이브러리 안쪽이라 여기 세지 않았다.

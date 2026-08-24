@@ -363,5 +363,5 @@ def StopAnalysis(self, request, context):
 - [`../REQUIREMENTS.md`](../REQUIREMENTS.md) §5·6·8 — 요구사항 근거
 - [`../tasks/23-ai-tasks-detail.md`](../tasks/23-ai-tasks-detail.md) — AI 작업 항목
 - [`./ai-h2-auth-middleware.md`](./ai-h2-auth-middleware.md) — 선행 작업 (H2 인증 미들웨어, 별도 패키지)
-- `backend/src/main/java/com/shadowfit/service/Exercise/ExerciseGrpcService.java:104` — gRPC `reportFeedbackBatch` 핸들러 (참고용)
-- `backend/src/main/java/com/shadowfit/service/Exercise/FeedbackLogService.java` — proto 직접 수신·INSERT IGNORE 멱등성
+- `backend/src/main/java/com/shadowfit/service/exercise/ExerciseGrpcService.java:104` — gRPC `reportFeedbackBatch` 핸들러 (참고용)
+- `backend/src/main/java/com/shadowfit/service/exercise/FeedbackLogService.java` — proto 직접 수신·INSERT IGNORE 멱등성

@@ -4,7 +4,7 @@ import com.shadowfit.dto.admin.AdminMemberListItemDto;
 import com.shadowfit.dto.admin.AdminMemberSearchCondition;
 import com.shadowfit.dto.admin.AdminMemberSortKey;
 import com.shadowfit.dto.common.PageResponse;
-import com.shadowfit.service.Member.AdminMemberService;
+import com.shadowfit.service.member.AdminMemberService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;

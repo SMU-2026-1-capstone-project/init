@@ -229,7 +229,7 @@ fps 를 3 으로 고정해도 **하강 속도가 느린 사용자**는 그대로
 
 ## 7. 미검증 / 확인 필요
 
-- 🔴 **`timestamp_sec` 의 의미가 경로마다 다르다** → **[#156](https://github.com/Shadowfit/init/issues/156) 로 등록.** 계약서는 「영상 내 시간」, 실시간 클라는 **epoch**, 배치는 영상 상대, fallback 은 **프레임 개수**. 리포트가 이 값을 `MM:SS` 로 포맷하므로([`SessionAnalysisCalculator.java:200-203`](../../backend/src/main/java/com/shadowfit/service/Report/SessionAnalysisCalculator.java)) 실시간 세션의 「최악 구간 시각」·「회차별 추이」가 깨진다. **정적 판독이고 재현 안 했다.**
+- 🔴 **`timestamp_sec` 의 의미가 경로마다 다르다** → **[#156](https://github.com/Shadowfit/init/issues/156) 로 등록.** 계약서는 「영상 내 시간」, 실시간 클라는 **epoch**, 배치는 영상 상대, fallback 은 **프레임 개수**. 리포트가 이 값을 `MM:SS` 로 포맷하므로([`SessionAnalysisCalculator.java:200-203`](../../backend/src/main/java/com/shadowfit/service/report/SessionAnalysisCalculator.java)) 실시간 세션의 「최악 구간 시각」·「회차별 추이」가 깨진다. **정적 판독이고 재현 안 했다.**
   ⚠️ **ㄴ안을 택하면 #156 이 선행 조건이다.** ㄴ이 판정에 쓰려는 그 값이 이미 저장·표시에서 틀려 있다.
 - ⚠️ #143 의 측정은 **합성 궤적**(하강 1.2s 선형)에 의존한다. 실제 스쿼트 각도 로그로 재확인 안 됨.
 - ⚠️ 3fps 에서 체류 0초 스쿼트가 bottom 진입을 못 한 관찰(#143 코멘트 "부수 관찰") — 사실이면 **현재 fps 에서도 구멍**이라는 뜻이지만 역시 합성 궤적 의존.

@@ -49,7 +49,7 @@
 - 📁 `PoseData`: `model/exercise/PoseData.java` — `timestampSec`, `syncRate`, `isCorrect`, `feedbackMessage` 컬럼 보유 (worst 구간 선정의 원천 데이터)
 
 ### 만질 파일
-1. `service/Report/ReportService.java` — `selectWorstSection(sessionId)`, `buildSyncRateDetails(sessionId)`, `buildComparisonWithPrevious(memberId, sessionId)` 3 메서드 신설
+1. `service/report/ReportService.java` — `selectWorstSection(sessionId)`, `buildSyncRateDetails(sessionId)`, `buildComparisonWithPrevious(memberId, sessionId)` 3 메서드 신설
    - **worst 선정 알고리즘**: `PoseData` 중 `syncRate` 가장 낮은 timestamp 구간 (또는 연속된 N개의 평균이 가장 낮은 구간)
    - **syncRateDetails**: 시계열 배열 — 프론트가 차트 그릴 수 있는 형태 `[{t: 5.2, sync: 0.78}, ...]`
    - **comparisonWithPrevious**: 직전 동일 운동 세션의 평균 syncRate 와 차이
@@ -76,13 +76,13 @@
 - 📁 `ReportService.java:29-56` — 현재는 Report 엔티티 조회/표시만 함. **누가 Report 를 생성하는지 불명확** (현재는 수동 시드 또는 미생성)
 
 ### 만질 파일
-1. `service/Report/GptFeedbackService.java` 신설
+1. `service/report/GptFeedbackService.java` 신설
    - 입력: `Session` + 그 세션의 `PoseData` 요약(평균 syncRate, worst 구간, totalReps)
    - 출력: `{summary, improvementTips, detailedAnalysis}` 텍스트 3종
    - 호출: OpenAI Chat Completions 또는 Anthropic Messages API
    - 프롬프트는 한국어 ([[project_korean_only]])
-2. `service/Report/ReportService.java` — `generateReportForSession(sessionId)` 추가, `GptFeedbackService` 호출 후 `Report` 엔티티 저장
-3. `service/Exercise/ExerciseAnalysisService.java` 또는 gRPC 콜백 `CompleteAnalysis` 처리부 — **세션 종료 콜백 수신 시 비동기로 리포트 생성 트리거** (`@Async` 또는 `ApplicationEventPublisher`)
+2. `service/report/ReportService.java` — `generateReportForSession(sessionId)` 추가, `GptFeedbackService` 호출 후 `Report` 엔티티 저장
+3. `service/exercise/ExerciseAnalysisService.java` 또는 gRPC 콜백 `CompleteAnalysis` 처리부 — **세션 종료 콜백 수신 시 비동기로 리포트 생성 트리거** (`@Async` 또는 `ApplicationEventPublisher`)
 4. `application.yml` — `openai.api-key: ${OPENAI_API_KEY}` 또는 `anthropic.api-key: ${ANTHROPIC_API_KEY}`
 5. `docker-compose.yml` — backend 컨테이너에 env 주입
 6. `.env.example` — 키 변수 추가
@@ -266,7 +266,7 @@
 3. `model/exercise/PoseData.java` — `setIndex` 컬럼 추가
 4. `mysql/schema.sql` — 컬럼 추가 (또는 Flyway 마이그레이션, OP-04 의존)
 5. `dto/exercises/session/*` — 세트 정보 노출
-6. `service/Exercise/PoseDataService.java`, `ExerciseGrpcService.java` — 새 필드 처리
+6. `service/exercise/PoseDataService.java`, `ExerciseGrpcService.java` — 새 필드 처리
 
 ### 완료 기준
 - 스쿼트 외 운동 추가 + 세트 단위 분석 결과 저장/조회 가능
@@ -286,14 +286,14 @@
 ### 현재 상태 (착수 전 스냅샷 — 아래는 옛 기록)
 - ~~❌ AI 서버 헬스체크 없음 — Spring 이 AI 다운 여부 모름~~
 - ~~❌ Resilience4j 미도입~~ → ✅ 도입 완료(`ExerciseAnalysisService`, `extractReferenceData`·`startAnalysis`·`stopAnalysis` 3개 호출 보호)
-- 📁 `service/Exercise/ExerciseAnalysisService.java` — gRPC 호출 후 실패 시 단순 throw
+- 📁 `service/exercise/ExerciseAnalysisService.java` — gRPC 호출 후 실패 시 단순 throw
 
 ### 만질 파일
 1. `backend/build.gradle` — `resilience4j-spring-boot3`, `resilience4j-reactor` 추가
-2. `service/Exercise/AiHealthCheckService.java` 신설 (+50줄)
+2. `service/exercise/AiHealthCheckService.java` 신설 (+50줄)
    - gRPC `grpc.health.v1.Health/Check` 주기 호출 (10초 fixedDelay)
    - 결과를 `AtomicReference<AiServerStatus>` 에 저장
-3. `service/Exercise/ExerciseAnalysisService.java` ±15
+3. `service/exercise/ExerciseAnalysisService.java` ±15
    - `startAnalysis` 진입 시 `AiHealthCheckService.isUp()` 확인 → DOWN 이면 `AiUnavailableException`
 4. `global/grpc/GrpcCircuitBreakerInterceptor.java` 신설 — gRPC client interceptor 로 모든 호출에 Circuit Breaker 적용 (`failureRateThreshold: 50%`, `minimumNumberOfCalls: 5`, `waitDurationInOpenState: 30s`)
 5. `application.yml` — `resilience4j.circuitbreaker.instances.aiServer` 설정
@@ -315,12 +315,12 @@
 **우선**: 🔴 | **추정**: 3h | **의존**: 분기 H = H2 확정
 
 ### 현재 상태
-- ⚠️ `ExerciseGrpcService.SavePoseDataBatch` (`service/Exercise/ExerciseGrpcService.java`) — AI 콜백을 거의 그대로 저장
+- ⚠️ `ExerciseGrpcService.SavePoseDataBatch` (`service/exercise/ExerciseGrpcService.java`) — AI 콜백을 거의 그대로 저장
 - ❌ sessionId 소유권 / memberId 일치 / 시간 범위 / syncRate 범위 검증 없음
 - 📁 H2 채택으로 프론트가 AI 직접 호출 → 임의 sessionId 로 호출 가능 → AI 가 그 sessionId 로 콜백 → 백엔드가 무방비로 받음
 
 ### 만질 파일
-1. `service/Exercise/PoseDataValidationGate.java` 신설 (+80줄)
+1. `service/exercise/PoseDataValidationGate.java` 신설 (+80줄)
    - `validate(sessionId, batch)` — 다음 검증:
      - sessionId 유효 + status IN_PROGRESS
      - memberId 일치 (세션 소유자 vs 콜백 시점)
@@ -328,8 +328,8 @@
      - `sync_rate` 가 [0.0, 1.0] 범위 안
      - 배치 크기 한도 (1000건 등)
    - 무효 시 `InvalidPoseDataException` + 메트릭 카운트
-2. `service/Exercise/PoseDataService.java` ±10 — `savePoseDataBatch` 호출 전 검증 게이트 통과
-3. `service/Exercise/ExerciseGrpcService.java` ±5 — 예외 처리, gRPC `INVALID_ARGUMENT` 응답
+2. `service/exercise/PoseDataService.java` ±10 — `savePoseDataBatch` 호출 전 검증 게이트 통과
+3. `service/exercise/ExerciseGrpcService.java` ±5 — 예외 처리, gRPC `INVALID_ARGUMENT` 응답
 4. Micrometer 메트릭: `posedata.callback.invalid.total{reason}` (sessionId / range / size / member)
 
 ### 완료 기준
@@ -353,12 +353,12 @@
 
 ### 만질 파일
 1. `mysql/schema.sql` (Flyway) — `pose_data_outbox` 테이블 신설 (id, session_id, payload JSON, status, retry_count, created_at, processed_at)
-2. `service/Exercise/PoseDataIngestService.java` 신설 (+120줄)
+2. `service/exercise/PoseDataIngestService.java` 신설 (+120줄)
    - `ExerciseGrpcService` 의 콜백 진입점이 호출
    - 1단계 (콜백 트랜잭션): Outbox 에만 INSERT, 즉시 ACK
    - 2단계 (별도 트랜잭션, `@Scheduled` 또는 `@Async`): Outbox 에서 꺼내 PoseData 저장 + 통계 갱신 + Goal 진척
    - 실패 시 retry_count++, max 3회 → DLQ (status=FAILED)
-3. `service/Exercise/ExerciseGrpcService.java` ±15
+3. `service/exercise/ExerciseGrpcService.java` ±15
 4. `service/admin/OutboxDlqController.java` (선택) — DLQ 조회·재처리
 
 ### 완료 기준
@@ -393,7 +393,7 @@
 1. `mysql/schema.sql:120-128` + `mysql/data.sql:79-87` — `exercise_feedback_templates` 테이블에 `persona VARCHAR(10) NULL` 컬럼 추가, uniqueKey 를 `(exercise_id, feedback_type, persona)` 로 변경. `persona IS NULL` row 는 *공통 fallback* 의미
 2. `model/exercise/ExerciseFeedbackTemplate.java` — `@Enumerated SelectedPersona persona` 필드 + uniqueConstraint 갱신 (~10줄)
 3. `repository/exercise/ExerciseFeedbackTemplateRepository.java` — `findByExerciseAndPersonaWithFallback(exercise, persona)` 신설. 페르소나 row 가 있으면 그것, 없으면 `persona IS NULL` fallback 반환 (~15줄)
-4. `service/Exercise/FeedbackTemplateService.java` — 토큰의 사용자 → `selectedPersona` 조회 → repo 호출 (~10줄)
+4. `service/exercise/FeedbackTemplateService.java` — 토큰의 사용자 → `selectedPersona` 조회 → repo 호출 (~10줄)
 5. `controller/FeedbackTemplateController.java` — `@AuthenticationPrincipal` 추가, service 위임 (~5줄)
 6. `mysql/data.sql` — 스쿼트 4 결함 × 4 페르소나 = 16 row seed (스쿼트만 우선, 런지·플랭크는 후속) (~20줄)
    - 12-persona-difficulty.md 의 페르소나별 톤 가이드 활용
@@ -412,8 +412,8 @@
               columnNames = {"session_id", "occurred_at", "feedback_type"}),
           indexes = @Index(name = "idx_session_feedback", columnList = "session_id, occurred_at"))
    ```
-10. `service/Exercise/FeedbackLogService.java` — `saveBatch(FeedbackBatchRequest proto)` 시그니처 (D-2 채택). native `INSERT IGNORE` 사용. AI 측 retry 가 같은 events 재송신해도 안전 흡수
-11. `service/Exercise/ExerciseGrpcService.java` — `reportFeedbackBatch` 핸들러 신규. proto → `FeedbackLogService.saveBatch` 위임. 응답에 `saved_count` 포함. ~~`InternalFeedbackController` REST endpoint~~ → 삭제됨
+10. `service/exercise/FeedbackLogService.java` — `saveBatch(FeedbackBatchRequest proto)` 시그니처 (D-2 채택). native `INSERT IGNORE` 사용. AI 측 retry 가 같은 events 재송신해도 안전 흡수
+11. `service/exercise/ExerciseGrpcService.java` — `reportFeedbackBatch` 핸들러 신규. proto → `FeedbackLogService.saveBatch` 위임. 응답에 `saved_count` 포함. ~~`InternalFeedbackController` REST endpoint~~ → 삭제됨
 
 ### 완료 기준
 
@@ -464,7 +464,7 @@
 
 ### 만질 파일 (완료됨)
 1. ✅ `controller/SessionController.java` — `PATCH /sessions/{id}/end` 구현
-2. ✅ `service/Exercise/SessionService.java` — `endSession(sessionId, member)`: 권한 검증 + endTime 기록 + `TransactionSynchronization.afterCommit` 안에서 `analysisService.stopAnalysis(sessionId)` 호출
+2. ✅ `service/exercise/SessionService.java` — `endSession(sessionId, member)`: 권한 검증 + endTime 기록 + `TransactionSynchronization.afterCommit` 안에서 `analysisService.stopAnalysis(sessionId)` 호출
 3. ~~`dto/session/SessionEndDto.java`~~ — body 불필요 (서버 시각 권위 채택)
 
 ### 완료 기준
@@ -504,7 +504,7 @@
 1. `controller/SessionFeedbackController.java` 신설 (~40줄)
    - `GET /sessions/{id}/feedbacks` — events 리스트, 페이징 옵션
    - `GET /sessions/{id}/feedback-summary` — feedback_type 별 카운트 + sync_rate 통계
-2. `service/Exercise/SessionFeedbackQueryService.java` 신설 (~30줄)
+2. `service/exercise/SessionFeedbackQueryService.java` 신설 (~30줄)
 3. `repository/exercise/SessionFeedbackLogRepository.java` — `findBySessionIdOrderByOccurredAtAsc`, 집계 쿼리 (~10줄)
 4. `dto/session/SessionFeedbackResponseDto.java`, `SessionFeedbackSummaryDto.java` (~20줄)
 

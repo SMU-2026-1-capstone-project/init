@@ -1,6 +1,6 @@
 package com.shadowfit.global.observability;
 
-import com.shadowfit.service.Report.WeeklySentenceRuleId;
+import com.shadowfit.service.report.WeeklySentenceRuleId;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;

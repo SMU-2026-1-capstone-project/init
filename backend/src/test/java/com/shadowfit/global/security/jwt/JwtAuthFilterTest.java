@@ -7,7 +7,7 @@ import com.shadowfit.global.observability.CorrelationIds;
 import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.UserRole;
-import com.shadowfit.service.Member.CustomUserDetailsService;
+import com.shadowfit.service.member.CustomUserDetailsService;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

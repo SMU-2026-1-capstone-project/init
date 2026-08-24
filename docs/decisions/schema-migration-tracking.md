@@ -114,7 +114,7 @@ JPA 경로였다면 `ddl-auto: validate` 로 부팅 시 막을 수 있었다(현
 
 ### 5-2. ⚠️ ㄴ 을 고르면 비교 범위를 먼저 못박아야 한다
 
-`information_schema` 를 `schema.sql` 기대값과 **통짜로 비교하면 매일 다른 답이 나온다.** `PoseDataPartitionScheduler` 가 매일 04:00 에 `pose_data` 의 파티션을 **추가·삭제**하기 때문이다([`PoseDataPartitionScheduler.java:55`](../../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataPartitionScheduler.java#L55)).
+`information_schema` 를 `schema.sql` 기대값과 **통짜로 비교하면 매일 다른 답이 나온다.** `PoseDataPartitionScheduler` 가 매일 04:00 에 `pose_data` 의 파티션을 **추가·삭제**하기 때문이다([`PoseDataPartitionScheduler.java:55`](../../backend/src/main/java/com/shadowfit/service/exercise/PoseDataPartitionScheduler.java#L55)).
 
 즉 **파티션 목록은 정당하게 드리프트한다** — 그건 결함이 아니라 설계된 동작이다. 비교 대상을 **컬럼과 인덱스로 한정**하고 파티션은 제외해야 신호가 된다. (이건 구현 난이도가 아니라 **범위 정의**의 문제고, 안 정하면 경보가 매일 울려 아무도 안 보게 된다.)
 

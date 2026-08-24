@@ -36,11 +36,11 @@ ai-server(Python)는 범위 밖 ([[feedback_minimize_python_changes]]).
 
 ## 2. 발견 — 인가(Authorization) — 최우선
 
-이 프로젝트엔 이미 **소유권 체크를 올바르게 하는 패턴**이 존재한다 — `SessionController.endSession`([`SessionController.java:26-32`](../../backend/src/main/java/com/shadowfit/controller/SessionController.java))가 `SessionService.endSession`([`SessionService.java:132-138`](../../backend/src/main/java/com/shadowfit/service/Exercise/SessionService.java))에서 `session.getMember().getId().equals(currentMemberId)`로 검증 후 `ACCESS_DENIED`를 던지고, `SessionFeedbackController`도 동일 패턴으로 `memberId`를 서비스에 넘긴다. **아래 항목들은 이 패턴이 이미 사내에 있는데도 빠뜨린 케이스**라는 게 핵심 — "몰라서"가 아니라 "일관되게 안 지켜서"인 게 인터뷰 서사상으로도 더 정직하다.
+이 프로젝트엔 이미 **소유권 체크를 올바르게 하는 패턴**이 존재한다 — `SessionController.endSession`([`SessionController.java:26-32`](../../backend/src/main/java/com/shadowfit/controller/SessionController.java))가 `SessionService.endSession`([`SessionService.java:132-138`](../../backend/src/main/java/com/shadowfit/service/exercise/SessionService.java))에서 `session.getMember().getId().equals(currentMemberId)`로 검증 후 `ACCESS_DENIED`를 던지고, `SessionFeedbackController`도 동일 패턴으로 `memberId`를 서비스에 넘긴다. **아래 항목들은 이 패턴이 이미 사내에 있는데도 빠뜨린 케이스**라는 게 핵심 — "몰라서"가 아니라 "일관되게 안 지켜서"인 게 인터뷰 서사상으로도 더 정직하다.
 
 ### 2-① `ExerciseReportController.getSessionReport` — 타인 세션 리포트 열람 가능 — ✅ 해결(`52049d0`)
 
-[`ExerciseReportController.java:24-31`](../../backend/src/main/java/com/shadowfit/controller/ExerciseReportController.java) — `CustomUserDetails customUserDetails`를 파라미터로 받아놓고 **한 번도 안 씀**. `ReportService.getSessionReport(sessionId)`([`ReportService.java:33`](../../backend/src/main/java/com/shadowfit/service/Report/ReportService.java))도 `sessionId`만으로 조회, 세션 소유자와 요청자 비교 로직이 전혀 없음.
+[`ExerciseReportController.java:24-31`](../../backend/src/main/java/com/shadowfit/controller/ExerciseReportController.java) — `CustomUserDetails customUserDetails`를 파라미터로 받아놓고 **한 번도 안 씀**. `ReportService.getSessionReport(sessionId)`([`ReportService.java:33`](../../backend/src/main/java/com/shadowfit/service/report/ReportService.java))도 `sessionId`만으로 조회, 세션 소유자와 요청자 비교 로직이 전혀 없음.
 
 **영향**: 로그인만 하면 `sessionId`를 순차 대입해 **다른 사용자의 운동 리포트(자세 분석·싱크율·피드백)를 전부 열람 가능** — OWASP Top 1 (Broken Access Control) 정확히 해당하는 IDOR.
 
@@ -95,7 +95,7 @@ ai-server(Python)는 범위 밖 ([[feedback_minimize_python_changes]]).
 
 ### 3-④ gRPC 에러 처리 — 4개 메서드 중 1개만 다른 패턴 — ✅ 해결(`85d6bff`)
 
-`ExerciseGrpcService`의 `savePoseDataBatch`·`extractReferenceData`·`reportFeedbackBatch`는 예외를 `io.grpc.Status.XXX.asRuntimeException()`으로 감싸는데, `completeAnalysis`([`ExerciseGrpcService.java:98-101`](../../backend/src/main/java/com/shadowfit/service/Exercise/ExerciseGrpcService.java))만 `responseObserver.onError(e)`로 원본 예외를 그대로 전달 — AI 서버 쪽에 내부 예외 클래스/메시지가 그대로 노출됨. `InternalAuthInterceptor`로 보호되는 서버-서버 통신이라 위험도는 낮지만, 3:1 패턴 불일치는 리뷰에서 지적받을 지점.
+`ExerciseGrpcService`의 `savePoseDataBatch`·`extractReferenceData`·`reportFeedbackBatch`는 예외를 `io.grpc.Status.XXX.asRuntimeException()`으로 감싸는데, `completeAnalysis`([`ExerciseGrpcService.java:98-101`](../../backend/src/main/java/com/shadowfit/service/exercise/ExerciseGrpcService.java))만 `responseObserver.onError(e)`로 원본 예외를 그대로 전달 — AI 서버 쪽에 내부 예외 클래스/메시지가 그대로 노출됨. `InternalAuthInterceptor`로 보호되는 서버-서버 통신이라 위험도는 낮지만, 3:1 패턴 불일치는 리뷰에서 지적받을 지점.
 
 ---
 
