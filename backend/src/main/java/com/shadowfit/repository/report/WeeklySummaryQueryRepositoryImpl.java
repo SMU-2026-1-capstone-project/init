@@ -4,9 +4,12 @@ import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.shadowfit.dto.report.weekly.RepCurvePointDto;
 import com.shadowfit.dto.report.weekly.WeeklyTotalsDto;
+import com.shadowfit.dto.report.weekly.WorstRepFrequencyDto;
 import com.shadowfit.model.exercise.QSession;
 import com.shadowfit.model.exercise.Status;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -14,9 +17,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
- * 주간 «A층» 집계 구현 — 한 표({@code exercise_sessions}) 안에서 끝난다.
+ * 주간 요약 집계 구현 — A층·B층 두 갈래다.
+ *
+ * <p><b>A층</b>({@link #totalsBetween}) — {@code exercise_sessions} 한 표 안에서 끝난다.
+ * QueryDSL 로 짠다.
  *
  * <p><b>왜 쿼리 한 번인가</b> — 다섯 값이 전부 같은 행 집합의 집계라 갈라 놓을 이유가 없다.
  * 갈라 놓으면 같은 범위를 다섯 번 스캔한다.
@@ -30,6 +37,11 @@ import java.time.LocalDateTime;
  * {@code CANCELLED} 는 {@code avg_sync_rate} 가 없거나(측정 전) 신뢰할 수 없다. 특히
  * 타임아웃으로 {@code FAILED} 된 세션은 «운동을 안 한 것» 이 아니라 «끝맺음이 안 된 것» 인데,
  * 그 구분을 여기서 하지 않는다 — 세면 주간 평균이 조용히 내려간다.
+ *
+ * <p><b>B층</b>({@link #repCurveBetween}, {@link #worstRepDistributionBetween}) —
+ * {@code reports.detailed_analysis}(JSON) 를 {@code JSON_TABLE} 로 펼친다. QueryDSL 은
+ * {@code JSON_TABLE} 을 표현하지 못해 네이티브 쿼리로 내린다. {@code reports} 는 세션 완료 시점에만
+ * 만들어지므로({@code SessionService.precomputeReport}) 세션 상태를 따로 거르지 않는다.
  */
 @Repository
 @RequiredArgsConstructor
@@ -38,6 +50,7 @@ public class WeeklySummaryQueryRepositoryImpl implements WeeklySummaryQueryRepos
     private static final QSession session = QSession.session;
 
     private final JPAQueryFactory queryFactory;
+    private final EntityManager entityManager;
 
     @Override
     public WeeklyTotalsDto totalsBetween(Long memberId, LocalDateTime from, LocalDateTime to) {
@@ -110,5 +123,61 @@ public class WeeklySummaryQueryRepositoryImpl implements WeeklySummaryQueryRepos
 
     private long orZero(Number value) {
         return value == null ? 0L : value.longValue();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<RepCurvePointDto> repCurveBetween(Long memberId, LocalDateTime from, LocalDateTime to) {
+        List<Object[]> rows = entityManager.createNativeQuery("""
+                SELECT jt.rep_number, AVG(jt.sync_rate), COUNT(*)
+                  FROM reports r
+                  JOIN exercise_sessions s ON s.id = r.session_id
+                 CROSS JOIN JSON_TABLE(r.detailed_analysis, '$.repTrend[*]'
+                        COLUMNS (rep_number INT PATH '$.repNumber',
+                                 sync_rate DOUBLE PATH '$.syncRate')) jt
+                 WHERE r.member_id = :memberId
+                   AND s.start_time >= :from AND s.start_time < :to
+                 GROUP BY jt.rep_number
+                 ORDER BY jt.rep_number
+                """)
+                .setParameter("memberId", memberId)
+                .setParameter("from", from)
+                .setParameter("to", to)
+                .getResultList();
+
+        return rows.stream()
+                .map(row -> new RepCurvePointDto(
+                        ((Number) row[0]).intValue(),
+                        BigDecimal.valueOf(((Number) row[1]).doubleValue()).setScale(2, RoundingMode.HALF_UP),
+                        ((Number) row[2]).longValue()))
+                .toList();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<WorstRepFrequencyDto> worstRepDistributionBetween(Long memberId, LocalDateTime from, LocalDateTime to) {
+        // «국면» 이 아니라 «회차» 다 — WorstSectionDto 에 국면 이름표가 없다(#80).
+        List<Object[]> rows = entityManager.createNativeQuery("""
+                SELECT jt.worst_rep, COUNT(*)
+                  FROM reports r
+                  JOIN exercise_sessions s ON s.id = r.session_id
+                 CROSS JOIN JSON_TABLE(r.detailed_analysis, '$'
+                        COLUMNS (worst_rep INT PATH '$.worstSection.repNumber')) jt
+                 WHERE r.member_id = :memberId
+                   AND s.start_time >= :from AND s.start_time < :to
+                   AND jt.worst_rep IS NOT NULL
+                 GROUP BY jt.worst_rep
+                 ORDER BY COUNT(*) DESC, jt.worst_rep ASC
+                """)
+                .setParameter("memberId", memberId)
+                .setParameter("from", from)
+                .setParameter("to", to)
+                .getResultList();
+
+        return rows.stream()
+                .map(row -> new WorstRepFrequencyDto(
+                        ((Number) row[0]).intValue(),
+                        ((Number) row[1]).longValue()))
+                .toList();
     }
 }

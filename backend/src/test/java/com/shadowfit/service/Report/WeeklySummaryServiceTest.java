@@ -2,6 +2,7 @@ package com.shadowfit.service.Report;
 
 import com.shadowfit.dto.report.weekly.WeeklySummaryResponseDto;
 import com.shadowfit.dto.report.weekly.WeeklyTotalsDto;
+import com.shadowfit.global.observability.WeeklyReportMetrics;
 import com.shadowfit.repository.report.WeeklySummaryQueryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +19,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,13 +37,20 @@ class WeeklySummaryServiceTest {
     @Mock
     private WeeklySummaryQueryRepository repository;
 
+    @Mock
+    private WeeklyReportMetrics weeklyReportMetrics;
+
     private WeeklySummaryService service;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new WeeklySummaryService(repository);
+        service = new WeeklySummaryService(repository, weeklyReportMetrics);
         when(repository.totalsBetween(any(), any(), any())).thenReturn(WeeklyTotalsDto.empty());
+        // B층 — 이 클래스의 테스트는 문장 «조립»(주 경계·위임)만 보고, B층 규칙 자체는
+        // WeeklySentenceRulesTest 가 순수 함수로 따로 검증한다. 그래서 기본은 빈 결과로 둔다.
+        when(repository.repCurveBetween(any(), any(), any())).thenReturn(List.of());
+        when(repository.worstRepDistributionBetween(any(), any(), any())).thenReturn(List.of());
     }
 
     @Test
@@ -128,6 +137,33 @@ class WeeklySummaryServiceTest {
     }
 
     @Test
+    @DisplayName("이번 주 기록이 없으면 B층 쿼리를 부르지 않는다 — A층이 이미 낸 결론을 또 스캔하지 않는다")
+    void 기록_없으면_B층을_안_부른다() {
+        // setUp() 의 기본 스텁이 이미 «기록 없음» 이다.
+        service.getWeeklySummary(7L, LocalDate.of(2026, 8, 19));
+
+        verify(repository, never()).repCurveBetween(any(), any(), any());
+        verify(repository, never()).worstRepDistributionBetween(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("이번 주 기록이 있으면 B층 쿼리를 이번 주 구간으로 부른다")
+    void 기록_있으면_B층을_이번주_구간으로_부른다() {
+        WeeklyTotalsDto thisWeek = new WeeklyTotalsDto(
+                3, 35, new BigDecimal("85.71"), new BigDecimal("85.00"), 3);
+        when(repository.totalsBetween(eq(7L),
+                eq(LocalDate.of(2026, 8, 17).atStartOfDay()), eq(LocalDate.of(2026, 8, 24).atStartOfDay())))
+                .thenReturn(thisWeek);
+
+        service.getWeeklySummary(7L, LocalDate.of(2026, 8, 19));
+
+        verify(repository).repCurveBetween(
+                7L, LocalDate.of(2026, 8, 17).atStartOfDay(), LocalDate.of(2026, 8, 24).atStartOfDay());
+        verify(repository).worstRepDistributionBetween(
+                7L, LocalDate.of(2026, 8, 17).atStartOfDay(), LocalDate.of(2026, 8, 24).atStartOfDay());
+    }
+
+    @Test
     @DisplayName("기준일을 안 주면 오늘이 속한 주를 잡는다")
     void 기준일_없음() {
         service.getWeeklySummary(7L, null);
@@ -148,5 +184,36 @@ class WeeklySummaryServiceTest {
         String joined = String.join(" ", sentences);
         assertThat(joined).doesNotContain("무너");
         assertThat(joined).doesNotContain("좋아요");
+    }
+
+    @Test
+    @DisplayName("관측(§13-5) — 지연·세션 수 분포·규칙별 발화를 매 호출마다 기록한다")
+    void 관측_지표를_기록한다() {
+        // eq() 로 이번 주 구간만 짚는다 — any() 를 다시 쓰면 setUp() 의 기본 스텁(빈 값)을
+        // 덮어써서 지난주까지 «기록 있음» 이 돼버린다(지난주가 비어 있어야 REP_COUNT_NO_LAST_WEEK).
+        WeeklyTotalsDto thisWeek = new WeeklyTotalsDto(
+                3, 35, new BigDecimal("85.71"), new BigDecimal("85.00"), 3);
+        when(repository.totalsBetween(eq(7L),
+                eq(LocalDate.of(2026, 8, 17).atStartOfDay()), eq(LocalDate.of(2026, 8, 24).atStartOfDay())))
+                .thenReturn(thisWeek);
+
+        service.getWeeklySummary(7L, LocalDate.of(2026, 8, 19));
+
+        verify(weeklyReportMetrics).sessionsInWindow(3L);
+        verify(weeklyReportMetrics).queryLatency(any());
+        // 이번 주 회차가 늘었는지는 지난주(빈 값) 대비이므로 REP_COUNT_NO_LAST_WEEK 가 나온다.
+        verify(weeklyReportMetrics).ruleFired(WeeklySentenceRuleId.FACT_ACTIVE_DAYS);
+        verify(weeklyReportMetrics).ruleFired(WeeklySentenceRuleId.REP_COUNT_NO_LAST_WEEK);
+    }
+
+    @Test
+    @DisplayName("기록이 없는 주는 NO_RECORD 하나만 발화로 기록된다")
+    void 기록_없음의_발화는_NO_RECORD_하나다() {
+        // setUp() 의 기본 스텁이 이미 «기록 없음» 이다.
+        service.getWeeklySummary(7L, LocalDate.of(2026, 8, 19));
+
+        verify(weeklyReportMetrics).ruleFired(WeeklySentenceRuleId.NO_RECORD);
+        verify(weeklyReportMetrics, times(1)).ruleFired(any());
+        verify(weeklyReportMetrics).sessionsInWindow(0L);
     }
 }

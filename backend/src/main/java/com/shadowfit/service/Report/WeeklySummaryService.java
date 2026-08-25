@@ -1,7 +1,10 @@
 package com.shadowfit.service.Report;
 
+import com.shadowfit.dto.report.weekly.RepCurvePointDto;
 import com.shadowfit.dto.report.weekly.WeeklySummaryResponseDto;
 import com.shadowfit.dto.report.weekly.WeeklyTotalsDto;
+import com.shadowfit.dto.report.weekly.WorstRepFrequencyDto;
+import com.shadowfit.global.observability.WeeklyReportMetrics;
 import com.shadowfit.repository.report.WeeklySummaryQueryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,12 +12,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
 /**
- * 주간 요약 — «A층» 집계 + 규칙 문장. <b>LLM 없음, 저장 없음, 외부 의존 없음.</b>
+ * 주간 요약 — A층·B층 집계 + 규칙 문장. <b>LLM 없음, 저장 없음, 외부 의존 없음.</b>
  *
  * <p>설계: {@code docs/decisions/report-generation-llm.md} §13.
  * 이 서비스가 내는 문장은 나중에 LLM 이 다듬게 될 «원문» 이자, LLM 이 죽었을 때 그대로 나갈
@@ -31,6 +35,7 @@ import java.util.List;
 public class WeeklySummaryService {
 
     private final WeeklySummaryQueryRepository weeklySummaryQueryRepository;
+    private final WeeklyReportMetrics weeklyReportMetrics;
 
     /**
      * 한 주의 요약. 기준일이 속한 주(월요일 시작)를 잡는다.
@@ -43,6 +48,8 @@ public class WeeklySummaryService {
      */
     @Transactional(readOnly = true)
     public WeeklySummaryResponseDto getWeeklySummary(Long memberId, LocalDate anyDayOfWeek) {
+        long callStart = System.nanoTime();
+
         LocalDate baseDate = anyDayOfWeek != null ? anyDayOfWeek : LocalDate.now();
         LocalDate start = baseDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate end = start.plusWeeks(1);
@@ -63,8 +70,24 @@ public class WeeklySummaryService {
                     thisWeek.sessionWeightedSyncRate(), thisWeek.weightingGap());
         }
 
-        List<String> sentences = WeeklySentenceRules.build(thisWeek, lastWeek);
+        // B층(회차 곡선·worst 분포)은 이번 주 회차가 없으면 어차피 빈 결과라 그때는 안 부른다 —
+        // reports 는 세션당 여러 회차를 JSON_TABLE 로 펼치는 조회라, 부를 이유가 없는 주에도 매번
+        // 돌리면 A층이 이미 «완료 세션 0» 이라 답한 것과 같은 결론을 한 번 더 스캔해서 얻는 셈이다.
+        List<RepCurvePointDto> repCurve = thisWeek.isEmpty()
+                ? List.of()
+                : weeklySummaryQueryRepository.repCurveBetween(memberId, start.atStartOfDay(), end.atStartOfDay());
+        List<WorstRepFrequencyDto> worstDistribution = thisWeek.isEmpty()
+                ? List.of()
+                : weeklySummaryQueryRepository.worstRepDistributionBetween(memberId, start.atStartOfDay(), end.atStartOfDay());
 
-        return new WeeklySummaryResponseDto(start, end, thisWeek, lastWeek, sentences);
+        WeeklySentenceRules.Result result = WeeklySentenceRules.build(thisWeek, lastWeek, repCurve, worstDistribution);
+
+        // 관측(설계 §13-5) — 지연·세션 수 분포·규칙별 발화. 셋 다 이 조회 자체를 위해 추가
+        // 스캔을 만들지 않는다(이미 손에 있는 값을 잰다).
+        weeklyReportMetrics.sessionsInWindow(thisWeek.sessions());
+        result.firedRules().forEach(weeklyReportMetrics::ruleFired);
+        weeklyReportMetrics.queryLatency(Duration.ofNanos(System.nanoTime() - callStart));
+
+        return new WeeklySummaryResponseDto(start, end, thisWeek, lastWeek, result.sentences());
     }
 }
