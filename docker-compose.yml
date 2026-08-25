@@ -100,10 +100,13 @@ services:
     # 분기 H2 (프론트 → AI 직결) 채택. HTTP 8000 은 InternalAuthMiddleware
     # (app/middleware/auth.py) 도입 후 외부 노출 복귀. gRPC 8585 는 Spring 만
     # 같은 도커 네트워크에서 호출하므로 expose 로 유지 (외부 노출 X).
-    ports:
-      - "8000:8000"
     expose:
+      - "8000"
+      - "8001"
+      - "8002"
       - "8585"
+      - "8586"
+      - "8587"
     # 메모리 한도 — «검출기를 세션별로 갖는» 구조(#164 ㄴ 안)의 «분모» 다.
     #
     # 한도가 없으면 AI 가 세션 수만큼 무한정 커지고, 호스트가 바닥나면 커널 OOM killer 가
@@ -157,6 +160,23 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s # 서버 기동 대기 시간 추가
+    networks:
+      - shadowfit-net
+
+  # 프론트 → AI 프레임 경로(POST /pose) 세션 고정 라우팅 (2026-08-26).
+  # AI를 워커 3개(별도 포트 8000/8001/8002)로 쪼갠 뒤, 프론트가 고정 주소 하나만 아는
+  # 구조를 유지하려고 앞에 둔다. Spring이 세션 시작 응답으로 알려준 워커 인덱스를
+  # X-AI-Worker 헤더로 실어 보내면, 그대로 해당 포트로 고정 전달한다(nginx-ai/default.conf).
+  ai-nginx:
+    image: nginx:1.27-alpine
+    container_name: shadowfit-ai-nginx
+    restart: unless-stopped
+    depends_on:
+      - shadowfit-ai
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./nginx-ai/default.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - shadowfit-net
 

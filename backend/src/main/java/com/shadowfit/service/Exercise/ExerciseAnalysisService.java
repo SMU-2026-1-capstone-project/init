@@ -63,13 +63,45 @@ public class ExerciseAnalysisService {
     @Value("${internal.api.token}")
     private String internalToken;
 
-    @GrpcClient("fastapi-client")
-    private ExerciseServiceGrpc.ExerciseServiceStub exerciseAsyncStub;
+    // 실측(2026-08-26, EC2 격리 테스트): net.devh 의 단일 채널(@GrpcClient) 은 커넥션 하나를
+    // 계속 재사용해, AI 서버를 프로세스 여러 개로 띄워도(SO_REUSEPORT) 트래픽이 그중 하나로만
+    // 몰린다는 걸 확인했다. 채널을 sessionId 기준으로 N개 풀에서 골라 쓰면 같은 세션의 호출은
+    // 계속 같은 채널(=같은 프로세스)로 가면서, 세션마다는 서로 다른 채널로 흩어진다.
+    private static final int AI_CHANNEL_POOL_SIZE = 3;
 
-    // 아웃박스 발행기 전용. 나머지 호출(추출·분석시작)은 결과를 안 쓰는 fire-and-forget 이라
-    // 비동기 스텁 그대로 두고, 결과가 행 상태를 정하는 중단 송신만 블로킹으로 받는다.
-    @GrpcClient("fastapi-client")
-    private ExerciseServiceGrpc.ExerciseServiceBlockingStub exerciseBlockingStub;
+    @Value("${grpc.client.fastapi-client.address}")
+    private String fastApiAddress; // "static://host:port" 형식
+
+    private final java.util.List<io.grpc.ManagedChannel> aiChannelPool = new java.util.ArrayList<>();
+
+    // 🔴 실측(2026-08-26)에서 잡힌 버그: 처음엔 채널 3개를 전부 같은 포트로 만들었다.
+    //    AI가 SO_REUSEPORT(포트 공유)였을 때는 커널이 그래도 분산시켜줘서 우연히 맞았는데,
+    //    AI를 포트별로 분리(8585/8586/8587, entrypoint.sh)한 뒤에는 채널 3개가 전부 8585
+    //    (=워커 0)로만 가서 세션 6개가 전부 같은 프로세스로 몰렸다 — 실측: pid=7 6/6.
+    //    채널 인덱스 i는 반드시 gRPC 포트 base+i 와 짝을 맞춰야 한다.
+    @jakarta.annotation.PostConstruct
+    private void initAiChannelPool() {
+        String hostPort = fastApiAddress.replaceFirst("^static://", "");
+        String host = hostPort.substring(0, hostPort.lastIndexOf(':'));
+        int basePort = Integer.parseInt(hostPort.substring(hostPort.lastIndexOf(':') + 1));
+        for (int i = 0; i < AI_CHANNEL_POOL_SIZE; i++) {
+            int port = basePort + i;
+            aiChannelPool.add(
+                    io.grpc.ManagedChannelBuilder.forAddress(host, port).usePlaintext().build()
+            );
+            log.info("AI gRPC 채널[{}] 초기화 완료 (대상: {}:{})", i, host, port);
+        }
+    }
+
+    private ExerciseServiceGrpc.ExerciseServiceStub asyncStubFor(long routingKey) {
+        io.grpc.ManagedChannel ch = aiChannelPool.get(Math.floorMod(routingKey, AI_CHANNEL_POOL_SIZE));
+        return ExerciseServiceGrpc.newStub(ch);
+    }
+
+    private ExerciseServiceGrpc.ExerciseServiceBlockingStub blockingStubFor(long routingKey) {
+        io.grpc.ManagedChannel ch = aiChannelPool.get(Math.floorMod(routingKey, AI_CHANNEL_POOL_SIZE));
+        return ExerciseServiceGrpc.newBlockingStub(ch);
+    }
 
     // AI가 죽지 않고 그냥 응답을 안 주는(hang) 경우, 데드라인 없이는 onNext/onError
     // 둘 다 안 불려서 서킷브레이커가 그 호출을 영원히 실패/느림으로 못 잡음. 셋 다
@@ -103,13 +135,13 @@ public class ExerciseAnalysisService {
 
     // 토큰 fastapi에게 보내고, 데드라인을 걸어 hang 상태도 onError(DEADLINE_EXCEEDED)로
     // 귀결시킨다 — 이래야 서킷브레이커가 hang도 실패로 기록할 수 있음.
-    private ExerciseServiceGrpc.ExerciseServiceStub getAuthenticatedStub() {
+    private ExerciseServiceGrpc.ExerciseServiceStub getAuthenticatedStub(long routingKey) {
         Metadata header = new Metadata();
         Metadata.Key<String> authKey = Metadata.Key.of("Authorization", Metadata.ASCII_STRING_MARSHALLER);
         header.put(authKey, "Bearer " + internalToken);
 
         // .attachHeaders() 호출 시 명확하게 stub 타입을 맞춰줍니다.
-        return exerciseAsyncStub.withInterceptors(
+        return asyncStubFor(routingKey).withInterceptors(
                 io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(header)
         ).withDeadlineAfter(GRPC_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
@@ -118,12 +150,12 @@ public class ExerciseAnalysisService {
      * 블로킹 스텁 버전. 데드라인이 특히 중요하다 — 없으면 AI 가 hang 했을 때 발행기 스레드가
      * 무한정 잡혀 폴링 자체가 멈춘다(비동기였다면 스레드는 안 잡혔을 지점).
      */
-    private ExerciseServiceGrpc.ExerciseServiceBlockingStub getAuthenticatedBlockingStub() {
+    private ExerciseServiceGrpc.ExerciseServiceBlockingStub getAuthenticatedBlockingStub(long routingKey) {
         Metadata header = new Metadata();
         Metadata.Key<String> authKey = Metadata.Key.of("Authorization", Metadata.ASCII_STRING_MARSHALLER);
         header.put(authKey, "Bearer " + internalToken);
 
-        return exerciseBlockingStub.withInterceptors(
+        return blockingStubFor(routingKey).withInterceptors(
                 io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(header)
         ).withDeadlineAfter(GRPC_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
@@ -158,7 +190,7 @@ public class ExerciseAnalysisService {
 
         // preserving(): 아래 콜백들은 gRPC 이벤트 루프 스레드에서 실행돼 호출자 MDC가 없다.
         // 감싸지 않으면 정작 실패 로그(onError)에 correlation id 가 안 붙는다.
-        getAuthenticatedStub().extractReferenceData(request, CorrelationIds.preserving(new StreamObserver<com.shadowfit.grpc.ExtractResponse>() {
+        getAuthenticatedStub(exerciseId).extractReferenceData(request, CorrelationIds.preserving(new StreamObserver<com.shadowfit.grpc.ExtractResponse>() {
             @Override
             public void onNext(com.shadowfit.grpc.ExtractResponse value) {
                 cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
@@ -193,7 +225,7 @@ public class ExerciseAnalysisService {
      *                  앵커이자 파티션 키이고(#188 · #392), 리포트·재부착 조회가 <b>등호</b>로
      *                  찾는 바로 그 값이다. 「받은 시각 = 저장된 시각」이 성립해야 한다.
      */
-    public record StartedSession(Long sessionId, String sessionNonce, LocalDateTime startTime) {}
+    public record StartedSession(Long sessionId, String sessionNonce, LocalDateTime startTime, int aiWorkerIndex) {}
 
     /**
      * [STEP 2: 운동 분석 시작 - Entry Point]
@@ -237,7 +269,7 @@ public class ExerciseAnalysisService {
         // 클라가 받는 값이 DB 와 갈린다 — Session 의 @PrePersist 가 초 이하를 자르므로(#446)
         // 이 값은 이미 DB 에 박힌 것과 같은 값이다.
         return new StartedSession(sessionId, savedSession.getSessionNonce(),
-                savedSession.getStartTime());
+                savedSession.getStartTime(), Math.floorMod(sessionId, AI_CHANNEL_POOL_SIZE));
     }
 
     /**
@@ -289,7 +321,7 @@ public class ExerciseAnalysisService {
             }
             long callStart = System.nanoTime();
 
-            getAuthenticatedStub().startAnalysis(requestBuilder.build(), CorrelationIds.preserving(new StreamObserver<AnalyzeResponse>() {
+            getAuthenticatedStub(sessionId).startAnalysis(requestBuilder.build(), CorrelationIds.preserving(new StreamObserver<AnalyzeResponse>() {
                 @Override
                 public void onNext(AnalyzeResponse value) {
                     cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
@@ -376,7 +408,7 @@ public class ExerciseAnalysisService {
             long callStart = System.nanoTime();
             ReattachResponse response;
             try {
-                response = getAuthenticatedBlockingStub().reattachAnalysis(request);
+                response = getAuthenticatedBlockingStub(sessionId).reattachAnalysis(request);
             } catch (StatusRuntimeException e) {
                 cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, e);
                 log.error("재부착 gRPC 통신 장애 - 세션 ID: {}, 사유: {}", sessionId, e.getMessage());
@@ -507,7 +539,7 @@ public class ExerciseAnalysisService {
             long callStart = System.nanoTime();
             StopResponse response;
             try {
-                response = getAuthenticatedBlockingStub().stopAnalysis(request);
+                response = getAuthenticatedBlockingStub(sessionId).stopAnalysis(request);
             } catch (StatusRuntimeException e) {
                 cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, e);
                 sessionMetrics.aiStopResult("grpc-error");

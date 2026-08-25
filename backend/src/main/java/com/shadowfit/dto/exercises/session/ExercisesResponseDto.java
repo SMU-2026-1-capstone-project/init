@@ -48,4 +48,16 @@ public class ExercisesResponseDto {
      */
     @Schema(description = "세션 소유권 검증용 비밀값 (#187). POST /pose 에 동봉할 것. null이면 이 기능 배포 전 세션")
     public String sessionNonce;
+
+    /**
+     * AI 서버 워커 인덱스 (2026-08-26, N=3 프로세스 분리 도입).
+     *
+     * <p>AI 를 프로세스 여러 개로 분리하면서(GIL 병목 회피) 세션 상태가 프로세스 로컬 메모리에
+     * 있게 됐다. Spring&#8594;AI 제어 호출(gRPC)은 sessionId 기준 채널 풀로 같은 워커에
+     * 고정되지만, 프론트&#8594;AI 프레임 경로(POST /pose, Spring 안 거침)는 그 라우팅을 모른다.
+     * 이 값을 nginx 앞단에 {@code X-AI-Worker} 헤더로 실어 보내야 같은 워커로 간다 — 안 그러면
+     * 커널이 무작위로 분산시켜 세션의 2/3 가 NO_LEASE 로 거절된다(2026-08-26 실측: 6건 중 4건).
+     */
+    @Schema(description = "AI 워커 인덱스(0~N-1). POST /pose 호출 시 X-AI-Worker 헤더로 동봉할 것")
+    public Integer aiWorkerIndex;
 }

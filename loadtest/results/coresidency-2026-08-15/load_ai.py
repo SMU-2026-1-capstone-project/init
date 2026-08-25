@@ -113,7 +113,17 @@ def session_worker(idx, base, ai, tok, exercise_id, frames, fps, t0, token, atta
     st, body = http(base + "/exercises/sessions", "POST", {"exerciseId": exercise_id},
                     {"Authorization": "Bearer " + tok})
     try:
-        sid = json.loads(body)["sessionId"]
+        session_resp = json.loads(body)
+        sid = session_resp["sessionId"]
+        # 2026-08-26: AI를 프로세스 3개(별도 포트)로 나눈 뒤, Spring이 세션마다 고정 워커를
+        # 알려준다. 안 실으면 nginx가 워커 0으로 기본 전달하는데, 세션이 다른 워커에서
+        # 시작됐으면 NO_LEASE로 거절된다 — 즉 이 값 없이 재면 sticky routing 수정 이전과
+        # 같은 결과가 나온다(실측: 안 실으면 6건 중 4건 NO_LEASE).
+        worker_idx = session_resp.get("aiWorkerIndex")
+        # 2026-08-26: 이 rig는 session_nonce(#187, 세션 소유권 검증) 도입 이전 버전이었다.
+        # 지금 pose.py는 nonce가 없거나 안 맞으면 "세션이 시작되지 않았습니다"로 거절한다 —
+        # nolease와 문구가 달라 classify()가 다른 카테고리로 잡지만, 근본 원인은 같다.
+        nonce = session_resp.get("sessionNonce")
     except Exception:  # noqa: BLE001
         with LOCK:
             SETUP_FAIL.append(f"[{idx}] 세션 생성 {st}: {body[:120]}")
@@ -126,6 +136,8 @@ def session_worker(idx, base, ai, tok, exercise_id, frames, fps, t0, token, atta
     interval = 1.0 / fps
     i = 0
     hdr = {"Authorization": "Bearer " + token}
+    if worker_idx is not None:
+        hdr["X-AI-Worker"] = str(worker_idx)
 
     # 🔴 **분석기가 붙기를 기다린다.** 세션 생성 응답은 즉시 오지만 `StartAnalysis` 는
     #    afterCommit + @Async 로 «그 뒤에» 나간다(ExerciseAnalysisService:210-217). 그래서
@@ -137,7 +149,7 @@ def session_worker(idx, base, ai, tok, exercise_id, frames, fps, t0, token, atta
     while True:
         st, tx = http(ai + "/api/v1/pose", "POST",
                       {"image": frames[0], "exercise_type": "squat",
-                       "session_id": sid, "timestamp_sec": 0.0}, hdr)
+                       "session_id": sid, "session_nonce": nonce, "timestamp_sec": 0.0}, hdr)
         if classify(st, tx) != "nolease":
             break
         if time.monotonic() >= deadline:
@@ -148,7 +160,7 @@ def session_worker(idx, base, ai, tok, exercise_id, frames, fps, t0, token, atta
     while not STOP.is_set():
         due = time.monotonic()
         payload = {"image": frames[i % len(frames)], "exercise_type": "squat",
-                   "session_id": sid, "timestamp_sec": i * interval}
+                   "session_id": sid, "session_nonce": nonce, "timestamp_sec": i * interval}
         s = time.monotonic()
         status, text = http(ai + "/api/v1/pose", "POST", payload, hdr)
         ms = (time.monotonic() - s) * 1000.0
