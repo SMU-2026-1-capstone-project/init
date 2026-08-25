@@ -34,6 +34,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 나오는데 그건 「차이가 없다」가 아니라 <b>「이 데이터로는 못 잰다」</b>다
  * ([[project_synthetic_data_distribution_limit]]). 그래서 여기서는 회차 수와 점수가 <b>서로 다른</b>
  * 세션을 손으로 심는다 — 식이 갈리는지를 보려면 갈릴 수 있는 데이터가 있어야 한다.
+ *
+ * <p><b>B층</b>({@code repCurveBetween}·{@code worstRepDistributionBetween})은 여기 없다 —
+ * {@code JSON_TABLE} 을 H2 가 구현하지 않아 이 프로파일로는 테스트가 원리상 안 된다.
+ * {@link WeeklySummaryBLayerRaceTest}(실 MySQL, race 프로파일)가 대신 본다.
  */
 @SpringBootTest
 @Transactional
