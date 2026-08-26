@@ -612,8 +612,11 @@ if [ "$ROLE" = "p6-target" ]; then
   cd "$WORKDIR" || die "$WORKDIR 로 못 들어간다"
   docker compose build shadowfit-backend shadowfit-ai || die "이미지 빌드 실패"
 
-  step "스택 기동 — mysql · backend · ai"
-  docker compose up -d mysql shadowfit-backend shadowfit-ai || die "compose up 실패"
+  step "스택 기동 — mysql · backend · ai · ai-nginx"
+  # ai-nginx 가 빠지면 호스트 8000이 안 열린다(#567) — d73e99d 로 dev compose가 N=3 워커 +
+  # ai-nginx(X-AI-Worker 헤더 기반 라우팅) 구조로 바뀌면서 shadowfit-ai 자체는 더 이상
+  # 호스트에 포트를 매핑하지 않고, 그 역할을 ai-nginx(depends_on: shadowfit-ai)가 대신한다.
+  docker compose up -d mysql shadowfit-backend shadowfit-ai ai-nginx || die "compose up 실패"
 
   echo -n "  백엔드 헬스체크 대기"
   for _ in $(seq 1 60); do
