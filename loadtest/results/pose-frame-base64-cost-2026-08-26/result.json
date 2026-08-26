@@ -1,0 +1,124 @@
+{
+  "assumptions": {
+    "peak_resolution": "4032x3024",
+    "jpeg_quality": 40,
+    "dau": 1000,
+    "sessions_per_day_per_user": 1.5,
+    "peak_concentration_p": 0.18,
+    "session_length_min": 15,
+    "tick_interval_ms": 330
+  },
+  "payload": {
+    "raw_jpeg_bytes": 1009111,
+    "base64_bytes": 1345484,
+    "inflation_ratio": 1.3333359759233623
+  },
+  "standalone_base64_decode_ms": {
+    "n": 30,
+    "mean_ms": 6.209,
+    "p50_ms": 5.477,
+    "p95_ms": 10.703,
+    "max_ms": 14.451
+  },
+  "http_probe": {
+    "client_side_ms": {
+      "n": 12,
+      "mean_ms": 233.229,
+      "p50_ms": 226.686,
+      "p95_ms": 289.045,
+      "max_ms": 299.761
+    },
+    "frame_path_spans": {
+      "wait": {
+        "n": 12,
+        "seen": 12,
+        "mean_ms": 19.93,
+        "p50_ms": 15.105,
+        "p95_ms": 43.457,
+        "p99_ms": 67.782,
+        "max_ms": 73.863
+      },
+      "decode": {
+        "n": 12,
+        "seen": 12,
+        "mean_ms": 131.692,
+        "p50_ms": 125.836,
+        "p95_ms": 176.206,
+        "p99_ms": 191.139,
+        "max_ms": 194.872
+      },
+      "lease": {
+        "n": 12,
+        "seen": 12,
+        "mean_ms": 0.015,
+        "p50_ms": 0.015,
+        "p95_ms": 0.019,
+        "p99_ms": 0.019,
+        "max_ms": 0.02
+      },
+      "infer": {
+        "n": 12,
+        "seen": 12,
+        "mean_ms": 68.182,
+        "p50_ms": 67.378,
+        "p95_ms": 83.059,
+        "p99_ms": 85.635,
+        "max_ms": 86.279
+      },
+      "post": {
+        "n": 12,
+        "seen": 12,
+        "mean_ms": 10.638,
+        "p50_ms": 9.115,
+        "p95_ms": 15.883,
+        "p99_ms": 17.414,
+        "max_ms": 17.797
+      },
+      "post_app": {
+        "n": 12,
+        "seen": 12,
+        "mean_ms": 9.067,
+        "p50_ms": 7.494,
+        "p95_ms": 14.192,
+        "p99_ms": 15.706,
+        "max_ms": 16.084
+      },
+      "post_loop": {
+        "n": 12,
+        "seen": 12,
+        "mean_ms": 1.571,
+        "p50_ms": 1.129,
+        "p95_ms": 3.4,
+        "p99_ms": 4.083,
+        "max_ms": 4.254
+      },
+      "respond": {
+        "n": 12,
+        "seen": 12,
+        "mean_ms": 0.993,
+        "p50_ms": 0.963,
+        "p95_ms": 1.126,
+        "p99_ms": 1.132,
+        "max_ms": 1.134
+      },
+      "total": {
+        "n": 12,
+        "seen": 12,
+        "mean_ms": 231.451,
+        "p50_ms": 225.337,
+        "p95_ms": 286.578,
+        "p99_ms": 294.389,
+        "max_ms": 296.342
+      }
+    }
+  },
+  "peak_aggregate": {
+    "peak_concurrent_sessions": 67.5,
+    "peak_fps_total": 204.55,
+    "raw_bandwidth_MBps": 206.41,
+    "base64_bandwidth_MBps": 275.21,
+    "extra_bandwidth_from_base64_MBps": 68.8,
+    "decode_cpu_cores_worst_case": 25.74,
+    "infer_cpu_cores_worst_case": 13.78
+  }
+}
