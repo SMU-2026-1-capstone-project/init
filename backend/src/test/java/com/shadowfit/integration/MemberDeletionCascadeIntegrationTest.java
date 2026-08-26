@@ -1,7 +1,7 @@
 package com.shadowfit.integration;
 
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
 import com.shadowfit.model.exercise.FeedbackType;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.SessionFeedbackLog;
@@ -55,6 +55,7 @@ class MemberDeletionCascadeIntegrationTest {
     @Autowired private SessionFeedbackLogRepository feedbackLogRepository;
     @Autowired private DailyLogRepository dailyLogRepository;
     @Autowired private EntityManager entityManager;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
 
     private Member member;
     private Session session;
@@ -69,8 +70,9 @@ class MemberDeletionCascadeIntegrationTest {
                 .role(UserRole.USER)
                 .build());
 
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         Exercise exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER)
+                .name("스쿼트").category(category)
                 .expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00"))

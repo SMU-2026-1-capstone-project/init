@@ -9,7 +9,6 @@ import com.shadowfit.dto.admin.AdminExerciseListItemDto;
 import com.shadowfit.dto.admin.AdminExerciseSearchCondition;
 import com.shadowfit.dto.admin.AdminExerciseSortKey;
 import com.shadowfit.dto.common.PageResponse;
-import com.shadowfit.model.exercise.ExerciseCategory;
 import com.shadowfit.model.exercise.QExercise;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -39,11 +38,13 @@ public class ExerciseQueryRepositoryImpl implements ExerciseQueryRepository {
                 .select(Projections.constructor(AdminExerciseListItemDto.class,
                         exercise.id,
                         exercise.name,
-                        exercise.category,
+                        exercise.category.id,
+                        exercise.category.name,
                         exercise.analysisSupported,
                         exercise.expectedDurationMinutes,
                         exercise.createdAt))
                 .from(exercise)
+                .join(exercise.category)
                 .where(whereOf(condition))
                 .orderBy(orderOf(sortKey, ascending))
                 .offset((long) page * size)
@@ -71,7 +72,7 @@ public class ExerciseQueryRepositoryImpl implements ExerciseQueryRepository {
     private BooleanExpression[] whereOf(AdminExerciseSearchCondition c) {
         return new BooleanExpression[]{
                 nameContains(c.keyword()),
-                categoryEq(c.category())
+                categoryEq(c.categoryId())
         };
     }
 
@@ -92,8 +93,8 @@ public class ExerciseQueryRepositoryImpl implements ExerciseQueryRepository {
         return exercise.name.contains(keyword);
     }
 
-    private BooleanExpression categoryEq(ExerciseCategory category) {
-        return category == null ? null : exercise.category.eq(category);
+    private BooleanExpression categoryEq(Long categoryId) {
+        return categoryId == null ? null : exercise.category.id.eq(categoryId);
     }
 
     /**

@@ -208,6 +208,13 @@
 1. 🔴 **gRPC 는 L4 로드밸런서로 안 갈린다.** HTTP/2 커넥션을 오래 쓰기 때문에 L4 는
    **커넥션**을 고른다 — 채널 하나가 한 인스턴스에 못 박히고 나머지가 논다.
    **요청 단위 분배**(클라이언트 사이드 LB 또는 Envoy·Linkerd 급)가 **전제**다
+   > 🟢 **실측으로 확인 (2026-08-26)**: [`../../loadtest/results/grpc-reuseport-probe-2026-08-26/README.md`](../../loadtest/results/grpc-reuseport-probe-2026-08-26/README.md).
+   > AI 프로세스 3개를 같은 gRPC 포트에 SO_REUSEPORT로 띄우고 파이썬 `grpc.insecure_channel()`
+   > 하나로 세션 30개를 열었더니 **전부 프로세스 하나로만 갔다**(나머지 둘은 0건).
+   > 채널을 새로 열면 **다른** 프로세스로 재추첨됐다. **이 문서가 추론으로 적어둔 문장이
+   > 실측으로 닫혔다.** ⚠️ 단, Java `grpc-client-spring-boot-starter`의 실제 채널 재사용
+   > 정책까지 확인한 것은 아니다 — 파이썬 클라이언트로 흉내낸 것이라 §9의 그 미검증
+   > 항목은 완전히는 안 닫힌다.
 2. 🔴 **`session_id` 가 HTTP 본문에 있다** — `ai-server/app/models/pose.py:49` 의 Pydantic
    필드다. L7 해싱을 하려면 **헤더나 경로로 올려야** 하고, 그건 **프론트와 같이 움직이는
    API 변경**이다. ㄴ 의 「프론트 변경 없다」가 여기서 깨진다

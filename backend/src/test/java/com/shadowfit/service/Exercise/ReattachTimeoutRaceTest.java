@@ -3,7 +3,7 @@ package com.shadowfit.service.Exercise;
 import com.shadowfit.grpc.PoseDataRequest;
 import com.shadowfit.grpc.SessionCompleteRequest;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -60,6 +60,7 @@ class ReattachTimeoutRaceTest {
     @Autowired private PoseDataRepository poseDataRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private OutboxEventRepository outboxRepository;
 
     @Value("${exercise.session.timeout.default-buffer-minutes:30}")
@@ -75,8 +76,9 @@ class ReattachTimeoutRaceTest {
         owner = memberRepository.saveAndFlush(Member.builder()
                 .email("race-owner@test.com").username("owner").password("dummy")
                 .selectedPersona(SelectedPersona.BEGINNER).role(UserRole.USER).build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER)
+                .name("스쿼트").category(category)
                 .expectedDurationMinutes(EXPECTED_DURATION_MINUTES)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00"))

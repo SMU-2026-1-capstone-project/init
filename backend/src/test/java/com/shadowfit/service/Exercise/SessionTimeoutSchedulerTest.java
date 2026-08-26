@@ -43,6 +43,9 @@ class SessionTimeoutSchedulerTest {
     private Exercise testExercise;
     private Member testMember;
     private Session testSession;
+    private Category category;
+    private Category categoryFull;
+    private Category categoryCore;
 
     @BeforeEach
     void setUp() {
@@ -57,10 +60,14 @@ class SessionTimeoutSchedulerTest {
                 .username("테스트유저")
                 .build();
 
+        category = Category.builder().id(1L).name("LOWER").build();
+        categoryFull = Category.builder().id(2L).name("FULL").build();
+        categoryCore = Category.builder().id(3L).name("CORE").build();
+
         testExercise = Exercise.builder()
                 .id(1L)
                 .name("스쿼트")
-                .category(ExerciseCategory.LOWER)
+                .category(category)
                 .expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00"))
@@ -134,7 +141,7 @@ class SessionTimeoutSchedulerTest {
         Exercise longExercise = Exercise.builder()
                 .id(2L)
                 .name("마라톤훈련")
-                .category(ExerciseCategory.FULL)
+                .category(categoryFull)
                 .expectedDurationMinutes(30)
                 .build();
 
@@ -162,7 +169,7 @@ class SessionTimeoutSchedulerTest {
         Exercise quickExercise = Exercise.builder()
                 .id(3L)
                 .name("플랭크")
-                .category(ExerciseCategory.CORE)
+                .category(categoryCore)
                 .expectedDurationMinutes(10)
                 .build();
 

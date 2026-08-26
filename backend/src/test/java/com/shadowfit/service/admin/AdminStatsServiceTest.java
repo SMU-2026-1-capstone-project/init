@@ -2,7 +2,7 @@ package com.shadowfit.service.admin;
 
 import com.shadowfit.dto.admin.AdminStatsOverviewDto;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -55,6 +55,7 @@ class AdminStatsServiceTest {
     @Autowired private SessionRepository sessionRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private EntityManager em;
 
     private LocalDateTime todayStart;
@@ -68,9 +69,10 @@ class AdminStatsServiceTest {
         sessionRepository.flush();
 
         todayStart = LocalDate.now().atStartOfDay();
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         squat = exercisesRepository.save(Exercise.builder()
                 .name("스쿼트")
-                .category(ExerciseCategory.LOWER)
+                .category(category)
                 .build());
     }
 

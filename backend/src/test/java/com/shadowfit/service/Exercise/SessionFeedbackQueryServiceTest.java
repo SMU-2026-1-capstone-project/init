@@ -5,7 +5,7 @@ import com.shadowfit.dto.exercises.feedback.SessionFeedbackSummaryDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.FeedbackType;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.SessionFeedbackLog;
@@ -47,7 +47,8 @@ class SessionFeedbackQueryServiceTest {
         service = new SessionFeedbackQueryService(feedbackLogRepository, sessionRepository);
 
         Member owner = Member.builder().id(OWNER_ID).email("t@t.com").username("u").password("p").role(UserRole.USER).build();
-        Exercise exercise = Exercise.builder().id(1L).name("스쿼트").category(ExerciseCategory.LOWER)
+        Category category = Category.builder().id(1L).name("LOWER").build();
+        Exercise exercise = Exercise.builder().id(1L).name("스쿼트").category(category)
                 .expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
                 .build();

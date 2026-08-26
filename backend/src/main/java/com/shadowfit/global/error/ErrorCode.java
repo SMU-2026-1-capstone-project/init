@@ -14,6 +14,7 @@ public enum ErrorCode {
     INVALID_TYPE_VALUE(400, "C004", "입력값의 타입이 적절하지 않습니다."),
     HANDLE_ACCESS_DENIED(403, "C005", "접근이 거부되었습니다."),
     RESOURCE_NOT_FOUND(404, "C006", "요청한 경로를 찾을 수 없습니다."),
+    FILE_TOO_LARGE(413, "C007", "파일 크기가 제한을 초과했습니다."),
 
     // --- Auth ---
     UNAUTHORIZED(401, "A001", "로그인이 필요한 서비스입니다."),
@@ -96,6 +97,12 @@ public enum ErrorCode {
     //
     // ⚠️ 이건 필요조건이지 충분조건이 아니다. W007 주석 참고.
     EXERCISE_ANALYSIS_ENABLE_BLOCKED(400, "W012", "기준 좌표가 없어 분석을 활성화할 수 없습니다."),
+    // BE-04 — 카테고리 CRUD. 셋 다 EXERCISE_DELETE_NOT_ALLOWED(W011)와 같은 결이다: DB FK가
+    // 이미 RESTRICT 로 막지만(V11__add_categories_table.sql), 그걸 500 대신 이 코드들로
+    // 앞단에서 걸러 사용자에게 이유를 준다.
+    CATEGORY_NOT_FOUND(404, "W013", "존재하지 않는 카테고리입니다."),
+    CATEGORY_NAME_DUPLICATION(409, "W014", "이미 존재하는 카테고리 이름입니다."),
+    CATEGORY_IN_USE(409, "W015", "사용 중인 카테고리는 삭제할 수 없습니다."),
 
     // --- 시도 제한 (이슈 #394) ---
     //

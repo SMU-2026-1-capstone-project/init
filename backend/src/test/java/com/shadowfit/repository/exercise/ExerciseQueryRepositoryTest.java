@@ -5,7 +5,8 @@ import com.shadowfit.dto.admin.AdminExerciseSearchCondition;
 import com.shadowfit.dto.admin.AdminExerciseSortKey;
 import com.shadowfit.dto.common.PageResponse;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
+import com.shadowfit.repository.exercise.CategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,6 +34,12 @@ class ExerciseQueryRepositoryTest {
 
     @Autowired private ExerciseQueryRepository exerciseQueryRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private CategoryRepository categoryRepository;
+
+    private Category category;      // LOWER
+    private Category categoryCore;
+    private Category categoryFull;
+    private Category categoryBack;
 
     @BeforeEach
     void setUp() {
@@ -40,6 +47,11 @@ class ExerciseQueryRepositoryTest {
         // 흔들린다. 이 테스트는 자기가 넣은 것만 보고 판단한다.
         exercisesRepository.deleteAll();
         exercisesRepository.flush();
+
+        category = categoryRepository.save(Category.builder().name("LOWER").build());
+        categoryCore = categoryRepository.save(Category.builder().name("CORE").build());
+        categoryFull = categoryRepository.save(Category.builder().name("FULL").build());
+        categoryBack = categoryRepository.save(Category.builder().name("BACK").build());
     }
 
     @Nested
@@ -49,8 +61,8 @@ class ExerciseQueryRepositoryTest {
         @Test
         @DisplayName("조건을 하나도 안 걸면 전부 나온다")
         void noCondition_returnsAll() {
-            save("스쿼트", ExerciseCategory.LOWER);
-            save("플랭크", ExerciseCategory.CORE);
+            save("스쿼트", category);
+            save("플랭크", categoryCore);
 
             PageResponse<AdminExerciseListItemDto> result = search(emptyCondition());
 
@@ -62,12 +74,12 @@ class ExerciseQueryRepositoryTest {
         @Test
         @DisplayName("카테고리 필터를 걸면 그 부위만 나온다")
         void categoryFilter_narrows() {
-            save("스쿼트", ExerciseCategory.LOWER);
-            save("런지", ExerciseCategory.LOWER);
-            save("플랭크", ExerciseCategory.CORE);
+            save("스쿼트", category);
+            save("런지", category);
+            save("플랭크", categoryCore);
 
             PageResponse<AdminExerciseListItemDto> result =
-                    search(new AdminExerciseSearchCondition(null, ExerciseCategory.LOWER));
+                    search(new AdminExerciseSearchCondition(null, category.getId()));
 
             assertThat(result.totalElements()).isEqualTo(2);
             assertThat(result.content()).extracting(AdminExerciseListItemDto::name)
@@ -77,8 +89,8 @@ class ExerciseQueryRepositoryTest {
         @Test
         @DisplayName("검색어는 운동명 부분일치다")
         void keyword_partialMatch() {
-            save("바벨 스쿼트", ExerciseCategory.LOWER);
-            save("플랭크", ExerciseCategory.CORE);
+            save("바벨 스쿼트", category);
+            save("플랭크", categoryCore);
 
             assertThat(search(new AdminExerciseSearchCondition("스쿼", null)).content())
                     .extracting(AdminExerciseListItemDto::name).containsExactly("바벨 스쿼트");
@@ -87,8 +99,8 @@ class ExerciseQueryRepositoryTest {
         @Test
         @DisplayName("빈 문자열 검색어는 조건으로 취급하지 않는다 — 전부 나온다")
         void blankKeyword_isIgnored() {
-            save("스쿼트", ExerciseCategory.LOWER);
-            save("플랭크", ExerciseCategory.CORE);
+            save("스쿼트", category);
+            save("플랭크", categoryCore);
 
             assertThat(search(new AdminExerciseSearchCondition("   ", null)).totalElements())
                     .isEqualTo(2);
@@ -97,10 +109,10 @@ class ExerciseQueryRepositoryTest {
         @Test
         @DisplayName("두 필터를 같이 걸면 AND 로 좁혀진다")
         void bothFilters_areAnded() {
-            save("바벨 스쿼트", ExerciseCategory.LOWER);
-            save("스쿼트 점프", ExerciseCategory.FULL);
+            save("바벨 스쿼트", category);
+            save("스쿼트 점프", categoryFull);
 
-            assertThat(search(new AdminExerciseSearchCondition("스쿼트", ExerciseCategory.LOWER))
+            assertThat(search(new AdminExerciseSearchCondition("스쿼트", category.getId()))
                     .content())
                     .extracting(AdminExerciseListItemDto::name).containsExactly("바벨 스쿼트");
         }
@@ -113,9 +125,9 @@ class ExerciseQueryRepositoryTest {
         @Test
         @DisplayName("총건수는 페이지 크기가 아니라 조건에 맞는 전체 건수다")
         void totalElements_isNotPageSize() {
-            save("스쿼트", ExerciseCategory.LOWER);
-            save("런지", ExerciseCategory.LOWER);
-            save("플랭크", ExerciseCategory.CORE);
+            save("스쿼트", category);
+            save("런지", category);
+            save("플랭크", categoryCore);
 
             PageResponse<AdminExerciseListItemDto> result = exerciseQueryRepository.searchForAdmin(
                     emptyCondition(), AdminExerciseSortKey.NAME, true, 0, 2);
@@ -128,9 +140,9 @@ class ExerciseQueryRepositoryTest {
         @Test
         @DisplayName("NAME 오름차순 정렬")
         void sortByName_ascending() {
-            save("플랭크", ExerciseCategory.CORE);
-            save("런지", ExerciseCategory.LOWER);
-            save("데드리프트", ExerciseCategory.BACK);
+            save("플랭크", categoryCore);
+            save("런지", category);
+            save("데드리프트", categoryBack);
 
             PageResponse<AdminExerciseListItemDto> result = exerciseQueryRepository.searchForAdmin(
                     emptyCondition(), AdminExerciseSortKey.NAME, true, 0, 20);
@@ -143,9 +155,9 @@ class ExerciseQueryRepositoryTest {
         @DisplayName("페이지를 넘겨도 같은 행이 두 번 나오지 않는다 — 2차 정렬 키(id)")
         void paging_isStableWhenSortValuesTie() {
             // 이름이 같은 3행. 1차 키만으로는 순서가 미정이라 페이지 경계에서 어긋날 수 있다.
-            save("동명", ExerciseCategory.LOWER);
-            save("동명", ExerciseCategory.LOWER);
-            save("동명", ExerciseCategory.LOWER);
+            save("동명", category);
+            save("동명", category);
+            save("동명", category);
 
             var first = exerciseQueryRepository.searchForAdmin(
                     emptyCondition(), AdminExerciseSortKey.NAME, true, 0, 2);
@@ -171,7 +183,7 @@ class ExerciseQueryRepositoryTest {
                 condition, AdminExerciseSortKey.CREATED_AT, false, 0, 20);
     }
 
-    private void save(String name, ExerciseCategory category) {
+    private void save(String name, Category category) {
         exercisesRepository.save(Exercise.builder().name(name).category(category).build());
         exercisesRepository.flush();
     }

@@ -6,7 +6,7 @@ import com.shadowfit.dto.admin.ExerciseUpdateDto;
 import com.shadowfit.dto.login.CustomUserInfoDto;
 import com.shadowfit.global.security.jwt.JwtUtil;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.ExerciseReference;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.member.Member;
@@ -61,11 +61,13 @@ class AdminExerciseCrudIntegrationTest {
     @Autowired private ExercisesRepository exercisesRepository;
     @Autowired private SessionRepository sessionRepository;
     @Autowired private ExerciseReferenceRepository referenceRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
 
     private Member user;
     private Exercise exercise;
     private String userToken;
     private String adminToken;
+    private Long categoryBack;
 
     @BeforeEach
     void setUp() {
@@ -73,8 +75,10 @@ class AdminExerciseCrudIntegrationTest {
                 .email("user@test.com").username("u").password("dummy").role(UserRole.USER).build());
         Member admin = memberRepository.saveAndFlush(Member.builder()
                 .email("admin@test.com").username("a").password("dummy").role(UserRole.ADMIN).build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
+        categoryBack = categoryRepository.save(Category.builder().name("BACK").build()).getId();
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER).build());
+                .name("스쿼트").category(category).build());
 
         userToken = jwtUtil.createAccessToken(
                 CustomUserInfoDto.builder().email(user.getEmail()).role(user.getRole()).build());
@@ -121,7 +125,7 @@ class AdminExerciseCrudIntegrationTest {
         @DisplayName("201 + Location, analysisSupported 는 false 로 내려온다")
         void create_returns201WithLocation() throws Exception {
             ExerciseCreateDto dto = new ExerciseCreateDto(
-                    "데드리프트", ExerciseCategory.BACK, "설명", null, "[\"hip\"]", 20);
+                    "데드리프트", categoryBack, "설명", null, "[\"hip\"]", 20);
 
             mockMvc.perform(post("/admin/exercises")
                             .header("Authorization", "Bearer " + adminToken)
@@ -137,7 +141,7 @@ class AdminExerciseCrudIntegrationTest {
         @DisplayName("이름이 비면 400")
         void create_blankName_returns400() throws Exception {
             ExerciseCreateDto dto = new ExerciseCreateDto(
-                    "  ", ExerciseCategory.BACK, null, null, null, null);
+                    "  ", categoryBack, null, null, null, null);
 
             mockMvc.perform(post("/admin/exercises")
                             .header("Authorization", "Bearer " + adminToken)
@@ -150,7 +154,7 @@ class AdminExerciseCrudIntegrationTest {
         @DisplayName("targetJoints 가 깨진 JSON 이면 500 이 아니라 400")
         void create_invalidJson_returns400() throws Exception {
             ExerciseCreateDto dto = new ExerciseCreateDto(
-                    "데드리프트", ExerciseCategory.BACK, null, null, "{깨진", null);
+                    "데드리프트", categoryBack, null, null, "{깨진", null);
 
             mockMvc.perform(post("/admin/exercises")
                             .header("Authorization", "Bearer " + adminToken)
@@ -176,7 +180,7 @@ class AdminExerciseCrudIntegrationTest {
                             .content(objectMapper.writeValueAsString(dto)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.name").value("스쿼트(개선)"))
-                    .andExpect(jsonPath("$.category").value("LOWER"));
+                    .andExpect(jsonPath("$.categoryName").value("LOWER"));
         }
     }
 

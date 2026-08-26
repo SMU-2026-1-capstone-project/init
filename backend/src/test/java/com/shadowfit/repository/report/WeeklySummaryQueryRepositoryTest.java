@@ -2,7 +2,7 @@ package com.shadowfit.repository.report;
 
 import com.shadowfit.dto.report.weekly.WeeklyTotalsDto;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -34,6 +34,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 나오는데 그건 「차이가 없다」가 아니라 <b>「이 데이터로는 못 잰다」</b>다
  * ([[project_synthetic_data_distribution_limit]]). 그래서 여기서는 회차 수와 점수가 <b>서로 다른</b>
  * 세션을 손으로 심는다 — 식이 갈리는지를 보려면 갈릴 수 있는 데이터가 있어야 한다.
+ *
+ * <p><b>B층</b>({@code repCurveBetween}·{@code worstRepDistributionBetween})은 여기 없다 —
+ * {@code JSON_TABLE} 을 H2 가 구현하지 않아 이 프로파일로는 테스트가 원리상 안 된다.
+ * {@link WeeklySummaryBLayerRaceTest}(실 MySQL, race 프로파일)가 대신 본다.
  */
 @SpringBootTest
 @Transactional
@@ -43,6 +47,7 @@ class WeeklySummaryQueryRepositoryTest {
     @Autowired private WeeklySummaryQueryRepository repository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private SessionRepository sessionRepository;
 
     /** 2026-08-17(월) 00:00 ~ 08-24(월) 00:00 — 반열린 구간 */
@@ -61,8 +66,9 @@ class WeeklySummaryQueryRepositoryTest {
         otherMember = memberRepository.saveAndFlush(Member.builder()
                 .email("weekly-other@test.com").username("남").password("dummy")
                 .selectedPersona(SelectedPersona.BEGINNER).role(UserRole.USER).build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                .name("스쿼트").category(category).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00")).build());
     }

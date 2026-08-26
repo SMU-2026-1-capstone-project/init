@@ -4,7 +4,7 @@ import com.shadowfit.dto.exercises.VideoRequestDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -42,6 +42,7 @@ class ExerciseAnalysisServiceTest {
     @Autowired private CircuitBreakerRegistry circuitBreakerRegistry;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private SessionRepository sessionRepository;
 
     private Member member;
@@ -53,8 +54,9 @@ class ExerciseAnalysisServiceTest {
                 .email("analysis@test.com").username("u").password("dummy")
                 .preferredUrl("https://youtu.be/dummy")
                 .selectedPersona(SelectedPersona.BEGINNER).role(UserRole.USER).build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                .name("스쿼트").category(category).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
                 .analysisSupported(true)  // 기본값 false — createSession이 W007로 막히므로 명시 필요
                 .build());

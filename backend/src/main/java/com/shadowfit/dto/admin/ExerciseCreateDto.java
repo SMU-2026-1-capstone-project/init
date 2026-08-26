@@ -1,6 +1,5 @@
 package com.shadowfit.dto.admin;
 
-import com.shadowfit.model.exercise.ExerciseCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -28,9 +27,9 @@ public record ExerciseCreateDto(
         @Size(max = 100, message = "운동명은 100자를 넘을 수 없습니다")
         String name,
 
-        @Schema(description = "부위 카테고리", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "부위 카테고리 ID", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "카테고리는 필수입니다")
-        ExerciseCategory category,
+        Long categoryId,
 
         @Schema(description = "설명")
         String description,

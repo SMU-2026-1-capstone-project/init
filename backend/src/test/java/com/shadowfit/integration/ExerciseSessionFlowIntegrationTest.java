@@ -8,7 +8,7 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.grpc.*;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.FeedbackType;
 import com.shadowfit.model.exercise.PoseData;
 import com.shadowfit.model.exercise.Session;
@@ -72,6 +72,7 @@ class ExerciseSessionFlowIntegrationTest {
     @Autowired private PoseDataRepository poseDataRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private ReportRepository reportRepository;
     @Autowired private SessionFeedbackLogRepository feedbackLogRepository;
 
@@ -89,9 +90,10 @@ class ExerciseSessionFlowIntegrationTest {
                 .role(UserRole.USER)
                 .build());
 
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         testExercise = exercisesRepository.saveAndFlush(Exercise.builder()
                 .name("스쿼트")
-                .category(ExerciseCategory.LOWER)
+                .category(category)
                 .expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00"))

@@ -1,7 +1,7 @@
 package com.shadowfit.service.Exercise;
 
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.PoseData;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
@@ -49,6 +49,7 @@ class PoseDataCleanupServiceTest {
     @Autowired private SessionRepository sessionRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private PlatformTransactionManager transactionManager;
 
     private Long memberId;
@@ -65,8 +66,9 @@ class PoseDataCleanupServiceTest {
                 .email("cleanup-" + unique + "@test.com").username("u-" + unique).password("dummy")
                 .role(UserRole.USER).build());
         memberId = member.getId();
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         Exercise exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                .name("스쿼트").category(category).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
                 .build());
         exerciseId = exercise.getId();

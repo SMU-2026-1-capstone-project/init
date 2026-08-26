@@ -2,7 +2,7 @@ package com.shadowfit.service.Exercise;
 
 import com.shadowfit.grpc.SessionCompleteRequest;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.PoseData;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
@@ -48,6 +48,7 @@ class SessionSyncStatsTest {
     @Autowired private SessionRepository sessionRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private PoseDataRepository poseDataRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
     // 발행기가 테스트 도중 돌면 검증이 흔들린다 (SessionServiceTest 와 같은 이유).
@@ -60,8 +61,9 @@ class SessionSyncStatsTest {
         Member member = memberRepository.saveAndFlush(Member.builder()
                 .email("syncstats@test.com").username("syncstats").password("dummy")
                 .selectedPersona(SelectedPersona.BEGINNER).role(UserRole.USER).build());
+        Category category = categoryRepository.save(Category.builder().name("LOWER").build());
         Exercise exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                .name("스쿼트").category(category).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00"))
                 .syncThresholdAdvanced(new BigDecimal("85.00"))
                 .analysisSupported(true).build());

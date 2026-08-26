@@ -7,7 +7,7 @@ import com.shadowfit.dto.report.record.WeeklyActivityResponseDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.exercise.Exercise;
-import com.shadowfit.model.exercise.ExerciseCategory;
+import com.shadowfit.model.exercise.Category;
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
@@ -60,6 +60,7 @@ class SessionServiceTest {
     @Autowired private SessionRepository sessionRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
+    @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private OutboxEventRepository outboxRepository;
     // endSession 이 더 이상 이걸 부르지 않는다는 것 자체를 검증한다(요청 경로에 외부 호출 없음).
     @MockitoBean private ExerciseAnalysisService analysisService;
@@ -68,14 +69,16 @@ class SessionServiceTest {
 
     private Member member;
     private Exercise exercise;
+    private Category category;
 
     @BeforeEach
     void setUp() {
         member = memberRepository.saveAndFlush(Member.builder()
                 .email("sessionsvc@test.com").username("u").password("dummy")
                 .selectedPersona(SelectedPersona.BEGINNER).role(UserRole.USER).build());
+        category = categoryRepository.save(Category.builder().name("LOWER").build());
         exercise = exercisesRepository.saveAndFlush(Exercise.builder()
-                .name("스쿼트").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                .name("스쿼트").category(category).expectedDurationMinutes(15)
                 .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
                 .analysisSupported(true)  // 기본값이 false라 명시 필요 — 없으면 createSession이 W007로 막힘
                 .build());
@@ -101,7 +104,7 @@ class SessionServiceTest {
         @DisplayName("AI 분석기가 없는 종목이면 EXERCISE_NOT_SUPPORTED — 런지·플랭크가 조용히 빈 결과를 내던 것 차단")
         void createSession_analysisNotSupported_throws() {
             Exercise unsupported = exercisesRepository.saveAndFlush(Exercise.builder()
-                    .name("런지").category(ExerciseCategory.LOWER).expectedDurationMinutes(15)
+                    .name("런지").category(category).expectedDurationMinutes(15)
                     .syncThresholdBeginner(new BigDecimal("60.00")).syncThresholdAdvanced(new BigDecimal("85.00"))
                     .build());  // analysisSupported 기본값 false
             VideoRequestDto dto = VideoRequestDto.builder().exerciseId(unsupported.getId()).build();
@@ -307,6 +310,15 @@ class SessionServiceTest {
                     .build());
         }
 
+        private Session sessionOn(LocalDate date, Status status) {
+            LocalDateTime start = date.atTime(9, 0);
+            return sessionRepository.saveAndFlush(Session.builder()
+                    .member(member).exercise(exercise)
+                    .startTime(start).endTime(start.plusMinutes(10))
+                    .status(status).totalReps(10)
+                    .build());
+        }
+
         @Test
         @DisplayName("getWeeklyActivity — 이번 주 세션 합산")
         void getWeeklyActivity_aggregatesThisWeek() {
@@ -333,6 +345,22 @@ class SessionServiceTest {
             assertThat(result.getTotalAvgSyncRate()).isEqualTo(80);
             assertThat(result.getRecords()).hasSize(1);
             assertThat(result.getRecords().get(0).isHasRecord()).isTrue();
+            assertThat(result.getConsecutiveDays()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("getCalendarMain — 연속일수는 COMPLETED가 아닌 세션도 센다 (#541 인덱스 수정이 " +
+                "status IN 절에 전체 상태값을 태우지만, 그건 계획 최적화일 뿐 필터링 의미가 바뀌면 안 된다)")
+        void getCalendarMain_consecutiveDaysCountsAllStatuses() {
+            LocalDate today = LocalDate.now();
+            completedSessionOn(today, 80.0, 100.0, 20);
+            sessionOn(today.minusDays(1), Status.FAILED);
+            sessionOn(today.minusDays(2), Status.IN_PROGRESS);
+
+            CalendarMainResponseDto result = sessionService.getCalendarMain(
+                    member.getId(), today.getYear(), today.getMonthValue());
+
+            assertThat(result.getConsecutiveDays()).isEqualTo(3);
         }
 
         @Test
