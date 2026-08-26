@@ -201,7 +201,7 @@ AI가 rep마다 중간 보고하고 AI는 stateless를 지향. `pose_data`가 �
 
 ### 6-2. 🔶 남은 미결정
 
-- [ ] C(AI 상태 영속화)를 언제 볼지 — 확장 옵션으로 둘지, 별도 카드로 올릴지
+- [x] ~~C(AI 상태 영속화)를 언제 볼지~~ → **당분간 안 본다** (2026-08-26, [`ai-backend-coupling.md §11`](./ai-backend-coupling.md) 결정 로그). 게이트(AI 재시작 빈도)가 배포 전엔 원천적으로 측정 불가 — 비용은 확정, 이득은 장애 발생 확률에 비례하는데 그 확률을 모른다. A+B가 이미 대부분의 가치를 싸게 확보 중이라 남는 이득도 작다. 재검토 조건은 그대로: AI 재시작 빈도 실측(배포 이후)
 - [ ] C를 가게 된다면 스냅샷에 **어디까지 담을지** — `completed_reps`만이면 B와 실질 차이가 작고, `rep_state`·스무딩 이력까지 담아야 진짜 이어짐이 된다
 - [ ] §2-2의 역설을 근거로 **타임아웃 버퍼 30분 자체를 재검토**할지
 - [x] ~~§7의 잔여 격차(싱크 통계 구간 불일치)를 메울지~~ → 이슈 [#75](https://github.com/Shadowfit/init/issues/75) 로 분리 후 **ㄱ안(Spring 이 `pose_data` 직접 집계) 채택·수정 완료**(2026-08-01, 커밋 `ca17ec0`, 미머지). §7-1 참고
@@ -261,6 +261,11 @@ Docker(MySQL + Spring + FastAPI)로 띄워 `POST /sessions/{id}/reattach` → `R
 ---
 
 ## 결정 로그
+- 2026-08-26: §6-2의 "C(AI 상태 영속화)를 언제 볼지" 미결정 항목을 닫는다 — **당분간 안 본다.**
+  근거·전체 논의는 [`ai-backend-coupling.md §7·§11`](./ai-backend-coupling.md)(분기 D)로 옮겨서
+  박제했다. 요지: 게이트로 삼았던 동시 사용자 트리거(N=5, `ai-load-budget.md`)는 이미 20배
+  넘게 초과 달성됐지만, 진짜 게이트인 "AI 재시작 빈도"는 배포 전엔 측정 불가 — 비용 확정·이득
+  확률 미상 구조라 지금 만들면 손해 쪽에 가깝다.
 - 2026-07-29: 문서 작성. [`outbox-reliable-messaging.md`](./outbox-reliable-messaging.md) §3-2를 파다가 **"AI 상태 in-memory"가 outbox의 한계가 아니라 의도한 재개 UX를 조용히 깨뜨리고 있다**는 것을 발견해 분리. 이슈 [#59](https://github.com/Shadowfit/init/issues/59) 등록. 확인: rep 데이터가 세션 진행 중 이미 `pose_data`에 쌓임(§3-2), 그러나 rep 번호 없음(§3-3). 대안 A~D 비교, **A+B 추천** — 사용자 선호 표명 있음. **확정 아님** — §6 8건 미결정, 특히 클라 동작 확인이 선행.
 - 2026-07-29(리뷰 반영): CodeRabbit 지적으로 **과장 2건 정정** — ① B/C 복원 범위. `initial_rep_count`·`completed_reps` 만으로는 `rep_state`·`frame_index`·스무딩 이력이 복원되지 않아 "C는 거의 완전, B 이후 손실은 rep 하나 분량"은 틀렸다(§4-0 신설). ② 재부착이 `SessionStateRegistry.create` 로 **살아있는 상태를 덮어쓰는 것**을 장점으로 적었으나 반대로 위험이다 — 멱등 가드 필요(§4-B). 미결정 3건 신설. **결정 변경 없음 — 여전히 A+B 추천·확정 전.**
 - 2026-07-31(확정·구현): §6 미결정 중 구현을 막던 4건을 사용자 confirm 으로 확정(§6-1) 후 구현. 범위는 proto 2벌 + pb2 4개 + DB 2 + Spring 10 + ai-server 3 + 테스트 2 = 21 파일. **구현 중 발견**: `total_reps` 가 `state.rep_count` 가 아니라 `len(completed_reps)` 로 계산되고 있어 rep 주입만으로는 최종 집계가 안 이어졌다 — 함께 수정. 싱크 통계는 여전히 재부착 이후 구간만 반영하며 이를 §7-1 로 박제(미해결). 테스트: Spring 12 신규(전체 212 통과), ai-server 5 신규.
