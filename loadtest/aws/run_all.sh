@@ -49,6 +49,20 @@ S3_DEST="${S3_BASE%/}/$RUN_ID"
 #     🔴 **부하기 박스에서** 돌린다(ROLE=p6-loader). 대상과 같은 박스면 이 라운드의
 #        존재 이유(판정선 대면)가 사라져서 단계가 스스로 멈춘다.
 #
+#   Q2 잔여 + 카드 A 라운드 (從 R12 + #205, 2026-08-27) — **대상 박스에서** 돈다:
+#     PHASES="preflight card_a_seed q2 card_a ridealong collect"
+#     (TARGET_HOST 를 안 준다 — 이 셋은 이 박스의 `docker exec shadowfit-mysql` 을 직접 친다.
+#      대상=측정 대상 박스 자체이므로 이 라운드는 **부하기가 없다** — 그게 «조용한 박스» 전제다)
+#     🔴 **순서를 지킬 것** — `card_a_seed` 가 실 pose_data 를 채워야 `q2` 가 안 죽는다.
+#        q2 rig 이 pose_data 에서 JSON 하나를 빌려 쓰는데 0행이면 죽는다(#574).
+#
+#   HTTP 읽기 p99 라운드 (從 R14) — **부하기 박스에서**, 위 라운드가 끝난 뒤 별도로:
+#     TARGET_HOST=<위 라운드를 돌린 대상 박스의 사설 IP> PHASES="preflight httpread ridealong collect"
+#     🔴 **다른 박스·다른 시점.** httpread 는 대상에 실제 HTTP 부하를 걸어서 Q2·카드 A 의
+#        «조용한 박스» 전제와 같이 못 돈다. 그리고 이 단계 자체가 TARGET_SSH 로 대상에
+#        읽기 시드(`seed_k6_read_account.sh`)를 원격 실행하므로 부하기(러너)와 대상이 달라야
+#        하고, k6 는 ROLE=p6-loader 부트스트랩이 깐 박스에만 있다.
+#
 #   P6 동거 용량 라운드 (主-P6):
 #     TARGET_HOST=10.0.0.5 AI_PUBLIC_TOKEN=... \
 #     PHASES="coresidency_preflight coresidency_rehearsal coresidency collect"
@@ -103,8 +117,11 @@ if [ -z "$OUTDIR" ]; then
       r276)                                _r=r276-newkeys ;;
       r276app)                             _r=r276-app-retry ;;
       httpwrite)                           _r=http-write-p99 ;;
+      httpread)                            _r=http-read-p99-ec2 ;;
       ukbp)                                _r=uk-bufferpool ;;
       framepath*)                          _r=frame-path ;;
+      q2)                                  _r=q2-partition-quiet-box ;;
+      card_a_seed|card_a)                  _r=card-a-write-cost ;;
       *)                                   continue ;;   # preflight·ridealong·collect 는 라운드를 안 정한다
     esac
     case " $_rounds " in *" $_r "*) ;; *) _rounds="${_rounds:+$_rounds }$_r" ;; esac
@@ -263,6 +280,42 @@ HTTPW_BLOCKS=${HTTPW_BLOCKS:-4}
 HTTPW_ACCOUNTS=${HTTPW_ACCOUNTS:-48}
 HTTPW_EXERCISE_ID=${HTTPW_EXERCISE_ID:-1}
 HTTPW_PORT=${HTTPW_PORT:-8080}
+
+# ── HTTP 읽기 p99 (從 R14, 판정선 대면) ───────────────────────────────────
+#
+# httpwrite 와 같은 이유·같은 형태(rig 머리 참고) — 부하기는 이 박스, 대상은 TARGET_HOST.
+# 갈리는 점: 읽기는 **대상 박스에서 시드 단계를 먼저 돌려야** 한다(K6_SIDS 확보) — 그래서
+# 이 단계 안에서 TARGET_SSH 로 원격 시딩을 하고, 그 출력에서 K6_SIDS 를 뽑아 k6 에 넘긴다.
+TIMEOUT_HTTPREAD=${TIMEOUT_HTTPREAD:-5400}
+HTTPR_MULTS=${HTTPR_MULTS:-"60 180 360"}
+HTTPR_DUR=${HTTPR_DUR:-120s}
+HTTPR_BLOCKS=${HTTPR_BLOCKS:-4}
+HTTPR_PORT=${HTTPR_PORT:-8080}
+HTTPR_VUS=${HTTPR_VUS:-50}
+HTTPR_SEED_SESSIONS=${HTTPR_SEED_SESSIONS:-1000}
+HTTPR_SEED_SIDS_LIMIT=${HTTPR_SEED_SIDS_LIMIT:-50}
+
+# ── Q2 잔여 (從 R12, +13% p=0.092) ───────────────────────────────────────
+#
+# row-shape-frag-2026-08-24/README.md 가 남긴 «팔당 30~40블록 더 필요」를 채운다.
+# MySQL 만 있으면 되고(앱·부하기·AI 무대 불필요) — 대상 박스가 조용한 동안(httpread 전에) 돈다.
+# 🔴 rig 이 실 pose_data 에서 JSON 하나를 빌려 쓴다 — pose_data 가 0행이면 조용히 죽는다(#574).
+#    이 라운드에선 card_a_seed 를 먼저 돌려 그 전제를 채운다(PHASES 순서로 지킬 것 — rig 자체엔
+#    가드가 없다).
+TIMEOUT_Q2=${TIMEOUT_Q2:-10800}
+Q2_N_BLOCKS=${Q2_N_BLOCKS:-35}
+
+# ── 카드 A 쓰기 처리량 (#205) ─────────────────────────────────────────────
+#
+# 실 pose_data 가 버퍼풀(2,048MB)을 넘겨야 커버링 인덱스의 대가가 디스크 I/O 밑에서 드러난다.
+# card_a_seed 가 그 무대를 만들고(단일 라이터·조용한 박스), card_a 가 실제 판을 돈다.
+CARD_A_TARGET_MB=${CARD_A_TARGET_MB:-5120}
+TIMEOUT_CARD_A_SEED=${TIMEOUT_CARD_A_SEED:-3600}
+CARD_A_STMTS=${CARD_A_STMTS:-800}
+CARD_A_ROWS=${CARD_A_ROWS:-25}
+CARD_A_TXN_STMTS=${CARD_A_TXN_STMTS:-1}
+CARD_A_ORDER=${CARD_A_ORDER:-"A B B A B A A B"}
+TIMEOUT_CARD_A=${TIMEOUT_CARD_A:-3600}
 
 # ── 동거 용량 (主 P6) ────────────────────────────────────────────────────
 #
@@ -1378,6 +1431,56 @@ phase_r276app() {
   return 0
 }
 
+# #205 카드 A 선결 — 실 pose_data 를 버퍼풀보다 큰 규모로
+phase_card_a_seed() {
+  local out=$OUTDIR/card_a_seed
+  mkdir -p "$out"
+
+  timeout $TIMEOUT_CARD_A_SEED env TARGET_MB="$CARD_A_TARGET_MB" \
+      bash "$ROOT/loadtest/seed/seed_pose_data_bulk.sh" > "$out/run.log" 2>&1
+  local rc=$?
+  if [ $rc -ne 0 ]; then
+    note "🔴 pose_data 벌크 시딩 rc=$rc — run.log 를 볼 것"
+    return 1
+  fi
+  note "pose_data 벌크 시딩 완료 — 목표 ${CARD_A_TARGET_MB}MB"
+  return 0
+}
+
+# #205 카드 A — 커버링 인덱스의 쓰기 대가 (card_a_seed 뒤에 돌 것 — 무대 전제)
+phase_card_a() {
+  local out=$OUTDIR/card_a
+  mkdir -p "$out"
+
+  timeout $TIMEOUT_CARD_A env STMTS="$CARD_A_STMTS" ROWS="$CARD_A_ROWS" \
+      TXN_STMTS="$CARD_A_TXN_STMTS" ORDER="$CARD_A_ORDER" OUT="$out" \
+      bash "$ROOT/loadtest/measure_205_card_a_write_cost.sh" > "$out/run.log" 2>&1
+  local rc=$?
+  if [ $rc -ne 0 ]; then
+    note "🔴 카드 A 쓰기비용 rc=$rc — run.log 를 볼 것"
+    return 1
+  fi
+  note "카드 A 쓰기비용 완료 — 판 순서 «$CARD_A_ORDER»"
+  return 0
+}
+
+# 從 R12 잔여 — Q2(구멍이 DROP PARTITION 을 바꾸는가) +13%(p=0.092)를 가른다
+# 🔴 card_a_seed 뒤에 돌 것 — rig 이 실 pose_data 에서 JSON 하나를 빌리는데 0행이면 죽는다(#574)
+phase_q2() {
+  local out=$OUTDIR/q2
+  mkdir -p "$out"
+
+  timeout $TIMEOUT_Q2 env N_BLOCKS="$Q2_N_BLOCKS" OUT="$out/round4-raw.tsv" \
+      bash "$ROOT/loadtest/results/row-shape-frag-2026-08-24/run_q2_blocks.sh" > "$out/run.log" 2>&1
+  local rc=$?
+  if [ $rc -ne 0 ]; then
+    note "🔴 Q2 라운드 rc=$rc — run.log 를 볼 것"
+    return 1
+  fi
+  note "Q2 라운드 완료 — ${Q2_N_BLOCKS}블록 — $out/round4-raw.tsv"
+  return 0
+}
+
 # 從 R8 후속 — 유니크 키의 대가를 «버퍼풀을 넘긴 규모» 에서 (재고표 2번)
 phase_ukbp() {
   local out=$OUTDIR/ukbp
@@ -1435,6 +1538,57 @@ phase_httpwrite() {
     return 1
   fi
   note "HTTP 쓰기 p99 라운드 완료 — 배수 «$HTTPW_MULTS» · 판당 $HTTPW_DUR"
+  return 0
+}
+
+# 從 R14 — HTTP 읽기 p99 판정선 대면. httpwrite 와 같은 이유·같은 형태(설정 블록 참고).
+phase_httpread() {
+  local out=$OUTDIR/httpread
+  mkdir -p "$out"
+
+  if [ -z "$TARGET_HOST" ]; then
+    note "🔴 TARGET_HOST 가 없다 — 이 단계의 존재 이유가 «부하기와 대상 분리» 다. 멈춘다"
+    return 1
+  fi
+  if ! command -v k6 >/dev/null 2>&1 && [ ! -x /usr/local/bin/k6 ]; then
+    note "🔴 k6 가 없다 — ROLE=p6-loader 부트스트랩을 안 거친 박스다"
+    return 1
+  fi
+  if [ -z "$TARGET_SSH" ]; then
+    note "🔴 TARGET_SSH 가 없다 — 읽기 시드 단계는 대상 박스에서 docker exec 로 돈다"
+    return 1
+  fi
+
+  # 🔴 시드는 대상 박스에서(mysql 이 거기 있다) — 부하기(러너)가 아니라 TARGET_SSH 로 돈다.
+  note "대상에서 읽기 시드 단계 실행 — K6_SIDS 확보"
+  local seed_log="$out/seed.log"
+  $TARGET_SSH "cd $TARGET_REPO_DIR && SESSIONS=$HTTPR_SEED_SESSIONS SIDS_LIMIT=$HTTPR_SEED_SIDS_LIMIT bash loadtest/seed/seed_k6_read_account.sh" > "$seed_log" 2>&1
+  local seed_rc=$?
+  if [ $seed_rc -ne 0 ]; then
+    note "🔴 읽기 시드 rc=$seed_rc — seed.log 를 볼 것"
+    return 1
+  fi
+  local sids email
+  sids=$(grep -oE "K6_SIDS='[^']*'" "$seed_log" | tail -1 | sed "s/K6_SIDS='//; s/'$//")
+  email=$(grep -oE "K6_EMAIL='[^']*'" "$seed_log" | tail -1 | sed "s/K6_EMAIL='//; s/'$//")
+  if [ -z "$sids" ] || [ -z "$email" ]; then
+    note "🔴 seed.log 에서 K6_SIDS/K6_EMAIL 을 못 읽었다 — 출력 형식이 바뀌었을 수 있다"
+    return 1
+  fi
+  note "K6_SIDS 확보 — $(echo "$sids" | tr ',' '\n' | grep -c .)개 세션 (계정 $email)"
+
+  timeout $TIMEOUT_HTTPREAD env       BASE="http://$TARGET_HOST:$HTTPR_PORT" MULTS="$HTTPR_MULTS" DUR="$HTTPR_DUR"       BLOCKS="$HTTPR_BLOCKS" VUS="$HTTPR_VUS" K6_SIDS="$sids" K6_EMAIL="$email"       K6_BIN="$(command -v k6 || echo /usr/local/bin/k6)" OUT="$out"       bash "$ROOT/loadtest/measure_http_read_p99_sweep.sh" > "$out/run.log" 2>&1
+  local rc=$?
+
+  if [ -n "$TARGET_SSH" ]; then
+    $TARGET_SSH "docker logs --tail 2000 shadowfit-backend 2>&1" > "$out/target-backend.log" 2>&1 || true
+  fi
+
+  if [ $rc -ne 0 ]; then
+    note "🔴 HTTP 읽기 p99 라운드 rc=$rc — run.log 를 볼 것 (게이트가 막았을 수 있다)"
+    return 1
+  fi
+  note "HTTP 읽기 p99 라운드 완료 — 배수 «$HTTPR_MULTS» · 판당 $HTTPR_DUR"
   return 0
 }
 
@@ -1616,6 +1770,10 @@ for p in $PHASES; do
     r276app)   run_phase r276app   phase_r276app ;;
     ukbp)      run_phase ukbp      phase_ukbp ;;
     httpwrite) run_phase httpwrite phase_httpwrite ;;
+    httpread)  run_phase httpread  phase_httpread ;;
+    q2)          run_phase q2          phase_q2 ;;
+    card_a_seed) run_phase card_a_seed phase_card_a_seed ;;
+    card_a)      run_phase card_a      phase_card_a ;;
     ridealong) run_phase ridealong phase_ridealong ;;
     collect)   run_phase collect   phase_collect ;;
     *)         note "알 수 없는 단계 '$p' — 건너뛴다" ;;

@@ -30,7 +30,6 @@ const BASE = __ENV.BASE;                       // 예: http://172.31.32.85:8080
 const MULT = Number(__ENV.MULT || 60);         // 가정 피크 배수
 const DUR  = __ENV.DUR || '120s';
 const PW   = __ENV.K6_PASSWORD || 'Test1234!';
-const PREFIX = __ENV.PREFIX || 'r14';
 
 const BASE_RATE = 0.075;                       // ×1 = 0.075 요청/초 (위 유도)
 
@@ -62,20 +61,20 @@ export const options = {
 
 export function setup() {
   if (!BASE) throw new Error('BASE 를 넘길 것 (예: http://10.0.0.5:8080)');
-  const email = `${PREFIX}_${Date.now()}@test.com`;
+  // 🔴 여기서 새 계정을 등록하면 안 된다(#576) — /reports/session/{id} 는 요청자 memberId 로
+  //    소유권을 확인하고, weekly/calendar/daily 는 요청자 자신의 memberId 로만 조회한다.
+  //    그래서 이 rig 은 반드시 seed/seed_k6_read_account.sh 가 미리 시드해 둔 **그 계정**으로
+  //    로그인만 한다 — 새 계정은 남의 세션엔 403, 자기 세션엔 데이터가 없어 둘 다 못 잰다.
+  const email = __ENV.K6_EMAIL;
+  if (!email) throw new Error('K6_EMAIL 이 필요하다 — seed/seed_k6_read_account.sh 의 출력을 넘길 것');
   const h = { headers: { 'Content-Type': 'application/json' } };
 
-  let r = http.post(`${BASE}/member/signup`, JSON.stringify({
-    username: `${PREFIX}user`, email, password: PW, sex: 'MALE', role: 'USER' }), h);
-  if (r.status !== 200) throw new Error('signup 실패: ' + r.status + ' ' + r.body);
-
-  r = http.post(`${BASE}/member/login`, JSON.stringify({ email, password: PW }), h);
-  if (r.status !== 200) throw new Error('login 실패: ' + r.status);
+  const r = http.post(`${BASE}/member/login`, JSON.stringify({ email, password: PW }), h);
+  if (r.status !== 200) throw new Error('login 실패: ' + r.status + ' ' + r.body);
   const token = r.json('accessToken');
 
-  // 🔴 시드는 rig 밖에서 한다. 이 계정의 member_id 로 세션·리포트를 넣어야 읽을 것이 생긴다
-  //    (시더가 member_id 를 1·5·12 로 하드코딩한다 — 파일 머리 참고).
-  //    러너가 SEED_URL 로 그 절차를 미리 돌리고, 여기서는 결과만 받는다.
+  // 🔴 시드는 rig 밖에서 한다 — seed/seed_k6_read_account.sh 가 이 계정의 member_id 로
+  //    세션·리포트를 이미 넣어 뒀고, 여기서는 그 세션 id 목록만 받는다.
   const sids = (__ENV.K6_SIDS || '').split(',').filter(Boolean).map(Number);
   if (sids.length === 0) throw new Error('K6_SIDS 가 비었다 — 시드 단계가 안 돌았다');
   return { token, sids };
