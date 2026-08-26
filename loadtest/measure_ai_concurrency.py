@@ -253,140 +253,146 @@ def host():
     return model, logical, physical, quota
 
 
-CPU, LOGICAL, PHYSICAL, QUOTA = host()
-EFF = int(QUOTA) if QUOTA else LOGICAL            # 실제로 쓸 수 있는 논리 CPU
 
-print("=== AI 서버 프레임당 추론 비용 · 동시성 스케일 ===")
-print(f"    model_complexity={settings.POSE_MODEL_COMPLEXITY}")
-print(f"    CPU   : {CPU}")
-print(f"    코어  : 논리 {LOGICAL} · 물리 {PHYSICAL if PHYSICAL else '검출 실패'}"
-      + (f" · cgroup 상한 {QUOTA:g}" if QUOTA else " · cgroup 상한 없음"))
-if QUOTA:
-    print("    🔴 cgroup CPU 상한이 걸려 있다. «코어당 세션» 을 낼 거면 상한을 풀고 다시 재라.")
-if not PHYSICAL:
-    print("    🔴 물리 코어를 못 셌다(비 x86?). «코어당 세션» 은 논리 코어 기준이 되어 과대평가된다.")
-print("    ⚠️ ms 는 이 CPU 에 묶인다. 옮겨 쓸 수 있는 것은 포화 곡선 «모양» 과 «물리 코어당 세션» 이다.")
-print()
+def main():
+    CPU, LOGICAL, PHYSICAL, QUOTA = host()
+    EFF = int(QUOTA) if QUOTA else LOGICAL            # 실제로 쓸 수 있는 논리 CPU
 
-# ── 사전 단언 ──────────────────────────────────────────────────────────────────
-same = squat_cycle(20)
-v = assert_detectable(same, "같은 사람 연속")
-print(f"[검출 단언] 같은 사람 20프레임 전부 검출 · 무릎 visibility 평균 {v:.3f}")
-verify_standalone()
-alt = [figure(squat=(i % 2) * 0.5, **PERSONS[i % len(PERSONS)]) for i in range(20)]
-print()
-
-# warmup — 첫 호출은 그래프 초기화가 섞인다
-timed(same, 2)
-
-# ── [A] 단일 스레드 · 같은 사람 연속 ───────────────────────────────────────────
-print("## [A] 단일 스레드 — 트래킹이 유지될 때 (바닥값)")
-print(HDR); print(SEP)
-a = stat(timed(same, 8))
-line("같은 사람 연속", a)
-print()
-
-# ── [B] 단일 스레드 · 다른 사람 번갈아 ─────────────────────────────────────────
-print("## [B] 단일 스레드 — 트래킹이 깨질 때")
-print("     같은 검출기에 서로 다른 위치·크기의 인체를 번갈아 넣는다.")
-print("     FastAPI 스레드풀 + 스레드 로컬 검출기 조합에서 동시 세션이 만드는 상황이다.")
-print("     각 «사람» 은 위 전제 확인에서 단독 검출 100% 임이 확인됐다.")
-_d = get_detector()
-_ok, _vis = detect_rate(_d, alt)
-print(f"     ⇒ 번갈아 넣었을 때 검출률: {_ok}/{len(alt)}"
-      f"{'  🔴 단독 100% 인데 여기서 떨어진다 = 번갈아 넣은 탓' if _ok < len(alt) else ''}")
-print(HDR); print(SEP)
-b = stat(timed(alt, 8))
-line("다른 사람 번갈아", b)
-print()
-ratio = b["mean"] / a["mean"]
-print(f"  ⇒ 트래킹 깨짐 비용: {ratio:.2f}x  (B/A)")
-print()
-
-# ── [C] 동시 스레드 스케일 ─────────────────────────────────────────────────────
-print("## [C] 동시 스레드 — 처리량 포화")
-print("     스레드마다 자기 검출기(스레드 로컬)를 갖고 같은 사람 연속 프레임을 돈다.")
-print("     = 세션이 스레드에 1:1로 붙는 «가장 유리한» 배치다. 실제 스레드풀은 이보다 나쁠 수 있다.")
-
-# 스윕을 장비에 맞춘다 — 포화점 «너머» 까지 가야 곡선이 닫힌다.
-# 초판은 (1,2,4,8) 고정이었다. 물리 8코어 박스면 포화가 8 밖이라 곡선이 안 닫힌다.
-SWEEP = sorted({1, 2, 4, 8, EFF, EFF * 2} | ({PHYSICAL} if PHYSICAL else set()))
-REPEATS = 3
-
-print(f"     스윕 {SWEEP} · {REPEATS}판 + 버림판 1 · 판마다 순서를 뒤집는다")
-print("     (오름차순 1판씩이면 «스레드 수» 와 «판 순서»(터보·써멀 드리프트)가 안 갈린다)")
-print()
-
-
-def throughput(nth):
-    """nth 스레드 동시 실행 → (총 처리량 fps, 스레드당 평균 ms)."""
-    per_thread = []
-    lock = threading.Lock()
-    frames = squat_cycle(20)
-    REPS = 6
-
-    def work():
-        get_detector()          # 스레드 로컬 검출기 생성
-        timed(frames, 1)        # 워밍업
-        ms = timed(frames, REPS)
-        with lock:
-            per_thread.append(statistics.mean(ms))
-
-    ths = [threading.Thread(target=work) for _ in range(nth)]
-    t0 = time.perf_counter()
-    for t in ths:
-        t.start()
-    for t in ths:
-        t.join()
-    wall = time.perf_counter() - t0
-    return nth * len(frames) * REPS / wall, statistics.mean(per_thread)
-
-
-for _n in SWEEP:                # 버림판 — 결과에 넣지 않는다
-    throughput(_n)
-
-runs = {n: [] for n in SWEEP}
-for r in range(REPEATS):
-    for n in (SWEEP if r % 2 == 0 else list(reversed(SWEEP))):
-        runs[n].append(throughput(n))
-
-print(f"| {'스레드':<8} | {'총 처리량(fps)':>14} | {'판별 최소~최대':>17} "
-      f"| {'스레드당 평균ms':>16} | {'1스레드 대비':>12} |")
-print("|" + "-" * 10 + "|" + "-" * 16 + "|" + "-" * 19 + "|" + "-" * 18 + "|" + "-" * 14 + "|")
-
-med = {}
-for n in SWEEP:
-    fpss = sorted(x[0] for x in runs[n])
-    med[n] = fpss[len(fpss) // 2]                 # 판 간 중앙값
-    print(f"| {n:<8} | {med[n]:>14.1f} | {fpss[0]:>7.1f}~{fpss[-1]:<9.1f} "
-          f"| {statistics.mean(x[1] for x in runs[n]):>16.1f} "
-          f"| {med[n] / med[SWEEP[0]]:>11.2f}x |")
-
-peak_n = max(med, key=med.get)
-peak = med[peak_n]
-
-print()
-print("## 유도")
-print(f"  프레임당 비용(트래킹 유지) : {a['mean']:.1f} ms")
-print(f"  프레임당 비용(트래킹 깨짐) : {b['mean']:.1f} ms")
-print(f"  측정된 포화 처리량         : {peak:.1f} fps (스레드 {peak_n})")
-print()
-print("  ⓐ 측정 기반 — 이 장비에서 «실제로 나온» 처리량을 클라 fps 로 나눈다")
-for fps_c in (3, 10):
-    ses = peak / fps_c
-    print(f"     클라 {fps_c:>2}fps → 동시 {ses:6.1f} 세션"
-          + (f"   ⇒ 물리 코어당 {ses / PHYSICAL:.2f} 세션" if PHYSICAL else ""))
-
-if PHYSICAL:
-    per_core = peak / 3 / PHYSICAL                # 실클라 3fps 기준(#143 상한)
+    print("=== AI 서버 프레임당 추론 비용 · 동시성 스케일 ===")
+    print(f"    model_complexity={settings.POSE_MODEL_COMPLEXITY}")
+    print(f"    CPU   : {CPU}")
+    print(f"    코어  : 논리 {LOGICAL} · 물리 {PHYSICAL if PHYSICAL else '검출 실패'}"
+          + (f" · cgroup 상한 {QUOTA:g}" if QUOTA else " · cgroup 상한 없음"))
+    if QUOTA:
+        print("    🔴 cgroup CPU 상한이 걸려 있다. «코어당 세션» 을 낼 거면 상한을 풀고 다시 재라.")
+    if not PHYSICAL:
+        print("    🔴 물리 코어를 못 셌다(비 x86?). «코어당 세션» 은 논리 코어 기준이 되어 과대평가된다.")
+    print("    ⚠️ ms 는 이 CPU 에 묶인다. 옮겨 쓸 수 있는 것은 포화 곡선 «모양» 과 «물리 코어당 세션» 이다.")
     print()
-    print("  ⓑ 다른 사양으로 옮길 때 — ⓐ 의 «코어당» 에 목표 물리 코어 수를 곱한다")
-    for cores in (4, 8, 16, 32):
-        print(f"     물리 {cores:>2}코어 · 클라 3fps → 동시 {per_core * cores:6.1f} 세션")
-    # 67 = DAU 1,000 가정의 피크 동시 세션 (ai-load-budget.md / load-test-strategy.md §1)
-    print(f"\n  ⇒ 가정한 피크 동시 67세션을 채우려면 물리 {67 / per_core:.1f}코어")
-print()
-print("  ⚠️ 위 유도는 «코어를 100% 추론에 쓸 수 있다» 는 상한이다. 실제로는 디코딩·HTTP·GIL,")
-print("     그리고 같은 박스에 사는 다른 컨테이너가 이 값을 깎는다. 하한이 아니라 상한으로 읽을 것.")
-print("  ⚠️ 코어 선형 가정도 상한이다 — 메모리 대역·L3 경합은 코어가 늘수록 나빠진다.")
-print("     그리고 [C] 가 보여주는 포화가 더 낮은 값을 만든다. 상한으로만 읽을 것.")
+
+    # ── 사전 단언 ──────────────────────────────────────────────────────────────────
+    same = squat_cycle(20)
+    v = assert_detectable(same, "같은 사람 연속")
+    print(f"[검출 단언] 같은 사람 20프레임 전부 검출 · 무릎 visibility 평균 {v:.3f}")
+    verify_standalone()
+    alt = [figure(squat=(i % 2) * 0.5, **PERSONS[i % len(PERSONS)]) for i in range(20)]
+    print()
+
+    # warmup — 첫 호출은 그래프 초기화가 섞인다
+    timed(same, 2)
+
+    # ── [A] 단일 스레드 · 같은 사람 연속 ───────────────────────────────────────────
+    print("## [A] 단일 스레드 — 트래킹이 유지될 때 (바닥값)")
+    print(HDR); print(SEP)
+    a = stat(timed(same, 8))
+    line("같은 사람 연속", a)
+    print()
+
+    # ── [B] 단일 스레드 · 다른 사람 번갈아 ─────────────────────────────────────────
+    print("## [B] 단일 스레드 — 트래킹이 깨질 때")
+    print("     같은 검출기에 서로 다른 위치·크기의 인체를 번갈아 넣는다.")
+    print("     FastAPI 스레드풀 + 스레드 로컬 검출기 조합에서 동시 세션이 만드는 상황이다.")
+    print("     각 «사람» 은 위 전제 확인에서 단독 검출 100% 임이 확인됐다.")
+    _d = get_detector()
+    _ok, _vis = detect_rate(_d, alt)
+    print(f"     ⇒ 번갈아 넣었을 때 검출률: {_ok}/{len(alt)}"
+          f"{'  🔴 단독 100% 인데 여기서 떨어진다 = 번갈아 넣은 탓' if _ok < len(alt) else ''}")
+    print(HDR); print(SEP)
+    b = stat(timed(alt, 8))
+    line("다른 사람 번갈아", b)
+    print()
+    ratio = b["mean"] / a["mean"]
+    print(f"  ⇒ 트래킹 깨짐 비용: {ratio:.2f}x  (B/A)")
+    print()
+
+    # ── [C] 동시 스레드 스케일 ─────────────────────────────────────────────────────
+    print("## [C] 동시 스레드 — 처리량 포화")
+    print("     스레드마다 자기 검출기(스레드 로컬)를 갖고 같은 사람 연속 프레임을 돈다.")
+    print("     = 세션이 스레드에 1:1로 붙는 «가장 유리한» 배치다. 실제 스레드풀은 이보다 나쁠 수 있다.")
+
+    # 스윕을 장비에 맞춘다 — 포화점 «너머» 까지 가야 곡선이 닫힌다.
+    # 초판은 (1,2,4,8) 고정이었다. 물리 8코어 박스면 포화가 8 밖이라 곡선이 안 닫힌다.
+    SWEEP = sorted({1, 2, 4, 8, EFF, EFF * 2} | ({PHYSICAL} if PHYSICAL else set()))
+    REPEATS = 3
+
+    print(f"     스윕 {SWEEP} · {REPEATS}판 + 버림판 1 · 판마다 순서를 뒤집는다")
+    print("     (오름차순 1판씩이면 «스레드 수» 와 «판 순서»(터보·써멀 드리프트)가 안 갈린다)")
+    print()
+
+
+    def throughput(nth):
+        """nth 스레드 동시 실행 → (총 처리량 fps, 스레드당 평균 ms)."""
+        per_thread = []
+        lock = threading.Lock()
+        frames = squat_cycle(20)
+        REPS = 6
+
+        def work():
+            get_detector()          # 스레드 로컬 검출기 생성
+            timed(frames, 1)        # 워밍업
+            ms = timed(frames, REPS)
+            with lock:
+                per_thread.append(statistics.mean(ms))
+
+        ths = [threading.Thread(target=work) for _ in range(nth)]
+        t0 = time.perf_counter()
+        for t in ths:
+            t.start()
+        for t in ths:
+            t.join()
+        wall = time.perf_counter() - t0
+        return nth * len(frames) * REPS / wall, statistics.mean(per_thread)
+
+
+    for _n in SWEEP:                # 버림판 — 결과에 넣지 않는다
+        throughput(_n)
+
+    runs = {n: [] for n in SWEEP}
+    for r in range(REPEATS):
+        for n in (SWEEP if r % 2 == 0 else list(reversed(SWEEP))):
+            runs[n].append(throughput(n))
+
+    print(f"| {'스레드':<8} | {'총 처리량(fps)':>14} | {'판별 최소~최대':>17} "
+          f"| {'스레드당 평균ms':>16} | {'1스레드 대비':>12} |")
+    print("|" + "-" * 10 + "|" + "-" * 16 + "|" + "-" * 19 + "|" + "-" * 18 + "|" + "-" * 14 + "|")
+
+    med = {}
+    for n in SWEEP:
+        fpss = sorted(x[0] for x in runs[n])
+        med[n] = fpss[len(fpss) // 2]                 # 판 간 중앙값
+        print(f"| {n:<8} | {med[n]:>14.1f} | {fpss[0]:>7.1f}~{fpss[-1]:<9.1f} "
+              f"| {statistics.mean(x[1] for x in runs[n]):>16.1f} "
+              f"| {med[n] / med[SWEEP[0]]:>11.2f}x |")
+
+    peak_n = max(med, key=med.get)
+    peak = med[peak_n]
+
+    print()
+    print("## 유도")
+    print(f"  프레임당 비용(트래킹 유지) : {a['mean']:.1f} ms")
+    print(f"  프레임당 비용(트래킹 깨짐) : {b['mean']:.1f} ms")
+    print(f"  측정된 포화 처리량         : {peak:.1f} fps (스레드 {peak_n})")
+    print()
+    print("  ⓐ 측정 기반 — 이 장비에서 «실제로 나온» 처리량을 클라 fps 로 나눈다")
+    for fps_c in (3, 10):
+        ses = peak / fps_c
+        print(f"     클라 {fps_c:>2}fps → 동시 {ses:6.1f} 세션"
+              + (f"   ⇒ 물리 코어당 {ses / PHYSICAL:.2f} 세션" if PHYSICAL else ""))
+
+    if PHYSICAL:
+        per_core = peak / 3 / PHYSICAL                # 실클라 3fps 기준(#143 상한)
+        print()
+        print("  ⓑ 다른 사양으로 옮길 때 — ⓐ 의 «코어당» 에 목표 물리 코어 수를 곱한다")
+        for cores in (4, 8, 16, 32):
+            print(f"     물리 {cores:>2}코어 · 클라 3fps → 동시 {per_core * cores:6.1f} 세션")
+        # 67 = DAU 1,000 가정의 피크 동시 세션 (ai-load-budget.md / load-test-strategy.md §1)
+        print(f"\n  ⇒ 가정한 피크 동시 67세션을 채우려면 물리 {67 / per_core:.1f}코어")
+    print()
+    print("  ⚠️ 위 유도는 «코어를 100% 추론에 쓸 수 있다» 는 상한이다. 실제로는 디코딩·HTTP·GIL,")
+    print("     그리고 같은 박스에 사는 다른 컨테이너가 이 값을 깎는다. 하한이 아니라 상한으로 읽을 것.")
+    print("  ⚠️ 코어 선형 가정도 상한이다 — 메모리 대역·L3 경합은 코어가 늘수록 나빠진다.")
+    print("     그리고 [C] 가 보여주는 포화가 더 낮은 값을 만든다. 상한으로만 읽을 것.")
+
+
+if __name__ == "__main__":
+    main()
