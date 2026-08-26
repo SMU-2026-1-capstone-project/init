@@ -139,6 +139,26 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
     int markFailed(@Param("id") Long id, @Param("lockedBy") String lockedBy);
 
     /**
+     * 종료 훅 전용 — 이 인스턴스가 들고 있던 lease 를 반납한다 (#208 조치 후보 2).
+     *
+     * <p>{@link #markForRetry} 와 달리 {@code retryCount} 를 안 올린다 — 이건 실패가 아니라
+     * 정상 종료 중의 자발적 반납이다. 아직 송신을 시도조차 안 했을 수도 있는 행을 "재시도"로
+     * 세면 관측이 왜곡된다. {@code lock_expires_at} 을 못 지웠을 때(비정상 종료, SIGKILL 등)는
+     * 기존 lease 만료 경로(§4-3-1)가 안전망으로 그대로 남는다 — 이 메서드는 그 대기 시간을
+     * 줄여주는 최적화지, 대체가 아니다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE OutboxEvent e
+               SET e.status = com.shadowfit.model.outbox.OutboxStatus.PENDING,
+                   e.lockedBy = NULL,
+                   e.lockExpiresAt = NULL
+             WHERE e.lockedBy = :lockedBy
+               AND e.status = com.shadowfit.model.outbox.OutboxStatus.PROCESSING
+            """)
+    int releaseOwnedLeases(@Param("lockedBy") String lockedBy);
+
+    /**
      * 적체 감시 게이지용. 계수기가 없으면 "PENDING 이 조용히 쌓이는 것"을 아무도 모른다 —
      * outbox 의 대표적 실패 양상이다.
      */
