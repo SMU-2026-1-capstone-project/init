@@ -49,12 +49,13 @@ S3_DEST="${S3_BASE%/}/$RUN_ID"
 #     🔴 **부하기 박스에서** 돌린다(ROLE=p6-loader). 대상과 같은 박스면 이 라운드의
 #        존재 이유(판정선 대면)가 사라져서 단계가 스스로 멈춘다.
 #
-#   Q2 잔여 + 카드 A 라운드 (從 R12 + #205, 2026-08-27) — **대상 박스에서** 돈다:
-#     PHASES="preflight card_a_seed q2 card_a ridealong collect"
-#     (TARGET_HOST 를 안 준다 — 이 셋은 이 박스의 `docker exec shadowfit-mysql` 을 직접 친다.
-#      대상=측정 대상 박스 자체이므로 이 라운드는 **부하기가 없다** — 그게 «조용한 박스» 전제다)
-#     🔴 **순서를 지킬 것** — `card_a_seed` 가 실 pose_data 를 채워야 `q2` 가 안 죽는다.
-#        q2 rig 이 pose_data 에서 JSON 하나를 빌려 쓰는데 0행이면 죽는다(#574).
+#   Q2 잔여 라운드 (從 R12, 2026-08-27) — **대상 박스에서** 돈다:
+#     PHASES="preflight q2 ridealong collect"
+#     (TARGET_HOST 를 안 준다 — MySQL 만 있으면 된다. 이 박스의 `docker exec shadowfit-mysql`
+#      을 직접 치고, 대상=측정 대상 박스 자체이므로 이 라운드는 **부하기가 없다** — 그게
+#      «조용한 박스» 전제다)
+#     🔴 **card_a·card_a_seed 는 이 라운드에 안 넣는다** — #205 쓰기 대가는 2026-08-22 에
+#        이미 닫혔다(A÷B=1.245). 다시 돌려도 같은 답을 반복할 뿐이다(설정 블록 참고).
 #
 #   HTTP 읽기 p99 라운드 (從 R14) — **부하기 박스에서**, 위 라운드가 끝난 뒤 별도로:
 #     TARGET_HOST=<위 라운드를 돌린 대상 박스의 사설 IP> PHASES="preflight httpread ridealong collect"
@@ -298,14 +299,18 @@ HTTPR_SEED_SIDS_LIMIT=${HTTPR_SEED_SIDS_LIMIT:-50}
 # ── Q2 잔여 (從 R12, +13% p=0.092) ───────────────────────────────────────
 #
 # row-shape-frag-2026-08-24/README.md 가 남긴 «팔당 30~40블록 더 필요」를 채운다.
-# MySQL 만 있으면 되고(앱·부하기·AI 무대 불필요) — 대상 박스가 조용한 동안(httpread 전에) 돈다.
-# 🔴 rig 이 실 pose_data 에서 JSON 하나를 빌려 쓴다 — pose_data 가 0행이면 조용히 죽는다(#574).
-#    이 라운드에선 card_a_seed 를 먼저 돌려 그 전제를 채운다(PHASES 순서로 지킬 것 — rig 자체엔
-#    가드가 없다).
+# MySQL 만 있으면 되고(앱·부하기·AI 무대·card_a_seed 불필요) — 대상 박스가 조용한 동안 돈다.
+# (한때 rig 이 실 pose_data 에서 JSON 을 빌려 써서 0행이면 죽었다 — #574, 고정 리터럴로 고쳤다.)
 TIMEOUT_Q2=${TIMEOUT_Q2:-10800}
 Q2_N_BLOCKS=${Q2_N_BLOCKS:-35}
 
 # ── 카드 A 쓰기 처리량 (#205) ─────────────────────────────────────────────
+#
+# 🔴 #205 의 «쓰기 대가»(bp_write_req 등 논리 카운터)는 2026-08-22 에 이미 닫혔다
+#    (A÷B=1.245, results/card-a-write-cost-2026-08-22/README.md) — 이 phase 를 다시
+#    돌려도 같은 답을 반복할 뿐이다. 여기 남은 «쓰기 처리량»(동시성·지속 삽입률)은
+#    다른 질문이고 이 rig 은 그걸 안 잰다 — **기본 라운드 PHASES 에선 뺀다.** 코드는
+#    남긴다(처리량 rig 을 나중에 만들 때 무대 준비는 재사용 가능).
 #
 # 실 pose_data 가 버퍼풀(2,048MB)을 넘겨야 커버링 인덱스의 대가가 디스크 I/O 밑에서 드러난다.
 # card_a_seed 가 그 무대를 만들고(단일 라이터·조용한 박스), card_a 가 실제 판을 돈다.
@@ -1465,7 +1470,6 @@ phase_card_a() {
 }
 
 # 從 R12 잔여 — Q2(구멍이 DROP PARTITION 을 바꾸는가) +13%(p=0.092)를 가른다
-# 🔴 card_a_seed 뒤에 돌 것 — rig 이 실 pose_data 에서 JSON 하나를 빌리는데 0행이면 죽는다(#574)
 phase_q2() {
   local out=$OUTDIR/q2
   mkdir -p "$out"
