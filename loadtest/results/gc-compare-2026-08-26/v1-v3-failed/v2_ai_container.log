@@ -1,0 +1,2401 @@
+time="2026-08-26T15:43:47Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |     server.run()
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     server.run()
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
+shadowfit-ai  | Traceback (most recent call last):
+shadowfit-ai  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+shadowfit-ai  |     sys.exit(main())
+shadowfit-ai  |              ^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1631, in __call__
+shadowfit-ai  |     return self.main(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1552, in main
+shadowfit-ai  |     rv = self.invoke(ctx)
+shadowfit-ai  |          ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 1415, in invoke
+shadowfit-ai  |     return ctx.invoke(self.callback, **ctx.params)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/click/core.py", line 910, in invoke
+shadowfit-ai  |     return callback(*args, **kwargs)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 413, in main
+shadowfit-ai  |     run(
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/main.py", line 580, in run
+shadowfit-ai  |     server.run()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 66, in run
+shadowfit-ai  |     return asyncio.run(self.serve(sockets=sockets))
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+shadowfit-ai  |     return runner.run(main)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+shadowfit-ai  |     return self._loop.run_until_complete(task)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 70, in serve
+shadowfit-ai  |     await self._serve(sockets)
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/server.py", line 77, in _serve
+shadowfit-ai  |     config.load()
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/config.py", line 435, in load
+shadowfit-ai  |     self.loaded_app = import_from_string(self.app)
+shadowfit-ai  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+shadowfit-ai  |     module = importlib.import_module(module_str)
+shadowfit-ai  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "/usr/local/lib/python3.12/importlib/__init__.py", line 90, in import_module
+shadowfit-ai  |     return _bootstrap._gcd_import(name[level:], package, level)
+shadowfit-ai  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+shadowfit-ai  |   File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+shadowfit-ai  |   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+shadowfit-ai  |   File "/app/app/main.py", line 13, in <module>
+shadowfit-ai  |     from app.api.router import api_router
+shadowfit-ai  |   File "/app/app/api/router.py", line 5, in <module>
+shadowfit-ai  |     from app.api.endpoints import pose, sync, video
+shadowfit-ai  |   File "/app/app/api/endpoints/pose.py", line 18, in <module>
+shadowfit-ai  |     from app.config import settings
+shadowfit-ai  |   File "/app/app/config.py", line 183, in <module>
+shadowfit-ai  |     _assert_tokens_separated()
+shadowfit-ai  |   File "/app/app/config.py", line 175, in _assert_tokens_separated
+shadowfit-ai  |     raise RuntimeError(
+shadowfit-ai  | RuntimeError: 🔴 INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다 (#230). AI_PUBLIC_TOKEN 은 앱 번들에 배포되는 값이라, 같은 값을 쓰면 번들에서 추출한 토큰으로 Spring 내부 gRPC 까지 통과한다 — 이슈 #134 가 그 사고였고 두 값을 나눈 이유다. 서로 다른 무작위 값을 넣을 것 (.env.example 참고).
