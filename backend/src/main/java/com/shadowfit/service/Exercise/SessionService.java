@@ -686,8 +686,12 @@ public class SessionService {
         LocalDate today = LocalDate.now();
 
         // 최근 100일치 활동 날짜를 한 번에 조회 (루프 N+1 → 쿼리 1방)
+        // status 전부(List.of(Status.values()))를 넘긴다 — 결과를 좁히려는 게 아니라
+        // idx_session_member_status_start 가 status 등치 없이는 start_time 을 seek 못 해
+        // 회원 전체 이력을 읽던 걸 막으려는 것(#541). 필터링 의미는 그대로다.
         Set<LocalDate> activeDates = sessionRepository.findDistinctActiveDates(
                         memberId,
+                        List.of(Status.values()),
                         today.minusDays(100).atStartOfDay(),
                         today.atTime(23, 59, 59)
                 ).stream()
