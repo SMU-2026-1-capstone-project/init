@@ -68,6 +68,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Seoul
+      # 로컬 개발 편의 — Swagger UI/OpenAPI 문서. docker-compose.prod.yml 에는 없어서
+      # 기본값(false)이 그대로 적용된다(application.yml [3]).
+      SPRINGDOC_ENABLED: "true"
       DB_HOST: shadowfit-mysql
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
