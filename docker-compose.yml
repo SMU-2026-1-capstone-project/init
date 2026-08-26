@@ -75,6 +75,9 @@ services:
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
       AI_SERVER_HOST: shadowfit-ai
       AI_SERVER_GRPC_PORT: 8585
+      # AI 채널 풀 크기 — shadowfit-ai 의 AI_WORKER_COUNT 와 같은 값이어야 한다(ai-channel-pool-hardening.md).
+      # 소스는 여기 하나(${AI_WORKER_COUNT}) 뿐이고, 아래 shadowfit-ai 서비스도 같은 변수를 읽는다.
+      AI_CHANNEL_POOL_SIZE: ${AI_WORKER_COUNT:-3}
       JWT_SECRET: ${JWT_SECRET:-shadowfit-prod-secret-key-change-this}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # 데드락 재시도 상한 (#276 ②). 기본 3 은 앱 경로 스윕으로 정한 값이다(2026-08-23 사용자 confirm,
@@ -153,6 +156,9 @@ services:
       # EXPO_PUBLIC_AI_PUBLIC_TOKEN 으로 갖는다.
       AI_PUBLIC_TOKEN: ${AI_PUBLIC_TOKEN}
       POSE_MODEL_COMPLEXITY: 1
+      # 워커 프로세스 수 — entrypoint.sh 가 이 값으로 몇 개를 띄우고 포트를 어떻게 나눌지 정한다.
+      # 위 shadowfit-backend 의 AI_CHANNEL_POOL_SIZE 와 같은 소스(${AI_WORKER_COUNT})를 쓴다.
+      AI_WORKER_COUNT: ${AI_WORKER_COUNT:-3}
     healthcheck:
       # AI 서버용 파이썬 방식 헬스체크 적용 (curl 대신)
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

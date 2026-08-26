@@ -132,6 +132,12 @@ grpc:
       address: 'static://${AI_SERVER_HOST:shadowfit-ai}:${AI_SERVER_GRPC_PORT:8585}'
       negotiation-type: plaintext
 
+# AI 채널 풀 크기 — entrypoint.sh 가 띄우는 AI 워커 프로세스 수와 같아야 한다.
+# docker-compose 의 AI_CHANNEL_POOL_SIZE(=AI_WORKER_COUNT 와 같은 소스)를 그대로 받는다
+# (docs/decisions/ai-channel-pool-hardening.md).
+ai:
+  channel-pool-size: ${AI_CHANNEL_POOL_SIZE:3}
+
 # [3] Swagger 및 기타 설정 (최상단 레벨)
 springdoc:
   api-docs:
