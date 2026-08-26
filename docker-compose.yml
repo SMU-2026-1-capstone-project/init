@@ -69,9 +69,30 @@ services:
       # 경계"라는 이 설계의 전제가 dev 에서 통째로 깨진다. 용도가 호스트 curl 이므로
       # 127.0.0.1 로 목적은 그대로다.
       - "127.0.0.1:9090:9090"
+    # 메모리 한도 — #570. shadowfit-ai(#212)와 같은 이유다: 한도가 없으면 JVM 이 컨테이너가
+    # 아니라 호스트 전체 메모리를 보고 힙을 잡는다(UseContainerSupport 기본값이 켜져 있어도
+    # cgroup 상한이 없으면 볼 게 없다) — MySQL·AI 와 한 호스트에 동거하는 이 프로젝트에서
+    # 그건 옆 컨테이너를 굶기는 쪽으로 간다.
+    #
+    # 값의 근거: 이 dev 박스에서 idle 상태 RSS 실측 651.7MiB(`docker stats`, 2026-08-26). 부하
+    # 중 피크는 미측정이다. AI 와 실패 방향이 다르다는 것도 유의 — AI 는 한도에 걸리면 새 세션을
+    # 거절하고 계속 돈다(우아한 열화)지만, JVM 은 힙이 부족하면 OOMKilled 로 죽는다. 그래서 이
+    # 값은 "빠듯하게 맞춘 값"이 아니라 "옆 컨테이너를 굶기지만 않을 넉넉한 상한"이다.
+    #
+    # ⚠️ 부하 중 실제 피크는 #570 의 열린 항목 — obs 프로파일의 jvm_memory_used_bytes 로 재고
+    # 나서 좁힐 것.
+    mem_limit: ${BACKEND_MEM_LIMIT:-2048m}
+    # CPU 한도 — AI(#212)처럼 포화 지점을 실측해서 고른 값이 아니다. Spring 은 I/O 바운드라
+    # AI 같은 폭주 근거가 아직 없다. 이 값은 "호스트 논리 코어 수를 넘지 않는다"는 구조적
+    # 상한일 뿐 — 실측 전까지는 여기서 더 좁히지 않는다.
+    cpus: ${BACKEND_CPU_LIMIT:-4}
     environment:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Seoul
+      # 컨테이너 힙 옵션 — 위 mem_limit 과 짝이다(#570). 75% 는 컨테이너 JVM 의 통상적인
+      # 시작값(논-힙 영역인 스레드 스택·메타스페이스·다이렉트 버퍼에 나머지를 남겨둔다)이고,
+      # 이 프로젝트가 실측해서 고른 값은 아니다 — 실측 후 좁힐 대상이다(#570).
+      JAVA_OPTS: ${BACKEND_JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
       # 로컬 개발 편의 — Swagger UI/OpenAPI 문서. docker-compose.prod.yml 에는 없어서
       # 기본값(false)이 그대로 적용된다(application.yml [3]).
       SPRINGDOC_ENABLED: "true"
