@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * <b>조회 넷이 전부 {@code sessionAnchor} 를 받는 이유</b> (#392): {@code pose_data} 는
@@ -45,11 +46,26 @@ public interface PoseDataRepository extends JpaRepository<PoseData, Long> {
      * "프레임이 아예 없다"와 "rep 을 알 수 없는 프레임뿐이다"를 계산기가 구분해 다룰 수 있다.
      */
     @Query("SELECT new com.shadowfit.dto.report.PoseFrameProjection(" +
-           "p.timestampSec, p.syncRate, p.repNumber, p.smoothedKneeAngle) " +
+           "p.id, p.timestampSec, p.syncRate, p.repNumber, p.smoothedKneeAngle) " +
            "FROM PoseData p WHERE p.session.id = :sessionId AND p.createdAt = :sessionAnchor " +
            "ORDER BY p.repNumber ASC, p.timestampSec ASC")
     List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long sessionId,
                                                     @Param("sessionAnchor") LocalDateTime sessionAnchor);
+
+    /**
+     * worst rep 대표 프레임의 자세 좌표 하나만 (P5 Tier 0, 32-deferred-items.md).
+     *
+     * <p><b>{@code createdAt} 을 같이 받는 이유는 다른 조회들과 같다</b>(클래스 주석) — {@code id} 만
+     * 조건이면 PK가 {@code (id, created_at)} 복합키라 파티션 프루닝이 안 걸려 14개 파티션을 전부
+     * 뒤진다. 둘 다 주면 복합 PK 그대로 단일 파티션 · 단일 행 다이브가 된다.
+     *
+     * <p>단일 행만 읽으므로 {@code findFramesBySessionId} 가 피하던 off-page I/O 비용은 딱 이
+     * 한 번만 낸다 — 세션 전체 프레임(수백~수천)이 아니라 대표로 뽑힌 딱 하나이기 때문에 값이 있다.
+     */
+    @Query("SELECT p.jointCoordinates FROM PoseData p " +
+           "WHERE p.id = :id AND p.createdAt = :sessionAnchor")
+    Optional<String> findJointCoordinatesById(@Param("id") Long id,
+                                              @Param("sessionAnchor") LocalDateTime sessionAnchor);
 
     // 재부착 시 AI 에 주입할 rep 카운트. AI 메모리가 증발해도 완료된 rep 은 진행 중에 이미
     // pose_data 로 넘어와 있다(docs/decisions/session-resume-and-ai-state.md §3-2).

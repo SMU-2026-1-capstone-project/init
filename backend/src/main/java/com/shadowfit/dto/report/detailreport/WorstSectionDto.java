@@ -23,4 +23,24 @@ public class WorstSectionDto {
     private String exerciseName;         // "스쿼트"
     private String timeStamp;            // "01:15" — 그 회차의 중앙 프레임
     private String reason;               // "2회차 · 싱크로율 75%" (문구 잠정 — 이슈 #80)
+
+    /**
+     * 대표 프레임의 {@code pose_data.id} (P5 Tier 0, 32-deferred-items.md). {@code jointCoordinates}
+     * 를 여기 바로 담지 않고 PK만 남기는 이유 — 이 DTO는 {@code SessionAnalysisCalculator.calculate}
+     * 가 만들어 {@code reports.detailed_analysis} 에 그대로 직렬화된다({@code SessionService
+     * .precomputeReport}). 좌표(2.3KB)를 여기 채우면 그 무게가 세션마다 영구히 복제 저장된다 —
+     * PK 하나(8바이트)만 저장해두고, 실제 좌표는 <b>리포트를 읽을 때</b>(ReportService) 그 PK로
+     * 딱 한 번 더 조회한다. 유효한 대표 프레임이 없으면(§ pickRepresentative) null 일 수 있다.
+     */
+    private Long poseDataId;
+
+    /**
+     * 대표 프레임의 관절 좌표(JSON 문자열, 33관절) — 앱이 그대로 그릴 수 있는 자세 스냅샷.
+     *
+     * <p>🔴 <b>precompute 시점엔 항상 null 이다.</b> {@code ReportService.buildReportResponse} 가
+     * {@code poseDataId} 로 조회해 <b>응답 직전에만</b> 채운다 — {@code detailed_analysis} 에는
+     * 절대 저장되지 않는다(위 {@code poseDataId} 주석 참고). 세션에 유효한 대표 프레임이 없거나
+     * 그 사이 행이 지워졌으면(파티션 DROP 등) null 로 남는다 — 이 경우 프론트는 화면을 그냥 생략한다.
+     */
+    private String jointCoordinates;
 }

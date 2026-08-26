@@ -64,7 +64,9 @@ public class ReportService {
         SessionReportResponseDto responseDto = SessionReportResponseDto.of(session, report);
 
         SessionDetailedAnalysis analysis = resolveDetailedAnalysis(session, report);
-        responseDto.setWorstSection(analysis.getWorstSection());
+        WorstSectionDto worstSection = analysis.getWorstSection();
+        attachJointCoordinates(worstSection, session);
+        responseDto.setWorstSection(worstSection);
         responseDto.setRepTrend(analysis.getRepTrend() == null ? List.of() : analysis.getRepTrend());
         responseDto.setSyncRateDetails(buildSyncRateDetails(session));
         lastSession.ifPresent(last ->
@@ -107,6 +109,25 @@ public class ReportService {
         return new SessionDetailedAnalysis(
                 sessionAnalysisCalculator.calculate(session, poseFrames),
                 sessionAnalysisCalculator.calculateRepTrend(poseFrames));
+    }
+
+    /**
+     * worst rep 대표 프레임의 자세 좌표를 <b>응답 직전에만</b> 채운다 (P5 Tier 0,
+     * 32-deferred-items.md). {@code detailed_analysis} 에는 {@code poseDataId} 만 저장돼
+     * 있으므로({@code SessionAnalysisCalculator.calculate} 주석), 여기서 PK 로 한 행만
+     * 더 읽어 응답 DTO 를 <b>이 메서드 안에서만</b> 채운다 — {@link #getSessionReport} 가
+     * {@code readOnly} 트랜잭션이라 이 mutation 은 DB 에 다시 저장되지 않는다.
+     *
+     * <p>{@code poseDataId} 가 없으면(유효한 대표 프레임이 없던 세션) 아무것도 안 한다.
+     * 조회했는데 행이 없으면(파티션 DROP 등으로 원본이 지워진 경우) {@code jointCoordinates} 는
+     * null 로 남고, 프론트는 그 필드가 없으면 화면을 생략하는 쪽으로 계약돼 있다.
+     */
+    private void attachJointCoordinates(WorstSectionDto worstSection, Session session) {
+        if (worstSection == null || worstSection.getPoseDataId() == null) {
+            return;
+        }
+        poseDataRepository.findJointCoordinatesById(worstSection.getPoseDataId(), session.getStartTime())
+                .ifPresent(worstSection::setJointCoordinates);
     }
 
     private List<ExerciseSyncRateDto> buildSyncRateDetails(Session session) {

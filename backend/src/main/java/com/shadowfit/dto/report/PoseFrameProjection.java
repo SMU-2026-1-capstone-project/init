@@ -17,8 +17,13 @@ package com.shadowfit.dto.report;
  * 순간"으로 정하려면 프레임마다 실제로 다른 값이 필요하고, 그게 이 컬럼이다.
  * {@code jointCoordinates} 를 싣지 않는 방침은 유지된다 — 각도는 숫자 하나라 off-page I/O 를
  * 되살리지 않으면서 프레임을 구분할 수 있다는 것이 이 안의 핵심이다.
+ *
+ * <p>{@code id} 는 P5 Tier 0(32-deferred-items.md)로 추가됐다. 대표 프레임이 정해진 뒤 그
+ * 프레임의 {@code jointCoordinates} 하나만 <b>PK로 다시 조회</b>하기 위한 열쇠다 — 여기서
+ * 값을 직접 싣지 않는 이유는 그대로다(대부분의 프레임은 대표로 안 뽑혀 그 비용이 버려진다).
  */
 public record PoseFrameProjection(
+        Long id,
         Double timestampSec,
         Double syncRate,
         Integer repNumber,

@@ -31,10 +31,15 @@ class SessionAnalysisCalculatorTest {
 
     private SessionAnalysisCalculator calculator;
     private Session session;
+    // pose_data.id 흉내 — 실제 값은 계산기가 신경 쓰지 않는 불투명 키라 프레임마다 유일하기만
+    // 하면 된다(P5 Tier 0, WorstSectionDto.poseDataId). 순서 의존 없이 테스트가 자기 검증할 수
+    // 있도록 frame() 호출부에서 반환값을 그대로 비교에 쓴다.
+    private long nextPoseDataId;
 
     @BeforeEach
     void setUp() {
         calculator = new SessionAnalysisCalculator();
+        nextPoseDataId = 1L;
 
         Category category = Category.builder().id(1L).name("LOWER").build();
         Exercise exercise = Exercise.builder()
@@ -69,7 +74,7 @@ class SessionAnalysisCalculatorTest {
     /** 무릎각을 명시한 프레임. 작을수록 깊게 앉은 것이다(0 = 미상). */
     private PoseFrameProjection frame(
             int repNumber, double timestampSec, Double syncRate, Double smoothedKneeAngle) {
-        return new PoseFrameProjection(timestampSec, syncRate, repNumber, smoothedKneeAngle);
+        return new PoseFrameProjection(nextPoseDataId++, timestampSec, syncRate, repNumber, smoothedKneeAngle);
     }
 
     @Test
@@ -220,17 +225,21 @@ class SessionAnalysisCalculatorTest {
     void representativeTimestamp_isDeepestFrameOfWorstRep() {
         // 중앙(1:15)이 아니라 무릎각 최소(1:20)가 뽑혀야 한다. 예전 코드는 배열 중앙을 골랐는데
         // 그게 스쿼트의 바닥이라는 근거가 없었다 — 올라오는 속도가 다르면 중앙은 바닥이 아니다.
+        PoseFrameProjection deepest = frame(2, 80.0, 50.0, 95.0); // 1:20 — 바닥(대표)
         List<PoseFrameProjection> frames = List.of(
                 frame(1, 10.0, 90.0, 150.0),
                 frame(2, 70.0, 50.0, 130.0),  // 1:10 — 내려가는 중
                 frame(2, 75.0, 50.0, 115.0),  // 1:15 — 중앙이지만 바닥 아님
-                frame(2, 80.0, 50.0, 95.0),   // 1:20 — 바닥(대표)
+                deepest,
                 frame(2, 85.0, 50.0, 120.0)   // 1:25 — 올라오는 중
         );
 
         WorstSectionDto result = calculator.calculate(session, frames);
 
         assertThat(result.getTimeStamp()).isEqualTo("01:20");
+        // P5 Tier 0 — 대표로 뽑힌 바로 그 프레임의 pose_data.id 가 실려야, 리포트를 읽을 때
+        // ReportService 가 그 자세 좌표를 PK 로 다시 조회할 수 있다.
+        assertThat(result.getPoseDataId()).isEqualTo(deepest.id());
     }
 
     /**

@@ -83,6 +83,10 @@ public class SessionAnalysisCalculator {
         worst.setExerciseName(session.getExercise().getName());
         worst.setTimeStamp(formatTimestamp(representative.timestampSec()));
         worst.setReason(buildWorstReason(worstRep, worstAverage));
+        // jointCoordinates 는 여기서 안 채운다 — 이 DTO가 detailed_analysis 에 그대로 저장되므로
+        // (SessionService.precomputeReport), PK만 남기고 실제 좌표는 읽기 시점에 조회한다
+        // (WorstSectionDto.poseDataId 주석 참고).
+        worst.setPoseDataId(representative.id());
         return worst;
     }
 
