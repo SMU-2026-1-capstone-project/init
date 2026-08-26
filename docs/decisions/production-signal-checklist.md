@@ -20,7 +20,7 @@
 | 1 | MySQL EXPLAIN 쿼리개선 | ✅ **이미 광범위 적용** | — (충분) | 없음 |
 | 2 | 로컬 캐시 | ✅ **구현+실측 완료**(FeedbackTemplateService, exercises, exercise_references) | — (완료) | 없음(§2-2-2·§2-2-3·§2-2-4 참고) |
 | 3 | 비동기/동기 외부호출 | ✅ **Resilience4j 구현+실측 완료** | — (완료) | 없음(§2-3-3 참고) |
-| 4 | tcpdump 패킷분석 | ❌ 미구현 | 🟡 제한적 | 낮음(선택) |
+| 4 | tcpdump 패킷분석 | ✅ **§7.7 재현 완료**(2026-08-26) | — (완료) | 없음(§2-4 참고) |
 | 5 | connection 설정(HikariCP) | ✅ **실측 완료 + 명시 완료** | — (완료) | 없음(§2-5 참고) |
 | 6 | k6 부하테스트 | 🔶 검토 후 미채택 | 🟡 제한적 | 낮음 |
 | 7 | thread 수치 + netty(WebFlux) | 🔶 의존성만 존재, 미사용 | 🔴 불필요(역효과) | 낮음(정리만) |
@@ -273,9 +273,12 @@ MediaPipe를 GPU로 5ms까지 줄이면 "MediaPipe 지배적이라 gRPC는 신�
 
 **판단**: §2-3-1과 동일 — 실제 착수 대상 아닌 면접 설계 서사용 사고실험. 다만 이 항목이 보여주는 서사(코로케이션 확인 → GPU 도입 시 비율 역전 → latency/capacity 축 분리 → Spring 쪽 재점검 항목 4개)는 "반사적으로 GPU 붙이자"가 아니라 **각 변경이 기존 가정(물리 박스 종속 pool 사이징, batch 페이싱, 네트워크 위치)에 어떤 파급을 주는지 짚는 능력**을 보여주는 카드로 쓸 수 있음.
 
-### 2-4. tcpdump를 이용한 패킷분석 장애해결 — 제한적
+### 2-4. tcpdump를 이용한 패킷분석 장애해결 — ✅ §7.7 재현 완료(2026-08-26)
 
-**현재 상태**: 프로젝트 어디에도 tcpdump 사용/네트워크 장애 재현 이력 없음.
+**현재 상태**: `loadtest/results/tcpdump-repro-2026-08-26/README.md` — §7.7("ghz 측정 종료 시
+in-flight `Unavailable`")을 TCP 패킷 레벨로 보강 재현. 클라이언트(ghz)가 먼저 FIN을 보내고 서버는
+FIN/RST를 먼저 보내지 않는다는 것을 캡처로 확인 — §7.7의 "서버 결함 아님, 측정 종료 아티팩트" 결론에
+패킷 증거 계층 추가. 절대 수치는 로컬 단일 박스 한정([[project_loadtest_env_constraint]]), 메커니즘만 인용 가능.
 
 **적용 가능성 판단**: 낮음~제한적. 이유:
 - 로컬 단일 박스([[project_loadtest_env_constraint]])라 진짜 네트워크 장애(패킷 손실, 지연, 파티션)가 발생할 여지가 구조적으로 적음.
@@ -403,3 +406,25 @@ MediaPipe를 GPU로 5ms까지 줄이면 "MediaPipe 지배적이라 gRPC는 신�
 - 2026-07-11: 사용자가 "이거 스프링만 하면 되는가, 쉽게 끝날 일인가"라고 재검토 요청 — 셀프 리뷰 결과 gRPC 호출에 데드라인이 없어서 AI가 죽는 게 아니라 그냥 응답 없이 멈추는(hang) 상황은 서킷브레이커가 전혀 못 잡는 갭을 발견해 정직하게 공유(§2-3-3에 갭으로 먼저 기록). 사용자가 "hang 대응(타임아웃) 먼저"로 우선순위 지정 후 착수 — `getAuthenticatedStub()`에 `withDeadlineAfter(5s)` 추가로 데드라인 초과 시 자동 `onError(DEADLINE_EXCEEDED)` 발생하도록 해서 기존 기록 로직 재사용. Docker에서 `docker pause`(TCP 유지, 응답만 없음 — `docker stop`과 다른 진짜 hang)로 재현·검증, hang 누적 시 OPEN 트립·복구까지 확인. 커밋 `0c47598`. §2-3-3 "갭" 서술을 "해결"로 갱신 — AI→Spring 반대 방향 무방비, 스킵된 세션 후속처리 없음, 설정값 미실측 등 남은 갭은 여전히 정직하게 남겨둠.
 - 2026-07-11: 사용자가 "남은 갭도 마저 정리해달라"고 요청 — §2-3-4 추가로 나머지 3개 갭 정리. (1) **해결**: 스킵/실패한 세션을 `markAsFailedIfStillInProgress`로 즉시 `FAILED` 전환하도록 추가, Docker 실측(`docker pause`)으로 OPEN-스킵 경로(gap 0초)와 데드라인 경로(gap 5초) 둘 다 확인, 커밋 `50bcf82`. (2) **의도적으로 스코프 밖으로 확정**: AI→Spring 반대 방향은 AI(Python) 코드 수정이 필요해 [[feedback_minimize_python_changes]] 방침상 이번엔 안 함 — 회피가 아니라 명시적 결정으로 기록. (3) **정직하게 미실측으로 명시**: 서킷브레이커 설정값은 업계 통상값에 가까운 보수적 기본값이지 이 프로젝트 트래픽으로 튜닝한 게 아님 — [[project_loadtest_env_constraint]] 때문에 튜닝 실측 자체가 이 환경에서 의미가 약하다는 점도 근거로 남김.
 - 2026-07-11: §2-5 connection 설정 문서화 완료. `application.properties`에 `spring.datasource.hikari.maximum-pool-size=10`을 실측 근거 주석과 함께 명시 — 코드/동작 변경 없음(HikariCP 자체 기본값도 10), "기본값에 우연히 의존"에서 "실측 후 의도적으로 10 유지"로 의도만 드러냄. Docker 재기동 후 `/actuator/metrics/hikaricp.connections.max=10.0`으로 반영 확인. 커밋 `d07d25a`. §1 표·§3 우선순위 갱신.
+- 2026-08-26: **§2-7("thread 수치 + netty(WebFlux) — 🔶 의존성만 존재, 미사용")이 낡았다.** `build.gradle` 전수 확인 결과 `webflux`·`reactor`·`WebClient` 문자열이 의존성 목록·소스코드(`backend/src/main/java`) 어디에도 없다 — "의존성만 존재"는 현재 사실과 다르다(과거 한때 있다가 정리됐거나 서술이 부정확했던 것으로 보이나 원인은 미확인). **WebFlux 서버 전면 전환 비추천 판정 자체는 그대로 유효**(JPA/JdbcTemplate 블로킹 스택은 안 변함).
+  - 새 후보 하나 발견: `report-generation-llm.md` §7이 LLM 연동 시 "발행기 20건 순차 호출, 건당 5~15초 → 최대 300초가 락 리스(60초) 초과 → 중복 발행기 회수 → 중복 LLM 비용" 갭을 이미 지적해뒀는데, 이건 **서버가 요청을 받는 쪽이 아니라 백그라운드 발행기가 외부 LLM API를 호출하는 쪽**이라 "블로킹 스택 위에 리액티브 서버는 안티패턴"이라는 기존 판단 근거가 애초에 적용되지 않는 자리다. `WebClient`(WebFlux 서버 도입 없이 HTTP 클라이언트로만 추가)로 20건을 논블로킹 동시 호출하면 락 리스 초과 문제를 구조적으로 줄일 수 있다는 것을 코드·문서 근거로 확인했다 — 단 **LLM 연동 자체가 아직 미착수**(`report-generation-llm.md` §12)라 지금 착수 대상은 아니고, 착수 시점의 도구 후보로만 남긴다. 상세는 `report-generation-llm.md` 결정 로그에 병기.
+  - 새로 판단한 것은 아니고 코드·타 문서 확인만 했다([[feedback_user_decides_not_claude]] — 착수 여부·순서는 사용자 확인 대기).
+- 2026-08-26: **§2-4 tcpdump — §7.7 재현 완료.** 이 문서 §2-4가 미리 적어둔 계획(§7.7에 TCP 레벨 증거
+  추가) 그대로 실행. 동시 세션이 `shadowfit-backend`를 쓰고 있을 수 있어([[project_concurrent_sessions]])
+  별도 compose 프로젝트(`tcpdump-repro`)로 격리 재현, 종료 후 컨테이너·볼륨 전부 제거해 기존 스택은
+  손대지 않았다. ghz `-c 50 -z 6s`로 §7.7과 같은 메커니즘(측정 종료 시 in-flight 강제 종료)을 재현하고
+  `netshoot` tcpdump를 backend 컨테이너 네트워크 네임스페이스에 붙여 캡처 — **클라이언트(ghz)가 먼저
+  FIN을 보내고 서버는 FIN/RST를 먼저 보내지 않는다**는 것을 확인해 §7.7의 "서버 결함 아님" 결론에
+  패킷 레벨 증거를 보탰다. 상세·한계(로컬 단일 박스라 절대 수치 인용 금지 등)는
+  `loadtest/results/tcpdump-repro-2026-08-26/README.md`. §1 표 갱신.
+  - **파생 발견(별도 트랙, 이 판의 목적과 무관)**: 재현 도중 코드 확인 결과
+    `ExerciseGrpcService.SavePoseDataBatch`가 `abortIfClientGaveUp`(`CallCancellation.isAbandoned()`,
+    #206-B)로 **호출 시작 시점의 취소만** 확인하고, 배치 INSERT 처리 도중(mid-flight)의 클라이언트
+    연결 종료는 확인하지 않는다 — `isCancelled`·`setOnCancelHandler` 등 mid-flight 취소 감지 코드가
+    `ExerciseGrpcService.java` 어디에도 없음(전수 grep). 클라이언트가 배치 처리 도중 연결을 끊어도
+    서버는 끝까지 쓰고 응답만 못 보낸다. 새 결정 아니고 착수 대상도 아직 아님 — 관찰만 기록.
+  - **2026-08-26 후속**: 이 관찰이 새 발견이 아니라 [이슈 #206](https://github.com/Shadowfit/init/issues/206)(CLOSED)의
+    B-2(멱등키·배치 트랜잭션 경계와 얽혀 명시적으로 미결로 남겨진 항목)와 같은 것임을 확인 —
+    B-1(시작 전 취소 확인)은 이미 구현 완료, B-2(진행 중 취소)만 미결. 분석 문서 펼침:
+    [`pose-batch-midflight-cancellation.md`](./pose-batch-midflight-cancellation.md) — 결론은
+    "batchUpdate 원자성과 취소 세분화가 상충, 지금은 손대지 않는 쪽 추천"(결정 아님, 사용자 확인 대기).

@@ -394,6 +394,14 @@ y 는 정규화 좌표라 **1.0 이 화면 아래 끝**이다. 하체 3부위가
 - ramp 이 session 801 에 **~25만 행(OK 10,066 batch × R25) 적재**(side effect). ⑤ projection 시드로 재활용 또는 `DELETE FROM pose_data WHERE session_id=801` 정리 — 사용자 결정 대기(§11).
 - SLO("콜백 p99<20ms", §10-1)는 작업량 정의(콜백 1건 vs R=25 batch) 불일치로 직접 비교 불가 → **재정의 필요**. 합격/불합격 판정은 R 실측·SLO 재정의·천장 특정 후.
 
+> 🔵 **2026-08-26 추가 — TCP 패킷 레벨 증거로 보강.** 위 결론("측정 종료 시 in-flight 강제 종료,
+> 서버 결함 아님")은 그동안 ghz 애플리케이션 로그(타임스탬프)로만 규명돼 있었다. `tcpdump`로
+> 재현해보니 **클라이언트(ghz)가 먼저 TCP FIN을 보내고, 서버는 이 종료 시퀀스에서 FIN/RST를
+> 먼저 보내지 않는다** — "종료를 시작한 쪽이 서버가 아니라 클라이언트"라는 것이 로그가 아니라
+> 패킷 플래그로 확인됐다. 절대 수치(에러 건수 등)는 로컬 단일 박스 한정이라 인용 불가, 메커니즘만
+> 유효. 전문: [`../../loadtest/results/tcpdump-repro-2026-08-26/`](../../loadtest/results/tcpdump-repro-2026-08-26/),
+> `production-signal-checklist.md` §2-4.
+
 ### 7.6 batch insert 개선 — before/after (2026-05-31)
 
 원인 분석(§7.5 코드 추적): `saveAll` 이 batch 가 아닌 **개별 INSERT N방**. ① JPA `@GeneratedValue(IDENTITY)` 가 Hibernate batch 를 원천 차단, ② batch 설정 부재. 개선:
