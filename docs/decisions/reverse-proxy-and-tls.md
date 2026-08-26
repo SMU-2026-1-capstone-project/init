@@ -31,7 +31,7 @@
 
 **하나만 감싸면 의미가 없다.** 프론트는 Spring 과 AI 양쪽에 직접 붙는다 — 아키텍처가 원래 그렇다(프레임을 Spring 으로 우회시키지 않으려고 일부러 그렇게 했다).
 
-> 🔶 **6565 는 왜 호스트에 열려 있나 — 확인 필요.** AI 는 같은 compose 네트워크(`shadowfit-net`)에 있어 서비스 이름으로 붙는다. 단일 노드 가정이면 호스트 노출이 필요 없어 보이는데, 근거를 찾지 못했다. 프록시 논의와 별개로 **닫을 수 있으면 공격면이 하나 준다.**
+> ✅ **6565 가 왜 호스트에 열려 있나 — 확인됨 (2026-08-26).** AI 는 같은 compose 네트워크(`shadowfit-net`)에 있어 서비스 이름(`shadowfit-backend:6565`, `ai-server/app/config.py:59`)으로 붙고 호스트 포트를 안 쓴다. **실제 이유는 `loadtest/ghz/*` 부하테스트 rig다** — ghz 가 호스트에서 `localhost:6565` 로 Spring gRPC(`SavePoseDataBatch`)를 직접 때린다(`loadtest/ghz/measure.ps1:23` 등). 이 rig 는 dev 환경에서만 돌고 prod 배포 대상에서는 안 돈다 — 그래서 **`docker-compose.prod.yml` 의 6565 호스트 노출은 근거가 없었다.** dev(`docker-compose.yml`)는 그대로 두고 prod 만 닫았다(2026-08-26).
 
 ### 1-2. 🔴 릴리스 빌드에서 AI 직결이 안 붙는다 — TLS 보다 먼저다
 
@@ -281,3 +281,7 @@ IP 와 스킴을 위조**할 수 있다. 즉 **켜 두는 쪽이 안 켜는 쪽�
   - 📌 새로 생긴 관계: [#187](https://github.com/Shadowfit/init/issues/187)(세션 소유권 nonce)이
     닫혔는데 **그 값이 평문 구간에서는 그대로 보인다.** #148 이 열려 있는 동안 #187 의 방어는
     도청 앞에서 무력하다 — 이 문서의 우선순위가 그만큼 올라갔다
+- 2026-08-26: §1-1 의 6565 호스트 노출 근거를 확인했다. `loadtest/ghz/*` 가 호스트에서
+  `localhost:6565` 로 Spring gRPC 를 직접 때리는 용도였다(dev 전용, prod 배포 대상에서는
+  안 쓴다). `docker-compose.prod.yml` 의 `"6565:6565"` 매핑을 제거했다 — dev(`docker-compose.yml`)는
+  rig 가 필요하므로 유지. 공격면 하나가 줄었다.

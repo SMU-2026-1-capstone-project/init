@@ -74,7 +74,12 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
-      - "6565:6565"
+      # 6565(Spring gRPC)는 dev 와 달리 host 노출이 없다 — AI는 이 컨테이너를
+      # 서비스 이름(shadowfit-backend:6565)으로 붙는다(ai-server/app/config.py:59,
+      # AI_SERVER_HOST/AI_SERVER_GRPC_PORT 도 서비스 이름·컨테이너 내부 포트만 쓴다).
+      # dev compose 가 이 포트를 여는 이유는 loadtest/ghz/* 가 호스트에서 localhost:6565로
+      # 직접 때리기 때문인데, 그 rig 는 prod 배포 대상에서 안 돈다 — 그래서 여기는 근거가 없다
+      # (docs/decisions/reverse-proxy-and-tls.md §1-1, 2026-08-26 확인).
     environment:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Seoul
