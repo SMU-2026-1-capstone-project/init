@@ -44,9 +44,16 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     // 반환 타입은 java.sql.Date로 받는다 — List<LocalDate>로 바로 받으면 Spring Data의
     // ConversionService가 java.sql.Date -> LocalDate 컨버터를 못 찾아 ConverterNotFoundException.
     // 변환은 호출부(calculateConsecutiveDays)에서 Date.toLocalDate()로 처리.
+    //
+    // status IN :statuses 는 이 쿼리의 결과를 좁히려는 것이 아니다 — 호출부가 Status.values()
+    // 전부를 넘겨 조건상 항상 참이다(#541). idx_session_member_status_start(member_id, status,
+    // start_time)가 status 등치 없이는 start_time을 seek 못 해 회원 전체 이력(EXPLAIN 실측
+    // 1,040행)을 읽은 뒤 걸렀다 — status를 명시하면 MySQL이 상태값별 range scan 4개로 쪼개
+    // start_time을 seek해 실제 해당 행(277)만 읽는다(loadtest/results/report-query-explain-r14-2026-08-24).
     @Query("SELECT DISTINCT CAST(s.startTime AS date) FROM Session s " +
-           "WHERE s.member.id = :memberId AND s.startTime BETWEEN :start AND :end")
+           "WHERE s.member.id = :memberId AND s.status IN :statuses AND s.startTime BETWEEN :start AND :end")
     List<Date> findDistinctActiveDates(@Param("memberId") Long memberId,
+                                       @Param("statuses") List<Status> statuses,
                                        @Param("start") LocalDateTime start,
                                        @Param("end") LocalDateTime end);
 
