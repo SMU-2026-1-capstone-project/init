@@ -1,0 +1,107 @@
+[14:51:15.910] 사전 확인: shadowfit-ai 컨테이너 상태
+time="2026-08-26T14:51:16+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+NAME                 IMAGE                    COMMAND                  SERVICE             CREATED          STATUS                   PORTS
+shadowfit-ai         init-shadowfit-ai        "/entrypoint.sh"         shadowfit-ai        18 minutes ago   Up 3 minutes (healthy)   8000-8002/tcp, 8585-8587/tcp
+shadowfit-ai-nginx   nginx:1.27-alpine        "/docker-entrypoint.…"   ai-nginx            17 minutes ago   Up 3 minutes             0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+shadowfit-backend    init-shadowfit-backend   "java -jar app.jar"      shadowfit-backend   18 minutes ago   Up 3 minutes             0.0.0.0:6565->6565/tcp, [::]:6565->6565/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 127.0.0.1:9090->9090/tcp
+[14:51:17.243] 워커(포트 8001) PID 탐색·강제 종료(SIGKILL)
+time="2026-08-26T14:51:17+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+[14:51:18.384] kill 시각: 1787723478.271222300
+[14:51:18.641] 폴링 시작 (0.5s 간격, 최대 s)
+[14:51:35.806] healthy 재확인 (poll #5)
+[14:59:41.673] 사전 확인: shadowfit-ai 컨테이너 상태
+time="2026-08-26T14:59:43+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+NAME                 IMAGE                    COMMAND                  SERVICE             CREATED          STATUS                   PORTS
+shadowfit-ai         init-shadowfit-ai        "/entrypoint.sh"         shadowfit-ai        27 minutes ago   Up 8 minutes (healthy)   8000-8002/tcp, 8585-8587/tcp
+shadowfit-ai-nginx   nginx:1.27-alpine        "/docker-entrypoint.…"   ai-nginx            26 minutes ago   Up 11 minutes            0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+shadowfit-backend    init-shadowfit-backend   "java -jar app.jar"      shadowfit-backend   27 minutes ago   Up 11 minutes            0.0.0.0:6565->6565/tcp, [::]:6565->6565/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 127.0.0.1:9090->9090/tcp
+[14:59:43.940] 워커(포트 8000) PID 탐색·강제 종료(SIGKILL)
+time="2026-08-26T14:59:48+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+[14:59:49.476] kill 시각: 1787723989.324550100
+[14:59:50.246] 폴링 시작 (0.5s 간격, 최대 120s)
+[15:00:14.300] healthy 재확인 (poll #5)
+[15:00:15.070] 다운타임(kill → healthy 재확인): 24.3초
+[15:00:15.386] Spring 서킷브레이커 현재 상태(kill 직후~복구 후 사이 관찰용)
+{"timestamp":1787724016150,"status":401,"error":"Unauthorized","path":"/actuator/circuitbreakers"}[15:00:16.571] 완료. 원시 타임라인: loadtest/results/ai-worker-kill-probe-2026-08-26/timeline.csv
+[15:00:16.975] 요약: 이 실행은 워커 1개(포트 8000)만 죽였는데도 컨테이너 전체가 재기동됐는지,
+[15:00:17.663]       그렇다면 그 다운타임이 얼마인지를 timeline.csv 의 container_status/health 전이로 확인할 것
+[15:00:46.164] 사전 확인: shadowfit-ai 컨테이너 상태
+time="2026-08-26T15:01:05+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+NAME                 IMAGE                    COMMAND                  SERVICE             CREATED          STATUS                        PORTS
+shadowfit-ai         init-shadowfit-ai        "/entrypoint.sh"         shadowfit-ai        28 minutes ago   Up About a minute (healthy)   8000-8002/tcp, 8585-8587/tcp
+shadowfit-ai-nginx   nginx:1.27-alpine        "/docker-entrypoint.…"   ai-nginx            27 minutes ago   Up 13 minutes                 0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+shadowfit-backend    init-shadowfit-backend   "java -jar app.jar"      shadowfit-backend   28 minutes ago   Up 13 minutes                 0.0.0.0:6565->6565/tcp, [::]:6565->6565/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 127.0.0.1:9090->9090/tcp
+[15:01:08.315] 워커(포트 8001) PID 탐색·강제 종료(SIGKILL)
+time="2026-08-26T15:01:13+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+[15:01:15.007] kill 시각: 1787724074.727944900
+[15:01:15.420] 폴링 시작 (0.5s 간격, 최대 120s)
+[15:01:40.179] healthy 재확인 (poll #5)
+[15:01:40.439] 다운타임(kill → healthy 재확인): 25.3초
+[15:01:40.563] Spring 서킷브레이커 현재 상태(kill 직후~복구 후 사이 관찰용)
+{"timestamp":1787724100917,"status":401,"error":"Unauthorized","path":"/actuator/circuitbreakers"}[15:01:41.412] 완료. 원시 타임라인: loadtest/results/ai-worker-kill-probe-2026-08-26/timeline.csv
+[15:01:41.595] 요약: 이 실행은 워커 1개(포트 8001)만 죽였는데도 컨테이너 전체가 재기동됐는지,
+[15:01:41.747]       그렇다면 그 다운타임이 얼마인지를 timeline.csv 의 container_status/health 전이로 확인할 것
+[15:01:52.618] 사전 확인: shadowfit-ai 컨테이너 상태
+time="2026-08-26T15:01:55+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+NAME                 IMAGE                    COMMAND                  SERVICE             CREATED          STATUS                    PORTS
+shadowfit-ai         init-shadowfit-ai        "/entrypoint.sh"         shadowfit-ai        29 minutes ago   Up 40 seconds (healthy)   8000-8002/tcp, 8585-8587/tcp
+shadowfit-ai-nginx   nginx:1.27-alpine        "/docker-entrypoint.…"   ai-nginx            28 minutes ago   Up 14 minutes             0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+shadowfit-backend    init-shadowfit-backend   "java -jar app.jar"      shadowfit-backend   29 minutes ago   Up 14 minutes             0.0.0.0:6565->6565/tcp, [::]:6565->6565/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 127.0.0.1:9090->9090/tcp
+[15:01:57.079] 워커(포트 8002) PID 탐색·강제 종료(SIGKILL)
+time="2026-08-26T15:02:00+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+[15:02:02.186] kill 시각: 1787724122.058724500
+[15:02:02.422] 폴링 시작 (0.5s 간격, 최대 120s)
+[15:02:37.521] healthy 재확인 (poll #7)
+[15:02:37.841] 다운타임(kill → healthy 재확인): 35.3초
+[15:02:38.026] Spring 서킷브레이커 현재 상태(kill 직후~복구 후 사이 관찰용)
+{"timestamp":1787724158471,"status":401,"error":"Unauthorized","path":"/actuator/circuitbreakers"}[15:02:38.665] 완료. 원시 타임라인: loadtest/results/ai-worker-kill-probe-2026-08-26/timeline.csv
+[15:02:38.832] 요약: 이 실행은 워커 1개(포트 8002)만 죽였는데도 컨테이너 전체가 재기동됐는지,
+[15:02:39.013]       그렇다면 그 다운타임이 얼마인지를 timeline.csv 의 container_status/health 전이로 확인할 것
+[15:02:52.444] 사전 확인: shadowfit-ai 컨테이너 상태
+time="2026-08-26T15:02:55+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+NAME                 IMAGE                    COMMAND                  SERVICE             CREATED          STATUS                    PORTS
+shadowfit-ai         init-shadowfit-ai        "/entrypoint.sh"         shadowfit-ai        30 minutes ago   Up 52 seconds (healthy)   8000-8002/tcp, 8585-8587/tcp
+shadowfit-ai-nginx   nginx:1.27-alpine        "/docker-entrypoint.…"   ai-nginx            29 minutes ago   Up 14 minutes             0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+shadowfit-backend    init-shadowfit-backend   "java -jar app.jar"      shadowfit-backend   30 minutes ago   Up 15 minutes             0.0.0.0:6565->6565/tcp, [::]:6565->6565/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 127.0.0.1:9090->9090/tcp
+[15:02:56.342] 워커(포트 8000) PID 탐색·강제 종료(SIGKILL)
+time="2026-08-26T15:02:57+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+[15:03:01.509] kill 시각: 1787724181.102080100
+[15:03:02.404] 폴링 시작 (0.5s 간격, 최대 120s)
+[15:03:24.631] healthy 재확인 (poll #4)
+[15:03:24.841] 다운타임(kill → healthy 재확인): 23.4초
+[15:03:25.049] Spring 서킷브레이커 현재 상태(kill 직후~복구 후 사이 관찰용)
+{"timestamp":1787724205426,"status":401,"error":"Unauthorized","path":"/actuator/circuitbreakers"}[15:03:25.633] 완료. 원시 타임라인: loadtest/results/ai-worker-kill-probe-2026-08-26/timeline.csv
+[15:03:25.772] 요약: 이 실행은 워커 1개(포트 8000)만 죽였는데도 컨테이너 전체가 재기동됐는지,
+[15:03:25.896]       그렇다면 그 다운타임이 얼마인지를 timeline.csv 의 container_status/health 전이로 확인할 것
+[15:03:36.943] 사전 확인: shadowfit-ai 컨테이너 상태
+time="2026-08-26T15:03:41+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+NAME                 IMAGE                    COMMAND                  SERVICE             CREATED          STATUS                    PORTS
+shadowfit-ai         init-shadowfit-ai        "/entrypoint.sh"         shadowfit-ai        31 minutes ago   Up 40 seconds (healthy)   8000-8002/tcp, 8585-8587/tcp
+shadowfit-ai-nginx   nginx:1.27-alpine        "/docker-entrypoint.…"   ai-nginx            30 minutes ago   Up 15 minutes             0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+shadowfit-backend    init-shadowfit-backend   "java -jar app.jar"      shadowfit-backend   31 minutes ago   Up 15 minutes             0.0.0.0:6565->6565/tcp, [::]:6565->6565/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 127.0.0.1:9090->9090/tcp
+[15:03:42.620] 워커(포트 8001) PID 탐색·강제 종료(SIGKILL)
+time="2026-08-26T15:03:44+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+[15:03:46.524] kill 시각: 1787724226.405289900
+[15:03:46.840] 폴링 시작 (0.5s 간격, 최대 120s)
+[15:04:13.898] healthy 재확인 (poll #4)
+[15:04:14.167] 다운타임(kill → healthy 재확인): 27.3초
+[15:04:14.400] Spring 서킷브레이커 현재 상태(kill 직후~복구 후 사이 관찰용)
+{"timestamp":1787724254926,"status":401,"error":"Unauthorized","path":"/actuator/circuitbreakers"}[15:04:16.007] 완료. 원시 타임라인: loadtest/results/ai-worker-kill-probe-2026-08-26/timeline.csv
+[15:04:16.235] 요약: 이 실행은 워커 1개(포트 8001)만 죽였는데도 컨테이너 전체가 재기동됐는지,
+[15:04:16.487]       그렇다면 그 다운타임이 얼마인지를 timeline.csv 의 container_status/health 전이로 확인할 것
+[15:04:28.334] 사전 확인: shadowfit-ai 컨테이너 상태
+time="2026-08-26T15:04:34+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+NAME                 IMAGE                    COMMAND                  SERVICE             CREATED          STATUS                    PORTS
+shadowfit-ai         init-shadowfit-ai        "/entrypoint.sh"         shadowfit-ai        31 minutes ago   Up 47 seconds (healthy)   8000-8002/tcp, 8585-8587/tcp
+shadowfit-ai-nginx   nginx:1.27-alpine        "/docker-entrypoint.…"   ai-nginx            31 minutes ago   Up 16 minutes             0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+shadowfit-backend    init-shadowfit-backend   "java -jar app.jar"      shadowfit-backend   31 minutes ago   Up 16 minutes             0.0.0.0:6565->6565/tcp, [::]:6565->6565/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 127.0.0.1:9090->9090/tcp
+[15:04:35.172] 워커(포트 8002) PID 탐색·강제 종료(SIGKILL)
+time="2026-08-26T15:04:36+09:00" level=warning msg="E:\\init\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+[15:04:38.656] kill 시각: 1787724278.362178200
+[15:04:38.893] 폴링 시작 (0.5s 간격, 최대 120s)
+[15:05:03.102] healthy 재확인 (poll #2)
+[15:05:06.382] 다운타임(kill → healthy 재확인): 24.0초
+[15:05:06.964] Spring 서킷브레이커 현재 상태(kill 직후~복구 후 사이 관찰용)
+{"timestamp":1787724307650,"status":401,"error":"Unauthorized","path":"/actuator/circuitbreakers"}[15:05:08.072] 완료. 원시 타임라인: loadtest/results/ai-worker-kill-probe-2026-08-26/timeline.csv
+[15:05:09.186] 요약: 이 실행은 워커 1개(포트 8002)만 죽였는데도 컨테이너 전체가 재기동됐는지,
+[15:05:09.904]       그렇다면 그 다운타임이 얼마인지를 timeline.csv 의 container_status/health 전이로 확인할 것

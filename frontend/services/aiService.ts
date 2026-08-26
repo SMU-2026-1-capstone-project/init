@@ -78,6 +78,13 @@ export const aiService = {
   isConfigured: () => aiConfigError === null,
 
   // 실시간 포즈 감지 (POST {ai}:8000/api/v1/pose)
-  detectPose: (data: PoseDetectRequest) =>
-    aiApi.post<PoseDetectResponse>('/pose', data),
+  //
+  // workerIndex: 세션 시작 응답(aiWorkerIndex)을 그대로 되돌려준다. AI를 프로세스
+  // 여러 개로 나눈 뒤(2026-08-26, GIL 병목 회피), 세션 상태가 프로세스 로컬 메모리에만
+  // 있어 앞단 nginx가 X-AI-Worker 헤더로 항상 같은 워커에 고정 라우팅해야 한다 — 안 주면
+  // nginx가 워커 0으로 기본 전달하는데, 세션이 다른 워커에서 시작됐으면 NO_LEASE로 거절된다.
+  detectPose: (data: PoseDetectRequest, workerIndex?: number | null) =>
+    aiApi.post<PoseDetectResponse>('/pose', data, {
+      headers: workerIndex != null ? { 'X-AI-Worker': String(workerIndex) } : {},
+    }),
 };

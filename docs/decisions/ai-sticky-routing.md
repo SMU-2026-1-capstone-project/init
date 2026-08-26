@@ -12,7 +12,11 @@
 [`./session-resume-and-ai-state.md`](./session-resume-and-ai-state.md) ·
 [`./ai-coresidency-capacity.md`](./ai-coresidency-capacity.md) ·
 [`./reverse-proxy-and-tls.md`](./reverse-proxy-and-tls.md) ·
-[`./reference-style-and-caching.md`](./reference-style-and-caching.md)
+[`./reference-style-and-caching.md`](./reference-style-and-caching.md) ·
+[`./architecture-review-2026-08-11.md`](./architecture-review-2026-08-11.md) §2-②(같은 결론을
+회고 서사로 먼저 짚어둔 자리, 2026-08-11 — 이 문서가 그 압축본을 편 것) ·
+[`./ai-channel-pool-hardening.md`](./ai-channel-pool-hardening.md)(1박스·N프로세스 스코프의
+같은 `ReattachAnalysis` 재사용 패턴, 2026-08-26)
 
 ---
 
@@ -208,13 +212,18 @@
 1. 🔴 **gRPC 는 L4 로드밸런서로 안 갈린다.** HTTP/2 커넥션을 오래 쓰기 때문에 L4 는
    **커넥션**을 고른다 — 채널 하나가 한 인스턴스에 못 박히고 나머지가 논다.
    **요청 단위 분배**(클라이언트 사이드 LB 또는 Envoy·Linkerd 급)가 **전제**다
+
    > 🟢 **실측으로 확인 (2026-08-26)**: [`../../loadtest/results/grpc-reuseport-probe-2026-08-26/README.md`](../../loadtest/results/grpc-reuseport-probe-2026-08-26/README.md).
    > AI 프로세스 3개를 같은 gRPC 포트에 SO_REUSEPORT로 띄우고 파이썬 `grpc.insecure_channel()`
    > 하나로 세션 30개를 열었더니 **전부 프로세스 하나로만 갔다**(나머지 둘은 0건).
    > 채널을 새로 열면 **다른** 프로세스로 재추첨됐다. **이 문서가 추론으로 적어둔 문장이
-   > 실측으로 닫혔다.** ⚠️ 단, Java `grpc-client-spring-boot-starter`의 실제 채널 재사용
-   > 정책까지 확인한 것은 아니다 — 파이썬 클라이언트로 흉내낸 것이라 §9의 그 미검증
-   > 항목은 완전히는 안 닫힌다.
+   > 실측으로 닫혔다.** ⚠️ **현재 채택된 설계(㉮=ㄱ)에는 이 위험이 적용되지 않는다** — 워커마다
+   > 별도 포트(8585/8586/8587)를 쓰고 Spring 이 포트별로 별도 `ManagedChannel` 을 직접 열어
+   > SO_REUSEPORT 자체를 안 쓴다. 이 실측이 확인한 것은 **기각된 대안**(㉮=ㄴ, 프록시가
+   > 단일 포트로 흡수)을 골랐다면 겪었을 문제라는 점이다 — ㄱ 을 고른 근거를 실측으로
+   > 보강한다. ⚠️ 단, Java `grpc-client-spring-boot-starter`의 실제 채널 재사용 정책까지
+   > 확인한 것은 아니다 — 파이썬 클라이언트로 흉내낸 것이라 §9의 그 미검증 항목은 완전히는
+   > 안 닫힌다.
 2. 🔴 **`session_id` 가 HTTP 본문에 있다** — `ai-server/app/models/pose.py:49` 의 Pydantic
    필드다. L7 해싱을 하려면 **헤더나 경로로 올려야** 하고, 그건 **프론트와 같이 움직이는
    API 변경**이다. ㄴ 의 「프론트 변경 없다」가 여기서 깨진다
@@ -248,6 +257,15 @@
 ㄷ 는 §6.
 ⚠️ **TTL 이 없는 것은 단점이 아니다** — 「어느 인스턴스에서 돌았나」가 남는 편이 사후 분석에 낫다.
 
+> 🔵 **2026-08-26 추가 — ㄴ 을 고르면 입장 제한(admission control)이 부산물로 딸려온다**
+> ([`architecture-review-2026-08-11.md` §2-②](./architecture-review-2026-08-11.md)).
+> [`32-deferred-items.md P3`](../tasks/32-deferred-items.md)가 열어둔 갭 — 「AI 가 포화돼도
+> Spring 이 세션 시작을 거절하지 않는다」 — 은 인스턴스별 활성 세션 수를 세는 재료가 있어야
+> 풀린다. `exercise_sessions` 에 배정 인스턴스 컬럼이 이미 있으면(ㄴ), `GROUP BY instance_id`
+> 한 번으로 그 재료가 나온다 — **P3 을 위해 새로 만들 것이 없다.** ㄱ(해시)이었다면 이 컬럼
+> 자체가 없어 매번 다시 유도해야 했을 것이다. 이 갭은 P3 문서 자체가 P1(재측정)에 종속으로
+> 걸어뒀지 이 문서가 새로 여는 것은 아니다 — 여기서는 ㄴ 의 추천 근거에 한 줄 추가하는 것뿐.
+
 ### 5-3. ㉰ 인스턴스가 죽으면
 
 🔴 **스티키는 장애 시 재배치를 못 한다.** 그 인스턴스의 진행 중 세션은 검출기와 함께 사라진다.
@@ -271,6 +289,17 @@
 「분석이 끊겼을 때 사용자에게 무엇을 보이나」는 여전히 **도메인 판단**이고, 그건 이 문서가
 정할 것이 아니다. 🔴 그리고 **재개해도 `current_rep_frames`(누적 윈도우)는 복원 안 된다** —
 진행 중이던 rep 은 잃는다.
+
+> 🔵 **2026-08-26 추가 — 같은 패턴이 더 작은 스코프에서 이미 분석돼 있다**
+> ([`ai-channel-pool-hardening.md`](./ai-channel-pool-hardening.md), 1박스·N프로세스). 그
+> 문서의 문제①(채널이 가리키는 프로세스가 죽으면 세션이 갇힌다)이 정확히 이 ㉰의 축소판이고,
+> 같은 이유로 같은 추천(`ReattachAnalysis` 재사용)에 도달했다 — 「Spring 이 DB 에서 읽어 채워
+> 보내는 재구성 재료만으로 AI 프로세스 쪽 상태를 어느 프로세스에서든 재구성할 수 있다」는 설계가
+> 이미 있다는 것. 다만 그 문서의 문제①은 **보류로 결정됐다**(2026-08-26) — 재배치 로직을
+> 만들기 전에 「AI 프로세스 장애가 실제 몇 번 났는지」부터 재기로 했고, 그 실측은 아직 착수
+> 전이다. 이 문서의 §9(2대로 성공하는 판을 아직 안 봄)와 같은 결의 공백이다. **서로를 대신
+> 닫아주지 않는다**, 다만 그쪽 실측이 먼저 나오면(장애 빈도) 이쪽 ㉰ 확정 시 「얼마나 자주
+> 필요한 문제인가」의 참고 자료가 된다.
 
 ---
 
@@ -337,20 +366,49 @@ AI 가 N대일 때 인스턴스 간 **공유가 필요한 것**을 세어보면:
 ## 9. 정직하게 비어 있는 것
 
 - 🔴 **2대로 «성공하는» 판을 아직 안 봤다.** 08-17 실험은 실패를 봤고, 그 실패의 원인만 안다
-- 🔴 **`grpc-client-spring-boot-starter` 로 인스턴스별 채널을 어떻게 잡는지 안 확인했다** —
-  §7 의 「직접 관리하거나 커스텀 리졸버」는 **읽은 것이 아니라 추정**이다
+- ~~🔴 **`grpc-client-spring-boot-starter` 로 인스턴스별 채널을 어떻게 잡는지 안 확인했다**~~
+  ✅ **2026-08-26 확인 — 질문 자체가 성립하지 않았다.** `ExerciseAnalysisService.java` 를
+  코드로 직접 확인하니 `@GrpcClient` 는 **어디에도 실제로 쓰이지 않는다**(import 는 남아 있지만
+  주석에만 언급되는 죽은 코드). 실제 채널 관리는 `io.grpc.ManagedChannelBuilder.forAddress(host, port)`
+  를 손으로 호출해 `List<ManagedChannel>` 을 직접 만들고 `Math.floorMod(routingKey, N)` 으로
+  라우팅한다(83-109행) — **net.devh 의 채널 관리를 처음부터 완전히 우회**하고 있었다. 여러
+  박스로 확장할 때도 같은 패턴(다른 `host:port` 로 `forAddress` 호출)이 그대로 늘어나면 되므로,
+  §7 의 「직접 관리하거나 커스텀 리졸버가 필요하다」는 이미 답이 나 있었다 — **직접 관리 쪽으로**.
 - **프론트 계약 변경의 크기를 안 쟀다.** `aiService.ts` 한 곳인지 그 위 화면들까지인지 모른다
 - **N 을 몇으로 둘지 근거가 없다** — 용량 계산이 「안 넘는다」로 끝나 **필요 대수를 산출한 적이 없다**
   ([[feedback_no_arbitrary_threshold_values]]: 그래서 이 문서는 숫자를 안 적는다)
 - **비용 축이 비어 있다** — 인스턴스 N대의 요금을 이 문서가 안 든다
-- 🔴 **세션당 상태 크기가 미측정이다**([#229](https://github.com/Shadowfit/init/issues/229)) —
-  §4-1 의 「100KB 대」는 산술이지 실측이 아니다. 외부화(ㄱ) 비용을 정말 재려면 이게 먼저다
+- 🟡 **세션당 상태 크기 — Python 객체 그래프는 쟀다, 컨테이너 RSS 는 아직**
+  ([#229](https://github.com/Shadowfit/init/issues/229)) — 2026-08-26, 실제 `SessionState`·
+  `PerRepFrame`·`CompletedRep`(33 랜드마크·squat 각도 4개, 실제 코드값)을 재귀적
+  `sys.getsizeof` 로 측정: 프레임 1개 3,016B · `current_rep_frames` 만재(60프레임) 146.7KB ·
+  완료 rep 0개 11.3KB → 1개 158.4KB → 5개 744.3KB → 10개 1.44MB → 30개 4.30MB. 🔴 **핵심**:
+  `pose.py:308-313` 이 매 rep 마다 그 rep 의 최대 60프레임 전체(랜드마크 JSON 포함)를
+  `completed_reps` 에 통째로 복사해 StopAnalysis 까지 안 비운다 — **세션 상태는 상수가 아니라
+  완료 rep 수에 선형 비례**(rep 당 ≈146KB)한다. §4-1 의 「100KB 대」는 rep 1개 기준으로는
+  얼추 맞지만 30rep 세션에서는 4.3MB 로 벌어진다. ⚠️ **이건 Python 객체 크기지 #229 가 요구하는
+  컨테이너 실측 RSS 가 아니다** — 파이썬 힙 오버헤드·gRPC 버퍼 등은 여전히 안 잡힌다. 외부화(ㄱ)
+  비용 산정의 하한선 근거로는 쓸 수 있지만 #229 를 닫는 실측은 아니다
 - **L4 vs L7 · 클라이언트 사이드 LB 중 무엇을 쓸지 안 정했다**(§5-1) — 이 저장소에서 gRPC
   로드밸런싱을 해본 적이 없다
 
 ---
 
 ## 결정 로그
+
+- 2026-08-26: `architecture-review-2026-08-11.md` §2-②·`ai-channel-pool-hardening.md`와 교차연결
+  둘을 추가했다. ① §5-2(㉯ 매핑 위치) — ㄴ(세션 테이블 컬럼)을 고르면 입장 제한
+  ([`32-deferred-items.md P3`](../tasks/32-deferred-items.md))이 새 작업 없이 딸려온다는
+  연결. ② §5-3(㉰ 장애 재배치) — `ai-channel-pool-hardening.md` 문제①이 1박스·N프로세스
+  스코프에서 같은 `ReattachAnalysis` 재사용 결론에 이미 도달해 있음을 참고로 남김. **결정
+  체크박스(§8)는 안 바뀐다** — 둘 다 기존 추천(ㄴ·ㄴ)의 근거를 보강할 뿐, 새 선택지나 새
+  추천을 만들지 않는다.
+
+- 2026-08-26: §9 의 미확인 항목 둘을 갱신했다. ① `net.devh` 채널 관리 조사 — `@GrpcClient` 는
+  코드에서 안 쓰이고 `ManagedChannelBuilder` 로 직접 관리 중임을 코드로 확인, 미확인 항목 닫힘.
+  ② 세션당 상태 크기(#229) — Python 객체 그래프 실측(`SessionState` 등, 재귀적
+  `sys.getsizeof`)으로 rep 당 ≈146KB 선형 증가를 확인. 단 컨테이너 RSS 실측이 아니라 #229 는
+  안 닫힘 — 외부화 비용 산정의 하한선 근거로만 쓴다.
 
 - 2026-08-23: 문서 초안. [`ai-receive-path-scaling.md` §3-ㄴ](./ai-receive-path-scaling.md) 가
   이름만 세워둔 갈래를 폈다 — **묶여 있는 결정이 셋**(프레임 엔드포인트 계약 · 매핑 위치 ·

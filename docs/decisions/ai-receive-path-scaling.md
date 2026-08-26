@@ -654,6 +654,11 @@ GIL 구간의 일부) · keep-alive 무효까지 **하나로 설명된다.**
 | **구간별 시간** | 수신 → 검증 → 워커 진입 → 추론 → 응답. **434ms 가 어디서 소모되는지** 갈린다 | ✅ 7구간 — `wait`·`decode`·**`lease`**·`infer`·`post`·`respond`·`total`. 🔴 **`lease` 를 따로 뗐다** — 합쳐 재면 후보 2순위(§10-2)가 「추론이 비싸다」로 읽히고 그건 R6 가 이미 반증한 답이다 |
 | **GIL 점유** | 1순위 직접 검증. `sys.setswitchinterval` 을 흔들어 처리량이 움직이면 GIL 기여의 증거 | ✅ `GIL_SWITCH_INTERVAL` 기동 노브. ⚠️ **판을 만드는 손잡이지 튜닝 값이 아니다** — «좋은 값» 은 없다 |
 
+🟢 **2026-08-26**: `decode`(base64 디코드+`cv2.cvtColor`) 값이 이미 여러 라운드에 찍혀 있다 —
+mean 3.6~3.9ms, `infer`(36~38ms) 대비 **~9~10%**(`sticky-routing-probe-2026-08-26/aws-run/sticky_run.json`).
+base64 제거의 서버 CPU 이득은 작다. 단 페이로드 크기(base64 +33%)의 **절대 바이트 수**는 여전히
+미측정 — `takePictureAsync`가 `pictureSize`를 안 지정해 실기기 값이 없으면 답을 못 낸다.
+
 ⚠️ **셋 다 ai-server 코드 변경이다**([[feedback_minimize_python_changes]]) — 2026-08-23 에 붙였고,
 서비스 경로에 남은 것은 **`mark_*` 호출 4줄**이다(계측이 꺼져 있으면 즉시 반환).
 

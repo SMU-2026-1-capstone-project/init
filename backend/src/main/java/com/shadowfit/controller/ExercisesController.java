@@ -80,6 +80,7 @@ public class ExercisesController {
                 .startTime(started.startTime())
                 .status(Status.IN_PROGRESS)
                 .sessionNonce(started.sessionNonce())
+                .aiWorkerIndex(started.aiWorkerIndex())
                 .build();
 
         return ResponseEntity.accepted().body(response);

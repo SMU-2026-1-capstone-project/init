@@ -1,0 +1,80 @@
+2026-08-26 14:17:16.442  INFO [ault-executor-4] [grpc-in-7f3c43cbd12e|998|·] c.s.s.Exercise.ExerciseGrpcService       : 세션 998 : 데드락 재시도 2회 만에 저장 성공 (#276)
+2026-08-26 14:17:16.442  INFO [ult-executor-13] [grpc-in-b8af6fc6fee0|994|·] c.s.service.Exercise.PoseDataService     : 세션 994 : 포즈 데이터 25개 수신 → 5개로 다운샘플 후 저장 성공
+2026-08-26 14:17:16.443  WARN [ault-executor-8] [grpc-in-b4b74d5c9ded|991|·] c.s.s.Exercise.ExerciseGrpcService       : 세션 991 : 배치 INSERT 데드락 — 4/5회째 다시 던진다 (#276, 간격 0ms)
+Hibernate: 
+    select
+        s1_0.id,
+        s1_0.avg_sync_rate,
+        s1_0.calories_burned,
+        s1_0.created_at,
+        s1_0.difficulty_level,
+        s1_0.end_time,
+        s1_0.exercise_id,
+        s1_0.last_active_at,
+        s1_0.max_sync_rate,
+        s1_0.member_id,
+        s1_0.min_sync_rate,
+        s1_0.reference_source,
+        s1_0.session_nonce,
+        s1_0.start_time,
+        s1_0.status,
+        s1_0.total_reps,
+        s1_0.version 
+    from
+        exercise_sessions s1_0 
+    where
+        s1_0.id=?
+2026-08-26 14:17:16.444  INFO [ault-executor-0] [grpc-in-e6c30e9097b5|1000|·] c.s.service.Exercise.PoseDataService     : 세션 1000 : 포즈 데이터 25개 수신 → 5개로 다운샘플 후 저장 성공
+2026-08-26 14:17:16.444  WARN [ault-executor-6] [grpc-in-64007e8f8efc|996|·] c.s.s.Exercise.ExerciseGrpcService       : 세션 996 : 배치 INSERT 데드락 — 3/5회째 다시 던진다 (#276, 간격 0ms)
+Hibernate: 
+    select
+        s1_0.id,
+        s1_0.avg_sync_rate,
+        s1_0.calories_burned,
+        s1_0.created_at,
+        s1_0.difficulty_level,
+        s1_0.end_time,
+        s1_0.exercise_id,
+        s1_0.last_active_at,
+        s1_0.max_sync_rate,
+        s1_0.member_id,
+        s1_0.min_sync_rate,
+        s1_0.reference_source,
+        s1_0.session_nonce,
+        s1_0.start_time,
+        s1_0.status,
+        s1_0.total_reps,
+        s1_0.version 
+    from
+        exercise_sessions s1_0 
+    where
+        s1_0.id=?
+2026-08-26 14:17:16.445  INFO [ult-executor-13] [grpc-in-b8af6fc6fee0|994|·] c.s.s.Exercise.ExerciseGrpcService       : 세션 994 : 데드락 재시도 2회 만에 저장 성공 (#276)
+2026-08-26 14:17:16.445  INFO [ault-executor-7] [grpc-in-962c334767fe|977|·] c.s.service.Exercise.PoseDataService     : 세션 977 : 포즈 데이터 25개 수신 → 5개로 다운샘플 후 저장 성공
+2026-08-26 14:17:16.447  INFO [ault-executor-8] [grpc-in-b4b74d5c9ded|991|·] c.s.service.Exercise.PoseDataService     : 세션 991 : 포즈 데이터 25개 수신 → 5개로 다운샘플 후 저장 성공
+2026-08-26 14:17:16.447  INFO [ault-executor-0] [grpc-in-e6c30e9097b5|1000|·] c.s.s.Exercise.ExerciseGrpcService       : 세션 1000 : 데드락 재시도 1회 만에 저장 성공 (#276)
+2026-08-26 14:17:16.448  INFO [ault-executor-6] [grpc-in-64007e8f8efc|996|·] c.s.service.Exercise.PoseDataService     : 세션 996 : 포즈 데이터 25개 수신 → 5개로 다운샘플 후 저장 성공
+2026-08-26 14:17:16.448  INFO [ault-executor-7] [grpc-in-962c334767fe|977|·] c.s.s.Exercise.ExerciseGrpcService       : 세션 977 : 데드락 재시도 4회 만에 저장 성공 (#276)
+2026-08-26 14:17:16.449  INFO [ault-executor-8] [grpc-in-b4b74d5c9ded|991|·] c.s.s.Exercise.ExerciseGrpcService       : 세션 991 : 데드락 재시도 4회 만에 저장 성공 (#276)
+2026-08-26 14:17:16.450  INFO [ault-executor-6] [grpc-in-64007e8f8efc|996|·] c.s.s.Exercise.ExerciseGrpcService       : 세션 996 : 데드락 재시도 3회 만에 저장 성공 (#276)
+Hibernate: 
+    select
+        count(oe1_0.id) 
+    from
+        outbox_events oe1_0 
+    where
+        oe1_0.status=?
+Hibernate: 
+    select
+        count(oe1_0.id) 
+    from
+        outbox_events oe1_0 
+    where
+        oe1_0.status=?
+Hibernate: 
+    select
+        count(oe1_0.id) 
+    from
+        outbox_events oe1_0 
+    where
+        oe1_0.status=?

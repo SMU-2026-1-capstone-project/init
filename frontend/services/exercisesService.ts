@@ -17,6 +17,9 @@ interface StartSessionResponse {
   //
   // 🔴 화면·로그·저장소 어디에도 남기지 말 것. 세션이 끝나면 같이 버린다.
   sessionNonce: string;
+  // AI 워커 인덱스(0~N-1, 2026-08-26). POST /pose 마다 X-AI-Worker 헤더로 동봉할 것 —
+  // 안 보내면 프레임이 세션 시작 때와 다른 AI 프로세스로 갈 수 있어 NO_LEASE로 거절된다.
+  aiWorkerIndex: number | null;
 }
 
 export const exercisesService = {
