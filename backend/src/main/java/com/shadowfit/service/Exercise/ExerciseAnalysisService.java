@@ -113,6 +113,10 @@ public class ExerciseAnalysisService {
             aiAsyncStubPool.add(ExerciseServiceGrpc.newStub(channel));
             aiBlockingStubPool.add(ExerciseServiceGrpc.newBlockingStub(channel));
             log.info("AI gRPC 채널[{}] 초기화 완료 (대상: {}:{})", i, host, port);
+            // 워커별 서킷을 여기서 미리 만들어둔다(#556) — 안 만들면 그 워커로 첫 호출이 갈
+            // 때까지 /actuator/health 의 circuitBreakers 에 안 잡혀, "워커 하나가 계속
+            // 조용하다"를 관측으로 구분할 수 없다.
+            circuitBreakerRegistry.circuitBreaker("aiServer-" + i);
         }
     }
 
@@ -163,10 +167,24 @@ public class ExerciseAnalysisService {
     // "빠른 ack" 성격의 제어 호출이라 5초로 통일(실측 튜닝된 값 아닌 보수적 기본값).
     private static final long GRPC_CALL_TIMEOUT_SECONDS = 5;
 
-    // Spring→AI(FastAPI) gRPC 호출 전체가 공유하는 서킷브레이커 — AI가 죽으면
-    // 세 호출(추출·분석시작·중단) 모두 같은 상대(AI 서버)로 가는 것이므로 인스턴스 하나로 충분.
-    private CircuitBreaker aiCircuitBreaker() {
-        return circuitBreakerRegistry.circuitBreaker("aiServer");
+    // 워커별로 서킷을 분리한다 (#556, docs/decisions/circuit-breaker-worker-aggregation.md).
+    //
+    // 예전엔 인스턴스 하나("aiServer")를 세 호출(추출·분석시작·중단)이 공유했다 — 그때는
+    // "워커"가 없었으니 맞는 설계였다. 채널 풀(883f508)이 워커 3개를 들여오면서 전제가
+    // 깨졌는데, 실측(JUnit, 위 문서 §2-1)으로 두 가지가 다 확인됐다:
+    //   - 균등 트래픽에서 워커 1개가 hang이면 실패율이 33%로 임계값(50%) 아래라 서킷이
+    //     "영원히" 안 열려 그 워커가 무방비로 방치된다
+    //   - 트래픽이 한 워커로 쏠리면 반대로 그 워커의 실패가 서킷을 열어 정상 워커까지 막는다
+    // 라우팅 키(session_id/exercise_id, asyncStubFor/blockingStubFor 와 같은 키)로 채널을
+    // 고르는 것과 동일한 방식으로 서킷도 나눠, 워커 하나의 장애가 그 워커의 서킷에만 반영되게
+    // 한다. 이름에 워커 수를 박지 않은 이유는 application.yml 의 resilience4j 설정을
+    // "configs.default"로 둬서다 — AI_WORKER_COUNT 가 바뀌어도 설정을 안 늘려도 된다.
+    int aiChannelIndexFor(long routingKey) {
+        return Math.floorMod(routingKey, aiChannelPoolSize);
+    }
+
+    private CircuitBreaker aiCircuitBreaker(long routingKey) {
+        return circuitBreakerRegistry.circuitBreaker("aiServer-" + aiChannelIndexFor(routingKey));
     }
 
     /**
@@ -238,7 +256,7 @@ public class ExerciseAnalysisService {
 
         log.info("FastAPI에게 기준 좌표 추출 요청 전송 - 운동 ID: {}", exerciseId);
 
-        CircuitBreaker cb = aiCircuitBreaker();
+        CircuitBreaker cb = aiCircuitBreaker(exerciseId);
         if (!cb.tryAcquirePermission()) {
             log.warn("AI 서버 서킷브레이커 OPEN — 기준 좌표 추출 요청 스킵 (운동 ID: {})", exerciseId);
             return;
@@ -370,7 +388,7 @@ public class ExerciseAnalysisService {
                         .build());
             }
 
-            CircuitBreaker cb = aiCircuitBreaker();
+            CircuitBreaker cb = aiCircuitBreaker(sessionId);
             if (!cb.tryAcquirePermission()) {
                 log.warn("AI 서버 서킷브레이커 OPEN — 분석 시작 요청 스킵 (세션 ID: {})", sessionId);
                 // 스킵된 세션을 IN_PROGRESS로 방치하면 SessionTimeoutScheduler 버퍼(기본 30분+)가
@@ -461,7 +479,7 @@ public class ExerciseAnalysisService {
             ReattachRequest request = self.loadReattachRequest(sessionId, currentMemberId);
             // ↑ 여기서 트랜잭션이 끝나고 커넥션이 반납된다. 아래 gRPC 는 커넥션을 쥐지 않는다.
 
-            CircuitBreaker cb = aiCircuitBreaker();
+            CircuitBreaker cb = aiCircuitBreaker(sessionId);
             if (!cb.tryAcquirePermission()) {
                 log.warn("AI 서버 서킷브레이커 OPEN — 재부착 실패 (세션 ID: {})", sessionId);
                 throw new BusinessException(ErrorCode.SESSION_REATTACH_UNAVAILABLE);
@@ -597,7 +615,7 @@ public class ExerciseAnalysisService {
 
             StopRequest request = StopRequest.newBuilder().setSessionId(sessionId).build();
 
-            CircuitBreaker cb = aiCircuitBreaker();
+            CircuitBreaker cb = aiCircuitBreaker(sessionId);
             if (!cb.tryAcquirePermission()) {
                 // 이전에는 여기서 그냥 return 해 통보를 통째로 버렸다(E1 의 두 번째 유실 경로).
                 // 하필 AI 가 죽어 통보가 가장 많이 쌓이는 구간이었다. 이제는 행이 PENDING 으로 남아

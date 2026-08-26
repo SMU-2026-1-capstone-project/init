@@ -282,10 +282,16 @@ management:
 # [7] Resilience4j — Spring→AI(FastAPI) gRPC 호출(StartAnalysis/ExtractReferenceData/StopAnalysis)
 # 서킷브레이커. AI 장애 시 백엔드가 계속 호출을 밀어넣는 대신 빠르게 실패해서 graceful하게
 # 버티도록(load-test-strategy.md §9.2 OPEN 항목, production-signal-checklist.md §2-3 재확인).
+#
+# 🔴 "instances.aiServer" 하나였던 것을 "configs.default"로 바꿨다(#556,
+# docs/decisions/circuit-breaker-worker-aggregation.md). ExerciseAnalysisService 가 이제
+# "aiServer-0"·"aiServer-1"·"aiServer-2"(워커별)를 요청한다 — 이름을 여기 하드코딩하지
+# 않고 default 설정으로 두면, AI_WORKER_COUNT 가 바뀌어도(ai-channel-pool-hardening.md
+# §2-2 가 지적한 하드코딩 이원화와 같은 함정) 이 설정을 안 늘려도 새 워커가 같은 값을 받는다.
 resilience4j:
   circuitbreaker:
-    instances:
-      aiServer:
+    configs:
+      default:
         registerHealthIndicator: true
         slidingWindowType: COUNT_BASED
         slidingWindowSize: 10
