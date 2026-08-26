@@ -621,15 +621,17 @@ if [ "$ROLE" = "p6-target" ]; then
     echo -n "."; sleep 5
   done
   curl -sf --max-time 3 http://localhost:9090/actuator/health >/dev/null 2>&1 \
-    || echo " ⚠️ 5분 안에 안 떴다 — 게이트 G2 가 다시 본다"
+    || die "백엔드가 5분 안에 안 떴다 — 부트스트랩이 실패하면 측정을 시작하면 안 된다(#265)"
 
   echo -n "  AI 헬스체크 대기"
   for _ in $(seq 1 36); do
     curl -sf --max-time 3 http://localhost:8000/health >/dev/null 2>&1 && { echo " — 떴다"; break; }
     echo -n "."; sleep 5
   done
+  # ⚠️ 이 die 가 잡는 것은 «컨테이너가 아예 안 선 경우» 다. /health 200 이어도 검출기 풀은
+  #    안 건드리므로(#214) 「뜬 것」과 「쓸 수 있는 것」은 다르다 — 그 구분은 여전히 G3 몫이다.
   curl -sf --max-time 3 http://localhost:8000/health >/dev/null 2>&1 \
-    || echo " ⚠️ 3분 안에 안 떴다 — /health 는 검출기 풀을 안 건드린다(#214). G3 가 다시 본다"
+    || die "AI 가 3분 안에 안 떴다 — 부트스트랩이 실패하면 측정을 시작하면 안 된다(#265)"
 
   # ── 시드 ───────────────────────────────────────────────────────────────
   # 從 부하 페이로드는 세션 901~1900 을 쓴다. 그 행이 없으면 **전 요청이 FK 로 실패**하는데
