@@ -1,0 +1,56 @@
+# outbox 중복 흡수 · 지연 분포 — 2026-08-26T12:49:22Z
+대상: http://localhost:8080
+🔴 로컬 대상 — 지연 절대값은 참고치일 뿐, AWS 재측정 전제
+커밋: 0e7ffeb
+
+signup: 200 (409/400 이면 이미 존재 — 무시하고 로그인)
+로그인 성공, 토큰 획득
+
+## [1] 중복 흡수
+
+세션 시작: sessionId=13
+종료 요청: HTTP 200
+1차 발행 SENT 까지: 0.83s
+1차 발행 후 — outbox: [13	SENT	0] · session.status=COMPLETED · reports=1
+
+→ 같은 행(outbox_id=13)을 PENDING 으로 강제 되돌려 재전송을 흉내낸다
+2차(강제 재전송) 도달까지: 0.12s
+2차 발행 후 — outbox: [13	SENT	0] · session.status=COMPLETED · reports=1
+
+✅ 판정: 리포트 중복 생성 없음(reports 1 → 1), session.status 유지(COMPLETED)
+
+백엔드 로그에서 2차 발행 관련 라인(마지막 60줄 중 관련 것):
+        outbox_events 
+        outbox_events 
+        outbox_events 
+        outbox_events 
+        outbox_events 
+        outbox_events 
+        outbox_events oe1_0 
+2026-08-26 21:49:32.460  INFO [fit-scheduler-1] [54a8958dda52|13|·] c.s.s.Exercise.ExerciseAnalysisService   : AI 서버 분석 중단 요청 전송 - sessionId: 13
+        outbox_events oe1_0 
+        outbox_events 
+        outbox_events 
+        outbox_events 
+        outbox_events 
+        outbox_events 
+        outbox_events 
+
+## [2] 지연 분포 (N=12, 참고치 — 로컬이면 절대값 신뢰 X)
+
+  [1] sessionId=14 outbox_wait=0.12s wall=1.73s
+  [2] sessionId=15 outbox_wait=0.97s wall=2.13s
+  [3] sessionId=16 outbox_wait=0.97s wall=1.92s
+  [4] sessionId=17 outbox_wait=0.98s wall=1.82s
+  [5] sessionId=18 outbox_wait=0.10s wall=1.14s
+  [6] sessionId=19 outbox_wait=0.87s wall=1.75s
+  [7] sessionId=20 outbox_wait=1.29s wall=2.35s
+  [8] sessionId=21 outbox_wait=0.17s wall=2.09s
+  [9] sessionId=22 outbox_wait=1.43s wall=2.78s
+  [10] sessionId=23 outbox_wait=0.12s wall=1.27s
+  [11] sessionId=24 outbox_wait=0.10s wall=1.11s
+  [12] sessionId=25 outbox_wait=0.08s wall=1.04s
+
+표본: 0.12 0.97 0.97 0.98 0.10 0.87 1.29 0.17 1.43 0.12 0.10 0.08
+
+완료. 원자료: /e/init/loadtest/results/outbox-duplicate-latency-2026-08-26/raw.txt

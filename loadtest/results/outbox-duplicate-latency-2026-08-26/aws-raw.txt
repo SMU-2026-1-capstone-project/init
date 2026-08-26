@@ -1,0 +1,73 @@
+# outbox 중복 흡수 · 지연 분포 — 2026-08-26T13:15:05Z
+대상: http://localhost:8080
+🔴 로컬 대상 — 지연 절대값은 참고치일 뿐, AWS 재측정 전제
+커밋: NA
+
+signup: 200 (409/400 이면 이미 존재 — 무시하고 로그인)
+로그인 성공, 토큰 획득
+
+## [1] 중복 흡수
+
+세션 시작: sessionId=1
+종료 요청: HTTP 200
+1차 발행 SENT 까지: 0.40s
+1차 발행 후 — outbox: [1	SENT	0] · session.status=COMPLETED · reports=1
+
+→ 같은 행(outbox_id=1)을 PENDING 으로 강제 되돌려 재전송을 흉내낸다
+2차(강제 재전송) 도달까지: 0.74s
+2차 발행 후 — outbox: [1	SENT	0] · session.status=COMPLETED · reports=1
+
+✅ 판정: 리포트 중복 생성 없음(reports 1 → 1), session.status 유지(COMPLETED)
+
+백엔드 로그에서 2차 발행 관련 라인:
+2026-08-26 22:15:10.628  INFO [fit-scheduler-3] [8ce912596d6a|1|·] c.s.s.Exercise.ExerciseAnalysisService   : AI 서버 분석 중단 요청 전송 - sessionId: 1
+2026-08-26 22:15:11.667  INFO [fit-scheduler-3] [8ce912596d6a|1|·] c.s.s.Exercise.ExerciseAnalysisService   : AI 서버 분석 중단 요청 전송 - sessionId: 1
+
+(로컬 리허설에서는 두 번째 호출에 대해 AI가 "이미 중단 처리된 세션입니다(재송신)"이라는
+명시적 응답을 준 것이 로그에 잡혔다 — 같은 메커니즘.)
+
+## [2] 지연 분포 (N=40)
+
+  [1] sessionId=2 outbox_wait=0.67s wall=0.84s
+  [2] sessionId=3 outbox_wait=0.67s wall=0.85s
+  [3] sessionId=4 outbox_wait=0.70s wall=0.85s
+  [4] sessionId=5 outbox_wait=0.73s wall=0.88s
+  [5] sessionId=6 outbox_wait=1.02s wall=1.19s
+  [6] sessionId=7 outbox_wait=0.70s wall=0.89s
+  [7] sessionId=8 outbox_wait=0.70s wall=0.87s
+  [8] sessionId=9 outbox_wait=0.72s wall=0.87s
+  [9] sessionId=10 outbox_wait=0.69s wall=0.85s
+  [10] sessionId=11 outbox_wait=0.98s wall=1.15s
+  [11] sessionId=12 outbox_wait=0.65s wall=0.81s
+  [12] sessionId=13 outbox_wait=0.70s wall=0.88s
+  [13] sessionId=14 outbox_wait=0.71s wall=0.91s
+  [14] sessionId=15 outbox_wait=0.70s wall=0.92s
+  [15] sessionId=16 outbox_wait=0.99s wall=1.17s
+  [16] sessionId=17 outbox_wait=0.73s wall=0.94s
+  [17] sessionId=18 outbox_wait=0.66s wall=0.81s
+  [18] sessionId=19 outbox_wait=0.71s wall=0.89s
+  [19] sessionId=20 outbox_wait=0.74s wall=0.92s
+  [20] sessionId=21 outbox_wait=1.02s wall=1.18s
+  [21] sessionId=22 outbox_wait=0.67s wall=0.84s
+  [22] sessionId=23 outbox_wait=0.70s wall=0.85s
+  [23] sessionId=24 outbox_wait=0.73s wall=0.89s
+  [24] sessionId=25 outbox_wait=0.68s wall=0.87s
+  [25] sessionId=26 outbox_wait=1.05s wall=1.20s
+  [26] sessionId=27 outbox_wait=0.68s wall=0.85s
+  [27] sessionId=28 outbox_wait=0.74s wall=0.91s
+  [28] sessionId=29 outbox_wait=0.68s wall=0.86s
+  [29] sessionId=30 outbox_wait=1.03s wall=1.17s
+  [30] sessionId=31 outbox_wait=0.70s wall=0.87s
+  [31] sessionId=32 outbox_wait=0.71s wall=0.87s
+  [32] sessionId=33 outbox_wait=0.70s wall=0.86s
+  [33] sessionId=34 outbox_wait=0.96s wall=1.15s
+  [34] sessionId=35 outbox_wait=0.66s wall=0.84s
+  [35] sessionId=36 outbox_wait=0.72s wall=0.93s
+  [36] sessionId=37 outbox_wait=0.68s wall=0.86s
+  [37] sessionId=38 outbox_wait=1.03s wall=1.22s
+  [38] sessionId=39 outbox_wait=0.70s wall=0.89s
+  [39] sessionId=40 outbox_wait=0.69s wall=0.85s
+  [40] sessionId=41 outbox_wait=0.70s wall=0.87s
+
+표본: 0.67 0.67 0.70 0.73 1.02 0.70 0.70 0.72 0.69 0.98 0.65 0.70 0.71 0.70 0.99 0.73 0.66 0.71 0.74 1.02 0.67 0.70 0.73 0.68 1.05 0.68 0.74 0.68 1.03 0.70 0.71 0.70 0.96 0.66 0.72 0.68 1.03 0.70 0.69 0.70
+n=40 min=0.65s median=0.70s p95=1.03s p99=1.05s max=1.05s
