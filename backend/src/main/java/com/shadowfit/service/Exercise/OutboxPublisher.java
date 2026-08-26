@@ -7,6 +7,7 @@ import com.shadowfit.model.outbox.OutboxEvent;
 import com.shadowfit.model.outbox.OutboxStatus;
 import com.shadowfit.repository.outbox.OutboxEventRepository;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,6 +80,28 @@ public class OutboxPublisher {
     @PostConstruct
     void registerGauge() {
         sessionMetrics.registerOutboxPendingGauge(() -> outboxRepository.countByStatus(OutboxStatus.PENDING));
+    }
+
+    /**
+     * 종료 훅 — 이 인스턴스가 들고 있던 lease 를 반납한다 (#208 조치 후보 2, 2026-08-27 채택).
+     *
+     * <p>graceful shutdown(server.shutdown: graceful)이 켜져 있어도 그건 <b>웹 요청</b>만
+     * 보호한다 — {@code @Scheduled} 작업은 별도 설정
+     * ({@code spring.task.scheduling.shutdown.await-termination})이 없으면 여기 안 걸린다.
+     * 즉 {@link #dispatchPending} 이 tick 중간(배치 안 다른 행을 아직 못 보낸 상태)에
+     * 컨텍스트 종료를 맞을 수 있고, 그 행들은 이 훅이 없으면 lease 만료(기본 60초)까지
+     * 아무도 못 건드린다 — #208 이 실측으로 확인한 지연이 정확히 이 자리다.
+     *
+     * <p>SIGKILL(예: {@code docker kill})처럼 훅 자체가 안 도는 죽음에는 이 메서드가
+     * 안 불린다 — 그때는 기존 lease 만료 경로가 그대로 안전망이다. 이 훅은 그 경로를
+     * 대체하지 않고, "정상 종료인데도 60초를 그냥 흘리는" 낭비만 없앤다.
+     */
+    @PreDestroy
+    void releaseLeaseOnShutdown() {
+        int released = self.releaseOwnedLeases(publisherId);
+        if (released > 0) {
+            log.info("종료 — 보유 lease {}건 반납(PENDING 복귀), publisherId={}", released, publisherId);
+        }
     }
 
     /**
@@ -240,5 +263,11 @@ public class OutboxPublisher {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int recordFailed(Long id, String lockedBy) {
         return outboxRepository.markFailed(id, lockedBy);
+    }
+
+    /** @return 반납된 행 수. {@link #releaseLeaseOnShutdown} 전용 — self 를 거쳐 트랜잭션을 태운다. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int releaseOwnedLeases(String lockedBy) {
+        return outboxRepository.releaseOwnedLeases(lockedBy);
     }
 }
