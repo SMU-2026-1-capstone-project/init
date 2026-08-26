@@ -218,20 +218,14 @@ public class SessionService {
         return session;
     }
 
-    /**
-     * 시스템(서킷브레이커 OPEN 자동 복구)이 트리거하는 재부착 — 사용자 요청이 아니므로
-     * {@link #findReattachableSession} 의 memberId 소유권 검증이 필요 없다. sessionId 는
-     * 이미 IN_PROGRESS 조회로 얻은 신뢰된 값이다. 상태·타임아웃 검증은 동일하게 적용한다
-     * (docs/decisions/ai-channel-pool-hardening.md §3-1 ㄴ).
-     */
-    public Session findReattachableSessionById(Long sessionId) {
-        Session session = sessionRepository.findSessionWithExerciseById(sessionId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
-        assertReattachable(session);
-        return session;
-    }
+    // 🔴 findReattachableSessionById 를 여기서 되돌렸다 (2026-08-26) — 서킷브레이커 OPEN 자동
+    //    복구(ai-channel-pool-hardening.md §3-1 ㄴ) 호출부였는데, 공유 워킹트리 사고(git reset
+    //    --hard)로 그 기능의 나머지가 날아간 채 이것만 커밋에 남아 sessionRepository
+    //    .findSessionWithExerciseById(그 기능 전용 신규 쿼리, 이것도 같이 날아감) 참조가 깨져
+    //    main 컴파일이 안 됐다. 재도입 시 그 리포지토리 메서드도 같이 필요하다.
+    //    (ExerciseAnalysisService.registerCircuitBreakerOpenListener 주석 참고)
 
-    /** {@link #findReattachableSession} 과 {@link #findReattachableSessionById} 가 공유하는 검증. */
+    /** {@link #findReattachableSession} 이 쓰는 검증. */
     private void assertReattachable(Session session) {
         if (session.getStatus() != Status.IN_PROGRESS || session.getEndTime() != null) {
             throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
