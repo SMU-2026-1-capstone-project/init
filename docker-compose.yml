@@ -83,10 +83,12 @@ services:
       AI_CHANNEL_POOL_SIZE: ${AI_WORKER_COUNT:-3}
       JWT_SECRET: ${JWT_SECRET:-shadowfit-prod-secret-key-change-this}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      # 데드락 재시도 상한 (#276 ②). 기본 3 은 앱 경로 스윕으로 정한 값이다(2026-08-23 사용자 confirm,
-      # r276-ceiling-sweep-aws-2026-08-23: 상한 2 는 14.0% · 3 은 6.2% 를 남긴다).
+      # 데드락 재시도 상한 (#276 ②). 기본 5 는 팔당 6판 재측정으로 재확정한 값이다(2026-08-26
+      # 사용자 confirm, r276-ceiling-rank-aws-2026-08-26: 잔여 실패율 3=8.0% > 4=5.9% > 5=2.5%,
+      # 짝비교로 5 가 4 를 6/6·3 을 5/6 에서 이긴다). 코드 기본값(ExerciseGrpcService.deadlockMaxRetries)도
+      # 같은 날 5 로 올라갔다 — 여기가 3 에 남아 있으면 dev 컨테이너만 구값을 쓴다.
       # 이 줄은 **측정용 손잡이**이기도 하다 — 팔을 바꿔 돌릴 때 재빌드를 안 하려고 둔다.
-      SHADOWFIT_POSE_DEADLOCK_MAX_RETRIES: ${POSE_DEADLOCK_MAX_RETRIES:-3}
+      SHADOWFIT_POSE_DEADLOCK_MAX_RETRIES: ${POSE_DEADLOCK_MAX_RETRIES:-5}
       # 재시도 간격 (#276 ③ 후속). 기본 0 = 즉시 재시도 — 지금까지의 모든 실측이 그 조건이다.
       # 이것도 측정용 손잡이다: 위쪽 상한이 «더 던지는데 안 벌리는» 이유 후보를 재려면 팔이 필요하다.
       SHADOWFIT_POSE_DEADLOCK_BACKOFF_MS: ${POSE_DEADLOCK_BACKOFF_MS:-0}
