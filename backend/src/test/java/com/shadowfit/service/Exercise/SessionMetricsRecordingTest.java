@@ -115,10 +115,10 @@ SessionMetricsRecordingTest {
             circuitBreakerRegistry = CircuitBreakerRegistry.ofDefaults();
             stub = mock(ExerciseServiceGrpc.ExerciseServiceStub.class);
             // getAuthenticatedStub() 의 빌더 체인 — 어느 단계든 같은 목을 돌려주면 된다
-            when(stub.withInterceptors(any())).thenReturn(stub);
+            when(stub.withInterceptors(any(io.grpc.ClientInterceptor[].class))).thenReturn(stub);
             when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
             blockingStub = mock(ExerciseServiceGrpc.ExerciseServiceBlockingStub.class);
-            when(blockingStub.withInterceptors(any())).thenReturn(blockingStub);
+            when(blockingStub.withInterceptors(any(io.grpc.ClientInterceptor[].class))).thenReturn(blockingStub);
             when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
 
             service = new ExerciseAnalysisService(sessionRepository, exercisesRepository,

@@ -68,7 +68,7 @@ class ReattachFailurePathTest {
         MockitoAnnotations.openMocks(this);
         circuitBreakerRegistry = CircuitBreakerRegistry.ofDefaults();
         blockingStub = mock(ExerciseServiceGrpc.ExerciseServiceBlockingStub.class);
-        when(blockingStub.withInterceptors(any())).thenReturn(blockingStub);
+        when(blockingStub.withInterceptors(any(io.grpc.ClientInterceptor[].class))).thenReturn(blockingStub);
         when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
         service = new ExerciseAnalysisService(sessionRepository, exercisesRepository,
                 memberRepository, sessionService, referenceRepository, poseDataRepository,

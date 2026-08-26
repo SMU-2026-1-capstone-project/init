@@ -5,6 +5,7 @@ import com.shadowfit.dto.exercises.session.ReattachSessionResponseDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.global.observability.CorrelationIds;
+import com.shadowfit.global.observability.GrpcCorrelationClientInterceptor;
 import com.shadowfit.global.observability.SessionMetrics;
 import com.shadowfit.grpc.*;
 import com.shadowfit.model.exercise.Exercise;
@@ -89,6 +90,11 @@ public class ExerciseAnalysisService {
     // mock 하려면 Channel.newCall()까지 흉내내야 해서 훨씬 무겁다.
     private final List<ExerciseServiceGrpc.ExerciseServiceStub> aiAsyncStubPool = new ArrayList<>();
     private final List<ExerciseServiceGrpc.ExerciseServiceBlockingStub> aiBlockingStubPool = new ArrayList<>();
+
+    // aiChannelPool 은 net.devh 의 @GrpcClient 관리 밖에서 ManagedChannelBuilder 로 직접 만들어져
+    // GrpcObservabilityConfig 의 @GrpcGlobalClientInterceptor 가 안 걸린다(#555) — 인증 헤더처럼
+    // 스텁에 수동으로 붙여야 cid 가 AI 로그까지 이어진다. 상태가 없어 인스턴스 하나를 공유해도 안전하다.
+    private static final GrpcCorrelationClientInterceptor CORRELATION_INTERCEPTOR = new GrpcCorrelationClientInterceptor();
 
     // 🔴 실측(2026-08-26)에서 잡힌 버그: 처음엔 채널 3개를 전부 같은 포트로 만들었다.
     //    AI가 SO_REUSEPORT(포트 공유)였을 때는 커널이 그래도 분산시켜줘서 우연히 맞았는데,
@@ -180,7 +186,8 @@ public class ExerciseAnalysisService {
 
         // .attachHeaders() 호출 시 명확하게 stub 타입을 맞춰줍니다.
         return asyncStubFor(routingKey).withInterceptors(
-                io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(header)
+                io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(header),
+                CORRELATION_INTERCEPTOR
         ).withDeadlineAfter(GRPC_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
@@ -194,7 +201,8 @@ public class ExerciseAnalysisService {
         header.put(authKey, "Bearer " + internalToken);
 
         return blockingStubFor(routingKey).withInterceptors(
-                io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(header)
+                io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(header),
+                CORRELATION_INTERCEPTOR
         ).withDeadlineAfter(GRPC_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
