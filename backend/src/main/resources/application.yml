@@ -139,11 +139,18 @@ ai:
   channel-pool-size: ${AI_CHANNEL_POOL_SIZE:3}
 
 # [3] Swagger 및 기타 설정 (최상단 레벨)
+#
+# 기본은 꺼짐이다 — SPRING_PROFILES_ACTIVE 로는 dev/prod 를 못 가른다(docker-compose.yml 의
+# dev 기동도 SPRING_PROFILES_ACTIVE: prod 를 쓴다). 그래서 별도 env var(SPRINGDOC_ENABLED)로
+# 연다. security.whitelist 의 /v3/api-docs·/swagger-ui 항목은 그대로 둔다 — 꺼져 있으면
+# springdoc 이 그 경로에 아무 핸들러도 안 등록해 permitAll 이어도 노출될 게 없다.
 springdoc:
   api-docs:
     path: /v3/api-docs
+    enabled: ${SPRINGDOC_ENABLED:false}
   swagger-ui:
     path: /swagger-ui.html
+    enabled: ${SPRINGDOC_ENABLED:false}
 
 security:
   whitelist:

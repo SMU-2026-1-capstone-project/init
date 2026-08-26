@@ -48,10 +48,13 @@
 | ③ | **배포 대상이 없다** | `.github/workflows/cd-backend.yml:6` — *"배포 대상 호스트가 아직 없기 때문이다(상시 EC2 인스턴스 없음)"*. CD 는 이미지만 굽는다 | «운영» 이라 부를 게 없어 SLO·용량·CPU 목표가 전부 가정 위 |
 | ④ | **관측이 시스템 경계를 못 넘는다** | [`observability-correlation-id.md §6`](./observability-correlation-id.md) — 분산추적 **의식적 제외** | 병목이 AI 인데 **AI 구간을 못 본다.** 의도적 선택이었으나 지금은 걸린다 |
 | ⑤ | ~~**관측 스택이 제품과 같은 박스**~~ | 🔴 **2026-08-11 철회 — 결함이 아니다.** `docker-compose.yml:130·150·188` 이 관측 3종을 `profiles: ["obs"]` 로 이미 분리해 뒀다. **기본 구동은 3개**(mysql·backend·ai)다 | 오히려 잘한 것 쪽이다. compose 주석이 이유까지 적는다 — *"profile 로 뺀 이유는 취향이 아니라 측정 오염이다… 그래프를 보려고 켠 것이 그래프를 못 믿게 만드는 상황을 만들지 않는다"* |
-| ⑥ | **클라이언트에 백프레셔가 없다** | `frontend/app/(tabs)/exercise.tsx:195` — `setInterval(tick, 330)` 인데 `tick` 이 async 이고 **in-flight 가드가 없다** | 🔴 **AI 가 포화될수록 클라가 요청을 더 쌓는다.** 느려지면 줄여야 하는데 그대로 밀어넣는다 |
+| ⑥ | ~~**클라이언트에 백프레셔가 없다**~~ | 🔴 **2026-08-26 철회 — 이미 고쳐져 있다.** `exercise.tsx:176-184` 에 `inFlight` 가드가 들어가 있다(`if (cancelled \|\| inFlight) return`). 이슈 [#554](https://github.com/Shadowfit/init/issues/554)로 등록·조치 완료 | 이 리뷰 이후(08-11 → 08-26 사이) 해소된 항목. 재검토 없이 인용하면 낡은 결함을 다시 지적하는 꼴이 된다 |
 | ⑦ | **프레임을 base64 HTTP POST** | `exercise.tsx:160` `base64: true` | ⚠️ **미측정.** 스트리밍이 자연스러운 자리지만 비용을 잰 적이 없다 |
 | ⑧ | **테이블 성격 경계가 흐림** | `exercise_references`(기준인데 프레임당 1행 = 대용량) · `daily_logs`(사용자 입력+파생 집계 혼재) · `reports`(스냅샷인지 재계산 뷰인지 미정) · `authority`(PK 이름이 `log_id` 인데 로그가 아님) | |
 | ⑨ | **마스터 시드 누락** | `INSERT INTO exercises` 가 마이그레이션·시드 어디에도 없다(전수 확인) | 새 환경에서 안 돈다 → **E1 직결**. [`32-deferred-items.md P2`](../tasks/32-deferred-items.md) |
+| ⑩ | ~~**CORS 위험 조합(FastAPI·Spring 둘 다)**~~ | ✅ **2026-08-26 발견 즉시 수정.** `ai-server/app/main.py`·`backend/.../WebConfig.java` 둘 다 `allow_origins("*")`/`allowedOriginPatterns("*")` + `allow_credentials(true)` 조합이었다 — 이 조합에서 CORS 미들웨어는 요청의 Origin 을 그대로 반사(reflect)해 "자격증명 포함 요청을 아무 오리진에서나 허용"이 된다. 양쪽 다 쿠키를 안 쓰는 것을 grep 으로 확인하고(`Set-Cookie`·`withCredentials` 0건) `allow_credentials`/`allowCredentials(true)` 를 제거 | 두 서비스에 **같은 실수가 복제**돼 있었다는 게 핵심 — 한쪽을 베낀 설정이거나 같은 프레임워크 기본값 습관. Spring 쪽은 [#149](https://github.com/Shadowfit/init/issues/149)에 "하드닝, 판단 유보"로 이미 등록돼 있던 것을 마저 닫았다 |
+| ⑪ | ~~**API 문서(OpenAPI/Swagger)가 환경 구분 없이 항상 열려 있었다**~~ | ✅ **2026-08-26 발견 즉시 수정.** FastAPI `/docs`·`/redoc`·`/openapi.json`, Spring `/v3/api-docs`·`/swagger-ui`(후자는 인증까지 면제하는 화이트리스트) 전부 dev/prod 구분 없이 열려 있었다. FastAPI 는 기존에 있었지만 안 쓰이던 `DEBUG` 플래그에 연결, Spring 은 profile 로 dev/prod 를 못 가르는 구조라(둘 다 `SPRING_PROFILES_ACTIVE: prod`) 별도 `SPRINGDOC_ENABLED` 로 게이트 | 두 서비스 다 "dev 기본값이 prod 로 새는" 같은 패턴. Spring 쪽이 더 심했다 — 문서 엔드포인트가 인증 화이트리스트에도 올라 있었다 |
+| ⑫ | ~~**`POST /pose` 의 `image` 필드에 크기 제한이 전혀 없었다**~~ | ✅ **2026-08-26 발견 즉시 수정.** `ai-server/app/models/pose.py` 의 `PoseRequest.image`(Base64)에 `max_length` 가 없었고, uvicorn·nginx-ai(dev 전용, prod 는 [#552](https://github.com/Shadowfit/init/issues/552)로 아예 없음) 어디도 안 막아줬다. `AI_PUBLIC_TOKEN` 이 앱 번들에서 추출 가능한 값이라([`ai-auth-token-flow.md`](./ai-auth-token-flow.md)) 토큰만 있으면 임의 크기 페이로드를 반복 전송할 수 있었다. `max_length=20_000_000`(안전판 — 실측이 아니라 정한 값) 부여 | DoS 성격의 실무형 결함. §4-1 의 세션 상태 크기 실측(rep 당 ≈146KB 선형 증가, [#229](https://github.com/Shadowfit/init/issues/229))과 같은 축(AI 프로세스 메모리 압박)에 있다 |
 
 ### 잘한 것 — 점수를 매기려면 이것도 센다
 
@@ -238,7 +241,11 @@ Spring 이 세션 시작 시 인스턴스를 배정하고 그 매핑의 진실 �
   🔴 **①(AI stateful 소유권 미정)은 안 바뀌었다** — 프로세스를 3개로 쪼갠 것은 같은 문제를
   더 많은 프로세스에 복제한 것이지 소유권 모델의 답이 아니다. §2 재조립 제안·§3 점수는
   이 갱신 범위 밖이다(재점수는 별도 판단 필요).
-
+- 2026-08-26: **결함 ⑥ 철회** — 클라이언트 인플라이트 가드(`inFlight`)가 이미 들어가 있어
+  더 이상 유효한 결함이 아니다(#554).
+- 2026-08-26: **새 결함 셋 발견 즉시 수정.** FastAPI·Spring "프레임워크 자체 설계" 리뷰에서
+  ⑩(CORS 위험 조합, FastAPI·Spring 둘 다) · ⑪(API 문서 항상 노출, 둘 다) ·
+  ⑫(`POST /pose` 입력 크기 무제한)를 찾아 그 자리에서 수정까지 마쳤다.
 - 2026-08-11: **결함 ⑤ 철회** — 「관측 스택이 제품과 같은 박스」는 사실이 아니다.
   `profiles: ["obs"]` 로 이미 분리돼 있고 기본 구동은 3개다. 초판이 `docker-compose.yml` 의
   서비스 «정의» 수만 세고 «기본 구동» 여부를 안 봤다. 같은 착오로 「시연 프로파일 분리」를
