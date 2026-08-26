@@ -248,6 +248,17 @@ security:
     # 이 장치 자체가 메모리 고갈 통로가 되지 않게 하는 상한. 넘으면 오래된 키부터 버린다.
     max-keys: 100000
 
+# [5-b] 종료 정책 — #208 조치 후보 1 (2026-08-26/27 실측 후 채택).
+# server.shutdown 이 없어 기본 IMMEDIATE였고, SIGTERM 후 ~2초는 정상 처리되다 그 뒤로는
+# 커넥션만 받고 응답 없이 끊기는 구간이 실측됐다(#208 코멘트, curl 「Empty reply」).
+# graceful 로 켠 뒤 진짜 in-flight 요청(2MB 느린 업로드, SIGTERM이 41% 진행 시점에 옴)으로
+# 재검증하니 HTTP 200으로 완료됐다 — 효과 확인.
+# spring.lifecycle.timeout-per-shutdown-phase 는 값을 안 정한다 — 이 값이 얼마여야
+# 하는지 실측 근거가 없어서([[feedback_no_arbitrary_threshold_values]]), Spring Boot
+# 기본값(30초)을 그대로 쓴다. 이 값으로도 위 재검증이 통과했다.
+server:
+  shutdown: graceful
+
 # [6] Actuator — 캐시 히트율·서킷브레이커 상태 관측용
 management:
   # ⚠️ 2026-08-08: 관리 엔드포인트를 앱 포트(8080)에서 분리했다.
