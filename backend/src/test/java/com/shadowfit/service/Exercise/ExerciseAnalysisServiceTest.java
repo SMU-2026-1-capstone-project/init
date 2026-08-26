@@ -64,8 +64,12 @@ class ExerciseAnalysisServiceTest {
 
     @AfterEach
     void resetCircuitBreaker() {
-        // 다른 테스트에 영향 안 주도록 매번 CLOSED로 복구
-        circuitBreakerRegistry.circuitBreaker("aiServer").transitionToClosedState();
+        // 워커별 서킷(#556)이라 이 테스트 클래스가 쓸 수 있는 인덱스를 전부 닫는다 —
+        // exercise/session id 가 H2 auto-increment 라 어느 인덱스로 갔는지 테스트마다 다르다.
+        int poolSize = (int) org.springframework.test.util.ReflectionTestUtils.getField(analysisService, "aiChannelPoolSize");
+        for (int i = 0; i < poolSize; i++) {
+            circuitBreakerRegistry.circuitBreaker("aiServer-" + i).transitionToClosedState();
+        }
     }
 
     // ---- extractReferencePoses ----
@@ -91,7 +95,9 @@ class ExerciseAnalysisServiceTest {
     @Test
     @DisplayName("기준 좌표 추출 — 서킷브레이커 OPEN이면 예외 없이 조용히 스킵")
     void extractReferencePoses_circuitOpen_skipsSilently() {
-        circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
+        // 라우팅 키가 exerciseId 다 — 그 워커의 서킷만 연다(#556, 워커별 분리)
+        circuitBreakerRegistry.circuitBreaker("aiServer-" + analysisService.aiChannelIndexFor(exercise.getId()))
+                .transitionToOpenState();
 
         // AI 서버 호출을 아예 시도하지 않아야 하므로(스텁 실제 연결 없이도) 예외 없이 반환돼야 함
         analysisService.extractReferencePoses(exercise.getId(), "https://youtu.be/dummy");
@@ -221,7 +227,9 @@ class ExerciseAnalysisServiceTest {
     @Test
     @DisplayName("분석 중단 — 서킷브레이커 OPEN이면 예외 없이 조용히 스킵")
     void stopAnalysis_circuitOpen_skipsSilently() {
-        circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
+        // 라우팅 키가 sessionId(1L) 다 — 그 워커의 서킷만 연다(#556, 워커별 분리)
+        circuitBreakerRegistry.circuitBreaker("aiServer-" + analysisService.aiChannelIndexFor(1L))
+                .transitionToOpenState();
 
         analysisService.stopAnalysis(1L, false);
     }

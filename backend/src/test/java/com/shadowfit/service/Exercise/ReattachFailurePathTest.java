@@ -95,11 +95,15 @@ class ReattachFailurePathTest {
      * 서킷을 OPEN 으로 만들어 tryAcquirePermission 이 거부하게 한다.
      *
      * <p>레지스트리에서 꺼낸 <b>바로 그 인스턴스</b>를 전이시켜야 한다 — 새로 만들어 replace 하면
-     * 프로덕션 코드의 {@code circuitBreaker("aiServer")} 가 여전히 원래 인스턴스를 돌려받아
+     * 프로덕션 코드의 {@code circuitBreaker("aiServer-0")} 가 여전히 원래 인스턴스를 돌려받아
      * 서킷이 닫힌 채로 남는다(이 테스트를 처음 짤 때 실제로 그렇게 새어 NPE 로 드러났다).
+     *
+     * <p>이름이 "aiServer-0"인 이유 — 워커별 서킷 분리(#556) 이후 이름은
+     * {@code "aiServer-" + (routingKey % aiChannelPoolSize)} 다. 이 테스트는
+     * {@code aiChannelPoolSize=1}(위 setUp)이라 어떤 sessionId 를 써도 항상 인덱스 0이다.
      */
     private void openCircuit() {
-        circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
+        circuitBreakerRegistry.circuitBreaker("aiServer-0").transitionToOpenState();
     }
     @Test
     @DisplayName("gRPC 통신 장애 → 503, 세션은 FAILED 로 바뀌지 않는다")
@@ -140,7 +144,7 @@ class ReattachFailurePathTest {
     void AI거절은_서킷실패로_치지않는다() {
         when(blockingStub.reattachAnalysis(any(ReattachRequest.class)))
                 .thenReturn(ReattachResponse.newBuilder().setSuccess(false).build());
-        CircuitBreaker cb = circuitBreakerRegistry.circuitBreaker("aiServer");
+        CircuitBreaker cb = circuitBreakerRegistry.circuitBreaker("aiServer-0"); // pool=1 → 항상 인덱스 0
         long before = cb.getMetrics().getNumberOfFailedCalls();
         assertThatThrownBy(() -> service.reattachSession(SESSION_ID, MEMBER_ID))
                 .isInstanceOf(BusinessException.class);

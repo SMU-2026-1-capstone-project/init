@@ -139,7 +139,7 @@ SessionMetricsRecordingTest {
         @Test
         @DisplayName("서킷 OPEN으로 세션을 걷어내면 FAILED 전이가 source=circuit-open 으로 기록된다")
         void circuitOpen_recordsFailedTransition() {
-            circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
+            circuitBreakerRegistry.circuitBreaker("aiServer-0").transitionToOpenState();
             when(sessionService.markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class))).thenReturn(true);
 
             service.sendAnalysisRequestToFastApi(1L, dto(), "https://youtu.be/dummy", "BEGINNER", "test-nonce");
@@ -152,7 +152,7 @@ SessionMetricsRecordingTest {
         @Test
         @DisplayName("서킷 OPEN이어도 세션이 이미 종료 상태면(false) 지표를 올리지 않는다")
         void circuitOpen_alreadyFinished_recordsNothing() {
-            circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
+            circuitBreakerRegistry.circuitBreaker("aiServer-0").transitionToOpenState();
             when(sessionService.markAsFailedIfStillInProgress(eq(1L), any(LocalDateTime.class))).thenReturn(false);
 
             service.sendAnalysisRequestToFastApi(1L, dto(), "https://youtu.be/dummy", "BEGINNER", "test-nonce");
@@ -199,7 +199,7 @@ SessionMetricsRecordingTest {
             // 있는 상태라, 여기서 실패로 집계하면 신규 startAnalysis 까지 막히게 된다.
             // getState()==CLOSED 만으로는 검증이 안 된다: 기본 minimumNumberOfCalls 가 100 이라
             // 아무것도 기록되지 않아도 CLOSED 라, 그 단언은 항상 통과한다.
-            CircuitBreaker.Metrics cb = circuitBreakerRegistry.circuitBreaker("aiServer").getMetrics();
+            CircuitBreaker.Metrics cb = circuitBreakerRegistry.circuitBreaker("aiServer-0").getMetrics();
             assertThat(cb.getNumberOfSuccessfulCalls()).isEqualTo(1);
             assertThat(cb.getNumberOfFailedCalls()).isZero();
         }
@@ -289,7 +289,7 @@ SessionMetricsRecordingTest {
         @Test
         @DisplayName("서킷 OPEN 이면 송신을 버리지 않고 RETRY 로 돌려준다 — 행이 남아 나중에 전달된다")
         void stopAnalysis_circuitOpen_retriesInsteadOfDropping() {
-            circuitBreakerRegistry.circuitBreaker("aiServer").transitionToOpenState();
+            circuitBreakerRegistry.circuitBreaker("aiServer-0").transitionToOpenState();
 
             DispatchOutcome outcome = service.stopAnalysis(11L, false);
 
@@ -312,7 +312,7 @@ SessionMetricsRecordingTest {
             assertThat(outcome).isEqualTo(DispatchOutcome.RETRY);
             assertThat(stopResults("grpc-error")).isEqualTo(1.0);
             // 전송 실패는 서킷에 실패로 기록돼야 한다(업무 실패인 session-missing 과 다른 축)
-            assertThat(circuitBreakerRegistry.circuitBreaker("aiServer").getMetrics()
+            assertThat(circuitBreakerRegistry.circuitBreaker("aiServer-0").getMetrics()
                     .getNumberOfFailedCalls()).isEqualTo(1);
             // 세션을 걷어내지 않는다 — 나중에 전달되면 정상 완료될 수 있다
             assertThat(transitions(Status.FAILED, "ai-session-missing")).isZero();
