@@ -85,6 +85,11 @@ services:
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?운영 배포에는 필수}
       AI_SERVER_HOST: shadowfit-ai
       AI_SERVER_GRPC_PORT: 8585
+      # AI 채널 풀 크기 — shadowfit-ai 의 AI_WORKER_COUNT 와 같은 값이어야 한다(#552,
+      # dev docker-compose.yml 과 같은 소스 ${AI_WORKER_COUNT} 하나). 이게 없으면 둘이
+      # 각자 기본값(둘 다 3)에 우연히 맞을 뿐이라, 배포 스크립트가 AI_WORKER_COUNT 만
+      # 바꾸면 조용히 어긋난다.
+      AI_CHANNEL_POOL_SIZE: ${AI_WORKER_COUNT:-3}
       # 폴백 없음 — dev compose 와 의도적으로 다르다 (위 3번)
       JWT_SECRET: ${JWT_SECRET:?운영 배포에는 필수. Base64 32바이트 이상}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -108,12 +113,18 @@ services:
     image: ${AI_IMAGE:-ghcr.io/shadowfit/init/ai-server}:${IMAGE_TAG:-latest}
     container_name: shadowfit-ai
     restart: unless-stopped
-    # gRPC 8585 는 Spring 만 같은 네트워크에서 호출하므로 expose 로 유지(외부 노출 X).
-    # HTTP 8000 은 프론트 직결 경로라 노출한다 — InternalAuthMiddleware 가 보호한다.
-    ports:
-      - "8000:8000"
+    # 워커 3개(N=3, GIL 병목 회피 — ai-channel-pool-hardening.md)를 별도 포트로 띄운다.
+    # 호스트 포트 매핑이 없다 — 프론트가 워커를 직접 못 찍고 항상 ai-nginx(8000)를 거쳐야
+    # 세션 고정 라우팅(X-AI-Worker 헤더)이 성립한다. #552: 이 계층이 없으면 워커 1·2로
+    # 시작된 세션의 프레임이 워커 0 으로만 가서 NO_LEASE 로 거절된다.
+    # gRPC 8585-8587 은 Spring 만 같은 네트워크에서 호출하므로 expose 로 유지(외부 노출 X).
     expose:
+      - "8000"
+      - "8001"
+      - "8002"
       - "8585"
+      - "8586"
+      - "8587"
     # 🔴 **왜 필수인가** (#214). 검출기 풀이 크기를 이 한도에서 유도하고
     #    (`mediapipe_detector.py:285-293`), 한도도 `POSE_DETECTOR_POOL_SIZE` 도 없으면
     #    RuntimeError 다. 그런데 그 호출은 기동이 아니라 **StartAnalysis 에서 처음**
@@ -154,12 +165,31 @@ services:
       # 낮춰진다(`mediapipe_detector.py:297-300`). **두 레버 중 하나는 반드시 있어야 한다** —
       # 여기 통로를 열어두는 것은 «한도를 못 거는 배포 형태» 를 위한 탈출구다.
       POSE_DETECTOR_POOL_SIZE: ${POSE_DETECTOR_POOL_SIZE:-0}
+      # 워커 프로세스 수 — entrypoint.sh 가 이 값으로 몇 개를 띄우고 포트를 어떻게 나눌지
+      # 정한다. 위 shadowfit-backend 의 AI_CHANNEL_POOL_SIZE 와 같은 소스다.
+      AI_WORKER_COUNT: ${AI_WORKER_COUNT:-3}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks:
+      - shadowfit-net
+
+  # 프론트 → AI 프레임 경로(POST /pose) 세션 고정 라우팅 (#552, dev docker-compose.yml 과 같은
+  # 구성). Spring 이 세션 시작 응답으로 알려준 워커 인덱스를 프론트가 X-AI-Worker 헤더로
+  # 실어 보내면, 그대로 해당 워커 포트로 고정 전달한다(nginx-ai/default.conf).
+  ai-nginx:
+    image: nginx:1.27-alpine
+    container_name: shadowfit-ai-nginx
+    restart: unless-stopped
+    depends_on:
+      - shadowfit-ai
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./nginx-ai/default.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - shadowfit-net
 
