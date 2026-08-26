@@ -1,0 +1,917 @@
++ S3=s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3
++ RIG=/tmp/q2_rig_v2.sh
++ BLOCKS=13
++ export MYSQL_ROOT_PASSWORD=1234
++ MYSQL_ROOT_PASSWORD=1234
++ echo 'block arm drop_ms rows_clean pages_clean rows_holed pages_holed'
++ GATE_FAIL=0
+++ seq 0 12
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/r3-b0-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b0-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b0-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b0-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b0-pclean.log
+++ tail -1
++ ph=16921
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b0-pclean.log
+++ tail -1
++ ms=20.0
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '0 pclean 20.0 50000 10032 50000 16921'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b0-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b0-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b0-pholed.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b0-pholed.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b0-pholed.log
+++ tail -1
++ ph=16921
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b0-pholed.log
+++ tail -1
++ ms=21.8
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '0 pholed 21.8 50000 10032 50000 16921'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 1 -eq 0 ']'
++ ORDER='pholed pclean'
++ for arm in $ORDER
++ log=/root/r3-b1-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b1-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b1-pholed.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b1-pholed.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b1-pholed.log
+++ tail -1
++ ph=16983
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b1-pholed.log
+++ tail -1
++ ms=21.1
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '1 pholed 21.1 50000 10032 50000 16983'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b1-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b1-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b1-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b1-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b1-pclean.log
+++ tail -1
++ ph=16921
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b1-pclean.log
+++ tail -1
++ ms=24.8
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '1 pclean 24.8 50000 10032 50000 16921'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/r3-b2-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b2-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b2-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b2-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b2-pclean.log
+++ tail -1
++ ph=16919
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b2-pclean.log
+++ tail -1
++ ms=18.6
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '2 pclean 18.6 50000 10032 50000 16919'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b2-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b2-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b2-pholed.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b2-pholed.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b2-pholed.log
+++ tail -1
++ ph=16921
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b2-pholed.log
+++ tail -1
++ ms=19.6
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '2 pholed 19.6 50000 10032 50000 16921'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 1 -eq 0 ']'
++ ORDER='pholed pclean'
++ for arm in $ORDER
++ log=/root/r3-b3-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b3-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b3-pholed.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b3-pholed.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b3-pholed.log
+++ tail -1
++ ph=16920
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b3-pholed.log
+++ tail -1
++ ms=19.7
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '3 pholed 19.7 50000 10032 50000 16920'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b3-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b3-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b3-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b3-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b3-pclean.log
+++ tail -1
++ ph=16923
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b3-pclean.log
+++ tail -1
++ ms=17.3
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '3 pclean 17.3 50000 10032 50000 16923'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/r3-b4-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b4-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b4-pclean.log
+++ tail -1
++ pc=10032
+++ tail -1
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b4-pclean.log
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b4-pclean.log
+++ tail -1
++ ph=16919
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b4-pclean.log
+++ tail -1
++ ms=17.7
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '4 pclean 17.7 50000 10032 50000 16919'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b4-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b4-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b4-pholed.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b4-pholed.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b4-pholed.log
+++ tail -1
++ ph=16920
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b4-pholed.log
+++ tail -1
++ ms=26.8
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '4 pholed 26.8 50000 10032 50000 16920'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 1 -eq 0 ']'
++ ORDER='pholed pclean'
++ for arm in $ORDER
++ log=/root/r3-b5-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b5-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b5-pholed.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b5-pholed.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b5-pholed.log
+++ tail -1
++ ph=16920
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b5-pholed.log
+++ tail -1
++ ms=20.9
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '5 pholed 20.9 50000 10032 50000 16920'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b5-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b5-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b5-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b5-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b5-pclean.log
+++ tail -1
++ ph=16920
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b5-pclean.log
+++ tail -1
++ ms=18.5
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '5 pclean 18.5 50000 10032 50000 16920'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/r3-b6-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b6-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b6-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b6-pclean.log
+++ tail -1
++ rh=50000
+++ tail -1
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b6-pclean.log
++ ph=16917
+++ tail -1
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b6-pclean.log
++ ms=17.0
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '6 pclean 17.0 50000 10032 50000 16917'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b6-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b6-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b6-pholed.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b6-pholed.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b6-pholed.log
+++ tail -1
++ ph=16920
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b6-pholed.log
+++ tail -1
++ ms=19.8
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '6 pholed 19.8 50000 10032 50000 16920'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 1 -eq 0 ']'
++ ORDER='pholed pclean'
++ for arm in $ORDER
++ log=/root/r3-b7-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b7-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b7-pholed.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b7-pholed.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b7-pholed.log
+++ tail -1
++ ph=16920
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b7-pholed.log
+++ tail -1
++ ms=24.4
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '7 pholed 24.4 50000 10032 50000 16920'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b7-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b7-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b7-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b7-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b7-pclean.log
+++ tail -1
++ ph=16920
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b7-pclean.log
+++ tail -1
++ ms=16.9
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '7 pclean 16.9 50000 10032 50000 16920'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/r3-b8-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b8-pclean.log
+++ tail -1
++ rc=50000
+++ tail -1
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b8-pclean.log
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b8-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b8-pclean.log
+++ tail -1
++ ph=16918
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b8-pclean.log
+++ tail -1
++ ms=30.9
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '8 pclean 30.9 50000 10032 50000 16918'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b8-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b8-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b8-pholed.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b8-pholed.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b8-pholed.log
+++ tail -1
++ ph=16920
+++ tail -1
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b8-pholed.log
++ ms=21.9
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '8 pholed 21.9 50000 10032 50000 16920'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 1 -eq 0 ']'
++ ORDER='pholed pclean'
++ for arm in $ORDER
++ log=/root/r3-b9-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b9-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b9-pholed.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b9-pholed.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b9-pholed.log
+++ tail -1
++ ph=16919
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b9-pholed.log
+++ tail -1
++ ms=20.8
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '9 pholed 20.8 50000 10032 50000 16919'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b9-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b9-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b9-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b9-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b9-pclean.log
+++ tail -1
++ ph=16917
+++ tail -1
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b9-pclean.log
++ ms=22.7
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '9 pclean 22.7 50000 10032 50000 16917'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/r3-b10-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b10-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b10-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b10-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b10-pclean.log
+++ tail -1
++ ph=16919
+++ tail -1
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b10-pclean.log
++ ms=16.8
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '10 pclean 16.8 50000 10032 50000 16919'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b10-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b10-pholed.log
+++ tail -1
++ rc=50000
+++ tail -1
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b10-pholed.log
++ pc=10032
+++ tail -1
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b10-pholed.log
++ rh=50000
+++ tail -1
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b10-pholed.log
++ ph=16916
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b10-pholed.log
+++ tail -1
++ ms=30.9
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '10 pholed 30.9 50000 10032 50000 16916'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 1 -eq 0 ']'
++ ORDER='pholed pclean'
++ for arm in $ORDER
++ log=/root/r3-b11-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b11-pholed.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b11-pholed.log
+++ tail -1
++ pc=10032
+++ tail -1
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b11-pholed.log
++ rh=50000
+++ tail -1
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b11-pholed.log
++ ph=16920
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b11-pholed.log
+++ tail -1
++ ms=19.6
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '11 pholed 19.6 50000 10032 50000 16920'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b11-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b11-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b11-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b11-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b11-pclean.log
+++ tail -1
++ ph=16919
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b11-pclean.log
+++ tail -1
++ ms=17.5
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '11 pclean 17.5 50000 10032 50000 16919'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for b in $(seq 0 $((BLOCKS-1)))
++ '[' 0 -eq 0 ']'
++ ORDER='pclean pholed'
++ for arm in $ORDER
++ log=/root/r3-b12-pclean.log
++ TARGET=pclean
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b12-pclean.log
+++ tail -1
++ rc=50000
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b12-pclean.log
+++ tail -1
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b12-pclean.log
+++ tail -1
++ rh=50000
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b12-pclean.log
+++ tail -1
++ ph=16921
+++ awk '$1=="pclean" && $3=="ms" {print $2}' /root/r3-b12-pclean.log
+++ tail -1
++ ms=16.0
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '12 pclean 16.0 50000 10032 50000 16921'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for arm in $ORDER
++ log=/root/r3-b12-pholed.log
++ TARGET=pholed
++ WARM_DROP=1
++ SETTLE_SEC=10
++ bash /tmp/q2_rig_v2.sh
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b12-pholed.log
+++ tail -1
++ rc=50000
+++ tail -1
+++ awk '$1=="pclean" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b12-pholed.log
++ pc=10032
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $2}' /root/r3-b12-pholed.log
+++ tail -1
++ rh=50000
+++ tail -1
+++ awk '$1=="pholed" && $2 ~ /^[0-9]+$/ {print $3}' /root/r3-b12-pholed.log
++ ph=16920
+++ tail -1
+++ awk '$1=="pholed" && $3=="ms" {print $2}' /root/r3-b12-pholed.log
++ ms=25.4
++ '[' 50000 '!=' 50000 ']'
++ '[' 50000 '!=' 50000 ']'
++ echo '12 pholed 25.4 50000 10032 50000 16920'
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ echo GATE_FAIL=0
+GATE_FAIL=0
++ push /root/q2-raw3.tsv
+++ basename /root/q2-raw3.tsv
++ aws s3 cp --quiet /root/q2-raw3.tsv s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-raw3.tsv
++ push /root/q2-round3.log
+++ basename /root/q2-round3.log
++ aws s3 cp --quiet /root/q2-round3.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/q2-round3.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b0-pclean.log
++ aws s3 cp --quiet /root/r3-b0-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b0-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b0-pholed.log
++ aws s3 cp --quiet /root/r3-b0-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b0-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b1-pclean.log
++ aws s3 cp --quiet /root/r3-b1-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b1-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b1-pholed.log
++ aws s3 cp --quiet /root/r3-b1-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b1-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b10-pclean.log
++ aws s3 cp --quiet /root/r3-b10-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b10-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b10-pholed.log
++ aws s3 cp --quiet /root/r3-b10-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b10-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b11-pclean.log
++ aws s3 cp --quiet /root/r3-b11-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b11-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b11-pholed.log
++ aws s3 cp --quiet /root/r3-b11-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b11-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b12-pclean.log
++ aws s3 cp --quiet /root/r3-b12-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b12-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b12-pholed.log
++ aws s3 cp --quiet /root/r3-b12-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b12-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b2-pclean.log
++ aws s3 cp --quiet /root/r3-b2-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b2-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b2-pholed.log
++ aws s3 cp --quiet /root/r3-b2-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b2-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b3-pclean.log
++ aws s3 cp --quiet /root/r3-b3-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b3-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b3-pholed.log
++ aws s3 cp --quiet /root/r3-b3-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b3-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b4-pclean.log
++ aws s3 cp --quiet /root/r3-b4-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b4-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b4-pholed.log
++ aws s3 cp --quiet /root/r3-b4-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b4-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b5-pclean.log
++ aws s3 cp --quiet /root/r3-b5-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b5-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b5-pholed.log
++ aws s3 cp --quiet /root/r3-b5-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b5-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b6-pclean.log
++ aws s3 cp --quiet /root/r3-b6-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b6-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b6-pholed.log
++ aws s3 cp --quiet /root/r3-b6-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b6-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b7-pclean.log
++ aws s3 cp --quiet /root/r3-b7-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b7-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b7-pholed.log
++ aws s3 cp --quiet /root/r3-b7-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b7-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b8-pclean.log
++ aws s3 cp --quiet /root/r3-b8-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b8-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b8-pholed.log
++ aws s3 cp --quiet /root/r3-b8-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b8-pholed.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b9-pclean.log
++ aws s3 cp --quiet /root/r3-b9-pclean.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b9-pclean.log
++ for f in /root/r3-b*.log
+++ basename /root/r3-b9-pholed.log
++ aws s3 cp --quiet /root/r3-b9-pholed.log s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/logs/r3-b9-pholed.log
++ echo 0
++ push /root/DONE
+++ basename /root/DONE
++ aws s3 cp --quiet /root/DONE s3://shadowfit-measure-055447613012/shadowfit/q2-partition-2026-08-24/round3/DONE
