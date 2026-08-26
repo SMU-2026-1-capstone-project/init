@@ -173,11 +173,11 @@ class ExerciseGrpcServiceTest {
 
         grpcService.savePoseDataBatch(request, obs);
 
-        // 첫 시도 + 재시도 **3회** = 4. 그 이상 던지지 않는다.
-        // 🔵 상한은 2026-08-23 에 2 → 3 으로 올라갔다(사용자 confirm) — 앱 경로 스윕에서
-        //    2 는 잔여 14.0%, 3 은 6.2% 였고 추가 시도 수는 비슷했다
-        //    (loadtest/results/r276-ceiling-sweep-aws-2026-08-23/).
-        verify(poseDataService, times(4)).savePoseDataBatch(anyLong(), anyList());
+        // 첫 시도 + 재시도 **5회** = 6. 그 이상 던지지 않는다.
+        // 🔵 상한은 2026-08-23 에 2 → 3, 2026-08-26 에 3 → 5 로 올라갔다(둘 다 사용자 confirm) —
+        //    팔당 판을 6개로 늘려 재본 앱 경로 스윕에서 3 은 잔여 8.0%, 5 는 2.5% 였고
+        //    5 가 4 를 짝비교 6/6 에서 이겼다(loadtest/results/r276-ceiling-rank-aws-2026-08-26/).
+        verify(poseDataService, times(6)).savePoseDataBatch(anyLong(), anyList());
         ArgumentCaptor<Throwable> deadlockCaptor = ArgumentCaptor.forClass(Throwable.class);
         verify(obs).onError(deadlockCaptor.capture());
         // 🔵 2026-08-23: INTERNAL → **ABORTED** (#276 ③). 「우리가 아프다」가 아니라 「경합에 졌다」이고,
