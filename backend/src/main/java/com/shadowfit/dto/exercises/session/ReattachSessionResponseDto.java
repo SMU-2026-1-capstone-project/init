@@ -77,15 +77,24 @@ public class ReattachSessionResponseDto {
     @Schema(description = "세션 소유권 검증용 비밀값 (#187). POST /pose 에 동봉할 것. null이면 이 기능 배포 전 세션")
     private String sessionNonce;
 
+    /**
+     * AI 워커 인덱스(0~N-1, 2026-08-26). {@code ActiveSessionResponseDto} 와 같은 값 —
+     * sessionId 로만 정해지는 순수 함수라 재부착 시점에 다시 계산해도 항상 같다. 클라는
+     * 재부착 이후 {@code POST /pose} 마다 이 값을 {@code X-AI-Worker} 헤더로 실어야 한다.
+     */
+    @Schema(description = "AI 워커 인덱스. POST /pose 의 X-AI-Worker 헤더에 그대로 실을 것")
+    private Integer aiWorkerIndex;
+
     private static final String MSG_ALREADY_ACTIVE = "이미 분석이 진행 중이라 그대로 이어서 진행합니다.";
     private static final String MSG_RESTORED =
             "%d회까지 이어서 진행합니다. 자세 판정이 잠시 흔들릴 수 있습니다.";
 
     public static ReattachSessionResponseDto of(Long sessionId, int repCount, boolean alreadyActive,
-                                                String sessionNonce) {
+                                                String sessionNonce, int aiWorkerIndex) {
         return ReattachSessionResponseDto.builder()
                 .sessionId(sessionId)
                 .sessionNonce(sessionNonce)
+                .aiWorkerIndex(aiWorkerIndex)
                 .restoredRepCount(repCount)
                 .alreadyActive(alreadyActive)
                 .analyzerStateReset(!alreadyActive)

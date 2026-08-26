@@ -22,6 +22,35 @@ interface StartSessionResponse {
   aiWorkerIndex: number | null;
 }
 
+// 백엔드 ActiveSessionResponseDto (GET /sessions/active, 200 또는 204)
+export interface ActiveSessionResponse {
+  sessionId: number;
+  exerciseId: number;
+  exerciseName: string;
+  startTime: string;
+  status: string;
+  // null이면 운동 중(이어하기 가능), 값이 있으면 사용자가 이미 종료를 눌러 결과 처리 대기 중
+  // — 이 경우 이어하기를 권하면 안 된다.
+  endTime: string | null;
+  sessionNonce: string | null;
+  aiWorkerIndex: number | null;
+}
+
+// 백엔드 ReattachSessionResponseDto (POST /sessions/{id}/reattach, 200)
+export interface ReattachSessionResponse {
+  sessionId: number;
+  // 이어서 셀 기준 rep 수 — UI 카운터를 이 값으로 맞춰야 한다(0부터 그리면 서버 집계와 어긋남).
+  restoredRepCount: number;
+  // true = AI 상태가 이미 살아있어 복원이 불필요했다(손실 없음).
+  alreadyActive: boolean;
+  // true = 분석기 내부 상태(rep 진행 단계·각도 스무딩 이력)가 리셋됐다. 진행 중이던 rep은
+  // 어느 쪽이든 버려진다 — 그대로 노출해도 되는 문구가 message 에 온다.
+  analyzerStateReset: boolean;
+  message: string;
+  sessionNonce: string | null;
+  aiWorkerIndex: number | null;
+}
+
 export const exercisesService = {
   // 운동 세션 시작 (POST /exercises/sessions → 202)
   startSession: (data: StartSessionRequest) =>
@@ -30,6 +59,15 @@ export const exercisesService = {
   // 운동 세션 종료 (PATCH /sessions/{id}/end → 200, 멱등)
   endSession: (sessionId: number) =>
     api.patch<void>(`/sessions/${sessionId}/end`),
+
+  // 진행 중인 내 세션 조회 (GET /sessions/active → 200 + 세션 또는 204 없음).
+  // 204는 axios 예외가 아니다 — 호출부가 res.status로 갈라야 한다.
+  getActiveSession: () => api.get<ActiveSessionResponse>('/sessions/active'),
+
+  // 세션 재부착 — 이어하기 (POST /sessions/{id}/reattach → 200 / 404 / 410 / 503).
+  // 프레임 전송 전에 반드시 먼저 불러야 한다 — 안 부르면 AI가 프레임을 전부 거부한다(#59).
+  reattachSession: (sessionId: number) =>
+    api.post<ReattachSessionResponse>(`/sessions/${sessionId}/reattach`),
 
   // 페르소나별 피드백 멘트 템플릿 (GET /exercises/{id}/feedback-templates)
   getFeedbackTemplates: (exerciseId: number) =>

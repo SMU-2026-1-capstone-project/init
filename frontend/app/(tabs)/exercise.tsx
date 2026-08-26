@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert } from 'react-native';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert, AppState, type AppStateStatus } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { exercisesService } from '@/services/exercisesService';
 import { aiService, aiConfigError } from '@/services/aiService';
 import type { FeedbackTemplate } from '@/types/feedback';
@@ -71,8 +71,9 @@ export default function ExerciseScreen() {
   // 백엔드 세션 (POST /exercises/sessions → PATCH /sessions/{id}/end)
   const [sessionId, setSessionId] = useState<number | null>(null);
   // 세션 소유권 비밀값 (#187). sessionId 와 **같이 살고 같이 죽는다** — 화면 상태로만 들고
-  // 저장소에 남기지 않는다. 앱이 죽으면 세션도 같이 잃는 것이 지금 동작이고(재부착 호출이
-  // 아직 없다), 그래서 이 값만 따로 살릴 이유가 없다.
+  // 저장소에 남기지 않는다. 앱 프로세스가 완전히 죽으면(cold start) 이 값도 같이 잃는데,
+  // 그건 GET /sessions/active + POST reattach 로 되찾는다(아래 tryResume) — 로컬에 영속시킬
+  // 필요가 없다(§4, session-resume-and-ai-state.md — sessionNonce 는 재부착 응답에도 실려온다).
   const [sessionNonce, setSessionNonce] = useState<string | null>(null);
   // AI 워커 인덱스 (2026-08-26). sessionNonce 와 같은 이유로 화면 상태로만 들고 다닌다 —
   // AI 프레임(POST /pose)마다 X-AI-Worker 헤더로 실어야 nginx가 세션 시작 때와 같은
@@ -87,6 +88,79 @@ export default function ExerciseScreen() {
   const [repCount, setRepCount] = useState(0);
   // 카메라 ref (takePictureAsync 호출용)
   const cameraRef = useRef<CameraView | null>(null);
+
+  // 앱 포그라운드 여부 — 백그라운드에서는 폴링만 멈춘다. 세션은 끝내지 않는다(재개로 이어간다).
+  const [isForeground, setIsForeground] = useState(true);
+  // 이 화면이 포커스돼 있는지 — 다른 탭으로 이동해도 화면은 마운트된 채 남으므로
+  // (`_layout.tsx` 에 unmountOnBlur 없음) 별도로 추적해야 폴링을 멈출 수 있다.
+  const [isScreenFocused, setIsScreenFocused] = useState(true);
+  // tryResume 동시 호출 가드 — 포커스·포그라운드 전환이 거의 같이 일어나 중복 호출될 수 있다.
+  const resumingRef = useRef(false);
+
+  // ── 이어하기(#59) ────────────────────────────────────────────────────────
+  // 진행 중이던 세션을 찾아 재부착한다. sessionId 를 이미 알고 있으면(같은 마운트 동안
+  // 배경↔전경만 오간 경우) AI 상태는 살아있으므로 다시 물을 필요가 없다 — cold start 로
+  // 이 화면 인스턴스가 세션을 모를 때만 서버에 묻는다.
+  const tryResume = useCallback(async () => {
+    if (sessionId != null || isRecording || busy || resumingRef.current) return;
+    resumingRef.current = true;
+    try {
+      const active = await exercisesService.getActiveSession();
+      if (active.status === 204 || active.data?.sessionId == null) return; // 이어할 세션 없음
+      if (active.data.endTime != null) return; // 이미 종료 요청됨 — 이어하기 권하면 안 됨
+
+      try {
+        const re = await exercisesService.reattachSession(active.data.sessionId);
+        const r = re.data;
+        setSessionId(r.sessionId);
+        setSessionNonce(r.sessionNonce);
+        setAiWorkerIndex(r.aiWorkerIndex ?? null);
+        setRepCount(r.restoredRepCount);
+        setIsRecording(true);
+        if (r.analyzerStateReset) {
+          // 감수하기로 확정된 손실(session-resume-and-ai-state.md §4-0) — 그대로 노출해도
+          // 되게 쓰인 문구다.
+          Alert.alert('운동을 이어합니다', r.message);
+        }
+      } catch (e: any) {
+        const status = e?.response?.status;
+        if (status === 410) {
+          Alert.alert('이어하기 시간 초과', '너무 오래 지나 이어할 수 없습니다. 새로 시작해주세요.');
+        } else if (status === 503) {
+          Alert.alert(
+            'AI 서버 연결 실패',
+            '잠시 후 다시 시도해주세요. 진행 중이던 운동 기록은 그대로 남아 있습니다.',
+          );
+        }
+        // 404(남의 세션/없음/이미 끝남) 는 조용히 포기 — 평소대로 "시작" 버튼을 그대로 둔다.
+      }
+    } catch {
+      // GET /sessions/active 실패 — 조용히 포기. 사용자는 그냥 새로 시작할 수 있다.
+    } finally {
+      resumingRef.current = false;
+    }
+  }, [sessionId, isRecording, busy]);
+
+  // 화면 포커스 — 최초 진입 + 다른 탭에서 돌아올 때. 포커스를 잃으면 폴링을 멈춘다(§2).
+  useFocusEffect(
+    useCallback(() => {
+      setIsScreenFocused(true);
+      tryResume();
+      return () => setIsScreenFocused(false);
+    }, [tryResume]),
+  );
+
+  // 앱 포그라운드/백그라운드 — 백그라운드 진입 시 세션은 끝내지 않고 폴링만 멈춘다.
+  // 복귀 시 이 화면 인스턴스가 세션을 잃은 상태(cold start)였다면 tryResume 이 되찾는다.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      setIsForeground(next === 'active');
+    });
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    if (isForeground) tryResume();
+  }, [isForeground, tryResume]);
 
   const handleToggleRecord = async () => {
     if (busy) return;
@@ -168,7 +242,9 @@ export default function ExerciseScreen() {
   useEffect(() => {
     // nonce 가 없으면 폴링을 시작하지 않는다 (#187 2단계). 보내봐야 AI 가 전부 버리므로,
     // 프레임을 쏘면서 «세션 없음» 을 반복해 받느니 아예 시작을 안 하는 편이 낫다.
-    if (!isRecording || sessionId == null || sessionNonce == null) return;
+    // 화면이 포커스를 잃었거나 앱이 백그라운드면 폴링 자체를 안 돈다(§2) — 세션은 끝내지
+    // 않고 그대로 두며, 돌아오면 이 effect 가 재실행돼 이어서 폴링한다.
+    if (!isRecording || sessionId == null || sessionNonce == null || !isForeground || !isScreenFocused) return;
     const token = process.env.EXPO_PUBLIC_AI_PUBLIC_TOKEN;
     if (!token) return;
 
@@ -220,6 +296,22 @@ export default function ExerciseScreen() {
           );
           if (cancelled) return;
           const r = res.data;
+          if (r.success === false) {
+            // success 는 «판정에 들어갔는가» 다(#267) — RATE_LIMITED·NO_POSE·LOW_VISIBILITY 는
+            // 정상 동작 중에도 나는 스킵이라 폴링을 유지한다. 세션·순서 문제만 치명적이다.
+            const fatal =
+              r.skip_reason === 'NO_LEASE' ||
+              r.skip_reason === 'SESSION_NOT_FOUND' ||
+              r.skip_reason === 'UNSUPPORTED_EXERCISE';
+            if (fatal) {
+              setIsRecording(false);
+              Alert.alert(
+                '운동 세션 연결 끊김',
+                r.message ?? '세션이 종료됐거나 서버가 재시작됐습니다. 다시 시작해주세요.',
+              );
+            }
+            return;
+          }
           if (r.sync_rate != null) setSyncRate(Math.round(r.sync_rate));
           if (r.feedback_type) setLastFeedback(r.feedback_type);
           if (r.rep_count != null) setRepCount(r.rep_count);
@@ -239,7 +331,7 @@ export default function ExerciseScreen() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [isRecording, sessionId, sessionNonce, exerciseId, aiWorkerIndex]);
+  }, [isRecording, sessionId, sessionNonce, exerciseId, aiWorkerIndex, isForeground, isScreenFocused]);
 
   // 싱크로율 낮을 때 진동 피드백
   const prevSyncRef = useRef(syncRate);

@@ -69,10 +69,23 @@ public class ActiveSessionResponseDto {
     private String sessionNonce;
 
     /**
+     * AI 워커 인덱스(0~N-1, 2026-08-26). {@code Math.floorMod(sessionId, 채널풀크기)} 로
+     * 시작 시점에 정해진 뒤 재계산해도 값이 같다 — sessionId 가 그대로면 세션 수명 내내
+     * 고정이다. 클라가 재부착 후 {@code POST /pose} 에 {@code X-AI-Worker} 헤더로 실어야
+     * nginx 가 세션 시작 때와 같은 워커로 고정 전달한다({@code ExercisesResponseDto} 참고).
+     */
+    @Schema(description = "AI 워커 인덱스. POST /pose 의 X-AI-Worker 헤더에 그대로 실을 것")
+    private Integer aiWorkerIndex;
+
+    /**
      * exercise 는 호출부에서 JOIN FETCH 로 미리 가져온 상태여야 한다 —
      * open-in-view: false 라 트랜잭션 밖에서 lazy 접근하면 터진다.
+     *
+     * @param aiWorkerIndex {@code Math.floorMod(session.getId(), 채널풀크기)} — 채널 풀 크기는
+     *                      이 DTO가 모르므로(순환 의존 회피, SessionController 주석 참고) 호출부가
+     *                      계산해 넘긴다.
      */
-    public static ActiveSessionResponseDto from(Session session) {
+    public static ActiveSessionResponseDto from(Session session, int aiWorkerIndex) {
         return ActiveSessionResponseDto.builder()
                 .sessionId(session.getId())
                 .exerciseId(session.getExercise().getId())
@@ -83,6 +96,7 @@ public class ActiveSessionResponseDto {
                 // 🔴 이 경로가 없으면 «앱이 죽었다 살아난» 세션은 nonce 를 영영 못 얻는다.
                 //    복구는 되는데 그 뒤 POST /pose 가 전부 거절되는 상태가 된다(2단계에서).
                 .sessionNonce(session.getSessionNonce())
+                .aiWorkerIndex(aiWorkerIndex)
                 .build();
     }
 }

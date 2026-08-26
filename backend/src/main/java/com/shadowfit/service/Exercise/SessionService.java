@@ -88,6 +88,12 @@ public class SessionService {
     @Value("${exercise.session.timeout.default-buffer-minutes:30}")
     private Integer defaultBufferMinutes;
 
+    // ExerciseAnalysisService 와 같은 프로퍼티를 읽는다(중복이지만 위 순환 의존 회피 원칙과
+    // 같은 이유 — SessionService 는 gRPC/AI 서비스 의존을 갖지 않는다). 값이 sessionId 에만
+    // 딸린 순수 함수라 두 곳에서 같은 값을 읽어도 어긋날 일이 없다(getActiveSession).
+    @Value("${ai.channel-pool-size:3}")
+    private int aiChannelPoolSize;
+
     /**
      * [세션 생성] 새로운 운동 분석 프로세스를 시작하기 위한 초기 레코드를 생성합니다.
      *
@@ -178,7 +184,8 @@ public class SessionService {
     public Optional<ActiveSessionResponseDto> getActiveSession(Long currentMemberId) {
         return sessionRepository
                 .findFirstByMemberIdAndStatusOrderByStartTimeDesc(currentMemberId, Status.IN_PROGRESS)
-                .map(ActiveSessionResponseDto::from);
+                .map(session -> ActiveSessionResponseDto.from(
+                        session, Math.floorMod(session.getId(), aiChannelPoolSize)));
     }
 
     /**
@@ -207,7 +214,25 @@ public class SessionService {
     public Session findReattachableSession(Long sessionId, Long currentMemberId) {
         Session session = sessionRepository.findSessionWithExerciseByIdAndMemberId(sessionId, currentMemberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+        assertReattachable(session);
+        return session;
+    }
 
+    /**
+     * 시스템(서킷브레이커 OPEN 자동 복구)이 트리거하는 재부착 — 사용자 요청이 아니므로
+     * {@link #findReattachableSession} 의 memberId 소유권 검증이 필요 없다. sessionId 는
+     * 이미 IN_PROGRESS 조회로 얻은 신뢰된 값이다. 상태·타임아웃 검증은 동일하게 적용한다
+     * (docs/decisions/ai-channel-pool-hardening.md §3-1 ㄴ).
+     */
+    public Session findReattachableSessionById(Long sessionId) {
+        Session session = sessionRepository.findSessionWithExerciseById(sessionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+        assertReattachable(session);
+        return session;
+    }
+
+    /** {@link #findReattachableSession} 과 {@link #findReattachableSessionById} 가 공유하는 검증. */
+    private void assertReattachable(Session session) {
         if (session.getStatus() != Status.IN_PROGRESS || session.getEndTime() != null) {
             throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
         }
@@ -215,8 +240,6 @@ public class SessionService {
         if (session.isTimedOutAt(LocalDateTime.now(), idleMinutes, defaultBufferMinutes)) {
             throw new BusinessException(ErrorCode.SESSION_REATTACH_EXPIRED);
         }
-
-        return session;
     }
 
     /**

@@ -14,11 +14,13 @@ import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.outbox.DispatchOutcome;
+import com.shadowfit.model.outbox.OutboxEvent;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
+import com.shadowfit.repository.outbox.OutboxEventRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.grpc.ManagedChannel;
@@ -58,6 +60,7 @@ public class ExerciseAnalysisService {
     private final PoseDataRepository poseDataRepository;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final SessionMetrics sessionMetrics;
+    private final OutboxEventRepository outboxRepository;
 
     // 자기 주입: startAnalysis → sendAnalysisRequestToFastApi 호출이 Spring 프록시를 통과해
     // @Async가 적용되도록 함(:199 주석 참조).
@@ -113,6 +116,42 @@ public class ExerciseAnalysisService {
             aiAsyncStubPool.add(ExerciseServiceGrpc.newStub(channel));
             aiBlockingStubPool.add(ExerciseServiceGrpc.newBlockingStub(channel));
             log.info("AI gRPC 채널[{}] 초기화 완료 (대상: {}:{})", i, host, port);
+        }
+    }
+
+    /**
+     * 서킷브레이커가 OPEN 으로 전환되는 순간(= AI 가 죽었다고 판단한 순간) 그 시점의
+     * IN_PROGRESS 세션 전부에 재부착 통보를 예약한다. 사용자가 앱을 껐다 켤 필요 없이 발행기가
+     * 자동으로 부른다(docs/decisions/ai-channel-pool-hardening.md §3-1 ㄴ).
+     *
+     * <p>Resilience4j 이벤트 리스너는 등록 시점의 스레드가 아니라 상태 전이를 실제로 만든
+     * 스레드(여기선 gRPC 호출자)에서 동기 실행된다 — 무겁게 만들면 그 호출을 늦춘다. 그래서
+     * 여기서는 outbox 행 INSERT 까지만 하고, 실제 gRPC 재부착 송신은 발행기(별도 스레드)에 맡긴다.
+     */
+    @PostConstruct
+    private void registerCircuitBreakerOpenListener() {
+        aiCircuitBreaker().getEventPublisher().onStateTransition(event -> {
+            if (event.getStateTransition().getToState() == CircuitBreaker.State.OPEN) {
+                self.enqueueReattachForInProgressSessions();
+            }
+        });
+    }
+
+    /**
+     * 그 순간의 IN_PROGRESS 세션마다 {@code REATTACH_ANALYSIS} outbox 행을 하나씩 넣는다.
+     *
+     * <p>중복 방지 로직을 안 둔다 — 서킷이 짧게 열렸다 닫히길 반복해도 중복으로 쌓인 행은
+     * AI 의 {@code already_active} 가드가 그대로 흡수한다(STOP_ANALYSIS 가 이미 같은 근거로
+     * 중복을 허용하는 것과 동일).
+     */
+    @Transactional
+    public void enqueueReattachForInProgressSessions() {
+        try (CorrelationIds.Scope tick = CorrelationIds.startTask("circuit-breaker-open")) {
+            List<Session> inProgress = sessionRepository.findByStatus(Status.IN_PROGRESS);
+            log.warn("AI 서버 서킷브레이커 OPEN — 재부착 통보 {}건 예약", inProgress.size());
+            for (Session session : inProgress) {
+                outboxRepository.save(OutboxEvent.reattachAnalysis(session.getId(), CorrelationIds.current()));
+            }
         }
     }
 
@@ -485,7 +524,8 @@ public class ExerciseAnalysisService {
             // 클라가 그걸 동봉해 «틀린 nonce» 가 된다.
             String reattachNonce = request.getSessionNonce().isEmpty() ? null : request.getSessionNonce();
             return ReattachSessionResponseDto.of(
-                    sessionId, response.getRepCount(), response.getAlreadyActive(), reattachNonce);
+                    sessionId, response.getRepCount(), response.getAlreadyActive(), reattachNonce,
+                    Math.floorMod(sessionId, aiChannelPoolSize));
         }
     }
 
@@ -507,6 +547,25 @@ public class ExerciseAnalysisService {
     @Transactional(readOnly = true)
     public ReattachRequest loadReattachRequest(Long sessionId, Long currentMemberId) {
         Session session = sessionService.findReattachableSession(sessionId, currentMemberId);
+        return buildReattachRequest(session);
+    }
+
+    /**
+     * 서킷브레이커 자동 복구(REATTACH_ANALYSIS) 전용 — 사용자가 아니라 발행기가 부른다.
+     * 소유권 검증(memberId) 없이 상태·타임아웃만 확인한다({@link SessionService#findReattachableSessionById}).
+     *
+     * @throws BusinessException {@code SESSION_NOT_FOUND}/{@code SESSION_REATTACH_EXPIRED} —
+     *         그 사이 세션이 정상 종료됐거나 idle 타임아웃을 넘긴 경우. 재부착이 더 이상
+     *         필요 없다는 뜻이라 호출부는 이걸 실패가 아니라 "할 일 없음"으로 다룬다.
+     */
+    @Transactional(readOnly = true)
+    public ReattachRequest loadReattachRequestForRecovery(Long sessionId) {
+        Session session = sessionService.findReattachableSessionById(sessionId);
+        return buildReattachRequest(session);
+    }
+
+    private ReattachRequest buildReattachRequest(Session session) {
+        Long sessionId = session.getId();
         Long exerciseId = session.getExercise().getId();
 
         // 완료된 rep 은 세션 진행 중에 이미 pose_data 로 넘어와 있다(§3-2). AI 메모리가 날아가도
@@ -643,7 +702,7 @@ public class ExerciseAnalysisService {
             sessionMetrics.aiStopResult("session-missing");
             log.warn("AI 에 세션 상태 없음 — 분석 결과 회수 불가 (sessionId: {}, 응답: {})",
                     sessionId, response.getMessage());
-            failSessionFast(sessionId);
+            failSessionFast(sessionId, "ai-session-missing");
 
             // 재시도해도 AI 는 그 세션을 영영 모른다 — 터미널이다. SENT 로 찍으면 실제 결과 유실을
             // "전송 성공"으로 위장하게 된다.
@@ -652,20 +711,98 @@ public class ExerciseAnalysisService {
     }
 
     /**
+     * [서킷브레이커 자동 복구] outbox 발행기가 호출하는 {@code REATTACH_ANALYSIS} 송신.
+     *
+     * <p>{@code stopAnalysis} 와 같은 3분류 계약(SENT/RETRY/TERMINAL_FAILED)을 따른다. 캡(재시도
+     * 한도) 초과는 여기서 처리하지 않는다 — 발행기가 {@code maxRetry} 를 넘기면 일반 로직으로 행을
+     * 종료하고, 세션은 STOP_ANALYSIS 와 같은 관례대로 건드리지 않는다(30분 타임아웃 스케줄러가
+     * 안전망). 즉시 FAILED 로 거두는 건 AI 가 <b>명시적으로 거절</b>했을 때뿐이다.
+     *
+     * @param possiblyRedelivered 참고용으로만 받는다 — STOP_ANALYSIS 와 달리 분기를 안 바꾼다.
+     *        재부착은 AI 의 {@code already_active} 가드가 중복 송신을 이미 "성공"으로 흡수하므로,
+     *        재전송인지 아닌지가 결과 해석에 영향을 주지 않는다.
+     */
+    public DispatchOutcome reattachFromOutbox(Long sessionId, boolean possiblyRedelivered) {
+        try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
+            // 서킷을 먼저 본다 — loadReattachRequestForRecovery 는 세션·pose_data·기준좌표를
+            // 훑는 DB 왕복이라, AI 가 이미 죽었다고 알려진 상태(서킷 OPEN)면 그 조회 자체가
+            // 낭비다. stopAnalysis 는 StopRequest 조립이 공짜(필드 하나)라 순서가 안 갈렸지만
+            // 여기는 다르다.
+            CircuitBreaker cb = aiCircuitBreaker();
+            if (!cb.tryAcquirePermission()) {
+                log.warn("AI 서버 서킷브레이커 OPEN — 재부착 보류 (세션 ID: {})", sessionId);
+                sessionMetrics.aiReattachResult("skipped-circuit-open");
+                return DispatchOutcome.RETRY;
+            }
+
+            ReattachRequest request;
+            try {
+                request = self.loadReattachRequestForRecovery(sessionId);
+            } catch (BusinessException e) {
+                // 그 사이 세션이 정상 종료됐거나(사용자가 직접 끝냄) idle 타임아웃을 넘겼다 —
+                // 재부착이 더 이상 필요 없다는 뜻이지 실패가 아니다. 재시도할 이유도 없다.
+                // 서킷 허가를 이미 얻었지만 실제 호출까지 가지 않았으므로 성공/실패로 집계하지
+                // 않고 반납한다 — 안 그러면 HALF_OPEN 구간의 허용 호출 수를 헛되이 까먹는다
+                // (isClientRejection 분기와 같은 근거, :428).
+                cb.releasePermission();
+                sessionMetrics.aiReattachResult("no-longer-in-progress");
+                log.info("재부착 불필요 — 세션이 이미 IN_PROGRESS 가 아님 (sessionId: {}, 사유: {})",
+                        sessionId, e.getMessage());
+                return DispatchOutcome.SENT;
+            }
+
+            long callStart = System.nanoTime();
+            ReattachResponse response;
+            try {
+                response = getAuthenticatedBlockingStub(sessionId).reattachAnalysis(request);
+            } catch (StatusRuntimeException e) {
+                cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, e);
+                sessionMetrics.aiReattachResult("grpc-error");
+                log.error("자동 재부착 gRPC 실패 - sessionId: {}, status: {}", sessionId, e.getStatus());
+                return DispatchOutcome.RETRY;
+            } catch (RuntimeException e) {
+                cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, e);
+                sessionMetrics.aiReattachResult("error");
+                log.error("자동 재부착 중 예기치 못한 오류 - sessionId: {}", sessionId, e);
+                return DispatchOutcome.RETRY;
+            }
+            cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
+
+            if (response.getSuccess()) {
+                sessionMetrics.aiReattachResult("ok");
+                log.info("자동 재부착 완료 - sessionId: {}, rep: {}, 이미활성: {}",
+                        sessionId, response.getRepCount(), response.getAlreadyActive());
+                return DispatchOutcome.SENT;
+            }
+
+            // AI 가 요청을 받고도 상태를 못 만들었다(기준 좌표 파싱 실패 등) — 재시도해도 같은
+            // 응답이 반복될 근거 있는 거절이다. stopAnalysis 의 session-missing 과 달리 여기는
+            // possiblyRedelivered 로 갈리지 않는다(위 문서 참고) — 바로 종료한다.
+            sessionMetrics.aiReattachResult("rejected");
+            log.warn("AI 가 자동 재부착을 거절 - sessionId: {}, 사유: {}", sessionId, response.getMessage());
+            failSessionFast(sessionId, "ai-reattach-rejected");
+            return DispatchOutcome.TERMINAL_FAILED;
+        }
+    }
+
+    /**
      * CompleteAnalysis 가 오지 않는 게 확정된 세션을 즉시 FAILED 로 걷어낸다 — 타임아웃 스케줄러
      * (시작시간+예상시간+버퍼)를 기다릴 이유가 없다. startAnalysis 가 같은 상황에서 하는 처리와 대칭.
+     *
+     * @param source 지표 태그 — "같은 FAILED라도 어느 흐름이 걷었는지"가 운영상 다른 사건이므로
+     *               호출부마다 구분한다({@link SessionMetrics#sessionTransition}).
      */
-    private void failSessionFast(Long sessionId) {
+    private void failSessionFast(Long sessionId, String source) {
         try {
             if (sessionService.markAsFailedIfStillInProgress(sessionId, LocalDateTime.now())) {
-                sessionMetrics.sessionTransition(Status.FAILED, "ai-session-missing");
+                sessionMetrics.sessionTransition(Status.FAILED, source);
             }
         } catch (ObjectOptimisticLockingFailureException e) {
             // 늦게 도착한 완료 콜백이 같은 세션을 동시에 갱신한 것 — 결과 데이터가 더 가치있으므로
             // 양보한다(markAsFailedIfStillInProgress 의 계약: "호출 측이 catch 하고 양보",
             // SessionService:248-249. 스케줄러도 같은 정책).
-            sessionMetrics.optimisticLockConflict("ai-session-missing", "yield");
-            log.info("세션 FAILED 처리 양보 — 완료 콜백 우선 (sessionId: {})", sessionId);
+            sessionMetrics.optimisticLockConflict(source, "yield");
+            log.info("세션 FAILED 처리 양보 — 완료 콜백 우선 (sessionId: {}, source: {})", sessionId, source);
         }
     }
 
