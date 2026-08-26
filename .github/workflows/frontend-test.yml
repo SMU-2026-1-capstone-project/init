@@ -1,0 +1,56 @@
+name: Frontend type check
+
+# frontend/ 의 .ts·.tsx 를 PR마다 타입체크한다.
+#
+# 이 워크플로가 없던 동안 프론트 타입 오류는 자동 검증이 0이었다 — backend-test.yml·
+# ai-server-test.yml 은 paths 필터가 각자 backend/**·ai-server/** 라 걸리지 않는다.
+# 그래서 프론트만 고친 PR 은 타입 오류가 있어도 체크 자체가 뜨지 않았다 (이슈 #327).
+#
+# 최소선으로 시작한다 — tsc --noEmit 만. ESLint·테스트는 별건(package.json 에 lint 스크립트도
+# 테스트도 아직 없다).
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-test.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-test.yml'
+
+# 같은 브랜치에 연속 푸시하면 이전 실행은 취소 — 러너 시간 낭비 방지
+concurrency:
+  group: frontend-test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: frontend typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # tsconfig 가 expo/tsconfig.base 를 참조한다 — node_modules 없이 돌리면 그 참조를
+      #못 찾아 오류 수백 개가 쏟아지는데 전부 가짜다(이슈 #327 재현 노트). npm ci 로
+      # 실제 의존성을 깔아야 진짜 타입 오류만 남는다.
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: tsc --noEmit
+        working-directory: frontend
+        run: npx tsc --noEmit -p .
