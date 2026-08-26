@@ -75,7 +75,7 @@ public class ExerciseAnalysisService {
     // 풀 크기는 상수가 아니라 ai.channel-pool-size(= docker-compose 의 AI_WORKER_COUNT 와
     // 같은 소스)에서 읽는다 — entrypoint.sh 가 띄우는 실제 워커 수와 손으로 맞출 필요가 없다
     // (docs/decisions/ai-channel-pool-hardening.md).
-    @Value("${ai.channel-pool-size}")
+    @Value("${ai.channel-pool-size:3}")
     private int aiChannelPoolSize;
 
     @Value("${grpc.client.fastapi-client.address}")
