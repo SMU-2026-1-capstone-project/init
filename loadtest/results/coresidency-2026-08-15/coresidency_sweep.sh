@@ -288,14 +288,21 @@ ghz_configured() {
 #    MySQL 이 롤백만 한다. P5 rig 이 같은 함정에 `assert_sessions_exist` 를 세운 이유다.
 assert_ghz_payload_seeded() {
   local ids want got
+  # 🔴 2026-08-17(#271)부터 GHZ_DATA는 리터럴 JSON 배열이 아니라 ghz Go 템플릿이다
+  #    (gen_batch_multi.py 참고 — "json.load로는 안 읽힌다, 그게 정상이다"). 예전처럼
+  #    json.load 로 열면 `{{ add 901 (mod .RequestNumber 1000) }}` 에서 무조건 죽는다
+  #    (2026-08-25 rehearsal 3연속 FAIL 의 원인 — Traceback이 게이트 통과 직후 찍혔다).
+  #    템플릿 산술식에서 세션 id 범위(lo, n)를 정규식으로 뽑아 대신한다.
   ids=$(python - "$GHZ_DATA" <<'PY'
-import json, sys
-d = json.load(open(sys.argv[1], encoding='utf-8'))
-rows = d if isinstance(d, list) else [d]
-s = sorted({r.get("sessionId") or r.get("session_id") for r in rows} - {None})
-print(",".join(str(x) for x in s))
+import re, sys
+s = open(sys.argv[1], encoding='utf-8').read()
+m = re.search(r'add\s+(\d+)\s*\(mod\s+\.RequestNumber\s+(\d+)\)', s)
+if not m:
+    sys.exit(1)
+lo, n = int(m.group(1)), int(m.group(2))
+print(",".join(str(x) for x in range(lo, lo + n)))
 PY
-  ) || { echo "  🔴 페이로드에서 세션 id 를 못 뽑았다: $GHZ_DATA" >&2; return 1; }
+  ) || { echo "  🔴 페이로드에서 세션 id 범위를 못 뽑았다(ghz 템플릿 형식이 아니다): $GHZ_DATA" >&2; return 1; }
   [ -n "$ids" ] || { echo "  🔴 페이로드에 세션 id 가 없다: $GHZ_DATA" >&2; return 1; }
   want=$(echo "$ids" | tr ',' '\n' | grep -c .)
   got=$($SSH "docker exec -i -e MYSQL_PWD=$MYSQL_PW $MYSQL_CONTAINER mysql -u$MYSQL_USER shadowfit -N \
