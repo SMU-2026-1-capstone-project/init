@@ -74,7 +74,8 @@ class ReattachFailurePathTest {
                 memberRepository, sessionService, referenceRepository, poseDataRepository,
                 circuitBreakerRegistry, metrics);
         ReflectionTestUtils.setField(service, "internalToken", "test-token");
-        ReflectionTestUtils.setField(service, "exerciseBlockingStub", blockingStub);
+        ReflectionTestUtils.setField(service, "aiChannelPoolSize", 1);
+        ReflectionTestUtils.setField(service, "aiBlockingStubPool", List.of(blockingStub));
         // reattachSession 은 DB 작업을 self.loadReattachRequest 로 분리해 트랜잭션을 gRPC 앞에서
         // 닫는다(이슈 #76). 여기선 프록시가 없으니 자기 자신을 넣는다 — 트랜잭션 경계는 단위
         // 테스트의 관심사가 아니고, 리포지토리가 전부 mock 이라 동작은 같다.

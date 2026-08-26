@@ -82,6 +82,13 @@ public class ExerciseAnalysisService {
     private String fastApiAddress; // "static://host:port" 형식
 
     private final List<ManagedChannel> aiChannelPool = new ArrayList<>();
+    // 채널당 스텁을 한 번만 만들어 캐싱한다 — asyncStubFor/blockingStubFor 가 매 호출마다
+    // ExerciseServiceGrpc.newStub(channel)을 새로 짓지 않는다. 이래야 단위 테스트가 옛
+    // 방식(exerciseAsyncStub/exerciseBlockingStub 필드를 mock으로 reflection 주입) 그대로
+    // aiAsyncStubPool/aiBlockingStubPool 을 List.of(mock)으로 주입할 수 있다 — 채널을
+    // mock 하려면 Channel.newCall()까지 흉내내야 해서 훨씬 무겁다.
+    private final List<ExerciseServiceGrpc.ExerciseServiceStub> aiAsyncStubPool = new ArrayList<>();
+    private final List<ExerciseServiceGrpc.ExerciseServiceBlockingStub> aiBlockingStubPool = new ArrayList<>();
 
     // 🔴 실측(2026-08-26)에서 잡힌 버그: 처음엔 채널 3개를 전부 같은 포트로 만들었다.
     //    AI가 SO_REUSEPORT(포트 공유)였을 때는 커널이 그래도 분산시켜줘서 우연히 맞았는데,
@@ -95,9 +102,10 @@ public class ExerciseAnalysisService {
         int basePort = Integer.parseInt(hostPort.substring(hostPort.lastIndexOf(':') + 1));
         for (int i = 0; i < aiChannelPoolSize; i++) {
             int port = basePort + i;
-            aiChannelPool.add(
-                    ManagedChannelBuilder.forAddress(host, port).usePlaintext().build()
-            );
+            ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+            aiChannelPool.add(channel);
+            aiAsyncStubPool.add(ExerciseServiceGrpc.newStub(channel));
+            aiBlockingStubPool.add(ExerciseServiceGrpc.newBlockingStub(channel));
             log.info("AI gRPC 채널[{}] 초기화 완료 (대상: {}:{})", i, host, port);
         }
     }
@@ -126,13 +134,11 @@ public class ExerciseAnalysisService {
     }
 
     private ExerciseServiceGrpc.ExerciseServiceStub asyncStubFor(long routingKey) {
-        ManagedChannel ch = aiChannelPool.get(Math.floorMod(routingKey, aiChannelPoolSize));
-        return ExerciseServiceGrpc.newStub(ch);
+        return aiAsyncStubPool.get(Math.floorMod(routingKey, aiChannelPoolSize));
     }
 
     private ExerciseServiceGrpc.ExerciseServiceBlockingStub blockingStubFor(long routingKey) {
-        ManagedChannel ch = aiChannelPool.get(Math.floorMod(routingKey, aiChannelPoolSize));
-        return ExerciseServiceGrpc.newBlockingStub(ch);
+        return aiBlockingStubPool.get(Math.floorMod(routingKey, aiChannelPoolSize));
     }
 
     // AI가 죽지 않고 그냥 응답을 안 주는(hang) 경우, 데드라인 없이는 onNext/onError

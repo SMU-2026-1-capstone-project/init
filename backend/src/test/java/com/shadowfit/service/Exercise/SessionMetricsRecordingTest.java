@@ -125,8 +125,9 @@ SessionMetricsRecordingTest {
                     memberRepository, sessionService, referenceRepository, poseDataRepository,
                     circuitBreakerRegistry, metrics);
             ReflectionTestUtils.setField(service, "internalToken", "test-token");
-            ReflectionTestUtils.setField(service, "exerciseAsyncStub", stub);
-            ReflectionTestUtils.setField(service, "exerciseBlockingStub", blockingStub);
+            ReflectionTestUtils.setField(service, "aiChannelPoolSize", 1);
+            ReflectionTestUtils.setField(service, "aiAsyncStubPool", List.of(stub));
+            ReflectionTestUtils.setField(service, "aiBlockingStubPool", List.of(blockingStub));
 
             when(referenceRepository.findByExerciseId(anyLong())).thenReturn(List.of());
         }
