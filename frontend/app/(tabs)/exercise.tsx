@@ -74,6 +74,10 @@ export default function ExerciseScreen() {
   // 저장소에 남기지 않는다. 앱이 죽으면 세션도 같이 잃는 것이 지금 동작이고(재부착 호출이
   // 아직 없다), 그래서 이 값만 따로 살릴 이유가 없다.
   const [sessionNonce, setSessionNonce] = useState<string | null>(null);
+  // AI 워커 인덱스 (2026-08-26). sessionNonce 와 같은 이유로 화면 상태로만 들고 다닌다 —
+  // AI 프레임(POST /pose)마다 X-AI-Worker 헤더로 실어야 nginx가 세션 시작 때와 같은
+  // 워커로 고정 전달한다. 안 실으면 커널이 무작위 분산시켜 세션 상태가 없는 워커로 갈 수 있다.
+  const [aiWorkerIndex, setAiWorkerIndex] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   // 페르소나 멘트 프리로드 (TTS 보류 — 일단 받아서 보관만)
   const [, setFeedbackTemplates] = useState<FeedbackTemplate[]>([]);
@@ -104,6 +108,7 @@ export default function ExerciseScreen() {
         const res = await exercisesService.startSession({ exerciseId });
         setSessionId(res.data.sessionId);
         setSessionNonce(res.data.sessionNonce);
+        setAiWorkerIndex(res.data.aiWorkerIndex ?? null);
         // 멘트 프리로드는 실패해도 운동은 진행
         exercisesService
           .getFeedbackTemplates(exerciseId)
@@ -117,6 +122,7 @@ export default function ExerciseScreen() {
         // 비밀값은 세션과 함께 버린다 (#187). 리포트 화면으로 넘어가면 어차피 언마운트되지만,
         // «끝난 세션의 자격증명이 메모리에 남아 있다» 를 화면 전환 타이밍에 기대지 않는다.
         setSessionNonce(null);
+        setAiWorkerIndex(null);
         if (id != null) {
           await exercisesService.endSession(id);
           router.replace(`/report/${id}` as any);
@@ -167,52 +173,64 @@ export default function ExerciseScreen() {
     if (!token) return;
 
     let cancelled = false;
+    // AI가 느려질수록 이전 tick이 안 끝난 채 다음 tick이 겹쳐 쌓이는 걸 막는 가드
+    // (백프레셔 부재, 이슈 #554) — 없으면 서버가 느려질수록 in-flight 요청 수가 늘어나
+    // 오히려 부하를 더 얹는 방향으로 간다.
+    let inFlight = false;
     const exerciseType = exerciseTypeOf(exerciseId);
     const intervalMs = 330; // ~3fps — takePictureAsync 부담 고려
 
     const tick = async () => {
-      if (cancelled) return;
-      let image = MOCK_FRAME_B64;
-      // 실제 카메라 프레임 (가능하면). 카메라가 아직 마운트 안 됐을 때만 mock 사용.
+      if (cancelled || inFlight) return;
+      inFlight = true;
       try {
-        const cam = cameraRef.current;
-        if (cam) {
-          const snap = await cam.takePictureAsync({
-            base64: true,
-            quality: 0.4, // 분석엔 충분, 페이로드 줄임
-            skipProcessing: true, // 회전·EXIF 처리 스킵 → 지연 단축
-            shutterSound: false,
-          });
-          if (snap?.base64) image = snap.base64;
+        let image = MOCK_FRAME_B64;
+        // 실제 카메라 프레임 (가능하면). 카메라가 아직 마운트 안 됐을 때만 mock 사용.
+        try {
+          const cam = cameraRef.current;
+          if (cam) {
+            const snap = await cam.takePictureAsync({
+              base64: true,
+              quality: 0.4, // 분석엔 충분, 페이로드 줄임
+              skipProcessing: true, // 회전·EXIF 처리 스킵 → 지연 단축
+              shutterSound: false,
+            });
+            if (snap?.base64) image = snap.base64;
+          }
+        } catch (e) {
+          if (__DEV__) {
+            // eslint-disable-next-line no-console
+            console.warn('[camera capture]', (e as Error).message);
+          }
         }
-      } catch (e) {
-        if (__DEV__) {
-          // eslint-disable-next-line no-console
-          console.warn('[camera capture]', (e as Error).message);
-        }
-      }
 
-      if (cancelled) return;
-      try {
-        // timestamp_sec 은 더 보내지 않는다 (이슈 #156). 여기서 보내던 Date.now()/1000 은
-        // epoch 라 «세션 시작 기준 경과 초» 가 아니었고, 변환하는 곳이 한 군데도 없어 그대로
-        // 리포트까지 흘러 시각 표시가 무의미해졌다. 이제 서버가 도착 시각으로 만든다.
-        const res = await aiService.detectPose({
-          image,
-          exercise_type: exerciseType,
-          session_id: sessionId,
-          session_nonce: sessionNonce,
-        });
         if (cancelled) return;
-        const r = res.data;
-        if (r.sync_rate != null) setSyncRate(Math.round(r.sync_rate));
-        if (r.feedback_type) setLastFeedback(r.feedback_type);
-        if (r.rep_count != null) setRepCount(r.rep_count);
-      } catch (e: any) {
-        if (__DEV__) {
-          // eslint-disable-next-line no-console
-          console.warn('[ai pose] status=', e?.response?.status, e?.message);
+        try {
+          // timestamp_sec 은 더 보내지 않는다 (이슈 #156). 여기서 보내던 Date.now()/1000 은
+          // epoch 라 «세션 시작 기준 경과 초» 가 아니었고, 변환하는 곳이 한 군데도 없어 그대로
+          // 리포트까지 흘러 시각 표시가 무의미해졌다. 이제 서버가 도착 시각으로 만든다.
+          const res = await aiService.detectPose(
+            {
+              image,
+              exercise_type: exerciseType,
+              session_id: sessionId,
+              session_nonce: sessionNonce,
+            },
+            aiWorkerIndex,
+          );
+          if (cancelled) return;
+          const r = res.data;
+          if (r.sync_rate != null) setSyncRate(Math.round(r.sync_rate));
+          if (r.feedback_type) setLastFeedback(r.feedback_type);
+          if (r.rep_count != null) setRepCount(r.rep_count);
+        } catch (e: any) {
+          if (__DEV__) {
+            // eslint-disable-next-line no-console
+            console.warn('[ai pose] status=', e?.response?.status, e?.message);
+          }
         }
+      } finally {
+        inFlight = false;
       }
     };
 
@@ -221,7 +239,7 @@ export default function ExerciseScreen() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [isRecording, sessionId, sessionNonce, exerciseId]);
+  }, [isRecording, sessionId, sessionNonce, exerciseId, aiWorkerIndex]);
 
   // 싱크로율 낮을 때 진동 피드백
   const prevSyncRef = useRef(syncRate);
