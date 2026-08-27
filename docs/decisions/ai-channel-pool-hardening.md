@@ -139,6 +139,21 @@
 - **실제 장애 빈도는 여전히 모른다.** §2-4는 "죽으면 무슨 일이 일어나는가"(다운타임·블라스트
   반경)에 답했을 뿐, "얼마나 자주 죽는가"에는 안 답했다 — 로컬 개발 이후 프로덕션에서 AI
   프로세스가 자발적으로(OOM 등) 죽은 사례가 실제로 있는지 확인 필요.
+  🆕 **2026-08-26: 24시간 자연관찰(soak) 착수 — 로컬에서 AWS로 이전.** 처음엔 로컬에서
+  띄웠으나(공유 docker 스택 오염 우려), 사용자 지시로 **격리된 EC2 1대**로 옮겼다 —
+  `c7i.2xlarge` `i-0619fbfda5495ae81`(태그 `ai-worker-soak-24h`), 커밋 `ae8fa7a`, `docker
+  inspect`로 `shadowfit-ai` 컨테이너의 `RestartCount`를 5분 간격 24시간 관찰
+  (`loadtest/measure_ai_worker_kill_recovery.sh`처럼 유도하지 않고, 순수 관찰). 시작
+  2026-08-26T19:25:46Z UTC · 종료 예정 2026-08-27T19:25:46Z UTC. 로그: 박스의
+  `/tmp/ai_worker_failure_soak.log`.
+  🔴 **착수 중 별개 버그 발견** — `bootstrap.sh`(ROLE=db 기본값)의 `.env` 생성이
+  `AI_PUBLIC_TOKEN`·`INTERNAL_API_TOKEN`을 둘 다 리터럴 `unused-in-this-role`로 채운다
+  (`ROLE=db`는 AI를 안 띄운다는 전제, `loadtest/aws/bootstrap.sh:161-163` 주석). 이 라운드처럼
+  **ROLE=db로 부트스트랩한 뒤 손으로 `docker compose up -d`(전체 스택)를 올리면** 두 토큰이
+  같아 앱이 `#230` 안전장치로 부팅을 거부하고 `shadowfit-ai`가 크래시루프에 빠진다(수 초 만에
+  RestartCount 6). 서로 다른 무작위 값으로 `.env`를 수동 패치하고 컨테이너를 재생성해 해결—
+  이후 1분간 관찰로 안정(RestartCount=0, healthy) 확인 후 soak 시작. **격리된 회귀는 아니고
+  이 라운드에서 한 번 겪은 일**이라 이슈로만 등록.
 - 문제 ① ㄴ을 택할 경우: 재기동 대기 시간을 얼마로 잡을지(§2-4의 17.3초는 1회 측정, 부하
   상태·이미지 크기 변화에 따라 달라질 수 있음), 몇 번까지 재시도할지.
 - **이 정도 다운타임(~17초, 전체 세션 영향)이 지금 목표(DAU 1,000)에서 감수할 만한 수준인지**
