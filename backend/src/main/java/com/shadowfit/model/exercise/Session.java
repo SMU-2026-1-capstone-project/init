@@ -145,17 +145,34 @@ public class Session {
      * @param bufferMinutes 활동이 아직 없을 때 쓰는 기존 식의 버퍼
      */
     public LocalDateTime timeoutThreshold(int idleMinutes, int bufferMinutes) {
+        return timeoutThreshold(lastActiveAt, startTime, exercise.getExpectedDurationMinutes(),
+                idleMinutes, bufferMinutes);
+    }
+
+    /**
+     * {@link #timeoutThreshold(int, int)} 의 순수 계산부 — 엔티티를 물지 않고도(예: #207 이 쓰는
+     * 타임아웃 스윕 프로젝션) 같은 식을 쓸 수 있도록 정적으로 승격했다. 인스턴스 메서드는 이
+     * 메서드에 위임할 뿐이라 <b>식의 소유는 여전히 이 클래스 하나</b>다(이슈 #59) — 갈리는 것은
+     * 값을 담는 그릇(엔티티 vs 프로젝션)뿐이다.
+     */
+    public static LocalDateTime timeoutThreshold(LocalDateTime lastActiveAt, LocalDateTime startTime,
+                                                  int expectedDurationMinutes, int idleMinutes, int bufferMinutes) {
         if (lastActiveAt != null) {
             return lastActiveAt.plusMinutes(idleMinutes);
         }
-        return startTime
-                .plusMinutes(exercise.getExpectedDurationMinutes())
-                .plusMinutes(bufferMinutes);
+        return startTime.plusMinutes(expectedDurationMinutes).plusMinutes(bufferMinutes);
     }
 
     /** {@code now} 기준으로 이미 타임아웃 기준을 지났는지. 스케줄러가 아직 안 돌았어도 true 일 수 있다. */
     public boolean isTimedOutAt(LocalDateTime now, int idleMinutes, int bufferMinutes) {
-        return now.isAfter(timeoutThreshold(idleMinutes, bufferMinutes));
+        return isTimedOutAt(now, lastActiveAt, startTime, exercise.getExpectedDurationMinutes(),
+                idleMinutes, bufferMinutes);
+    }
+
+    /** {@link #isTimedOutAt(LocalDateTime, int, int)} 의 정적 버전 — 위 {@code timeoutThreshold} 와 같은 이유. */
+    public static boolean isTimedOutAt(LocalDateTime now, LocalDateTime lastActiveAt, LocalDateTime startTime,
+                                       int expectedDurationMinutes, int idleMinutes, int bufferMinutes) {
+        return now.isAfter(timeoutThreshold(lastActiveAt, startTime, expectedDurationMinutes, idleMinutes, bufferMinutes));
     }
 
     /**

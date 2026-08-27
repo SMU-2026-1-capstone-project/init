@@ -21,10 +21,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 타임아웃 스윕 1회의 <b>할당량·소요시간</b>이 IN_PROGRESS 세션 수 N 에 어떻게 반응하는지 잰다 (#207).
  *
- * <p><b>무엇을 묻는가.</b> {@code SessionTimeoutScheduler.sweep()} 은
- * {@code findByStatus(IN_PROGRESS)} 로 <b>진행 중 세션 전부</b>를 엔티티로 물린 뒤 Java 에서 거른다.
- * 제한도 페이징도 프로젝션도 없다. 그러면 적재량이 「타임아웃된 세션 수」가 아니라
+ * <p><b>무엇을 묻는가.</b> {@code SessionTimeoutScheduler.sweep()} 은 <b>진행 중 세션 전부</b>를
+ * 걷어와 Java 에서 거른다. 제한도 페이징도 없다. 그러면 적재량이 「타임아웃된 세션 수」가 아니라
  * 「진행 중 세션 전체」에 비례하고, <b>세션이 안 끝날수록 스윕이 무거워지는 방향</b>이 된다.
+ *
+ * <p>🔄 2026-08-27(#207): 물리는 방식은 {@code findByStatus}(엔티티 전체 + JOIN FETCH exercise)에서
+ * {@code findTimeoutCandidatesByStatus}(판정에 필요한 컬럼만 싣는 프로젝션)로 바뀌었다 — 그래서
+ * <b>세션당 할당은 줄 것으로 기대한다.</b> 다만 위 문단의 「행 수 자체가 N 에 비례한다」는 성질은
+ * 안 바뀌었다 — 배치 상한(§7-①)은 미채택이라 이 리그가 여전히 묻는 질문("적재가 N 에 선형인가")
+ * 자체는 유효하다. 고친 뒤 재측정한 값은 이 클래스가 잰 이전 값(§ 커밋 로그 참고)과 비교할 것.
  *
  * <p><b>핵심 조작 — 걷어갈 대상을 0 으로 둔다.</b> 모든 IN_PROGRESS 세션의 {@code last_active_at} 을
  * 판 직전 시각으로 맞춘다. 그러면 임계가 {@code lastActiveAt + idleMinutes}(기본 10분) 라 하나도

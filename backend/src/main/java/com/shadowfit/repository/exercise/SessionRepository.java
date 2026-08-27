@@ -57,8 +57,31 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
                                        @Param("start") LocalDateTime start,
                                        @Param("end") LocalDateTime end);
 
-    @Query("SELECT s FROM Session s JOIN FETCH s.exercise WHERE s.status = :status")
-    List<Session> findByStatus(@Param("status") Status status);
+    /**
+     * {@code SessionTimeoutScheduler} 의 타임아웃 판정에 필요한 컬럼만 싣는 프로젝션 (#207).
+     *
+     * <p>예전엔 {@code findByStatus} 가 {@code IN_PROGRESS} 세션 전부를 {@code JOIN FETCH exercise}
+     * 로 엔티티째 물었다 — 적재량이 「타임아웃된 세션 수」가 아니라 「진행 중 세션 전체」에 비례해
+     * 세션이 안 끝날수록(=장애 시) 스윕이 무거워지는 방향이었다. 스윕이 물린 엔티티는 판정과 로그
+     * 한 줄에만 쓰이고 실제 FAILED 전환은 {@code SessionService.markAsFailedIfStillInProgress} 가
+     * id 로 다시 읽어서 하므로(자기 트랜잭션), 엔티티 그래프를 통째로 들고 있을 이유가 없었다.
+     */
+    interface TimeoutCandidate {
+        Long getId();
+        LocalDateTime getStartTime();
+        LocalDateTime getLastActiveAt();
+        Long getMemberId();
+        String getExerciseName();
+        Integer getExpectedDurationMinutes();
+    }
+
+    // member·exercise 는 스칼라 컬럼만 select 하므로(id·name·expectedDurationMinutes) 그 엔티티들이
+    // 영속성 컨텍스트에 안 올라간다 — Session.isTimedOutAt(정적 버전)에 필요한 값만 실은 것.
+    @Query("SELECT s.id AS id, s.startTime AS startTime, s.lastActiveAt AS lastActiveAt, "
+         + "s.member.id AS memberId, s.exercise.name AS exerciseName, "
+         + "s.exercise.expectedDurationMinutes AS expectedDurationMinutes "
+         + "FROM Session s WHERE s.status = :status")
+    List<TimeoutCandidate> findTimeoutCandidatesByStatus(@Param("status") Status status);
 
     // 회원당 활성 세션 1개 제약 — MemberRepository.findByIdForUpdate로 잠근 뒤 체크해야
     // TOCTOU 없이 안전함(단독 호출 시엔 레이스 존재).

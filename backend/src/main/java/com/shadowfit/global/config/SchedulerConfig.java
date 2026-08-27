@@ -19,8 +19,9 @@ import org.springframework.context.annotation.Bean;
  * 그 양은 테스트가 오래 돌수록 는다({@code docs/decisions/admin-page-scope.md} §4-2 결함 #4).
  *
  * <p>프로퍼티로 스케줄 주기만 늘려서는 막을 수 없다 — {@code checkAndTimeoutSessions} 의
- * {@code initialDelay} 가 30초 고정이라 한 번은 반드시 돌고, 그 한 번이
- * {@code findByStatus(IN_PROGRESS)} 로 25만 엔티티를 메모리에 올린다.
+ * {@code initialDelay} 가 30초 고정이라 한 번은 반드시 돈다. 🔄 2026-08-27(#207): 그 한 번이
+ * 엔티티를 물던 것은 프로젝션으로 바뀌었지만({@code findTimeoutCandidatesByStatus}), 25만행을
+ * 스캔해 자바에서 거르는 것 자체는 그대로다 — 배치 상한(#207 §7-①)은 아직 미채택.
  */
 @Configuration
 @EnableScheduling

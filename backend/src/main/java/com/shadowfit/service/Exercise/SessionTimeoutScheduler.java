@@ -69,9 +69,11 @@ public class SessionTimeoutScheduler {
         try {
             log.debug("세션 타임아웃 체크 시작 - 버퍼시간: {}분", defaultBufferMinutes);
 
-            List<Session> inProgressSessions = sessionRepository.findByStatus(Status.IN_PROGRESS);
+            // #207 — 엔티티 전체(findByStatus)가 아니라 판정에 필요한 컬럼만 실은 프로젝션.
+            List<SessionRepository.TimeoutCandidate> candidates =
+                    sessionRepository.findTimeoutCandidatesByStatus(Status.IN_PROGRESS);
 
-            if (inProgressSessions.isEmpty()) {
+            if (candidates.isEmpty()) {
                 log.debug("타임아웃 체크 대상 세션 없음");
                 return;
             }
@@ -80,27 +82,34 @@ public class SessionTimeoutScheduler {
             int timeoutCount = 0;
             int yieldedCount = 0;
 
-            for (Session session : inProgressSessions) {
-                // 식은 Session 이 갖는다 — 재부착 허용 판정(SessionService.findReattachableSession)이
-                // 같은 식을 써야 두 기준이 어긋나지 않는다(이슈 #59 2단계).
-                LocalDateTime timeoutThreshold = session.timeoutThreshold(idleMinutes, defaultBufferMinutes);
+            for (SessionRepository.TimeoutCandidate candidate : candidates) {
+                LocalDateTime lastActiveAt = candidate.getLastActiveAt();
+                LocalDateTime startTime = candidate.getStartTime();
+                int expectedDurationMinutes = candidate.getExpectedDurationMinutes();
 
-                if (!session.isTimedOutAt(now, idleMinutes, defaultBufferMinutes)) {
+                // 식은 Session 이 갖는다(정적 버전) — 재부착 허용 판정(SessionService.findReattachableSession)
+                // 이 같은 식을 써야 두 기준이 어긋나지 않는다(이슈 #59 2단계). 프로젝션 경로도 엔티티
+                // 인스턴스 경로와 같은 스태틱 메서드를 그대로 호출한다.
+                LocalDateTime timeoutThreshold = Session.timeoutThreshold(
+                        lastActiveAt, startTime, expectedDurationMinutes, idleMinutes, defaultBufferMinutes);
+
+                if (!Session.isTimedOutAt(now, lastActiveAt, startTime, expectedDurationMinutes,
+                        idleMinutes, defaultBufferMinutes)) {
                     continue;
                 }
 
-                try (CorrelationIds.Scope perSession = CorrelationIds.withSession(session.getId())) {
+                try (CorrelationIds.Scope perSession = CorrelationIds.withSession(candidate.getId())) {
                     try {
                         // notifyAi=true — 걷어가는 세션은 AI 에 상태가 살아있을 수 있다. 통보하지
                         // 않으면 그 상태가 프로세스 재시작까지 남고, CompleteAnalysis 가 오지 않아
                         // pose_data 에 rep 이 있는데도 리포트가 안 만들어진다 (이슈 #98).
-                        boolean changed = sessionService.markAsFailedIfStillInProgress(session.getId(), now, true);
+                        boolean changed = sessionService.markAsFailedIfStillInProgress(candidate.getId(), now, true);
                         if (changed) {
                             log.warn("세션 타임아웃 처리 - 세션 ID: {}, 멤버: {}, 운동: {}, 시작시간: {}, 타임아웃기준: {}",
-                                    session.getId(),
-                                    session.getMember().getId(),
-                                    session.getExercise().getName(),
-                                    session.getStartTime(),
+                                    candidate.getId(),
+                                    candidate.getMemberId(),
+                                    candidate.getExerciseName(),
+                                    startTime,
                                     timeoutThreshold);
                             timeoutCount++;
                             sessionMetrics.sessionTransition(Status.FAILED, "timeout-scheduler");
@@ -109,9 +118,9 @@ public class SessionTimeoutScheduler {
                         // FastAPI 완료 콜백이 동시에 같은 세션을 갱신함. 결과 데이터가 더 가치있으므로 양보.
                         yieldedCount++;
                         sessionMetrics.optimisticLockConflict("timeout-scheduler", "yield");
-                        log.info("세션 타임아웃 양보 - 세션 ID: {} (FastAPI 결과 우선)", session.getId());
+                        log.info("세션 타임아웃 양보 - 세션 ID: {} (FastAPI 결과 우선)", candidate.getId());
                     } catch (Exception e) {
-                        log.error("세션 {} 타임아웃 처리 실패", session.getId(), e);
+                        log.error("세션 {} 타임아웃 처리 실패", candidate.getId(), e);
                     }
                 }
             }
