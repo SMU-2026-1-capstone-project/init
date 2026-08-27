@@ -1,0 +1,485 @@
+부팅 2026-08-26T14:52:01Z
+RUN_ID=gc-compare-20260826-145201
+REF=854ba9e1d42cf52d84dac24bbb89fb86471e929d
+
+──── 패키지 ────
+  buildx 0.12.1 → 0.19.3 으로 올린다 (compose build 는 0.17+ 를 요구한다)
+
+──── 저장소 — https://github.com/Shadowfit/init.git @ 854ba9e1d42cf52d84dac24bbb89fb86471e929d ────
+  커밋: 854ba9e
+
+──── .env ────
+/root/bootstrap.sh: line 149: compose: command not found
+/root/bootstrap.sh: line 149: shadowfit-ai: command not found
+/root/bootstrap.sh: line 149: INTERNAL_API_TOKEN:?: command not found
+/root/bootstrap.sh: line 149: MYSQL_EXPORTER_PASSWORD: command not found
+/root/bootstrap.sh: line 149: :?: command not found
+  MYSQL_ROOT_PASSWORD 를 rig 기본값과 맞췄다 (+ 해석만 되면 되는 변수들)
+  compose 해석 확인 ✅ (mysql 만 띄워도 파일 전체가 해석된다)
+
+──── MySQL 컨테이너 ────
+time="2026-08-26T14:52:51Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Image mysql:8.0 Pulling 
+ edf85873f64e Pulling fs layer 0B
+ 6ef6c7b50a93 Pulling fs layer 0B
+ e3e5d1ac74c1 Pulling fs layer 0B
+ 0d74d296605b Pulling fs layer 0B
+ 297d04cfe470 Pulling fs layer 0B
+ 4c8a3e0d4e4b Pulling fs layer 0B
+ a63160a5eda1 Pulling fs layer 0B
+ 7534d1db9f8d Pulling fs layer 0B
+ 49ec2dab01d9 Pulling fs layer 0B
+ ab24264a27e9 Pulling fs layer 0B
+ 96d30d9fbee8 Pulling fs layer 0B
+ 0d74d296605b Waiting 0B
+ 4c8a3e0d4e4b Waiting 0B
+ 297d04cfe470 Waiting 0B
+ a63160a5eda1 Waiting 0B
+ 49ec2dab01d9 Waiting 0B
+ 7534d1db9f8d Waiting 0B
+ 96d30d9fbee8 Waiting 0B
+ ab24264a27e9 Waiting 0B
+ 6ef6c7b50a93 Downloading 884B
+ 6ef6c7b50a93 Verifying Checksum 0B
+ 6ef6c7b50a93 Download complete 0B
+ e3e5d1ac74c1 Downloading 15.74kB
+ edf85873f64e Downloading 474.5kB
+ e3e5d1ac74c1 Downloading 783.6kB
+ e3e5d1ac74c1 Verifying Checksum 0B
+ e3e5d1ac74c1 Download complete 0B
+ edf85873f64e Downloading 43.24MB
+ edf85873f64e Verifying Checksum 0B
+ edf85873f64e Download complete 0B
+ edf85873f64e Extracting 491.5kB
+ edf85873f64e Extracting 6.881MB
+ edf85873f64e Extracting 11.8MB
+ edf85873f64e Extracting 21.63MB
+ 297d04cfe470 Downloading 2.607kB
+ 297d04cfe470 Verifying Checksum 0B
+ 297d04cfe470 Download complete 0B
+ edf85873f64e Extracting 30.97MB
+ 0d74d296605b Downloading 64.9kB
+ 0d74d296605b Verifying Checksum 0B
+ 0d74d296605b Download complete 0B
+ 4c8a3e0d4e4b Downloading 335B
+ 4c8a3e0d4e4b Verifying Checksum 0B
+ 4c8a3e0d4e4b Download complete 0B
+ edf85873f64e Extracting 41.29MB
+ edf85873f64e Extracting 44.24MB
+ edf85873f64e Extracting 47.31MB
+ edf85873f64e Pull complete 0B
+ 6ef6c7b50a93 Extracting 884B
+ 6ef6c7b50a93 Extracting 884B
+ 6ef6c7b50a93 Pull complete 0B
+ e3e5d1ac74c1 Extracting 32.77kB
+ e3e5d1ac74c1 Extracting 783.6kB
+ e3e5d1ac74c1 Extracting 783.6kB
+ e3e5d1ac74c1 Pull complete 0B
+ 0d74d296605b Extracting 65.54kB
+ 0d74d296605b Extracting 5.505MB
+ 0d74d296605b Extracting 6.173MB
+ 0d74d296605b Pull complete 0B
+ a63160a5eda1 Downloading 507.3kB
+ 297d04cfe470 Extracting 2.607kB
+ 297d04cfe470 Extracting 2.607kB
+ 297d04cfe470 Pull complete 0B
+ 4c8a3e0d4e4b Extracting 335B
+ 4c8a3e0d4e4b Extracting 335B
+ 4c8a3e0d4e4b Pull complete 0B
+ 7534d1db9f8d Downloading 316B
+ 7534d1db9f8d Verifying Checksum 0B
+ 7534d1db9f8d Download complete 0B
+ a63160a5eda1 Downloading 24.89MB
+ 49ec2dab01d9 Downloading 538.9kB
+ 49ec2dab01d9 Downloading 24.9MB
+ a63160a5eda1 Downloading 40.12MB
+ a63160a5eda1 Verifying Checksum 0B
+ a63160a5eda1 Download complete 0B
+ a63160a5eda1 Extracting 524.3kB
+ 49ec2dab01d9 Downloading 43.99MB
+ a63160a5eda1 Extracting 10.49MB
+ 49ec2dab01d9 Downloading 57.78MB
+ a63160a5eda1 Extracting 19.4MB
+ 49ec2dab01d9 Downloading 80.01MB
+ a63160a5eda1 Extracting 28.31MB
+ ab24264a27e9 Downloading 3.501kB
+ ab24264a27e9 Downloading 5.327kB
+ ab24264a27e9 Verifying Checksum 0B
+ ab24264a27e9 Download complete 0B
+ 49ec2dab01d9 Downloading 99.62MB
+ a63160a5eda1 Extracting 37.22MB
+ 49ec2dab01d9 Downloading 124MB
+ 49ec2dab01d9 Verifying Checksum 0B
+ 49ec2dab01d9 Download complete 0B
+ a63160a5eda1 Extracting 45.09MB
+ 96d30d9fbee8 Downloading 120B
+ 96d30d9fbee8 Verifying Checksum 0B
+ 96d30d9fbee8 Download complete 0B
+ a63160a5eda1 Extracting 49.93MB
+ a63160a5eda1 Pull complete 0B
+ 7534d1db9f8d Extracting 316B
+ 7534d1db9f8d Extracting 316B
+ 7534d1db9f8d Pull complete 0B
+ 49ec2dab01d9 Extracting 557.1kB
+ 49ec2dab01d9 Extracting 9.47MB
+ 49ec2dab01d9 Extracting 18.38MB
+ 49ec2dab01d9 Extracting 24.51MB
+ 49ec2dab01d9 Extracting 30.64MB
+ 49ec2dab01d9 Extracting 32.31MB
+ 49ec2dab01d9 Extracting 33.42MB
+ 49ec2dab01d9 Extracting 34.54MB
+ 49ec2dab01d9 Extracting 35.65MB
+ 49ec2dab01d9 Extracting 36.77MB
+ 49ec2dab01d9 Extracting 37.88MB
+ 49ec2dab01d9 Extracting 38.99MB
+ 49ec2dab01d9 Extracting 40.11MB
+ 49ec2dab01d9 Extracting 41.22MB
+ 49ec2dab01d9 Extracting 42.34MB
+ 49ec2dab01d9 Extracting 43.45MB
+ 49ec2dab01d9 Extracting 44.56MB
+ 49ec2dab01d9 Extracting 45.68MB
+ 49ec2dab01d9 Extracting 46.79MB
+ 49ec2dab01d9 Extracting 49.58MB
+ 49ec2dab01d9 Extracting 53.48MB
+ 49ec2dab01d9 Extracting 61.83MB
+ 49ec2dab01d9 Extracting 70.19MB
+ 49ec2dab01d9 Extracting 77.99MB
+ 49ec2dab01d9 Extracting 86.34MB
+ 49ec2dab01d9 Extracting 95.81MB
+ 49ec2dab01d9 Extracting 104.2MB
+ 49ec2dab01d9 Extracting 113.1MB
+ 49ec2dab01d9 Extracting 124.2MB
+ 49ec2dab01d9 Extracting 129.4MB
+ 49ec2dab01d9 Pull complete 0B
+ ab24264a27e9 Extracting 5.327kB
+ ab24264a27e9 Extracting 5.327kB
+ ab24264a27e9 Pull complete 0B
+ 96d30d9fbee8 Extracting 120B
+ 96d30d9fbee8 Extracting 120B
+ 96d30d9fbee8 Pull complete 0B
+ Image mysql:8.0 Pulled 
+ Network init_shadowfit-net Creating 
+ Volume init_mysql_data Creating 
+ Volume init_mysql_data Creating 
+ Network init_shadowfit-net Creating 
+ Volume init_mysql_data Created 
+ Volume init_mysql_data Created 
+ Network init_shadowfit-net Created 
+ Network init_shadowfit-net Created 
+ Container shadowfit-mysql Creating 
+ Container shadowfit-mysql Created 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-mysql Started 
+  준비 대기... — 떴다 (TCP 인증 질의 연속 2회)
+
+──── percona-toolkit 이미지 ────
+docker.io/percona/percona-toolkit:latest
+
+──── xtrabackup 이미지 (P3 백업 · P4 복제) — percona/percona-xtrabackup:8.0 ────
+docker.io/percona/percona-xtrabackup:8.0
+
+──── 스키마 — Flyway 마이그레이션 ────
+Unable to find image 'flyway/flyway:latest' locally
+latest: Pulling from flyway/flyway
+0926a8eb0e60: Pulling fs layer
+22f329e4db3f: Pulling fs layer
+c256661d95c1: Pulling fs layer
+989e0d98c975: Pulling fs layer
+507729e6d2c5: Pulling fs layer
+7c9fb65f1d91: Pulling fs layer
+a2ee5cb34fcc: Pulling fs layer
+7c9fb65f1d91: Waiting
+989e0d98c975: Waiting
+a2ee5cb34fcc: Waiting
+507729e6d2c5: Waiting
+22f329e4db3f: Verifying Checksum
+22f329e4db3f: Download complete
+0926a8eb0e60: Verifying Checksum
+0926a8eb0e60: Download complete
+c256661d95c1: Verifying Checksum
+c256661d95c1: Download complete
+989e0d98c975: Download complete
+507729e6d2c5: Verifying Checksum
+507729e6d2c5: Download complete
+7c9fb65f1d91: Verifying Checksum
+7c9fb65f1d91: Download complete
+0926a8eb0e60: Pull complete
+22f329e4db3f: Pull complete
+c256661d95c1: Pull complete
+989e0d98c975: Pull complete
+507729e6d2c5: Pull complete
+a2ee5cb34fcc: Verifying Checksum
+a2ee5cb34fcc: Download complete
+7c9fb65f1d91: Pull complete
+a2ee5cb34fcc: Pull complete
+Digest: sha256:ffc79dde4eff1c67d116de55cc959238f8e6f46d878d357e0d9bb428f76dc67d
+Status: Downloaded newer image for flyway/flyway:latest
+WARNING: Storing migrations in 'sql' is not recommended and default scanning of this location may be deprecated in a future release
+Flyway OSS Edition 13.4.0 by Redgate
+
+See release notes here: https://help.red-gate.com/help/flyway-cli13/help_4.aspx?topic=release-notes-and-older-versions/release-notes-for-flyway-engine
+Database: ******** (MySQL 8.0)
+Schema history table `shadowfit`.`flyway_schema_history` does not exist yet
+Successfully validated 10 migrations (execution time 00:00.030s)
+Creating Schema History table `shadowfit`.`flyway_schema_history` ...
+Current version of schema `shadowfit`: << Empty Schema >>
+Migrating schema `shadowfit` to version "1 - baseline"
+Migrating schema `shadowfit` to version "2 - seed master data"
+Migrating schema `shadowfit` to version "3 - add refresh token rotation"
+Migrating schema `shadowfit` to version "4 - seed squat reference"
+Migrating schema `shadowfit` to version "5 - feedback log rep key"
+Migrating schema `shadowfit` to version "6 - add pose data idempotency key"
+Migrating schema `shadowfit` to version "7 - hash refresh token"
+Migrating schema `shadowfit` to version "8 - add session nonce"
+Migrating schema `shadowfit` to version "9 - normalize pose created at"
+Migrating schema `shadowfit` to version "10 - add categories table"
+Successfully applied 10 migrations to schema `shadowfit`, now at version v10 (execution time 00:01.092s)
+  ✅ 스키마 생성됨 — 從 R1·R3 이 잴 대상이 생겼다
+
+──── 준비됨 ────
+  작업 디렉터리 : /root/init
+  커밋          : 854ba9e (854ba9e1d42cf52d84dac24bbb89fb86471e929d)
+  디스크 여유   : 25G
+  MySQL         : 8.0.46
+
+다음:
+  cd /root/init
+  S3_BASE=s3://<버킷>/<프리픽스> nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+
+  ⚠️ nohup 없이 & 만 붙이면 SSH 가 끊길 때 같이 죽는다.
+──── backend 이미지 빌드 ────
+time="2026-08-26T14:54:03Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Image init-shadowfit-backend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 526B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 783B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/eclipse-temurin:21-jre
+#3 DONE 1.7s
+
+#4 [internal] load metadata for docker.io/library/gradle:jdk21
+#4 DONE 1.7s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 172B done
+#5 DONE 0.0s
+
+#6 [stage-1 1/3] FROM docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+#6 resolve docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037 0.0s done
+#6 ...
+
+#7 [internal] load build context
+#7 transferring context: 1.80MB 0.0s done
+#7 DONE 0.1s
+
+#6 [stage-1 1/3] FROM docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+#6 sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037 5.92kB / 5.92kB done
+#6 sha256:57a04a45584adac49fd9384a21e542ef47652030ff2168fab59d1bdf2a027c96 8.72kB / 8.72kB done
+#6 sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 0B / 41.57MB 0.1s
+#6 sha256:d1d7f43094ea37e9ae77ea3ca40026bc1de1bf1dc2cad37b08d66b9a016a2ea6 2.13kB / 2.13kB done
+#6 sha256:f3db1cd940786339b09d8a60e47c66fea9502d788e6fab5bec91a4a77d4ced1c 0B / 393B 0.1s
+#6 sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 26.21MB / 41.57MB 0.3s
+#6 sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 41.57MB / 41.57MB 0.4s done
+#6 sha256:f3db1cd940786339b09d8a60e47c66fea9502d788e6fab5bec91a4a77d4ced1c 393B / 393B 0.5s done
+#6 extracting sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 0.3s
+#6 sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be 0B / 20.13MB 1.5s
+#6 sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be 11.53MB / 20.13MB 1.7s
+#6 sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be 20.13MB / 20.13MB 1.8s
+#6 extracting sha256:f3db1cd940786339b09d8a60e47c66fea9502d788e6fab5bec91a4a77d4ced1c done
+#6 sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be 20.13MB / 20.13MB 2.0s done
+#6 sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d 0B / 53.10MB 2.1s
+#6 sha256:74d4de9c947ffb50bb6447a5c09e24df5e1685b1137f82406f33e6f44bba79d6 0B / 160B 2.1s
+#6 sha256:74d4de9c947ffb50bb6447a5c09e24df5e1685b1137f82406f33e6f44bba79d6 160B / 160B 2.3s
+#6 sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d 40.89MB / 53.10MB 2.6s
+#6 sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d 53.10MB / 53.10MB 2.7s
+#6 sha256:74d4de9c947ffb50bb6447a5c09e24df5e1685b1137f82406f33e6f44bba79d6 160B / 160B 3.2s done
+#6 extracting sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be
+#6 extracting sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be 0.4s done
+#6 sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d 53.10MB / 53.10MB 3.6s done
+#6 extracting sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d 0.1s
+#6 sha256:f6795b7189ec73f2774735d97a688bf9205d69cf49ceeb539654ddd7d70efe53 0B / 2.46kB 3.7s
+#6 sha256:f6795b7189ec73f2774735d97a688bf9205d69cf49ceeb539654ddd7d70efe53 2.46kB / 2.46kB 3.8s done
+#6 extracting sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d 0.6s done
+#6 extracting sha256:74d4de9c947ffb50bb6447a5c09e24df5e1685b1137f82406f33e6f44bba79d6 done
+#6 extracting sha256:f6795b7189ec73f2774735d97a688bf9205d69cf49ceeb539654ddd7d70efe53 done
+#6 DONE 4.5s
+
+#8 [builder 1/5] FROM docker.io/library/gradle:jdk21@sha256:c0ce93e022ea2e705332dabe090019c749356576fc8fe39c38129b2aae9ed68f
+#8 resolve docker.io/library/gradle:jdk21@sha256:c0ce93e022ea2e705332dabe090019c749356576fc8fe39c38129b2aae9ed68f 0.0s done
+#8 sha256:c0ce93e022ea2e705332dabe090019c749356576fc8fe39c38129b2aae9ed68f 5.23kB / 5.23kB done
+#8 sha256:fecde584fdf1f751f44d71ae9834cfdaf4fb6a38713bb974948979972e35e982 13.69kB / 13.69kB done
+#8 sha256:f3db1cd940786339b09d8a60e47c66fea9502d788e6fab5bec91a4a77d4ced1c 393B / 393B 0.6s done
+#8 sha256:0f30df1d5d811a28bf9e104a9aedfff998ea15173e4dc5951178c7eaba9e611d 3.08kB / 3.08kB done
+#8 sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 41.57MB / 41.57MB 0.4s done
+#8 sha256:f0b5b340c424d98e3a02290e6a6d5f1b75a6f9c958b90306a38d393a57383967 24.04MB / 24.04MB 0.5s done
+#8 sha256:3deee1eac5f9e22d16671d5a8f91662f01c661aa71eee241a888361b8738b493 158.12MB / 158.12MB 1.3s done
+#8 extracting sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 1.4s done
+#8 sha256:0886d33635652d1c82ee07ca689366976c3607cdf8dd077db7da18e60d144112 160B / 160B 0.7s done
+#8 sha256:32c4ecfebe88c2d6748ee3d8062096ebccc73773ff44eef745b58ea9135618df 2.46kB / 2.46kB 0.8s done
+#8 sha256:14869128bd9caad7374e20648e3920cfa7599a3fbd879fa8effd67135766adc0 1.29kB / 1.29kB 0.9s done
+#8 sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 32B / 32B 1.0s done
+#8 sha256:6a6943842a0f48c39734c30be980a303e9fe81707e10a0f4e2958a9fc152e50a 151.35MB / 151.35MB 3.2s done
+#8 sha256:8eed98b1b29cea1e7fbcb9a8dc3b0141da14524f3180a1ca7deadd07682b7488 69.98MB / 69.98MB 1.9s done
+#8 sha256:59a651cadc2305c4e22263bb32d11b0b786e760ec6e14448a7524a227f0451c7 25.61kB / 25.61kB 1.5s done
+#8 extracting sha256:f3db1cd940786339b09d8a60e47c66fea9502d788e6fab5bec91a4a77d4ced1c done
+#8 extracting sha256:f0b5b340c424d98e3a02290e6a6d5f1b75a6f9c958b90306a38d393a57383967 0.5s done
+#8 extracting sha256:3deee1eac5f9e22d16671d5a8f91662f01c661aa71eee241a888361b8738b493 0.8s
+#8 extracting sha256:3deee1eac5f9e22d16671d5a8f91662f01c661aa71eee241a888361b8738b493 1.2s done
+#8 extracting sha256:0886d33635652d1c82ee07ca689366976c3607cdf8dd077db7da18e60d144112
+#8 extracting sha256:0886d33635652d1c82ee07ca689366976c3607cdf8dd077db7da18e60d144112 done
+#8 extracting sha256:32c4ecfebe88c2d6748ee3d8062096ebccc73773ff44eef745b58ea9135618df
+#8 extracting sha256:32c4ecfebe88c2d6748ee3d8062096ebccc73773ff44eef745b58ea9135618df done
+#8 extracting sha256:14869128bd9caad7374e20648e3920cfa7599a3fbd879fa8effd67135766adc0
+#8 extracting sha256:14869128bd9caad7374e20648e3920cfa7599a3fbd879fa8effd67135766adc0 done
+#8 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1
+#8 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 done
+#8 extracting sha256:8eed98b1b29cea1e7fbcb9a8dc3b0141da14524f3180a1ca7deadd07682b7488
+#8 ...
+
+#9 [stage-1 2/3] WORKDIR /app
+#9 DONE 4.8s
+
+#8 [builder 1/5] FROM docker.io/library/gradle:jdk21@sha256:c0ce93e022ea2e705332dabe090019c749356576fc8fe39c38129b2aae9ed68f
+#8 extracting sha256:8eed98b1b29cea1e7fbcb9a8dc3b0141da14524f3180a1ca7deadd07682b7488 1.4s done
+#8 extracting sha256:6a6943842a0f48c39734c30be980a303e9fe81707e10a0f4e2958a9fc152e50a 0.1s
+#8 extracting sha256:6a6943842a0f48c39734c30be980a303e9fe81707e10a0f4e2958a9fc152e50a 0.7s done
+#8 extracting sha256:59a651cadc2305c4e22263bb32d11b0b786e760ec6e14448a7524a227f0451c7 done
+#8 DONE 10.8s
+
+#10 [builder 2/5] WORKDIR /app
+#10 DONE 2.1s
+
+#11 [builder 3/5] COPY . .
+#11 DONE 0.1s
+
+#12 [builder 4/5] RUN chmod +x ./gradlew
+#12 DONE 0.2s
+
+#13 [builder 5/5] RUN ./gradlew bootJar -x test --no-daemon
+#13 0.481 Downloading https://services.gradle.org/distributions/gradle-8.14.5-bin.zip
+#13 1.084 .............10%.............20%.............30%.............40%.............50%..............60%.............70%.............80%.............90%.............100%
+#13 2.683 
+#13 2.684 Welcome to Gradle 8.14.5!
+#13 2.684 
+#13 2.684 Here are the highlights of this release:
+#13 2.684  - Java 24 support
+#13 2.684  - GraalVM Native Image toolchain selection
+#13 2.684  - Enhancements to test reporting
+#13 2.684  - Build Authoring improvements
+#13 2.684 
+#13 2.684 For more details see https://docs.gradle.org/8.14.5/release-notes.html
+#13 2.684 
+#13 2.782 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+#13 3.582 Daemon will be stopped at the end of the build 
+#13 24.78 > Task :protobufDummy UP-TO-DATE
+#13 26.58 > Task :extractIncludeProto
+#13 26.58 > Task :extractProto
+#13 26.88 > Task :generateProto
+#13 34.48 
+#13 34.48 > Task :compileJava
+#13 34.48 Note: Some input files use or override a deprecated API.
+#13 34.48 Note: Recompile with -Xlint:deprecation for details.
+#13 86.38 
+#13 86.38 > Task :processProtoResources
+#13 86.49 > Task :processResources
+#13 86.49 > Task :classes
+#13 86.49 > Task :resolveMainClassName
+#13 89.04 > Task :bootJar
+#13 89.04 
+#13 89.04 [Incubating] Problems report is available at: file:///app/build/reports/problems/problems-report.html
+#13 89.04 
+#13 89.04 BUILD SUCCESSFUL in 1m 28s
+#13 89.04 8 actionable tasks: 8 executed
+#13 DONE 89.3s
+
+#14 [stage-1 3/3] COPY --from=builder /app/build/libs/*.jar app.jar
+#14 DONE 0.0s
+
+#15 exporting to image
+#15 exporting layers
+#15 exporting layers 0.4s done
+#15 writing image sha256:a95b24ba841b3bb39e6b5699c53f9542eac295d6b7435c57e5875eeaa67ff59a done
+#15 naming to docker.io/library/init-shadowfit-backend done
+#15 DONE 0.4s
+
+#16 resolving provenance for metadata file
+#16 DONE 0.0s
+ Image init-shadowfit-backend Built 
+──── mysql 기동 ────
+time="2026-08-26T14:55:48Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Running 
+──── k6 설치 (v2.1.0, 기존 라운드와 같은 버전) ────
+  k6 → k6 v2.1.0 (commit/83a87a41e2, go1.26.4, linux/amd64)
+──── backend 첫 기동 (G1, 계정 준비용) ────
+time="2026-08-26T14:55:50Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-backend Creating 
+ Container shadowfit-backend Created 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+──── 계정 48 개 준비 ────
+  창 비우기 60초
+==== 블록 0 — g1 (opts: -XX:MaxRAMPercentage=75.0) ====
+time="2026-08-26T14:59:12Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+  워밍업 60s (버림, JIT·힙 정착)
+  결과: 0	g1	0.0900	31	3692.0	58.9	17.8	4.77	6.77	NA	NA	4051	0
+==== 블록 1 — zgc (opts: -XX:MaxRAMPercentage=75.0 -XX:+UseZGC -XX:+ZGenerational) ====
+time="2026-08-26T15:05:59Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+  워밍업 60s (버림, JIT·힙 정착)
+  결과: 1	zgc	0.0000	100	4934.0	148.0	17.3	4.67	7.23	NA	NA	4051	0
+==== 블록 2 — g1 (opts: -XX:MaxRAMPercentage=75.0) ====
+time="2026-08-26T15:12:46Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+  워밍업 60s (버림, JIT·힙 정착)
+  결과: 2	g1	0.0790	29	3534.0	127.5	16.9	4.70	6.75	NA	NA	4051	0
+==== 블록 3 — zgc (opts: -XX:MaxRAMPercentage=75.0 -XX:+UseZGC -XX:+ZGenerational) ====
+time="2026-08-26T15:19:34Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-backend Recreate 
+ Container shadowfit-backend Recreated 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
+  워밍업 60s (버림, JIT·힙 정착)
+  결과: 3	zgc	0.0010	90	4804.0	188.0	16.7	4.77	7.20	NA	NA	4051	0
+──── 백엔드 로그 회수 ────
+──── S3 업로드 ────
+Completed 168 Bytes/43.1 MiB (2.8 KiB/s) with 27 file(s) remainingupload: ../gc-results/k6_b0.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/k6_b0.log
+Completed 168 Bytes/43.1 MiB (2.8 KiB/s) with 26 file(s) remainingCompleted 1.0 MiB/43.1 MiB (15.7 MiB/s) with 26 file(s) remaining Completed 2.0 MiB/43.1 MiB (28.0 MiB/s) with 26 file(s) remaining Completed 3.0 MiB/43.1 MiB (40.8 MiB/s) with 26 file(s) remaining Completed 4.0 MiB/43.1 MiB (54.4 MiB/s) with 26 file(s) remaining Completed 5.0 MiB/43.1 MiB (67.9 MiB/s) with 26 file(s) remaining Completed 5.0 MiB/43.1 MiB (65.0 MiB/s) with 26 file(s) remaining upload: ../gc-results/cpu_b0.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/cpu_b0.log
+Completed 5.0 MiB/43.1 MiB (65.0 MiB/s) with 25 file(s) remainingCompleted 5.0 MiB/43.1 MiB (62.0 MiB/s) with 25 file(s) remainingCompleted 5.0 MiB/43.1 MiB (61.5 MiB/s) with 25 file(s) remainingupload: ../gc-results/cpu_b1.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/cpu_b1.log
+Completed 5.0 MiB/43.1 MiB (61.5 MiB/s) with 24 file(s) remainingupload: ../gc-results/cpu_b3.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/cpu_b3.log
+Completed 5.0 MiB/43.1 MiB (61.5 MiB/s) with 23 file(s) remainingCompleted 5.0 MiB/43.1 MiB (58.7 MiB/s) with 23 file(s) remainingupload: ../gc-results/cpu_b2.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/cpu_b2.log
+Completed 5.0 MiB/43.1 MiB (58.7 MiB/s) with 22 file(s) remainingCompleted 6.0 MiB/43.1 MiB (68.9 MiB/s) with 22 file(s) remainingCompleted 6.0 MiB/43.1 MiB (68.0 MiB/s) with 22 file(s) remainingupload: ../gc-results/gc_delta.py to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/gc_delta.py
+Completed 6.0 MiB/43.1 MiB (68.0 MiB/s) with 21 file(s) remainingCompleted 7.0 MiB/43.1 MiB (77.4 MiB/s) with 21 file(s) remainingCompleted 8.0 MiB/43.1 MiB (87.7 MiB/s) with 21 file(s) remainingCompleted 9.0 MiB/43.1 MiB (97.4 MiB/s) with 21 file(s) remainingCompleted 10.0 MiB/43.1 MiB (106.1 MiB/s) with 21 file(s) remainingCompleted 11.0 MiB/43.1 MiB (115.8 MiB/s) with 21 file(s) remainingCompleted 12.0 MiB/43.1 MiB (125.3 MiB/s) with 21 file(s) remainingCompleted 13.0 MiB/43.1 MiB (134.8 MiB/s) with 21 file(s) remainingCompleted 13.0 MiB/43.1 MiB (130.1 MiB/s) with 21 file(s) remainingupload: ../gc-results/k6_b0.row to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/k6_b0.row
+Completed 13.0 MiB/43.1 MiB (130.1 MiB/s) with 20 file(s) remainingCompleted 13.0 MiB/43.1 MiB (125.9 MiB/s) with 20 file(s) remainingupload: ../gc-results/k6_b1.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/k6_b1.log
+Completed 13.0 MiB/43.1 MiB (125.9 MiB/s) with 19 file(s) remainingCompleted 13.0 MiB/43.1 MiB (121.9 MiB/s) with 19 file(s) remainingupload: ../gc-results/k6_b1.row to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/k6_b1.row
+Completed 13.0 MiB/43.1 MiB (121.9 MiB/s) with 18 file(s) remainingCompleted 13.0 MiB/43.1 MiB (118.5 MiB/s) with 18 file(s) remainingupload: ../gc-results/k6_b3.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/k6_b3.log
+Completed 13.0 MiB/43.1 MiB (118.5 MiB/s) with 17 file(s) remainingCompleted 14.0 MiB/43.1 MiB (124.7 MiB/s) with 17 file(s) remainingCompleted 15.0 MiB/43.1 MiB (133.5 MiB/s) with 17 file(s) remainingCompleted 16.0 MiB/43.1 MiB (140.7 MiB/s) with 17 file(s) remainingCompleted 17.0 MiB/43.1 MiB (148.4 MiB/s) with 17 file(s) remainingCompleted 18.0 MiB/43.1 MiB (156.6 MiB/s) with 17 file(s) remainingCompleted 19.0 MiB/43.1 MiB (163.5 MiB/s) with 17 file(s) remainingCompleted 20.0 MiB/43.1 MiB (172.0 MiB/s) with 17 file(s) remainingCompleted 21.0 MiB/43.1 MiB (179.7 MiB/s) with 17 file(s) remainingCompleted 22.0 MiB/43.1 MiB (179.4 MiB/s) with 17 file(s) remainingCompleted 22.7 MiB/43.1 MiB (183.7 MiB/s) with 17 file(s) remainingCompleted 22.7 MiB/43.1 MiB (182.9 MiB/s) with 17 file(s) remainingCompleted 23.7 MiB/43.1 MiB (190.9 MiB/s) with 17 file(s) remainingupload: ../gc-results/k6_b2.row to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/k6_b2.row
+Completed 23.7 MiB/43.1 MiB (190.9 MiB/s) with 16 file(s) remainingCompleted 24.7 MiB/43.1 MiB (196.8 MiB/s) with 16 file(s) remainingCompleted 25.7 MiB/43.1 MiB (204.1 MiB/s) with 16 file(s) remainingCompleted 25.7 MiB/43.1 MiB (202.0 MiB/s) with 16 file(s) remainingupload: ../gc-results/k6_b3.row to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/k6_b3.row
+Completed 25.7 MiB/43.1 MiB (202.0 MiB/s) with 15 file(s) remainingCompleted 26.7 MiB/43.1 MiB (206.5 MiB/s) with 15 file(s) remainingCompleted 27.7 MiB/43.1 MiB (214.2 MiB/s) with 15 file(s) remainingCompleted 28.7 MiB/43.1 MiB (221.8 MiB/s) with 15 file(s) remainingCompleted 28.7 MiB/43.1 MiB (220.9 MiB/s) with 15 file(s) remainingupload: ../gc-results/k6_b2.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/k6_b2.log
+Completed 28.7 MiB/43.1 MiB (220.9 MiB/s) with 14 file(s) remainingCompleted 29.7 MiB/43.1 MiB (223.8 MiB/s) with 14 file(s) remainingCompleted 30.7 MiB/43.1 MiB (231.2 MiB/s) with 14 file(s) remainingCompleted 31.7 MiB/43.1 MiB (238.2 MiB/s) with 14 file(s) remainingCompleted 32.7 MiB/43.1 MiB (243.1 MiB/s) with 14 file(s) remainingCompleted 33.7 MiB/43.1 MiB (250.3 MiB/s) with 14 file(s) remainingCompleted 34.7 MiB/43.1 MiB (256.3 MiB/s) with 14 file(s) remainingCompleted 35.7 MiB/43.1 MiB (261.8 MiB/s) with 14 file(s) remainingCompleted 36.7 MiB/43.1 MiB (268.3 MiB/s) with 14 file(s) remainingCompleted 37.7 MiB/43.1 MiB (274.3 MiB/s) with 14 file(s) remainingCompleted 38.7 MiB/43.1 MiB (280.3 MiB/s) with 14 file(s) remainingCompleted 39.7 MiB/43.1 MiB (286.6 MiB/s) with 14 file(s) remainingCompleted 40.7 MiB/43.1 MiB (292.8 MiB/s) with 14 file(s) remainingCompleted 41.7 MiB/43.1 MiB (297.7 MiB/s) with 14 file(s) remainingCompleted 41.8 MiB/43.1 MiB (295.3 MiB/s) with 14 file(s) remainingupload: ../gc-results/prom_b0_after.txt to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/prom_b0_after.txt
+Completed 41.8 MiB/43.1 MiB (295.3 MiB/s) with 13 file(s) remainingCompleted 42.8 MiB/43.1 MiB (298.6 MiB/s) with 13 file(s) remainingCompleted 42.8 MiB/43.1 MiB (267.3 MiB/s) with 13 file(s) remainingupload: ../gc-results/prom_b1_after.txt to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/prom_b1_after.txt
+Completed 42.8 MiB/43.1 MiB (267.3 MiB/s) with 12 file(s) remainingCompleted 42.9 MiB/43.1 MiB (261.1 MiB/s) with 12 file(s) remainingupload: ../gc-results/prom_b0_before.txt to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/prom_b0_before.txt
+Completed 42.9 MiB/43.1 MiB (261.1 MiB/s) with 11 file(s) remainingCompleted 42.9 MiB/43.1 MiB (249.2 MiB/s) with 11 file(s) remainingupload: ../gc-results/prom_b1_before.txt to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/prom_b1_before.txt
+Completed 42.9 MiB/43.1 MiB (249.2 MiB/s) with 10 file(s) remainingCompleted 43.0 MiB/43.1 MiB (232.0 MiB/s) with 10 file(s) remainingupload: ../gc-results/prom_b2_after.txt to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/prom_b2_after.txt
+Completed 43.0 MiB/43.1 MiB (232.0 MiB/s) with 9 file(s) remainingCompleted 43.0 MiB/43.1 MiB (221.6 MiB/s) with 9 file(s) remainingupload: ../gc-results/prom_b2_before.txt to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/prom_b2_before.txt
+Completed 43.0 MiB/43.1 MiB (221.6 MiB/s) with 8 file(s) remainingCompleted 43.1 MiB/43.1 MiB (216.2 MiB/s) with 8 file(s) remainingupload: ../gc-results/prom_b3_before.txt to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/prom_b3_before.txt
+Completed 43.1 MiB/43.1 MiB (216.2 MiB/s) with 7 file(s) remainingCompleted 43.1 MiB/43.1 MiB (213.3 MiB/s) with 7 file(s) remainingupload: ../gc-results/prom_b3_after.txt to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/prom_b3_after.txt
+Completed 43.1 MiB/43.1 MiB (213.3 MiB/s) with 6 file(s) remainingCompleted 43.1 MiB/43.1 MiB (212.5 MiB/s) with 6 file(s) remainingupload: ../gc-results/summary.tsv to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/summary.tsv
+Completed 43.1 MiB/43.1 MiB (212.5 MiB/s) with 5 file(s) remainingCompleted 43.1 MiB/43.1 MiB (204.3 MiB/s) with 5 file(s) remainingupload: ../gc-results/warmup_b0.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/warmup_b0.log
+Completed 43.1 MiB/43.1 MiB (204.3 MiB/s) with 4 file(s) remainingCompleted 43.1 MiB/43.1 MiB (203.7 MiB/s) with 4 file(s) remainingupload: ../gc-results/warmup_b1.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/warmup_b1.log
+Completed 43.1 MiB/43.1 MiB (203.7 MiB/s) with 3 file(s) remainingCompleted 43.1 MiB/43.1 MiB (202.5 MiB/s) with 3 file(s) remainingupload: ../gc-results/warmup_b2.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/warmup_b2.log
+Completed 43.1 MiB/43.1 MiB (202.5 MiB/s) with 2 file(s) remainingCompleted 43.1 MiB/43.1 MiB (192.3 MiB/s) with 2 file(s) remainingupload: ../gc-results/warmup_b3.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/warmup_b3.log
+Completed 43.1 MiB/43.1 MiB (192.3 MiB/s) with 1 file(s) remainingupload: ../gc-results/backend_container.log to s3://shadowfit-measure-055447613012/shadowfit/gc-compare-20260826-145201/backend_container.log
