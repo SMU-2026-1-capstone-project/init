@@ -165,6 +165,78 @@ worst 구간·rep 곡선을 갖고 있으므로, 주간은 **그것들의 집계
 ⚠️ `OutboxPublisher` 는 `@Lazy self` 자기주입을 쓴다 — [#175](https://github.com/Shadowfit/init/issues/175) 가 지목한 세 곳 중
 하나다. 여기를 건드리면 그 이슈와 만난다.
 
+### 5-1. 🔴 실측 — 지금 발행기는 타입을 구분하지 않는다 (2026-08-27)
+
+코드 확인 결과다:
+
+- `lockPendingBatch`/`lockStaleProcessingBatch`(`OutboxEventRepository.java:46-71`) **둘 다
+  `event_type` 조건이 없다** — `PENDING` 이면 뭐든 같은 배치에 섞여 들어온다
+- `batchSize`·`lockTimeoutSeconds`·`maxRetry`·`maxBackoffSeconds`(`OutboxPublisher.java:58-74`)는
+  **인스턴스 필드 스칼라 하나씩** — 타입별로 나뉠 자리가 애초에 없다
+- `idx_outbox_dispatch (status, next_retry_at)`는 **2026-07-29 실측으로 `status` 단일 선두
+  컬럼에 맞춰 튜닝된 인덱스**다(`V1__baseline.sql:356-367`, key_len 7 · filtered 100% 를 얻으려고
+  회수용 인덱스를 일부러 지운 자리). 여기에 `AND event_type = ?` 를 얹으면 인덱스가 그 컬럼을
+  모르므로 필터링이 인덱스 밖에서 일어나 **그 실측을 무효화한다**
+- 테이블 코멘트 자체가 `'...세션 종료 통보(STOP_ANALYSIS) 전달 보장'`(`V1__baseline.sql:368`) —
+  스키마는 범용으로 지었다고 §5 에 적었지만 **실제로는 단일 목적으로 굳어 있다**
+
+즉 지금 상태로 `GENERATE_WEEKLY_REPORT` 를 얹으면 이중으로 문제다:
+
+1. **설정이 섞인다** — STOP_ANALYSIS 와 같은 lock-timeout(60초)·같은 max-retry(10)·같은
+   backoff 상한(300초) 을 강제로 같이 쓴다. 표에서 이미 지적한 문제 그대로
+2. **실행이 섞인다** — `ORDER BY id LIMIT 20` 이므로 STOP_ANALYSIS 가 밀리면 weekly 행이 뒤에서
+   굶는다. 반대로 LLM 이 건당 5~15초면, **같은 순차 `dispatchBatch` 루프 안에서 세션 종료
+   통보가 그만큼 지연된다** — §1 이 "LLM 호출은 세션 완료 **트랜잭션** 밖" 이라고 막아둔 것과
+   같은 형태의 문제가 이번엔 **스레드/tick** 레벨에서 재현되는 것이다
+
+### 5-2. 설계안
+
+**안 A — 이벤트 타입별 발행기를 분리한다**
+
+- 새 클래스(가칭 `ReportOutboxPublisher`) — 자기 `@Scheduled` tick, 자기 폴링 쿼리
+  (`event_type = 'GENERATE_WEEKLY_REPORT'` 로 필터), 자기 설정 프리픽스(`outbox.weekly-report.*`)
+- 타입 필터링을 인덱스로 받으려면 **추가 인덱스**가 필요하다 — 예:
+  `idx_outbox_report_dispatch (event_type, status, next_retry_at)`. 기존
+  `idx_outbox_dispatch` 는 그대로 둬 STOP_ANALYSIS 튜닝을 안 건드리는 **추가형(additive)
+  마이그레이션**이 된다. 운영 중 DDL 이므로 §6 이 쓸 무중단 DDL 절차를 그대로 재사용할 수 있다
+  (다른 테이블이라 §6 자체와는 별개)
+- `claimPending`/`claimStale`/`dispatchBatch`/self-injection 골격은 `OutboxPublisher` 와
+  거의 동일하므로, 그대로 복제하면 중복이 크다 — **공통 로직을 추상 클래스나 전략 객체로
+  뽑는 리팩터가 선행**된다(claim 쿼리·설정값만 하위 클래스/구현체가 갈아끼우는 형태)
+- 장점: 설정이 완전히 독립(STOP_ANALYSIS 값을 안 건드리고 LLM 쪽만 조정), tick 이 분리돼
+  **한쪽이 느려도 다른 쪽 폴링 주기에 안 물린다**, 장애 격리(한 발행기가 죽어도 다른 하나는 돈다)
+- 단점: 클래스 하나 + 인덱스 마이그레이션 하나가 늘어난다
+
+**안 B — 발행기 하나, 설정만 타입별로 나눈다**
+
+- `@Value` 스칼라들을 이벤트 타입별 맵(`Map<OutboxEventType, PublisherConfig>`)으로 바꾸고,
+  `dispatchOne` 안에서 `configFor(event.getEventType())` 로 lock-timeout·max-retry·backoff 를 선택
+- 그런데 **쿼리 분리 필요성은 안 A 랑 같다** — 타입별로 다른 lock-timeout 을 적용하려면
+  `markProcessing` 시 타입별 만료 시각을 계산해야 하고, 배치를 타입별로 나눠 잡으려면 결국
+  타입별 쿼리(그리고 그걸 받쳐줄 인덱스)가 필요하다. B 가 A 와 실제로 다른 지점은
+  **tick 스케줄과 클래스를 공유한다는 것뿐**이다
+- 장점: claim/dispatch/self-injection 골격을 그대로 재사용, 클래스가 하나
+- 단점: 같은 스레드·같은 tick 안에서 순차 처리하므로 **한 타입이 오래 걸리면 다른 타입도
+  지연된다** — §5-1 이 지적한 "실행이 섞인다" 문제가 격리되지 않고 남는다
+
+**추천: 안 A.** 근거는 §1 이 이미 낸 등록금과 같은 형태다 — "LLM 호출이 세션 완료
+**트랜잭션** 밖에 있어야 한다"는 이 프로젝트가 실패로 배운 원칙인데, 안 B 로 가면 그 원칙이
+막던 것과 같은 사고가 **트랜잭션 대신 tick/스레드 레벨**에서 재현된다. 2026-08-26 결정
+로그가 남긴 메모("이 이벤트 타입만 별도 발행기로")와도 방향이 같다.
+
+✅ **결정 (2026-08-27, 사용자) — 안 A(별도 발행기) 로 간다.** 추천대로다. 남은 실행 항목은
+`claim`/`dispatch`/self-injection 골격의 공통 로직 추상화, `event_type` 필터를 받는 새 인덱스
+마이그레이션, `outbox.weekly-report.*` 설정 프리픽스 신설이다 — 튜닝 숫자는 여전히 ③(프로바이더)
+확정 후로 미룬다.
+
+⚠️ **튜닝 값은 여기서 정하지 않는다.** lock-timeout 은 "batch-size × 최대 응답시간 여유"
+(주석이 이미 요구하는 규칙 그대로), max-retry·max-backoff 는 "유료 호출이라 재시도가 비용을
+곱한다"(§5)는 방향만 맞고, **실제 숫자는 프로바이더 선정(③)과 실측 응답시간이 나온 뒤** 정한다
+— 근거 없는 임계값을 지금 박지 않는다([[feedback_no_arbitrary_threshold_values]]).
+
+⚠️ 원문 유지 — **안 A/안 B 중 최종 선택은 사용자 몫이다**([[feedback_user_decides_not_claude]]).
+이 절은 분석과 추천까지만이고, §12 의 ⑥ 은 여전히 미결정으로 남긴다.
+
 ---
 
 ## 6. 🔴 스키마가 먼저 막는다
@@ -178,13 +250,69 @@ session_id BIGINT NOT NULL,
 없다.** 필요한 변경:
 
 ⚠️ **단 이 벽은 «저장할 때» 만난다.** 1단계(템플릿 문장)는 조회 시 계산이라 **스키마를 안 건드린다**
-— §13-0 을 먼저 볼 것. 아래는 LLM 을 붙여 «저장이 필요해지는» 시점의 목록이다.
+— §13-0 을 먼저 볼 것. 🔴 **그래서 아래는 초안이지 지금 적용할 마이그레이션이 아니다.** §12-1 이
+이미 적어뒀듯 지금 실행하면 **"저장이 필요해지는 시점"(=LLM 착수) 전에 재기 전에 고르는 것**이다.
+③(프로바이더)·⑥(아웃박스 튜닝 구현) 이 끝나고 실제로 값을 저장해야 할 때 아래를 다듬어 진짜
+Flyway 파일(`V11__...`)로 만든다.
 
+### 6-1. 초안 — `V11__weekly_report_schema.sql` (가칭, 미적용)
 
-- `session_id` **nullable**
-- `period_start` · `period_end` 추가
-- 유니크를 `(member_id, report_type, period_start)` 로 (멱등의 근거)
-- 생성 출처 기록: **어떤 모델·프롬프트 버전으로 만든 문장인가** (모델이 바뀌면 출력이 바뀐다)
+```sql
+-- 주간(WEEKLY) 리포트 저장 준비 — session_id 를 nullable 로 풀고 기간 컬럼 + 생성 출처를 더한다.
+-- 근거: docs/decisions/report-generation-llm.md §6, §12-1
+
+-- 1) 세션 없는 리포트(WEEKLY/MONTHLY)를 허용
+--    ⚠️ NOT NULL → NULL 전환이 ALGORITHM=INPLACE 로 되는지 이 테이블 실제 행 수로 EXPLAIN
+--    확인이 선행이다 — pose_data 파티셔닝(P1)이 겪은 "INPLACE 거절 → COPY/pt-osc 양자택일"
+--    함정이 여기서도 재현될 수 있다(online-ddl-aws-2026-08-12/README.md §1). 다만 그 실험의
+--    절대 소요시간(69초 등)은 다른 스키마·다른 행 수라 인용 금지 — 재현 여부만 이 표에서 배운다.
+ALTER TABLE reports
+    MODIFY COLUMN session_id BIGINT NULL COMMENT 'WEEKLY/MONTHLY 는 NULL — 세션 하나에 묶이지 않는다';
+
+-- 2) 집계 기간 — DATE 로 둔다. WeeklySummaryService 가 이미 LocalDate 로 주 경계를 계산해
+--    쓰고 있다(start = previousOrSame(MONDAY), end = start.plusWeeks(1), end 는 배타적 상한) —
+--    그 규약을 그대로 물려받아 별도 변환 없이 매핑되게 한다.
+ALTER TABLE reports
+    ADD COLUMN period_start DATE NULL COMMENT '집계 시작일(해당 주 월요일). SESSION 리포트는 NULL',
+    ADD COLUMN period_end   DATE NULL COMMENT '집계 종료일(배타적 상한, WeeklySummaryService.end 와 동일 규약)';
+
+-- 3) 멱등성 — (member_id, report_type, period_start) 유니크.
+--    기존 uk_report_session(session_id)은 그대로 둔다: WEEKLY 행은 session_id 가 NULL 이고
+--    MySQL 유니크 인덱스는 NULL 을 서로 다른 값으로 취급하므로 충돌하지 않는다. 즉 두 유니크가
+--    report_type 별로 각자의 멱등성만 담당하는 구조가 되고, 어느 쪽도 지울 필요가 없다.
+ALTER TABLE reports
+    ADD UNIQUE KEY uk_report_period (member_id, report_type, period_start);
+
+-- 4) 생성 출처 — 모델이 바뀌면 출력이 바뀌고(§6 원 문장), LLM 실패 시 템플릿으로 채워지는
+--    경로도 있다(§9). "누가 이 문장을 썼나"는 §10 폴백 비율 관측과 재현(같은 프롬프트로 다시
+--    생성) 양쪽에 필요한 최소 정보다.
+ALTER TABLE reports
+    ADD COLUMN summary_source   ENUM('LLM','TEMPLATE_FALLBACK') NULL
+        COMMENT '문장이 LLM 출력인지 실패 후 템플릿 대체인지 — §10 폴백 비율의 원천',
+    ADD COLUMN generation_model VARCHAR(100) NULL COMMENT '예: gemini-1.5-flash-002. 프로바이더(③) 확정 전엔 전부 NULL',
+    ADD COLUMN prompt_version   VARCHAR(50)  NULL COMMENT '프롬프트 카탈로그 버전 — 문장 재현·회귀 비교용';
+```
+
+### 6-2. 같이 바뀌어야 하는 것 — 스키마만으로 안 끝난다
+
+- `Report.java:28-31` — `@JoinColumn(name = "session_id", nullable = false)` 를
+  `nullable = true` 로. JPA 매핑이 DB 제약보다 먼저 막고 있어 **DDL 만 바꾸면 엔티티가 거짓말을
+  하게 된다**
+- `Report.java` — `periodStart`·`periodEnd`(`LocalDate`), `summarySource`(신규 enum,
+  `ReportType` 과 같은 자리에 둔다), `generationModel`·`promptVersion`(`String`) 필드 추가
+- `SessionService.java:375` 근방(`report.setReportType(ReportType.SESSION)`) 은 **안 바뀐다** —
+  SESSION 리포트 생성 경로는 그대로다. 새 필드는 WEEKLY 생성 경로(§5-2 가 만들 발행기)에서만 채운다
+
+### 6-3. 열린 채로 남기는 것
+
+- ⚠️ **1)의 ALGORITHM 확인은 지금 안 한다.** `reports` 실제 운영 행 수가 있어야 EXPLAIN 이
+  의미가 있고, 지금은 그 시점이 아니다(§12-1)
+- `summary_source`/`generation_model`/`prompt_version` 세 컬럼을 **하나의 JSON 컬럼**(예:
+  `generation_meta`)으로 합칠지, 지금처럼 개별 컬럼으로 둘지는 **미정** — 개별 컬럼은 SQL 로
+  집계·필터(예: "폴백 비율")가 쉽고, JSON 은 필드를 늘려도 마이그레이션이 없다는 게 장점이다.
+  이 프로젝트가 §3 에서 이미 "숫자는 SQL, LLM 은 문장만"이라는 경계를 강제해온 것과 같은
+  이유로 **관측에 쓰는 필드(summary_source)는 개별 컬럼 쪽이 결이 맞다**는 게 잠정 의견이고,
+  최종은 사용자 확인 대기
 
 ⚠️ 운영 중 DDL 이므로 **무중단 DDL 실측(P1)**과 바로 이어진다 —
 [결과](../../loadtest/results/online-ddl-aws-2026-08-12/README.md). 「설계 → 스키마 변경 →
@@ -290,8 +418,8 @@ session_id BIGINT NOT NULL,
 | ② | **「이번 주 평균」의 정의** — 세션 가중 ↔ rep 가중 | **rep 가중 + 정의를 프롬프트·화면에 같이 박기** (§4) | 🔴 미결정 — 다만 **재료는 생겼다**(아래) |
 | ③ | **프로바이더 · 무료 티어** | 무료로 시작하되 **약관 확인이 선행**, 인터페이스 뒤로 (§7) | 🔴 미결정 |
 | ④ | **조언을 지금 만들 것인가** | **미룬다.** #217·#256 이 먼저 (§11) | 🔴 미결정 |
-| ⑤ | ~~**스키마 변경 시점** — 주간을 택하면 필수~~ → **필수 확정** | 무중단 DDL 실측이 있으니 그 절차로 (§6) | 🔴 미결정(시점) — **①로 «필수» 가 됐다** |
-| ⑥ | **아웃박스 튜닝** — 이벤트 타입별 리스·재시도 분리 | 별도 발행기 vs 타입별 설정 — **미정** (§5) | 🔴 미결정 |
+| ⑤ | ~~**스키마 변경 시점** — 주간을 택하면 필수~~ → **필수 확정** | 무중단 DDL 실측이 있으니 그 절차로 (§6). **초안 작성됨**(§6-1) — 미적용 | 🔴 미결정(시점) — **①로 «필수» 가 됐다**, 실행은 저장이 필요해질 때 |
+| ⑥ | **아웃박스 튜닝** — 이벤트 타입별 리스·재시도 분리 | **안 A(별도 발행기)** — 근거는 §5-1·§5-2 | ✅ **결정 — 안 A** (2026-08-27, 사용자). 튜닝 숫자는 ③ 확정 후 |
 
 ### 12-1. ① 이 닫히면서 달라진 것 (2026-08-22)
 
@@ -455,3 +583,42 @@ LLM · 저장 · 스키마 변경 · 조언 · 국면 축. **1단계는 읽기 �
   - **②는 열려 있되 재료가 생겼다** — A층이 평균 둘을 다 내므로 재서 정할 수 있다
   - ⚠️ **착수 순서는 안 정했다.** 이 결정은 «어디에 붙이나» 하나만 닫는다. ③(프로바이더)·
     ⑥(아웃박스 튜닝)이 열려 있는 한 LLM 착수는 아직이다
+
+- **2026-08-26: §7의 "발행기 20건 순차 → 락 리스(60초) 초과" 갭에 후보 도구 하나 추가.**
+  사용자가 "WebFlux 도입할 부분이 더 없냐"고 물어 코드로 재확인하던 중 나온 부산물 — 새 결정
+  아니다. §1의 "LLM 호출이 세션 완료 트랜잭션 밖에 있어야 한다"는 이미 이 발행기가 **서버
+  요청 스레드가 아니라 백그라운드 잡**이라는 뜻이라, `production-signal-checklist.md` §2-7이
+  판정한 "블로킹 JDBC 스택 위에 리액티브 서버는 안티패턴"이 이 자리엔 적용되지 않는다.
+  `WebClient`(WebFlux **서버** 도입 없이 HTTP 클라이언트로만 추가)로 20건을 논블로킹 동시
+  호출하면 "건당 5~15초 × 20건 순차 = 최대 300초"가 줄어 리스 초과·중복 호출 리스크가
+  구조적으로 낮아진다는 것을 판단만 해뒀다 — 실측 없음, ⑥(아웃박스 튜닝)이 열려 있어 지금
+  착수 대상이 아니라 **⑥ 착수 시점의 도구 후보**로만 남긴다. 상세는
+  `production-signal-checklist.md` 결정 로그(2026-08-26)에 병기.
+  ([[feedback_user_decides_not_claude]] — 착수 여부·순서는 사용자 확인 대기)
+
+- **2026-08-27: ⑥(아웃박스 튜닝) 설계안 작성 — 결정 아님.** §12 미결정 중 사용자가
+  이걸 먼저 진행하기로 골라, 코드(`OutboxPublisher`·`OutboxEventRepository`·
+  `V1__baseline.sql`)를 다시 읽고 §5-1·§5-2 를 새로 썼다. 핵심 발견은 **지금 발행기가
+  이벤트 타입을 아예 구분하지 않는다**는 것 — 폴링 쿼리에 `event_type` 조건이 없고,
+  `idx_outbox_dispatch` 는 2026-07-29 실측으로 `status` 단일 컬럼에 맞춰 튜닝돼 있어 타입
+  필터를 얹으면 그 튜닝이 깨진다. 두 안(별도 발행기 / 단일 발행기+타입별 config)을 비교해
+  **안 A(별도 발행기)를 추천**했지만 최종 선택은 아직이다. 튜닝 값(lock-timeout·max-retry
+  등 구체적 숫자)은 프로바이더(③) 선정 전이라 의도적으로 비워뒀다.
+
+- **2026-08-27: ⑥ 결정 — 안 A(별도 발행기)** (사용자). §5-2 추천대로 확정했다. 아직
+  구현은 시작 전이다 — 실행 순서(공통 로직 추상화 → 새 인덱스 마이그레이션 → 설정 프리픽스
+  신설)와 튜닝 숫자(③ 확정 후)가 남아 있다. ⑤(스키마 변경)·③(프로바이더)이 여전히 열려
+  있어 실제 착수 순서는 별도 확인이 필요하다.
+
+- **2026-08-27: ⑤ 스키마 마이그레이션 초안 작성 — 미적용, 결정 아님.** `Report.java`·
+  `WeeklySummaryService.java` 를 다시 읽고 §6-1(`V11__weekly_report_schema.sql` 가칭)·§6-2
+  (엔티티 동반 변경)·§6-3(열린 항목)을 새로 썼다. 핵심 설계: `session_id` nullable 전환 +
+  `period_start`/`period_end`(DATE, `WeeklySummaryService` 의 `LocalDate` 주 경계 규약을
+  그대로 물려받음) + 신규 유니크 `uk_report_period` + 생성 출처 3컬럼
+  (`summary_source`/`generation_model`/`prompt_version`). 기존 `uk_report_session` 은 NULL
+  이 유니크에서 서로 다른 값으로 취급되는 성질을 이용해 **그대로 유지**하기로 했다(별도
+  마이그레이션으로 지울 필요 없음). 열어둔 것: `session_id` NOT NULL→NULL 전환이
+  ALGORITHM=INPLACE 로 되는지는 **운영 행 수가 있어야 EXPLAIN 이 의미가 있어 지금 안 잰다**,
+  생성 출처를 개별 컬럼 vs JSON 하나로 합칠지는 미정(개별 컬럼 쪽이 관측·집계에 유리하다는
+  잠정 의견만 적음). §12-1 의 경고대로 **이 마이그레이션은 지금 적용 대상이 아니다** — 저장이
+  필요해지는 시점(LLM 착수)까지 초안으로만 둔다.
