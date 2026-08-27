@@ -1,0 +1,113 @@
+=== R4 재현 — DB=3.35.14.120 App=3.35.14.120 Loader=3.34.123.41 ===
+  MySQL: 컨테이너 'shadowfit-mysql' 응답 확인
+  세션 시드: 901~950 50개 확인
+=== 메타·페이로드 준비 ===
+  준비 완료
+──────── 버림판 (A: flush=1 sync=1) ────────
+  내구성: flush=1 sync_binlog=1 (확인됨)
+  워밍업 15s (c=4)
+  discard_A: RPS=1034.8 rows/s=5174.0 p50=55ms p99=107ms fail=0/20000
+    batch_factor=1.0 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+  (버림판 제외)
+──────── [1/16] A_r1 (팔 A) ────────
+  내구성: flush=1 sync_binlog=1 (확인됨)
+  워밍업 15s (c=4)
+  A_r1: RPS=1035.8 rows/s=5179.0 p50=65ms p99=109ms fail=0/20000
+    batch_factor=0.952 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [2/16] B_r1 (팔 B) ────────
+  내구성: flush=2 sync_binlog=0 (확인됨)
+  워밍업 15s (c=4)
+  B_r1: RPS=1035.3 rows/s=5176.5 p50=59ms p99=109ms fail=0/20000
+    batch_factor=0.955 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [3/16] C_r1 (팔 C) ────────
+  내구성: flush=1 sync_binlog=0 (확인됨)
+  워밍업 15s (c=4)
+  C_r1: RPS=1039.1 rows/s=5195.5 p50=54ms p99=105ms fail=0/20000
+    batch_factor=0.955 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [4/16] D_r1 (팔 D) ────────
+  내구성: flush=2 sync_binlog=1 (확인됨)
+  워밍업 15s (c=4)
+  D_r1: RPS=1041.3 rows/s=5206.5 p50=56ms p99=110ms fail=0/20000
+    batch_factor=1.0 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [5/16] B_r2 (팔 B) ────────
+  내구성: flush=2 sync_binlog=0 (확인됨)
+  워밍업 15s (c=4)
+  B_r2: RPS=1041.8 rows/s=5209.0 p50=58ms p99=105ms fail=0/20000
+    batch_factor=1.0 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [6/16] C_r2 (팔 C) ────────
+  내구성: flush=1 sync_binlog=0 (확인됨)
+  워밍업 15s (c=4)
+  C_r2: RPS=1034.0 rows/s=5170.0 p50=56ms p99=108ms fail=0/20000
+    batch_factor=1.0 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [7/16] D_r2 (팔 D) ────────
+  내구성: flush=2 sync_binlog=1 (확인됨)
+  워밍업 15s (c=4)
+  D_r2: RPS=1043.2 rows/s=5216.0 p50=64ms p99=107ms fail=0/20000
+    batch_factor=1.0 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [8/16] A_r2 (팔 A) ────────
+  내구성: flush=1 sync_binlog=1 (확인됨)
+  워밍업 15s (c=4)
+  A_r2: RPS=1043.5 rows/s=5217.5 p50=64ms p99=108ms fail=0/20000
+    batch_factor=0.957 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [9/16] C_r3 (팔 C) ────────
+  내구성: flush=1 sync_binlog=0 (확인됨)
+  워밍업 15s (c=4)
+  C_r3: RPS=1034.3 rows/s=5171.5 p50=59ms p99=106ms fail=0/20000
+    batch_factor=0.952 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [10/16] D_r3 (팔 D) ────────
+  내구성: flush=2 sync_binlog=1 (확인됨)
+  워밍업 15s (c=4)
+  D_r3: RPS=1042.6 rows/s=5213.0 p50=58ms p99=109ms fail=0/20000
+    batch_factor=0.955 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [11/16] A_r3 (팔 A) ────────
+  내구성: flush=1 sync_binlog=1 (확인됨)
+  워밍업 15s (c=4)
+  A_r3: RPS=1039.6 rows/s=5198.0 p50=58ms p99=106ms fail=0/20000
+    batch_factor=1.0 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [12/16] B_r3 (팔 B) ────────
+  내구성: flush=2 sync_binlog=0 (확인됨)
+  워밍업 15s (c=4)
+  B_r3: RPS=1039.3 rows/s=5196.5 p50=62ms p99=107ms fail=0/20000
+    batch_factor=1.05 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [13/16] D_r4 (팔 D) ────────
+  내구성: flush=2 sync_binlog=1 (확인됨)
+  워밍업 15s (c=4)
+  D_r4: RPS=1034.1 rows/s=5170.5 p50=53ms p99=107ms fail=0/20000
+    batch_factor=1.0 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [14/16] A_r4 (팔 A) ────────
+  내구성: flush=1 sync_binlog=1 (확인됨)
+  워밍업 15s (c=4)
+  A_r4: RPS=1039.5 rows/s=5197.5 p50=65ms p99=107ms fail=0/20000
+    batch_factor=1.0 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [15/16] B_r4 (팔 B) ────────
+  내구성: flush=2 sync_binlog=0 (확인됨)
+  워밍업 15s (c=4)
+  B_r4: RPS=1043.1 rows/s=5215.5 p50=65ms p99=111ms fail=0/20000
+    batch_factor=1.0 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+──────── [16/16] C_r4 (팔 C) ────────
+  내구성: flush=1 sync_binlog=0 (확인됨)
+  워밍업 15s (c=4)
+  C_r4: RPS=1042.6 rows/s=5213.0 p50=60ms p99=107ms fail=0/20000
+    batch_factor=0.952 bytes/write=512.0 log_waits=0 binlog_disk_use=0
+
+=== 결과 ===
+tag	rps	rows_s	p50_ms	p95_ms	p99_ms	fail	total	commits	fsyncs	fsync_s	log_bytes	log_write_req	log_writes	batch_factor	bytes_per_write	log_waits	binlog_use	binlog_disk_use
+A_r1	1035.8	5179.0	65	94	109	0	20000	40081	20	1.0	10752	20	21	0.952	512.0	0	0	0
+B_r1	1035.3	5176.5	59	93	109	0	20000	40080	21	1.1	11264	21	22	0.955	512.0	0	0	0
+C_r1	1039.1	5195.5	54	91	105	0	20000	40080	21	1.1	11264	21	22	0.955	512.0	0	0	0
+D_r1	1041.3	5206.5	56	92	110	0	20000	40085	21	1.1	10752	21	21	1.0	512.0	0	0	0
+B_r2	1041.8	5209.0	58	93	105	0	20000	40084	21	1.1	11264	22	22	1.0	512.0	0	0	0
+C_r2	1034.0	5170.0	56	93	108	0	20000	40080	20	1.0	10240	20	20	1.0	512.0	0	0	0
+D_r2	1043.2	5216.0	64	93	107	0	20000	40085	21	1.1	10752	21	21	1.0	512.0	0	0	0
+A_r2	1043.5	5217.5	64	93	108	0	20000	40080	30	1.6	11776	22	23	0.957	512.0	0	0	0
+C_r3	1034.3	5171.5	59	93	106	0	20000	40080	36	1.8	10752	20	21	0.952	512.0	0	0	0
+D_r3	1042.6	5213.0	58	92	109	0	20000	40081	21	1.1	11264	21	22	0.955	512.0	0	0	0
+A_r3	1039.6	5198.0	58	92	106	0	20000	40084	21	1.1	10752	21	21	1.0	512.0	0	0	0
+B_r3	1039.3	5196.5	62	93	107	0	20000	40084	20	1.0	10240	21	20	1.05	512.0	0	0	0
+D_r4	1034.1	5170.5	53	91	107	0	20000	40081	21	1.1	10752	21	21	1.0	512.0	0	0	0
+A_r4	1039.5	5197.5	65	94	107	0	20000	40080	21	1.1	10752	21	21	1.0	512.0	0	0	0
+B_r4	1043.1	5215.5	65	94	111	0	20000	40084	22	1.2	11776	23	23	1.0	512.0	0	0	0
+C_r4	1042.6	5213.0	60	92	107	0	20000	40081	20	1.0	10752	20	21	0.952	512.0	0	0	0
+✅ 16판 전부 유효.
+=== 내구성 기본값 복원 ===
+  내구성: flush=1 sync_binlog=1 (확인됨)
