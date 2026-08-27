@@ -80,9 +80,18 @@ services:
       # dev compose 가 이 포트를 여는 이유는 loadtest/ghz/* 가 호스트에서 localhost:6565로
       # 직접 때리기 때문인데, 그 rig 는 prod 배포 대상에서 안 돈다 — 그래서 여기는 근거가 없다
       # (docs/decisions/reverse-proxy-and-tls.md §1-1, 2026-08-26 확인).
+    # 메모리 한도 — #570. shadowfit-ai(#212)와 같은 이유(옆 컨테이너를 굶기지 않기 위함)지만,
+    # dev 와 달리 기본값을 두지 않는다 — 배포 호스트 스펙이 여기서 정해지고, 그걸 모르는 채
+    # 숫자를 박으면 근거 없는 값이 된다([[feedback_no_arbitrary_threshold_values]]). AI_MEM_LIMIT
+    # 이 prod 에서 `:?` 로 필수인 것과 같은 이유·같은 패턴이다.
+    mem_limit: ${BACKEND_MEM_LIMIT:?운영 배포에는 필수 — 호스트 스펙에 맞춰 정할 것 (이슈 570)}
+    cpus: ${BACKEND_CPU_LIMIT:?운영 배포에는 필수 — 호스트 논리 코어 수를 넘지 않게 (이슈 570)}
     environment:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Seoul
+      # 컨테이너 힙 옵션 — 위 mem_limit 과 짝이다(#570). 75% 는 통상적인 시작값이고 실측해서
+      # 고른 값은 아니다 — dev 와 같은 근거·같은 기본값.
+      JAVA_OPTS: ${BACKEND_JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
       DB_HOST: shadowfit-mysql
       DB_NAME: ${MYSQL_DATABASE:-shadowfit}
       DB_USERNAME: ${DB_USERNAME:?운영 배포에는 필수}
