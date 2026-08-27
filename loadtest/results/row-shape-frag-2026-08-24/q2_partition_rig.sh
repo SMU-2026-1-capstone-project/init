@@ -56,10 +56,15 @@ DB "SET SESSION cte_max_recursion_depth=1000000;
     DROP TABLE IF EXISTS pq_nums; CREATE TABLE pq_nums (n INT PRIMARY KEY);
     INSERT INTO pq_nums WITH RECURSIVE s(n) AS (SELECT 0 UNION ALL SELECT n+1 FROM s WHERE n+1 < $(( ROWS > CHURN ? ROWS : CHURN ))) SELECT n FROM s;"
 
+# 🔴 예전엔 (SELECT joint_coordinates FROM pose_data LIMIT 1) 로 실 pose_data 에서 JSON을
+#   빌려 썼다 — pose_data 가 0행인 박스(로컬 dev DB 등)에서 그 서브쿼리가 NULL 을 반환해
+#   NOT NULL 위반으로 INSERT 가 죽는데, DB() 가 stderr 를 삼켜 "무대가 안 섰다"는 엉뚱한
+#   메시지만 남았다(#574). pq_t 는 실 pose_data 와 무관한 자체 테이블이라 빌릴 이유가
+#   애초에 없었다 — 고정 리터럴로 바꾼다.
 ins(){ # $1=날짜  $2=행수  $3=offset  $4=keep식
   DB "INSERT INTO pq_t (created_at, session_id, rep_number, timestamp_sec, joint_coordinates, sync_rate, keep_flag)
       SELECT TIMESTAMP('$1'), 800000 + (n+$3) DIV 750, (n+$3) % 30, ROUND(((n+$3) % 750)/10,3),
-             (SELECT joint_coordinates FROM pose_data LIMIT 1), 75.0, $4
+             JSON_OBJECT('note','q2-rig-fixed-payload'), 75.0, $4
         FROM pq_nums WHERE n < $2;"
 }
 
