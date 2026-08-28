@@ -1,9 +1,6 @@
 package com.shadowfit.service.Exercise;
 
 import com.shadowfit.dto.exercises.VideoRequestDto;
-import com.shadowfit.dto.report.record.CalendarMainResponseDto;
-import com.shadowfit.dto.report.record.DailyActivityResponseDto;
-import com.shadowfit.dto.report.record.WeeklyActivityResponseDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.exercise.Exercise;
@@ -28,7 +25,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -295,128 +291,4 @@ class SessionServiceTest {
         }
     }
 
-    @Nested
-    @DisplayName("조회 집계 (getWeeklyActivity / getCalendarMain / getDailyActivity)")
-    class Aggregation {
-
-        private Session completedSessionOn(LocalDate date, double avgSyncRate, double calories, int minutes) {
-            LocalDateTime start = date.atTime(9, 0);
-            return sessionRepository.saveAndFlush(Session.builder()
-                    .member(member).exercise(exercise)
-                    .startTime(start).endTime(start.plusMinutes(minutes))
-                    .status(Status.COMPLETED).totalReps(10)
-                    .avgSyncRate(BigDecimal.valueOf(avgSyncRate))
-                    .caloriesBurned(BigDecimal.valueOf(calories))
-                    .build());
-        }
-
-        private Session sessionOn(LocalDate date, Status status) {
-            LocalDateTime start = date.atTime(9, 0);
-            return sessionRepository.saveAndFlush(Session.builder()
-                    .member(member).exercise(exercise)
-                    .startTime(start).endTime(start.plusMinutes(10))
-                    .status(status).totalReps(10)
-                    .build());
-        }
-
-        @Test
-        @DisplayName("getWeeklyActivity — 이번 주 세션 합산")
-        void getWeeklyActivity_aggregatesThisWeek() {
-            LocalDate today = LocalDate.now();
-            completedSessionOn(today, 80.0, 100.0, 20);
-
-            WeeklyActivityResponseDto result = sessionService.getWeeklyActivity(member.getId());
-
-            assertThat(result.getTotalWorkouts()).isEqualTo(1);
-            assertThat(result.getTotalMinutes()).isEqualTo(20);
-            assertThat(result.getTotalCalories()).isEqualTo(100);
-            assertThat(result.getTodayDetails()).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("getCalendarMain — 이번 달 운동일수·평균 싱크로율 계산")
-        void getCalendarMain_aggregatesThisMonth() {
-            LocalDate today = LocalDate.now();
-            completedSessionOn(today, 80.0, 100.0, 20);
-
-            CalendarMainResponseDto result = sessionService.getCalendarMain(member.getId(), today.getYear(), today.getMonthValue());
-
-            assertThat(result.getMonthlyExerciseDays()).isEqualTo(1);
-            assertThat(result.getTotalAvgSyncRate()).isEqualTo(80);
-            assertThat(result.getRecords()).hasSize(1);
-            assertThat(result.getRecords().get(0).isHasRecord()).isTrue();
-            assertThat(result.getConsecutiveDays()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("getCalendarMain — 연속일수는 COMPLETED가 아닌 세션도 센다 (#541 인덱스 수정이 " +
-                "status IN 절에 전체 상태값을 태우지만, 그건 계획 최적화일 뿐 필터링 의미가 바뀌면 안 된다)")
-        void getCalendarMain_consecutiveDaysCountsAllStatuses() {
-            LocalDate today = LocalDate.now();
-            completedSessionOn(today, 80.0, 100.0, 20);
-            sessionOn(today.minusDays(1), Status.FAILED);
-            sessionOn(today.minusDays(2), Status.IN_PROGRESS);
-
-            CalendarMainResponseDto result = sessionService.getCalendarMain(
-                    member.getId(), today.getYear(), today.getMonthValue());
-
-            assertThat(result.getConsecutiveDays()).isEqualTo(3);
-        }
-
-        @Test
-        @DisplayName("getCalendarMain — avg_sync_rate가 null인 세션은 0점이 아니라 평균에서 제외된다")
-        void getCalendarMain_nullSyncRateExcludedFromAverage() {
-            LocalDate today = LocalDate.now();
-            completedSessionOn(today, 80.0, 100.0, 20);
-            // 분석 전/실패라 값이 없는 세션 — 0으로 치면 월평균이 40으로 반토막 난다
-            LocalDateTime start = today.atTime(11, 0);
-            sessionRepository.saveAndFlush(Session.builder()
-                    .member(member).exercise(exercise)
-                    .startTime(start).endTime(start.plusMinutes(10))
-                    .status(Status.COMPLETED).totalReps(5)
-                    .avgSyncRate(null)
-                    .caloriesBurned(BigDecimal.valueOf(50))
-                    .build());
-
-            CalendarMainResponseDto result = sessionService.getCalendarMain(
-                    member.getId(), today.getYear(), today.getMonthValue());
-
-            assertThat(result.getTotalAvgSyncRate()).isEqualTo(80);
-            assertThat(result.getRecords().get(0).getDailyAvgSyncRate()).isEqualTo(80.0);
-        }
-
-        @Test
-        @DisplayName("getCalendarMain — 모든 세션의 sync_rate가 null이면 평균 0으로 떨어진다")
-        void getCalendarMain_allNullSyncRate_fallsBackToZero() {
-            LocalDate today = LocalDate.now();
-            LocalDateTime start = today.atTime(11, 0);
-            sessionRepository.saveAndFlush(Session.builder()
-                    .member(member).exercise(exercise)
-                    .startTime(start).endTime(start.plusMinutes(10))
-                    .status(Status.COMPLETED).totalReps(5)
-                    .avgSyncRate(null).caloriesBurned(BigDecimal.valueOf(50))
-                    .build());
-
-            CalendarMainResponseDto result = sessionService.getCalendarMain(
-                    member.getId(), today.getYear(), today.getMonthValue());
-
-            // 평균 낼 값이 하나도 없을 때의 fallback — 운동일수는 그대로 1일로 잡혀야 한다
-            assertThat(result.getTotalAvgSyncRate()).isZero();
-            assertThat(result.getMonthlyExerciseDays()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("getDailyActivity — 특정 날짜의 세션만 반환, 빈 날은 빈 리스트")
-        void getDailyActivity_returnsOnlyThatDate() {
-            LocalDate today = LocalDate.now();
-            completedSessionOn(today, 80.0, 100.0, 20);
-
-            DailyActivityResponseDto todayResult = sessionService.getDailyActivity(member.getId(), today);
-            DailyActivityResponseDto yesterdayResult = sessionService.getDailyActivity(member.getId(), today.minusDays(1));
-
-            assertThat(todayResult.getTotalWorkouts()).isEqualTo(1);
-            assertThat(yesterdayResult.getTotalWorkouts()).isZero();
-            assertThat(yesterdayResult.getSessions()).isEmpty();
-        }
-    }
 }

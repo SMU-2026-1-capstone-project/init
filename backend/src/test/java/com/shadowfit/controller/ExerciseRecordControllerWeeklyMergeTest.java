@@ -20,7 +20,7 @@ import com.shadowfit.dto.report.weekly.WeeklyTotalsDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.service.Report.DailyLogService;
-import com.shadowfit.service.Exercise.SessionService;
+import com.shadowfit.service.Exercise.SessionActivityQueryService;
 import com.shadowfit.service.Report.WeeklySummaryService;
 
 /**
@@ -37,12 +37,12 @@ import com.shadowfit.service.Report.WeeklySummaryService;
  */
 class ExerciseRecordControllerWeeklyMergeTest {
 
-    private final SessionService sessionService = mock(SessionService.class);
+    private final SessionActivityQueryService sessionActivityQueryService = mock(SessionActivityQueryService.class);
     private final DailyLogService dailyLogService = mock(DailyLogService.class);
     private final WeeklySummaryService weeklySummaryService = mock(WeeklySummaryService.class);
 
     private final ExerciseRecordController controller =
-            new ExerciseRecordController(sessionService, dailyLogService, weeklySummaryService);
+            new ExerciseRecordController(sessionActivityQueryService, dailyLogService, weeklySummaryService);
 
     @Test
     @DisplayName("#352 /reports/weekly-summary 는 활동 집계와 A층 요약을 «한 응답» 으로 돌려준다")
@@ -56,7 +56,7 @@ class ExerciseRecordControllerWeeklyMergeTest {
                 .dateRange("8월 17일 - 23일")
                 .totalWorkouts(4)
                 .build();
-        when(sessionService.getWeeklyActivity(7L)).thenReturn(activity);
+        when(sessionActivityQueryService.getWeeklyActivity(7L)).thenReturn(activity);
 
         WeeklySummaryResponseDto summary = new WeeklySummaryResponseDto(
                 LocalDate.of(2026, 8, 17), LocalDate.of(2026, 8, 24),
@@ -79,7 +79,7 @@ class ExerciseRecordControllerWeeklyMergeTest {
         when(member.getId()).thenReturn(7L);
         CustomUserDetails principal = mock(CustomUserDetails.class);
         when(principal.getMember()).thenReturn(member);
-        when(sessionService.getWeeklyActivity(7L))
+        when(sessionActivityQueryService.getWeeklyActivity(7L))
                 .thenReturn(WeeklyActivityResponseDto.builder().build());
         when(weeklySummaryService.getWeeklySummary(eq(7L), any()))
                 .thenReturn(new WeeklySummaryResponseDto(null, null,
