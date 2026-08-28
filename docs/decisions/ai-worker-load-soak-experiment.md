@@ -1,9 +1,13 @@
 # AI 워커 soak — 부하 중 자발적 장애 빈도 (가속 스트레스)
 
 작성일: 2026-08-28
-상태: **완료 (2026-08-28) — 계획한 3시간을 못 채우고 대상 전체가 죽었다.** 원래 채널
-(`shadowfit-ai` RestartCount/OOMKilled)로는 아무것도 못 봤고, 대신 MySQL InnoDB 내부 정체로
-강하게 의심되는 원인으로 박스 전체가 응답 불능에 빠졌다 — [결과](../../loadtest/results/ai-worker-load-soak-2026-08-28/README.md)
+상태: **완료 (2026-08-28, 재현 라운드까지 2회) — 원인 미확정으로 종결.** 1차: 계획한 3시간을
+못 채우고 대상 전체가 죽음, MySQL InnoDB 내부 정체가 원인으로 의심됨(간접 증거). 2차(MySQL
+mem_limit=3072m 적용 + 실시간 계측 후 재실행): **사고가 다시 났다 — MySQL 캡은 안 막았고,
+이번엔 직접 증거가 나왔는데 그 증거는 오히려 "MySQL 원인" 가설을 반박한다**(사고 직전까지
+MySQL은 완전히 idle·healthy). 대신 SSH·백엔드·메트릭 스크레이핑이 같은 30초 창에서 동시에
+멎는 새 패턴을 확인했고, 메모리는 안 튀어서 EBS I/O 크레딧 소진이라는 새 가설이 열렸다(미검증) —
+[결과](../../loadtest/results/ai-worker-load-soak-2026-08-28/README.md) §6
 대상: `shadowfit-ai` 컨테이너([`ai-server/entrypoint.sh`](../../ai-server/entrypoint.sh) — 워커 1개라도 죽으면
 `wait -n; exit $?`로 컨테이너 전체가 같이 내려가는 설계, `docker inspect`의 `RestartCount`로 관측)
 연관: [`./ai-channel-pool-hardening.md`](./ai-channel-pool-hardening.md) §6(장애 빈도 미결 질문) ·
@@ -181,3 +185,19 @@ base64 프레임을 보내야 `lease_detector`가 세션별 MediaPipe 검출기 
   무제한, 8vCPU 박스)이 동접 ~200에서 박스 전체를 응답 불능으로 만들 수 있다"**는 설계에
   없던 발견을 얻었다. 인스턴스 2대 정상 terminate 확인. 상세·미결 항목:
   [`../../loadtest/results/ai-worker-load-soak-2026-08-28/README.md`](../../loadtest/results/ai-worker-load-soak-2026-08-28/README.md).
+- 2026-08-28: **재현 시도(2차) — idle 실측 후 MySQL mem_limit=3072m 커밋(`9aa9879`) + 7초
+  간격 INNODB STATUS/스레드덤프 폴러 커밋(`e615088`)을 붙이고 새 EC2 2대로 재실행.** 같은
+  대화의 별개 작업이 그사이 push한 obs 프로파일(Grafana·Prometheus·cAdvisor 등, 커밋
+  `e89e14b`)도 같이 채택 — 이 때문에 이 라운드는 "MySQL 캡만 바꾼 깨끗한 대조"가 아니게 됐다.
+  **결과: 사고가 다시 났다**(부하 시작 후 ~10분, systemd 저널·INNODB STATUS 폴러·Prometheus
+  스크레이핑 셋이 같은 30초 창에서 동시에 멎음). MySQL 캡은 사고를 못 막았고, **사고 30~40초
+  전 `SHOW ENGINE INNODB STATUS`(직접 증거, 1차엔 없었다)는 MySQL이 완전히 idle·healthy했다는
+  걸 보여줘 1차의 "MySQL 락 정체" 가설을 반박한다.** 재부팅 셧다운 도중(사고로부터 5분 뒤)
+  `shadowfit-ai`의 uvicorn이 global OOM kill 당했지만(anon-rss 4.5GB), 사고 원인인지 결과인지는
+  못 가른다. 메모리는 사고 직전까지 평평(호스트 13.4GB 여유·AI 컨테이너 604MB)해서 점진적
+  고갈의 흔적이 없다 — **새 후보로 EBS(gp3) I/O 크레딧 소진을 열어뒀다(미검증, 이번 라운드는
+  EBS 지표를 안 걸었다).** 인스턴스 2대 정상 terminate 확인. 결론: **§0 원본 질문은 여전히
+  미답이고, 이제 원인 후보가 MySQL 락(반박됨)·AI 메모리(인과 미확정)·EBS I/O(미검증) 셋으로
+  갈렸다** — 어느 것도 확정하지 못한 채 이 실험 스레드는 종결한다. 다음에 이어 갈 사람을 위해
+  §6-6에 이 라운드의 한계(obs 스택 confound·EBS 지표 부재)를 정직하게 남겼다. 상세:
+  [결과 §6](../../loadtest/results/ai-worker-load-soak-2026-08-28/README.md).
