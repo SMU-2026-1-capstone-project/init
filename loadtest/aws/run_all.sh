@@ -58,11 +58,16 @@ S3_DEST="${S3_BASE%/}/$RUN_ID"
 #        이미 닫혔다(A÷B=1.245). 다시 돌려도 같은 답을 반복할 뿐이다(설정 블록 참고).
 #
 #   HTTP 읽기 p99 라운드 (從 R14) — **부하기 박스에서**, 위 라운드가 끝난 뒤 별도로:
-#     TARGET_HOST=<위 라운드를 돌린 대상 박스의 사설 IP> PHASES="preflight httpread ridealong collect"
+#     TARGET_HOST=<위 라운드를 돌린 대상 박스의 사설 IP> PHASES="httpread ridealong collect"
 #     🔴 **다른 박스·다른 시점.** httpread 는 대상에 실제 HTTP 부하를 걸어서 Q2·카드 A 의
 #        «조용한 박스» 전제와 같이 못 돈다. 그리고 이 단계 자체가 TARGET_SSH 로 대상에
 #        읽기 시드(`seed_k6_read_account.sh`)를 원격 실행하므로 부하기(러너)와 대상이 달라야
 #        하고, k6 는 ROLE=p6-loader 부트스트랩이 깐 박스에만 있다.
+#     🔴 **`preflight` 를 넣지 않는다** (#583) — 그 phase 는 MySQL·percona-toolkit 이
+#        로컬에 있다는 걸 전제하는 DDL/backup 라운드용이라, p6-loader 박스(MySQL 없음)에서
+#        무조건 FAIL 한다. 그 FAIL 이 `run_all.sh`의 다른 문제와 겹치면(예: 거의 빈 결과물도
+#        업로드는 성공) `AUTO_SHUTDOWN` 이 그 성공을 「정상 종료」로 오인해 박스를 조기에
+#        꺼버릴 수 있다 — 실측을 시작도 못 한 판이 «측정 완료» 처럼 보인다.
 #
 #   P6 동거 용량 라운드 (主-P6):
 #     TARGET_HOST=10.0.0.5 AI_PUBLIC_TOKEN=... \
