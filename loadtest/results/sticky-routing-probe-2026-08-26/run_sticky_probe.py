@@ -297,17 +297,24 @@ def teardown_all(procs_logs):
 
 
 def run_arm_C(label, sessions_total, fps, dur, warmup, sampler):
-    """정적 사전분할 — N 스윕과 같은 모양. rig N 개를 병렬로 띄운다."""
+    """정적 사전분할 — N 스윕과 같은 모양. rig N 개를 병렬로 띄운다.
+
+    나머지(sessions_total % N)를 버리지 않고 앞쪽 rig 부터 하나씩 더 받게
+    분배한다 — E 팔(`session_id % N`)과 마찬가지로 sessions_total 을 전부 쓴다.
+    (2026-08-26 판은 `sessions_total // N` 을 그대로 써서 160 중 1개를 버렸다.)
+    """
     s_each = sessions_total // N
+    remainder = sessions_total % N
     procs = []
     for i in range(N):
+        s_this = s_each + (1 if i < remainder else 0)
         first_sid = 900001 + i * 1000       # 서로 다른 프로세스라 겹쳐도 무해하지만, 로그
                                               # 가독성을 위해 겹치지 않게 둔다
         out_tsv = os.path.join(OUT, f"raw_{label}_rig{i}.tsv")
         p = subprocess.Popen(
             [PY, OVERHEAD_RIG, "--ai", http_addr(i), "--grpc", grpc_addr(i),
              "--token", PUBLIC_TOKEN, "--internal-token", INTERNAL_TOKEN,
-             "--frames", FRAMES, "--sessions", str(s_each), "--fps", str(fps),
+             "--frames", FRAMES, "--sessions", str(s_this), "--fps", str(fps),
              "--dur", str(dur), "--warmup", str(warmup),
              "--first-session-id", str(first_sid),
              "--label", f"{label}_rig{i}", "--out", out_tsv],
