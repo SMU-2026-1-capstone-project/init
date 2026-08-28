@@ -218,12 +218,28 @@ public class SessionService {
         return session;
     }
 
-    // 🔴 findReattachableSessionById 를 여기서 되돌렸다 (2026-08-26) — 서킷브레이커 OPEN 자동
-    //    복구(ai-channel-pool-hardening.md §3-1 ㄴ) 호출부였는데, 공유 워킹트리 사고(git reset
-    //    --hard)로 그 기능의 나머지가 날아간 채 이것만 커밋에 남아 sessionRepository
-    //    .findSessionWithExerciseById(그 기능 전용 신규 쿼리, 이것도 같이 날아감) 참조가 깨져
-    //    main 컴파일이 안 됐다. 재도입 시 그 리포지토리 메서드도 같이 필요하다.
-    //    (ExerciseAnalysisService.registerCircuitBreakerOpenListener 주석 참고)
+    /**
+     * {@link #findReattachableSession} 의 시스템 트리거 버전 — 서킷브레이커 OPEN 자동 복구
+     * (ai-channel-pool-hardening.md §3-1 ㄴ) 전용. 회원 소유권 조건이 없다: 호출자가 사용자
+     * 요청이 아니라 아웃박스 발행기이므로 대조할 {@code currentMemberId} 자체가 없다 —
+     * {@code sessionRepository.findIdsByStatus(IN_PROGRESS)} 로 서버가 직접 뽑은 id 만 여기로
+     * 들어온다(클라이언트 입력 아님).
+     *
+     * <p>검증 로직({@link #assertReattachable})은 그대로 공유한다 — "이어붙일 수 있는 상태인가"의
+     * 정의는 트리거 주체와 무관하다.
+     *
+     * @throws BusinessException {@code SESSION_NOT_FOUND}(없음/이미 끝남/종료 요청됨),
+     *                           {@code SESSION_REATTACH_EXPIRED}(시간 초과) — 둘 다
+     *                           호출부(ExerciseAnalysisService.reattachFromOutbox)에서
+     *                           "재시도해도 소용없다"(TERMINAL_FAILED)로 해석된다.
+     */
+    @Transactional(readOnly = true)
+    public Session findReattachableSessionById(Long sessionId) {
+        Session session = sessionRepository.findSessionWithExerciseById(sessionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+        assertReattachable(session);
+        return session;
+    }
 
     /** {@link #findReattachableSession} 이 쓰는 검증. */
     private void assertReattachable(Session session) {

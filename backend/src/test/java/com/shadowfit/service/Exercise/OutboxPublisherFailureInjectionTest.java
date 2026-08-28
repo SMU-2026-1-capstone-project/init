@@ -125,6 +125,30 @@ class OutboxPublisherFailureInjectionTest {
     }
 
     @Nested
+    @DisplayName("이벤트 타입별 라우팅")
+    class EventTypeRouting {
+
+        /**
+         * dispatchOne 의 event-type switch(#581) 가 REATTACH_ANALYSIS 를
+         * {@code analysisService.reattachFromOutbox} 로 보내는지만 본다 — 백오프·회수 등
+         * 나머지 발행기 동작은 이벤트 타입과 무관해 {@code WhenSendFails} 등 다른 Nested 가
+         * STOP_ANALYSIS 로 이미 고정했다.
+         */
+        @Test
+        @DisplayName("REATTACH_ANALYSIS 행은 reattachFromOutbox 로 라우팅된다")
+        void reattachAnalysis_routesToReattachFromOutbox() {
+            when(analysisService.reattachFromOutbox(SESSION_ID)).thenReturn(DispatchOutcome.SENT);
+            OutboxEvent seeded = outboxRepository.saveAndFlush(
+                    OutboxEvent.reattachAnalysis(SESSION_ID, "cid-test"));
+
+            publisher.dispatchPending();
+
+            verify(analysisService).reattachFromOutbox(SESSION_ID);
+            assertThat(reload(seeded).getStatus()).isEqualTo(OutboxStatus.SENT);
+        }
+    }
+
+    @Nested
     @DisplayName("송신이 실패했을 때")
     class WhenSendFails {
 

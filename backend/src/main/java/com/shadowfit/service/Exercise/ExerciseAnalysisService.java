@@ -14,11 +14,15 @@ import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.outbox.DispatchOutcome;
+import com.shadowfit.model.outbox.OutboxEvent;
+import com.shadowfit.model.outbox.OutboxEventType;
+import com.shadowfit.model.outbox.OutboxStatus;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
+import com.shadowfit.repository.outbox.OutboxEventRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.grpc.ManagedChannel;
@@ -58,6 +62,7 @@ public class ExerciseAnalysisService {
     private final PoseDataRepository poseDataRepository;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final SessionMetrics sessionMetrics;
+    private final OutboxEventRepository outboxEventRepository;
 
     // 자기 주입: startAnalysis → sendAnalysisRequestToFastApi 호출이 Spring 프록시를 통과해
     // @Async가 적용되도록 함(:199 주석 참조).
@@ -116,20 +121,20 @@ public class ExerciseAnalysisService {
             // 워커별 서킷을 여기서 미리 만들어둔다(#556) — 안 만들면 그 워커로 첫 호출이 갈
             // 때까지 /actuator/health 의 circuitBreakers 에 안 잡혀, "워커 하나가 계속
             // 조용하다"를 관측으로 구분할 수 없다.
-            circuitBreakerRegistry.circuitBreaker("aiServer-" + i);
+            CircuitBreaker workerBreaker = circuitBreakerRegistry.circuitBreaker("aiServer-" + i);
+
+            // 서킷브레이커 OPEN 자동 재부착 (#581, ai-channel-pool-hardening.md §3-1 ㄴ).
+            // 워커 i 가 죽으면(entrypoint.sh 의 wait -n 로 컨테이너 전체가 같이 죽는다) 그
+            // 워커로 가던 호출이 연달아 실패해 이 서킷이 OPEN 된다 — 그 전이 자체를 "장애
+            // 감지"로 쓴다. 람다 캡처를 위해 루프 변수를 지역 final 로 복사한다.
+            final int workerIndex = i;
+            workerBreaker.getEventPublisher().onStateTransition(event -> {
+                if (event.getStateTransition().getToState() == CircuitBreaker.State.OPEN) {
+                    self.enqueueReattachForWorker(workerIndex);
+                }
+            });
         }
     }
-
-    // 🔴 2026-08-26 — 여기 있던 서킷브레이커 OPEN 자동 재부착(registerCircuitBreakerOpenListener·
-    //    enqueueReattachForInProgressSessions, ai-channel-pool-hardening.md §3-1 ㄴ)을 되돌렸다.
-    //    공유 워킹트리 사고(git reset --hard)로 그 기능이 의존하던 OutboxEvent.reattachAnalysis·
-    //    SessionMetrics.aiReattachResult·SessionRepository.findSessionWithExerciseById 구현부가
-    //    전부 날아간 채 이 호출부만 커밋에 남아 main 컴파일이 깨져 있었다(#78f35b6 이후 CI
-    //    "Backend tests" 계속 실패). 원작성자가 복구할 때까지 기다릴 수 없어 호출부를 되돌린다 —
-    //    설계 자체를 폐기하는 게 아니라, 반쪽만 남은 걸 정리하는 것이다. 재도입 시 아래도 같이
-    //    필요하다: outboxRepository 필드, OutboxEvent.reattachAnalysis, SessionMetrics
-    //    .aiReattachResult, SessionRepository.findSessionWithExerciseById, loadReattachRequestForRecovery,
-    //    reattachFromOutbox(DispatchOutcome 반환, OutboxPublisher 가 호출).
 
     // initAiChannelPool 과 대칭 — 없으면 ManagedChannel 이 쥔 커넥션·스레드가 컨텍스트 종료
     // 후에도 정리되지 않은 채 프로세스 종료에만 기댄다. shutdownNow()로 강제 종료하는
@@ -540,8 +545,18 @@ public class ExerciseAnalysisService {
         return buildReattachRequest(session);
     }
 
-    // 🔴 loadReattachRequestForRecovery 를 여기서 되돌렸다 — 위 registerCircuitBreakerOpenListener
-    //    주석 참고. sessionService.findReattachableSessionById 가 없어 컴파일이 깨져 있었다.
+    /**
+     * {@link #loadReattachRequest} 의 시스템 트리거 버전 — 회원 소유권 검증 없이 sessionId 만으로
+     * 재부착 요청을 조립한다. {@link #reattachFromOutbox}(아웃박스 발행기)가 호출한다.
+     *
+     * <p>{@code self.} 를 거쳐야 하는 이유는 {@link #loadReattachRequest} 와 같다 — 자기호출은
+     * 프록시를 우회해 {@code @Transactional} 이 조용히 무시된다.
+     */
+    @Transactional(readOnly = true)
+    public ReattachRequest loadReattachRequestById(Long sessionId) {
+        Session session = sessionService.findReattachableSessionById(sessionId);
+        return buildReattachRequest(session);
+    }
 
     private ReattachRequest buildReattachRequest(Session session) {
         Long sessionId = session.getId();
@@ -689,7 +704,97 @@ public class ExerciseAnalysisService {
         }
     }
 
-    // 🔴 reattachFromOutbox 를 여기서 되돌렸다 — 위 registerCircuitBreakerOpenListener 주석 참고.
+    /**
+     * 워커 {@code workerIndex} 의 서킷브레이커가 OPEN 으로 전이하는 순간 호출된다(#581).
+     * 그 워커로 라우팅되던(= {@code Math.floorMod(sessionId, aiChannelPoolSize) == workerIndex})
+     * IN_PROGRESS 세션마다 {@code REATTACH_ANALYSIS} 아웃박스 행을 하나씩 남긴다 — 실제 gRPC
+     * 재부착 호출은 여기서 하지 않는다(서킷이 막 열린 시점이라 어차피 실패한다). 발행기가
+     * 폴링하며 재시도·백오프를 처리하다가, 컨테이너가 재기동돼 서킷이 다시 닫히면 그때 성공한다.
+     *
+     * <p>IN_PROGRESS 전체를 훑고 자바에서 걸러내는 이유는 {@code findTimeoutCandidatesByStatus}
+     * (스케줄러)와 같다 — 이 규모(DAU 1,000 가정 최대 116)에서 워커별 전용 쿼리를 새로 만들
+     * 값어치가 없다.
+     *
+     * <p>서킷브레이커는 CLOSED↔OPEN↔HALF_OPEN 을 짧은 시간에 여러 번 오갈 수 있어(플래핑),
+     * 같은 세션에 중복으로 큐잉하지 않도록 이미 PENDING/PROCESSING 인 행이 있으면 건너뛴다.
+     */
+    @Transactional
+    public void enqueueReattachForWorker(int workerIndex) {
+        try (CorrelationIds.Scope task = CorrelationIds.startTask("ai-cb-open-w" + workerIndex)) {
+            List<Long> targets = sessionRepository.findIdsByStatus(Status.IN_PROGRESS).stream()
+                    .filter(id -> Math.floorMod(id, aiChannelPoolSize) == workerIndex)
+                    .toList();
+
+            int queued = 0;
+            for (Long sessionId : targets) {
+                if (outboxEventRepository.existsByAggregateIdAndEventTypeAndStatusIn(
+                        sessionId, OutboxEventType.REATTACH_ANALYSIS,
+                        List.of(OutboxStatus.PENDING, OutboxStatus.PROCESSING))) {
+                    continue;
+                }
+                outboxEventRepository.save(OutboxEvent.reattachAnalysis(sessionId, CorrelationIds.current()));
+                queued++;
+            }
+            if (queued > 0) {
+                log.warn("AI 워커[{}] 서킷 OPEN — IN_PROGRESS {}건 중 {}건 재부착 큐잉(나머지는 이미 대기 중)",
+                        workerIndex, targets.size(), queued);
+            }
+        }
+    }
+
+    /**
+     * 아웃박스 발행기가 호출하는 재부착 실행부(#581). {@link #reattachSession}(사용자 요청,
+     * 동기, 예외로 실패를 알림)과 대칭이지만 계약이 다르다 — 여기는 예외를 던지지 않고
+     * {@link DispatchOutcome} 으로만 답한다({@link #stopAnalysis} 와 같은 이유).
+     *
+     * @return SENT(재부착 성공, already_active 포함) · RETRY(서킷 OPEN·gRPC 오류, 나중에 재시도) ·
+     *         TERMINAL_FAILED(더 이상 이어붙일 대상이 아니거나, AI 가 명시적으로 거절)
+     */
+    public DispatchOutcome reattachFromOutbox(Long sessionId) {
+        try (CorrelationIds.Scope ignored = CorrelationIds.withSession(sessionId)) {
+            ReattachRequest request;
+            try {
+                request = self.loadReattachRequestById(sessionId);
+            } catch (BusinessException e) {
+                // SESSION_NOT_FOUND(이미 끝남·삭제됨) 또는 SESSION_REATTACH_EXPIRED(타임아웃
+                // 스케줄러가 먼저 걷어감) — 재시도해도 결과가 같다.
+                sessionMetrics.aiReattachResult("not-reattachable");
+                log.info("자동 재부착 대상 아님 - 세션 ID: {}, 사유: {}", sessionId, e.getMessage());
+                return DispatchOutcome.TERMINAL_FAILED;
+            }
+
+            CircuitBreaker cb = aiCircuitBreaker(sessionId);
+            if (!cb.tryAcquirePermission()) {
+                sessionMetrics.aiReattachResult("circuit-open");
+                return DispatchOutcome.RETRY;
+            }
+
+            long callStart = System.nanoTime();
+            ReattachResponse response;
+            try {
+                response = getAuthenticatedBlockingStub(sessionId).reattachAnalysis(request);
+            } catch (StatusRuntimeException e) {
+                cb.onError(System.nanoTime() - callStart, TimeUnit.NANOSECONDS, e);
+                sessionMetrics.aiReattachResult("grpc-error");
+                log.warn("자동 재부착 gRPC 실패 - 세션 ID: {}, 사유: {}", sessionId, e.getMessage());
+                return DispatchOutcome.RETRY;
+            }
+            cb.onSuccess(System.nanoTime() - callStart, TimeUnit.NANOSECONDS);
+
+            if (!response.getSuccess()) {
+                // 통신은 성공했는데 AI 가 상태를 못 만든 경우(기준 좌표 파싱 실패 등) — 재시도해도
+                // 같은 결과다. reattachSession(사용자 경로)과 대칭 판단.
+                sessionMetrics.aiReattachResult("ai-rejected");
+                log.warn("AI 가 자동 재부착을 거절 - 세션 ID: {}, 사유: {}", sessionId, response.getMessage());
+                return DispatchOutcome.TERMINAL_FAILED;
+            }
+
+            sessionMetrics.aiReattachResult(response.getAlreadyActive() ? "already-active" : "ok");
+            log.info("자동 재부착 완료 - 세션 ID: {}, rep: {}, 이미활성: {}",
+                    sessionId, response.getRepCount(), response.getAlreadyActive());
+            return DispatchOutcome.SENT;
+        }
+    }
 
     /**
      * CompleteAnalysis 가 오지 않는 게 확정된 세션을 즉시 FAILED 로 걷어낸다 — 타임아웃 스케줄러

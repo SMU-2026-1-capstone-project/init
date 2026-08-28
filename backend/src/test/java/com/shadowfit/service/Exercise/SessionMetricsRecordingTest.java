@@ -15,6 +15,7 @@ import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
+import com.shadowfit.repository.outbox.OutboxEventRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.grpc.Status.Code;
@@ -102,6 +103,7 @@ SessionMetricsRecordingTest {
         @Mock private ExerciseReferenceRepository referenceRepository;
         // 재부착 시 MAX(rep_number) 복원용 (이슈 #59 2단계). 이 테스트가 보는 경로는 안 쓴다.
         @Mock private PoseDataRepository poseDataRepository;
+        @Mock private OutboxEventRepository outboxEventRepository;
 
         private CircuitBreakerRegistry circuitBreakerRegistry;
         private ExerciseServiceGrpc.ExerciseServiceStub stub;
@@ -123,7 +125,7 @@ SessionMetricsRecordingTest {
 
             service = new ExerciseAnalysisService(sessionRepository, exercisesRepository,
                     memberRepository, sessionService, referenceRepository, poseDataRepository,
-                    circuitBreakerRegistry, metrics);
+                    circuitBreakerRegistry, metrics, outboxEventRepository);
             ReflectionTestUtils.setField(service, "internalToken", "test-token");
             ReflectionTestUtils.setField(service, "aiChannelPoolSize", 1);
             ReflectionTestUtils.setField(service, "aiAsyncStubPool", List.of(stub));

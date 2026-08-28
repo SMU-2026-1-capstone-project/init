@@ -14,6 +14,7 @@ import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.PoseDataRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
+import com.shadowfit.repository.outbox.OutboxEventRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.grpc.Status.Code;
@@ -57,6 +58,7 @@ class ReattachFailurePathTest {
     @Mock private SessionService sessionService;
     @Mock private ExerciseReferenceRepository referenceRepository;
     @Mock private PoseDataRepository poseDataRepository;
+    @Mock private OutboxEventRepository outboxEventRepository;
     private final SessionMetrics metrics = new SessionMetrics(new SimpleMeterRegistry());
     private CircuitBreakerRegistry circuitBreakerRegistry;
     private ExerciseServiceGrpc.ExerciseServiceBlockingStub blockingStub;
@@ -72,7 +74,7 @@ class ReattachFailurePathTest {
         when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
         service = new ExerciseAnalysisService(sessionRepository, exercisesRepository,
                 memberRepository, sessionService, referenceRepository, poseDataRepository,
-                circuitBreakerRegistry, metrics);
+                circuitBreakerRegistry, metrics, outboxEventRepository);
         ReflectionTestUtils.setField(service, "internalToken", "test-token");
         ReflectionTestUtils.setField(service, "aiChannelPoolSize", 1);
         ReflectionTestUtils.setField(service, "aiBlockingStubPool", List.of(blockingStub));

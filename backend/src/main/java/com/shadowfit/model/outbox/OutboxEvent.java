@@ -113,5 +113,20 @@ public class OutboxEvent {
                 .build();
     }
 
+    /**
+     * 재부착 통보 한 건을 만든다 — 서킷브레이커 OPEN 감지 시(요청 트랜잭션 밖) 호출된다.
+     * {@code stopAnalysis} 와 달리 도메인 커밋에 얹히지 않는다 — 이 행 자체가 "장애 감지"라는
+     * 사건의 기록이다.
+     */
+    public static OutboxEvent reattachAnalysis(Long sessionId, String correlationId) {
+        return OutboxEvent.builder()
+                .aggregateType(AGGREGATE_TYPE_SESSION)
+                .aggregateId(sessionId)
+                .eventType(OutboxEventType.REATTACH_ANALYSIS)
+                .payload("{\"sessionId\":" + sessionId + "}")
+                .correlationId(correlationId)
+                .build();
+    }
+
     public static final String AGGREGATE_TYPE_SESSION = "SESSION";
 }

@@ -148,6 +148,9 @@ public class OutboxPublisher {
     private void dispatchOne(OutboxEvent event, boolean possiblyRedelivered) {
         DispatchOutcome outcome = switch (event.getEventType()) {
             case STOP_ANALYSIS -> analysisService.stopAnalysis(event.getAggregateId(), possiblyRedelivered);
+            // possiblyRedelivered 를 안 쓴다 — 재부착은 이미 AI 쪽 already_active 로 멱등해서
+            // (§2-1 stopAnalysis 와 달리) 회수분 구분이 결과 해석에 영향을 주지 않는다.
+            case REATTACH_ANALYSIS -> analysisService.reattachFromOutbox(event.getAggregateId());
         };
 
         switch (outcome) {

@@ -16,5 +16,13 @@ public enum OutboxEventType {
      * 세션 종료 → AI 에 분석 중단 통보(gRPC {@code StopAnalysis}).
      * payload: {@code { "sessionId": 42 }}
      */
-    STOP_ANALYSIS
+    STOP_ANALYSIS,
+
+    /**
+     * AI 워커 서킷브레이커 OPEN → 그 워커로 라우팅되던 IN_PROGRESS 세션의 상태 복구
+     * (gRPC {@code ReattachAnalysis}). 컨테이너가 재기동돼 채널이 다시 살아나면 발행기가
+     * 자동으로 재시도한다(docs/decisions/ai-channel-pool-hardening.md §3-1 ㄴ).
+     * payload: {@code { "sessionId": 42 }}
+     */
+    REATTACH_ANALYSIS
 }

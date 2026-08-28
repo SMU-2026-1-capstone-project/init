@@ -1,6 +1,7 @@
 package com.shadowfit.repository.outbox;
 
 import com.shadowfit.model.outbox.OutboxEvent;
+import com.shadowfit.model.outbox.OutboxEventType;
 import com.shadowfit.model.outbox.OutboxStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -169,4 +170,16 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
     @Query("DELETE FROM OutboxEvent e WHERE e.status = :status AND e.createdAt < :threshold")
     int deleteByStatusAndCreatedAtBefore(@Param("status") OutboxStatus status,
                                          @Param("threshold") LocalDateTime threshold);
+
+    /**
+     * 이미 대기·처리 중인 같은 종류 이벤트가 있는가 — 중복 등록 가드.
+     *
+     * <p>서킷브레이커는 OPEN↔HALF_OPEN↔CLOSED 를 짧은 시간에 여러 번 오갈 수 있다(플래핑).
+     * 그때마다 같은 세션에 {@code REATTACH_ANALYSIS} 행을 새로 꽂으면 발행기가 같은 세션을
+     * 여러 번 재부착하게 된다 — AI 쪽 {@code already_active} 가 응답을 안전하게 만들어주지만
+     * (재부착 자체는 멱등), 낭비인 건 여전하다. {@code SENT}·{@code FAILED}(종료 상태)는
+     * 대상에서 뺀다 — 이미 끝난 시도는 새 시도를 막을 이유가 없다.
+     */
+    boolean existsByAggregateIdAndEventTypeAndStatusIn(Long aggregateId, OutboxEventType eventType,
+                                                        Collection<OutboxStatus> statuses);
 }

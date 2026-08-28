@@ -24,6 +24,20 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     // 개별 세션 삭제(deleteSession) 전용 — exercise fetch join 불필요, 소유권만 WHERE절로 확인.
     Optional<Session> findByIdAndMemberId(Long sessionId, Long memberId);
 
+    // 서킷브레이커 OPEN 자동 재부착(REATTACH_ANALYSIS) 전용 — 위 findSessionWithExerciseByIdAndMemberId
+    // 와 달리 소유권(memberId) 조건이 없다. 호출 경로가 사용자 요청이 아니라 시스템(서킷브레이커
+    // 이벤트 → 아웃박스 발행기)이라 "요청자"가 없다 — 애초에 대조할 currentMemberId 가 없다.
+    // IDOR 우려가 없는 이유: 이 경로로 얻은 sessionId는 findIdsByStatus(IN_PROGRESS)로 이미 서버가
+    // 직접 뽑은 값이지, 클라이언트가 실어 보낸 값이 아니다.
+    @Query("SELECT s FROM Session s JOIN FETCH s.exercise WHERE s.id = :sessionId")
+    Optional<Session> findSessionWithExerciseById(@Param("sessionId") Long sessionId);
+
+    // 서킷브레이커 OPEN 시 "이 워커가 물고 있던 세션"을 찾는 선행 조회 — 결과를 Math.floorMod로
+    // 걸러 워커별로 좁힌다(ExerciseAnalysisService.enqueueReattachForWorker). IN_PROGRESS 세션
+    // 수는 동시 운동 인원 규모라 작다(ai-sticky-routing.md §1-1: DAU 1,000 가정에서 최대 116) —
+    // findTimeoutCandidatesByStatus 와 같은 전제로 전체 스캔을 감수한다.
+    List<Long> findIdsByStatus(Status status);
+
     // 현재 조회 중인 세션 자체를 "이전 세션"으로 잘못 뽑지 않도록 excludeSessionId로 제외
     // (CodeRabbit 리뷰로 발견 — 현재 세션이 해당 운동의 가장 최근 완료 세션이면 자기 자신과
     // 비교하는 조용한 버그가 있었음, ReportService.getSessionReport §3).

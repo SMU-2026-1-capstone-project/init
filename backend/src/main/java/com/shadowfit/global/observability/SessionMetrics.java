@@ -56,6 +56,9 @@ public class SessionMetrics {
      */
     private static final String AI_STOP_RESULT = "shadowfit.ai.stop.result";
 
+    /** 서킷브레이커 OPEN 자동 재부착 결과. tags: outcome(ok/already-active/circuit-open/grpc-error/not-reattachable) */
+    private static final String AI_REATTACH_RESULT = "shadowfit.ai.reattach.result";
+
     /** 아웃박스 발행 결과. tags: outcome(sent/retry/failed) */
     private static final String OUTBOX_DISPATCH = "shadowfit.outbox.dispatch";
 
@@ -104,6 +107,16 @@ public class SessionMetrics {
      */
     public void aiStopResult(String outcome) {
         registry.counter(AI_STOP_RESULT, "outcome", outcome).increment();
+    }
+
+    /**
+     * 서킷브레이커 OPEN 자동 재부착(REATTACH_ANALYSIS) 1건의 결과 —
+     * {@link #aiStopResult} 와 같은 축, 다른 흐름.
+     *
+     * @param outcome ok / already-active / circuit-open / grpc-error / not-reattachable
+     */
+    public void aiReattachResult(String outcome) {
+        registry.counter(AI_REATTACH_RESULT, "outcome", outcome).increment();
     }
 
     /**
