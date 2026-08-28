@@ -67,6 +67,12 @@ dependencies {
 	// 취약)에 걸려 있어 이 모듈만 명시적으로 상향(jackson-bom의 나머지 모듈은 그대로 둠).
 	implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
 
+	// spring-boot-starter-logging이 끌어오는 log4j-to-slf4j가 log4j-api(2.24.3)를 물고 오는데,
+	// 이게 GHSA(2.13.1~2.25.4 취약, MapMessage.asJson()의 비정상 부동소수점 JSON 직렬화 결함)에
+	// 걸려 있어 상향. 이 앱은 log4j-core가 없어(로깅 구현은 Logback) 취약 경로(JsonTemplateLayout·
+	// MapMessage.asJson) 자체가 지금은 안 닿지만, log4j-core가 나중에 추가돼도 안전하도록 고정.
+	implementation 'org.apache.logging.log4j:log4j-api:2.25.5'
+
 	// --- QueryDSL (동적 조회 계층, querydsl-adoption.md §1-1 채택) ---
 	// 버전을 박지 않는 이유: Boot 3.5.16 의 의존성 관리가 QueryDSL 5.1.0 을 이미 잡고 있다.
 	// 'jakarta' 분류자는 필수 — 빠뜨리면 javax 기반 아티팩트가 딸려온다.
