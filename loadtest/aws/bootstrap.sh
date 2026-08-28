@@ -115,6 +115,15 @@ else
   die "지원하는 패키지 관리자를 못 찾았다 (dnf/apt 만 안다)"
 fi
 
+# 🔴 rig·시더가 «python» 을 부른다(seed_report_rig.sh 등). AL2023 은 python3 만 있다.
+#    예전엔 이 심볼릭 링크가 p6-loader 역할 블록 안에만 있어서, **대상 박스(p6-target 등)에서
+#    시드 스크립트를 돌리면 「python: command not found」로 죽었다**(從 R14 결과 §버그 ③,
+#    2026-08-28 — 그때는 대상 박스에서 손으로 우회하고 여기는 안 고쳤다). 역할과 무관하게
+#    한 번만 걸면 되므로 여기(패키지 설치 직후)로 옮긴다.
+if ! command -v python >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+  ln -sf "$(command -v python3)" /usr/local/bin/python
+fi
+
 # 🔴 ai-venv 는 데몬을 **안 띄운다.** 그 박스가 답해야 하는 질문이 하필 「16 vCPU 중 얼마를
 #    쓰나」이고, dockerd 는 **재려는 것과 같은 CPU 를 문다.** 이 역할은 컨테이너를 하나도
 #    안 띄우므로(§ai-venv) 띄울 이유도 없다 — 조건에 안 적힌 상주 프로세스를 남기지 않는다.

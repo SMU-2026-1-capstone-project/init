@@ -1,0 +1,68 @@
+
+──── 패키지 ────
+  buildx 0.12.1 → 0.19.3 으로 올린다 (compose build 는 0.17+ 를 요구한다)
+
+──── 저장소 — https://github.com/Shadowfit/init.git @ a411d726cb03587e43fa442dc051f18e452ad593 ────
+  커밋: a411d72
+
+──── .env ────
+/dev/fd/63: line 158: compose: command not found
+/dev/fd/63: line 158: shadowfit-ai: command not found
+/dev/fd/63: line 158: INTERNAL_API_TOKEN:?: command not found
+/dev/fd/63: line 158: MYSQL_EXPORTER_PASSWORD: command not found
+/dev/fd/63: line 158: :?: command not found
+  MYSQL_ROOT_PASSWORD 를 rig 기본값과 맞췄다 (+ 해석만 되면 되는 변수들)
+  compose 해석 확인 ✅ (mysql 만 띄워도 파일 전체가 해석된다)
+
+──── 부하기 도구 ────
+  python → Python 3.9.25
+  ghz → v0.120.0
+  k6  → k6 v2.1.0 (commit/83a87a41e2, go1.26.4, linux/amd64)
+
+──── 從 부하 페이로드 — 세션 901-1900 · reps 25 ────
+wrote /root/batch_multi.json: sessions=1000 (901~1900, 템플릿 라우팅) reps=25 size=53.7KB mode=신규 키(rep_number = RequestNumber)
+  ⚠️ 이 파일은 JSON 이 아니라 ghz 템플릿이다 — json.load 로는 안 읽힌다(#271)
+  /root/batch_multi.json (56K)
+  frames.json ✅ (커밋본)
+
+──── 부하기 준비됨 ────
+  작업 디렉터리 : /root/init
+  커밋          : a411d72 (a411d726cb03587e43fa442dc051f18e452ad593)
+  ghz           : /usr/local/bin/ghz
+  k6            : /usr/local/bin/k6
+  페이로드      : /root/batch_multi.json
+
+  다음 — 대상 박스로 붙을 SSH 키를 이 박스에 두고(예: /root/.ssh/measure.pem, chmod 600),
+  cd /root/init && \
+  S3_BASE=s3://<버킷>/<프리픽스> TARGET_HOST=<대상 사설 IP> \
+  TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>" \
+  AI_PUBLIC_TOKEN=<대상 .env 의 AI_PUBLIC_TOKEN> GHZ_TOKEN=<대상 .env 의 INTERNAL_API_TOKEN> \
+  GHZ_RPS=19 GHZ_DATA=/root/batch_multi.json GHZ_BIN=/usr/local/bin/ghz \
+  CORES_ARMS="A B C" \
+  PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
+    nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+
+  ⚠️ nohup 없이 & 만 붙이면 SSH 가 끊길 때 같이 죽는다.
+bootstrap 종료 코드: 0
+==== 대상 박스의 target_ready.txt 대기 (최대 30분) ====
+target_ready.txt 확보 (140초 경과)
+K6_EMAIL=k6read@shadowfit.local
+K6_SIDS=1901,1902,1903,1904,1905,1906,1907,1908,1909,1910,1911,1912,1913,1914,1915,1916,1917,1918,1919,1920,1921,1922,1923,1924,1925,1926,1927,1928,1929,1930,1931,1932,1933,1934,1935,1936,1937,1938,1939,1940,1941,1942,1943,1944,1945,1946,1947,1948,1949,1950
+BASE=http://:8080
+COMMIT=a411d726cb03587e43fa442dc051f18e452ad593
+K6_EMAIL=k6read@shadowfit.local
+K6_SIDS=1901,1902,1903,1904,1905,1906,1907,1908,1909,1910,1911,1912,1913,1914,1915,1916,1917,1918,1919,1920,1921,1922,1923,1924,1925,1926,1927,1928,1929,1930,1931,1932,1933,1934,1935,1936,1937,1938,1939,1940,1941,1942,1943,1944,1945,1946,1947,1948,1949,1950
+BASE(target_ready.txt)=http://:8080
+preflight 401
+measure_http_read_spike.sh 종료 코드: 0
+Completed 9.8 KiB/57.7 KiB (296.1 KiB/s) with 10 file(s) remainingupload: loadtest/results/http-read-spike-ec2-2026-08-29/logs/rep0.json to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/logs/rep0.json
+Completed 9.8 KiB/57.7 KiB (296.1 KiB/s) with 9 file(s) remainingCompleted 13.4 KiB/57.7 KiB (194.9 KiB/s) with 9 file(s) remainingupload: loadtest/results/http-read-spike-ec2-2026-08-29/logs/rep0.log to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/logs/rep0.log
+Completed 13.4 KiB/57.7 KiB (194.9 KiB/s) with 8 file(s) remainingCompleted 23.0 KiB/57.7 KiB (277.5 KiB/s) with 8 file(s) remainingupload: loadtest/results/http-read-spike-ec2-2026-08-29/logs/rep1.json to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/logs/rep1.json
+Completed 23.0 KiB/57.7 KiB (277.5 KiB/s) with 7 file(s) remainingCompleted 27.8 KiB/57.7 KiB (275.3 KiB/s) with 7 file(s) remainingupload: loadtest/results/http-read-spike-ec2-2026-08-29/raw.tsv to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/raw.tsv
+Completed 27.8 KiB/57.7 KiB (275.3 KiB/s) with 6 file(s) remainingCompleted 37.5 KiB/57.7 KiB (365.3 KiB/s) with 6 file(s) remainingupload: loadtest/results/http-read-spike-ec2-2026-08-29/logs/rep3.json to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/logs/rep3.json
+Completed 37.5 KiB/57.7 KiB (365.3 KiB/s) with 5 file(s) remainingCompleted 40.6 KiB/57.7 KiB (381.2 KiB/s) with 5 file(s) remainingupload: loadtest/results/http-read-spike-ec2-2026-08-29/logs/rep3.log to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/logs/rep3.log
+Completed 40.6 KiB/57.7 KiB (381.2 KiB/s) with 4 file(s) remainingCompleted 41.8 KiB/57.7 KiB (390.3 KiB/s) with 4 file(s) remainingupload: loadtest/results/http-read-spike-ec2-2026-08-29/table.md to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/table.md
+Completed 41.8 KiB/57.7 KiB (390.3 KiB/s) with 3 file(s) remainingCompleted 45.0 KiB/57.7 KiB (417.0 KiB/s) with 3 file(s) remainingCompleted 54.6 KiB/57.7 KiB (504.2 KiB/s) with 3 file(s) remainingupload: loadtest/results/http-read-spike-ec2-2026-08-29/logs/rep2.json to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/logs/rep2.json
+Completed 54.6 KiB/57.7 KiB (504.2 KiB/s) with 2 file(s) remainingCompleted 57.7 KiB/57.7 KiB (531.2 KiB/s) with 2 file(s) remainingupload: loadtest/results/http-read-spike-ec2-2026-08-29/logs/rep2.log to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/logs/rep2.log
+Completed 57.7 KiB/57.7 KiB (531.2 KiB/s) with 1 file(s) remainingupload: loadtest/results/http-read-spike-ec2-2026-08-29/logs/rep1.log to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/logs/rep1.log
+Completed 2.2 KiB/2.2 KiB (34.2 KiB/s) with 1 file(s) remainingupload: ../spike_run.log to s3://shadowfit-measure-055447613012/shadowfit/read-spike-587-2026-08-29/loader/spike_run.log

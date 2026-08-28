@@ -1,0 +1,64 @@
+
+
+  █ THRESHOLDS 
+
+    bad_status
+    ✓ 'count==0' count=0
+
+    dropped_iterations
+    ✓ 'count==0' count=0
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 26196   181.817951/s
+    checks_succeeded...: 100.00% 26196 out of 26196
+    checks_failed......: 0.00%   0 out of 26196
+
+    ✓ session 200
+    ✓ weekly 200
+    ✓ calendar 200
+    ✓ daily 200
+
+    CUSTOM
+    bad_status.....................: 0      0/s
+    t_calendar__baseline...........: avg=3.27ms  med=3.15ms  p(95)=4.64ms  p(99)=5.07ms  max=5.29ms 
+    t_calendar__rampdown...........: avg=2.25ms  med=2.18ms  p(95)=2.93ms  p(99)=3.86ms  max=4.49ms 
+    t_calendar__rampup.............: avg=2.33ms  med=2.21ms  p(95)=3.31ms  p(99)=4.28ms  max=4.95ms 
+    t_calendar__recovery...........: avg=3.07ms  med=2.85ms  p(95)=4.61ms  p(99)=5.01ms  max=5.35ms 
+    t_calendar__spike..............: avg=2.24ms  med=2.21ms  p(95)=2.46ms  p(99)=2.73ms  max=7.34ms 
+    t_daily__baseline..............: avg=2.77ms  med=2.49ms  p(95)=4ms     p(99)=4.44ms  max=4.52ms 
+    t_daily__rampdown..............: avg=1.99ms  med=1.9ms   p(95)=2.81ms  p(99)=3.62ms  max=4.13ms 
+    t_daily__rampup................: avg=2ms     med=1.89ms  p(95)=2.83ms  p(99)=3.46ms  max=4.47ms 
+    t_daily__recovery..............: avg=2.82ms  med=2.72ms  p(95)=4.18ms  p(99)=4.61ms  max=4.87ms 
+    t_daily__spike.................: avg=1.94ms  med=1.93ms  p(95)=2.13ms  p(99)=2.35ms  max=5.7ms  
+    t_report_session__baseline.....: avg=7.75ms  med=7.79ms  p(95)=8.96ms  p(99)=9.86ms  max=10.52ms
+    t_report_session__rampdown.....: avg=5.53ms  med=5.43ms  p(95)=6.57ms  p(99)=7.45ms  max=8.16ms 
+    t_report_session__rampup.......: avg=5.86ms  med=5.51ms  p(95)=8.49ms  p(99)=12.22ms max=12.8ms 
+    t_report_session__recovery.....: avg=7.65ms  med=7.7ms   p(95)=9.19ms  p(99)=9.56ms  max=9.74ms 
+    t_report_session__spike........: avg=5.72ms  med=5.68ms  p(95)=6.16ms  p(99)=7.5ms   max=8.99ms 
+    t_weekly_summary__baseline.....: avg=4.36ms  med=4.38ms  p(95)=6.29ms  p(99)=6.7ms   max=7.28ms 
+    t_weekly_summary__rampdown.....: avg=2.81ms  med=2.71ms  p(95)=3.93ms  p(99)=4.67ms  max=5.48ms 
+    t_weekly_summary__rampup.......: avg=2.93ms  med=2.73ms  p(95)=4.62ms  p(99)=5.62ms  max=6.9ms  
+    t_weekly_summary__recovery.....: avg=4.26ms  med=4.1ms   p(95)=6.13ms  p(99)=6.95ms  max=7.37ms 
+    t_weekly_summary__spike........: avg=2.8ms   med=2.78ms  p(95)=3.09ms  p(99)=3.49ms  max=8.48ms 
+
+    HTTP
+    http_req_duration..............: avg=3.3ms   med=2.6ms   p(95)=6.01ms  p(99)=8.02ms  max=75.29ms
+      { expected_response:true }...: avg=3.3ms   med=2.6ms   p(95)=6.01ms  p(99)=8.02ms  max=75.29ms
+    http_req_failed................: 0.00%  0 out of 26197
+    http_reqs......................: 26197  181.824891/s
+
+    EXECUTION
+    dropped_iterations.............: 0      0/s
+    iteration_duration.............: avg=13.53ms med=12.91ms p(95)=18.59ms p(99)=21.47ms max=75.66ms
+    iterations.....................: 6549   45.454488/s
+    vus............................: 0      min=0          max=4  
+    vus_max........................: 300    min=300        max=300
+
+    NETWORK
+    data_received..................: 45 MB  311 kB/s
+    data_sent......................: 8.9 MB 62 kB/s
+
+
+
