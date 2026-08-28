@@ -40,6 +40,28 @@ services:
     # 포화됐을 때만 작동하고 여유가 있으면 아무 영향이 없다. 쓰기 천장이 fsync 인 이 서비스가
     # AI 추론(코어를 주는 만큼 먹는다, load-test-strategy.md §1)에 밀려 굶는 것을 막는다.
     cpu_shares: 2048
+    # 메모리 한도 — 이 프로젝트에서 shadowfit-ai(#212)·shadowfit-backend(#570)는 이미 캡이
+    # 있는데 MySQL만 무제한이었다. 2026-08-28 AI 워커 부하-중 장애 라운드
+    # (docs/decisions/ai-worker-load-soak-experiment.md)에서 동접 193세션 부하 90초 만에
+    # 대상 박스 전체(SSH·전 앱 포트)가 무응답이 됐고, MySQL 로그 마지막 줄이 InnoDB
+    # "장기 세마포어 대기" 경고 헤더에서 끊긴 채 시스템이 얼어붙었다 — 락 경합이 강하게
+    # 의심되는 정황이지 확정 원인은 아니다(그 문서 §3-3). 캡이 그 원인을 직접 고치진
+    # 않지만, 최소한 "MySQL이 스왑도 없는 호스트에서 한도 없이 계속 자란다"는 별개
+    # 위험은 없앤다.
+    #
+    # 값의 근거: `--innodb-buffer-pool-size=2G`(위)가 이미 걸려 있는데, 재현 라운드
+    # 착수 전 idle 상태 실측(`docker stats`, 2026-08-28)은 583.7MiB — 버퍼풀의 30%도
+    # 안 된다. JVM 힙(backend#570)과 달리 InnoDB 버퍼풀은 즉시 다 잡지 않고 페이지가
+    # 캐시되며 점진적으로 채워지므로, idle 값을 그대로 "여유 붙여 캡"으로 쓰면 부하가
+    # 버퍼풀을 2G로 채우려는 순간 그대로 OOM 크래시가 날 위험이 크다. 그래서 기준을
+    # idle이 아니라 **설정된 버퍼풀(2G)**로 잡고, 연결 버퍼·딕셔너리 캐시·적응형 해시 등
+    # InnoDB 부가 메모리 몫으로 위에 여유를 얹었다 — "빠듯하게 맞춘 값"이 아니라
+    # "버퍼풀은 확실히 뜨지만 무제한은 아닌" 실질적 상한이다([[feedback_no_arbitrary_threshold_values]]:
+    # baseline은 이 두 실측값, threshold는 그 위에 둔 여유값이라는 걸 그대로 밝혀둔다).
+    #
+    # ⚠️ 부하 중 실제 피크는 미측정이다 — 이 캡을 걸고 같은 강도로 재현을 시도하는 것
+    # 자체가 그 갭을 메우려는 시도다. 재현 결과는 위 문서에 반영한다.
+    mem_limit: ${MYSQL_MEM_LIMIT:-3072m}
     healthcheck:
       # MySQL 전용 헬스체크로 복구
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
