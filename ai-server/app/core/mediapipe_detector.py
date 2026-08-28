@@ -205,6 +205,9 @@ class _Lease:
         return False
 
 
+_PENDING = object()  # acquire() 가 자리를 예약했지만 PoseDetector() 생성이 아직 안 끝난 상태의 표식
+
+
 class DetectorPool:
     """세션 → 검출기. 크기가 곧 동시 활성 세션 상한이다."""
 
@@ -223,28 +226,48 @@ class DetectorPool:
 
         검출기는 여기서 «만들지만» 메모리는 첫 추론에서 붙는다(M2: 생성 0.1MB / 추론 98.5MB).
         즉 시작만 하고 프레임을 안 보내는 세션은 자리만 차지하고 메모리는 안 먹는다.
+
+        🔴 **`PoseDetector()` 생성은 `_guard` 밖에서 돈다** (#599). MediaPipe 그래프 초기화가
+        비파이썬(C++) 작업이라 dict 연산과 비용이 다른데, 예전엔 이 락 "안"에서 실행돼
+        세션 A 하나의 생성이 끝날 때까지 세션 B·C·... 의 `acquire`·`lease`·`release`가
+        전부 막혔다(실측: 동시성 1→50에서 p50 201→1401ms, 7배). 자리만 락 안에서
+        예약(`_PENDING`)하고, 무거운 생성은 락 밖에서 한 뒤 다시 락을 잡아 채운다.
         """
         with self._guard:
             if session_id in self._detectors:
                 return True
             if len(self._detectors) >= self._capacity:
                 return False
-            self._detectors[session_id] = PoseDetector()
+            self._detectors[session_id] = _PENDING   # 용량 계산에는 즉시 반영되는 예약
+        det = PoseDetector()
+        with self._guard:
+            # 예약 뒤 release() 가 먼저 왔다 갔을 수 있다(세션이 생성 완료 전에 취소된 경우) —
+            # 그때는 자리가 이미 지워졌으므로 여기서 되살리지 않는다. 대신 방금 만든 검출기는
+            # 아무도 안 쓸 것이므로 바로 닫는다.
+            if self._detectors.get(session_id) is not _PENDING:
+                det.close()
+                return True
+            self._detectors[session_id] = det
             self._locks[session_id] = threading.Lock()
-            return True
+        return True
 
     def lease(self, session_id: int) -> _Lease | None:
         with self._guard:
             det = self._detectors.get(session_id)
             lock = self._locks.get(session_id)
-        return None if det is None else _Lease(det, lock)
+        # 생성이 아직 안 끝난 예약 상태면 «자리 없음» 과 같게 다룬다 — 곧 채워지므로 다음
+        # 프레임이 재시도하면 된다. pose.py 는 이미 NO_LEASE 를 "StartAnalysis 먼저 호출
+        # 필요"로 안내하는데, 이 경우엔 그게 아니라 "방금 호출했고 아직 준비 중"이다.
+        if det is None or det is _PENDING:
+            return None
+        return _Lease(det, lock)
 
     def release(self, session_id: int) -> bool:
         """자리를 반납하고 `close()` 한다. M2 에서 회수율 100% 를 확인했다."""
         with self._guard:
             det = self._detectors.pop(session_id, None)
             self._locks.pop(session_id, None)
-        if det is None:
+        if det is None or det is _PENDING:
             return False
         det.close()
         return True
@@ -261,7 +284,7 @@ class DetectorPool:
         (배포 대상 0대) 그 숫자가 곧 «배포 때 몇 명이 끊겼나» 다.
         """
         with self._guard:
-            dets = list(self._detectors.values())
+            dets = [d for d in self._detectors.values() if d is not _PENDING]
             self._detectors.clear()
             self._locks.clear()
         for d in dets:
