@@ -1,0 +1,66 @@
+time="2026-08-28T17:25:31Z" level=warning msg="Insufficient VUs, reached 300 active VUs and cannot initialize more" executor=ramping-arrival-rate scenario=read
+
+
+  █ THRESHOLDS 
+
+    bad_status
+    ✓ 'count==0' count=0
+
+    dropped_iterations
+    ✗ 'count==0' count=193
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 25424   176.450438/s
+    checks_succeeded...: 100.00% 25424 out of 25424
+    checks_failed......: 0.00%   0 out of 25424
+
+    ✓ session 200
+    ✓ weekly 200
+    ✓ calendar 200
+    ✓ daily 200
+
+    CUSTOM
+    bad_status.....................: 0      0/s
+    t_calendar__baseline...........: avg=6.5ms    med=6.2ms    p(95)=9.32ms   p(99)=10.56ms  max=17.58ms 
+    t_calendar__rampdown...........: avg=2.32ms   med=2.25ms   p(95)=2.87ms   p(99)=3.85ms   max=4.22ms  
+    t_calendar__rampup.............: avg=21.67ms  med=4.7ms    p(95)=86.19ms  p(99)=125.57ms max=144.14ms
+    t_calendar__recovery...........: avg=3.4ms    med=3.34ms   p(95)=4.88ms   p(99)=5.35ms   max=7.84ms  
+    t_calendar__spike..............: avg=143.57ms med=96.76ms  p(95)=451ms    p(99)=628.26ms max=1.11s   
+    t_daily__baseline..............: avg=5.33ms   med=5.07ms   p(95)=7.85ms   p(99)=10.62ms  max=14ms    
+    t_daily__rampdown..............: avg=2.04ms   med=1.95ms   p(95)=2.63ms   p(99)=3.4ms    max=4.09ms  
+    t_daily__rampup................: avg=18.39ms  med=3.91ms   p(95)=75.41ms  p(99)=106.53ms max=146.8ms 
+    t_daily__recovery..............: avg=2.8ms    med=2.69ms   p(95)=4.04ms   p(99)=4.42ms   max=6.05ms  
+    t_daily__spike.................: avg=143.74ms med=93.75ms  p(95)=459.68ms p(99)=611ms    max=1.01s   
+    t_report_session__baseline.....: avg=14.69ms  med=13.25ms  p(95)=20.31ms  p(99)=29.83ms  max=100.39ms
+    t_report_session__rampdown.....: avg=5.74ms   med=5.57ms   p(95)=6.98ms   p(99)=8.2ms    max=11.34ms 
+    t_report_session__rampup.......: avg=39.65ms  med=18.12ms  p(95)=121.98ms p(99)=133.55ms max=149ms   
+    t_report_session__recovery.....: avg=7.8ms    med=7.85ms   p(95)=9.46ms   p(99)=10.02ms  max=11.32ms 
+    t_report_session__spike........: avg=159.72ms med=114.65ms p(95)=488.84ms p(99)=645.04ms max=990.63ms
+    t_weekly_summary__baseline.....: avg=8.88ms   med=8.05ms   p(95)=11.66ms  p(99)=16.26ms  max=116.29ms
+    t_weekly_summary__rampdown.....: avg=2.88ms   med=2.76ms   p(95)=3.64ms   p(99)=5.45ms   max=6.47ms  
+    t_weekly_summary__rampup.......: avg=28.34ms  med=7.06ms   p(95)=98.31ms  p(99)=117.83ms max=165.35ms
+    t_weekly_summary__recovery.....: avg=4.22ms   med=3.88ms   p(95)=6.32ms   p(99)=6.91ms   max=8.77ms  
+    t_weekly_summary__spike........: avg=167.89ms med=109.38ms p(95)=526.51ms p(99)=712.95ms max=1.11s   
+
+    HTTP
+    http_req_duration..............: avg=128.87ms med=41.05ms  p(95)=460.11ms p(99)=643.38ms max=1.11s   
+      { expected_response:true }...: avg=128.87ms med=41.05ms  p(95)=460.11ms p(99)=643.38ms max=1.11s   
+    http_req_failed................: 0.00%  0 out of 25425
+    http_reqs......................: 25425  176.457378/s
+
+    EXECUTION
+    dropped_iterations.............: 193    1.33948/s
+    iteration_duration.............: avg=515.84ms med=258.43ms p(95)=1.48s    p(99)=1.82s    max=2.52s   
+    iterations.....................: 6356   44.11261/s
+    vus............................: 0      min=0          max=300
+    vus_max........................: 300    min=300        max=300
+
+    NETWORK
+    data_received..................: 44 MB  302 kB/s
+    data_sent......................: 8.7 MB 60 kB/s
+
+
+
+time="2026-08-28T17:27:22Z" level=error msg="thresholds on metrics 'dropped_iterations' have been crossed"
