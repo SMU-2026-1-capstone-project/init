@@ -352,6 +352,60 @@ services:
     networks:
       - shadowfit-net
 
+  # 컨테이너별 CPU·메모리 시계열. 2026-08-28 추가 — AI 워커 부하-중 장애 라운드
+  # (docs/decisions/ai-worker-load-soak-experiment.md)에서 MySQL 컨테이너가 죽기 직전 메모리가
+  # 어떻게 올라갔는지 `docker stats` 수동 스냅샷으로만 사후 재구성해야 했던 갭을 메운다 —
+  # 이게 있었으면 Grafana 에서 실시간으로 봤을 것을 SSH 붙어 로그를 뒤져야 했다.
+  #
+  # cgroup v2 전제(이 저장소가 개발·EC2 양쪽에서 실제로 도는 조건, 2026-08-28 `cgroup.controllers`
+  # 로 확인) — v0.49+ 가 v2 를 안정적으로 지원한다. `/sys`·`/var/lib/docker` 를 읽기 전용으로
+  # 마운트해서 컨테이너별 cgroup 지표를 직접 읽는다(docker.sock 은 필요 없다).
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: shadowfit-cadvisor
+    profiles: ["obs"]
+    restart: unless-stopped
+    # CPU 상대 우선순위 — 나머지 obs 컨테이너와 같은 이유(#212).
+    cpu_shares: 256
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      # 백엔드(8080)와 안 겹치게 호스트 쪽만 8085 로 어긋낸다. 루프백 고정(#128) — cAdvisor UI 도
+      # 인증이 없다.
+      - "127.0.0.1:8085:8080"
+    networks:
+      - shadowfit-net
+
+  # 호스트 레벨 지표(전체 메모리·스왑·**커널 OOM killer 이벤트**). 2026-08-28 추가 — 같은 라운드가
+  # systemd 저널이 사고 도중 멈춰서 OOM killer 로그 자체를 사후에 못 찾는 상황을 겪었다. 이
+  # 익스포터가 살아있는 동안 Prometheus 가 긁어가면, 저널이 나중에 죽어도 그 전까지의 시계열은
+  # 남는다.
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: shadowfit-node-exporter
+    profiles: ["obs"]
+    restart: unless-stopped
+    cpu_shares: 256
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      # 컨테이너 안에서 도커 자체의 오버레이 파일시스템까지 훑으면 노이즈만 늘고, 알고 싶은 건
+      # 호스트 실제 디스크다.
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    ports:
+      - "127.0.0.1:9100:9100"
+    networks:
+      - shadowfit-net
+
 networks:
   shadowfit-net:
     driver: bridge

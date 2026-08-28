@@ -41,9 +41,43 @@ scrape_configs:
   #    매핑하지 않고, 스크레이프는 같은 도커 네트워크 안에서만 풀린다).
   # ⚠️ /metrics 는 AI 의 인증 미들웨어에서 열려 있다(PUBLIC_PATHS). 안 열면 401 이라 타깃이
   #    영원히 DOWN 이 되는데, 그게 아래 블록이 경고하던 상태다.
+  #
+  # 🔴 2026-08-28 (#580): 8000(워커 0) 하나만 긁고 있었다 — entrypoint.sh 가 워커를
+  #    AI_WORKER_COUNT(기본 3)개, base(8000)+인덱스 포트로 띄우는데(8000/8001/8002),
+  #    워커 1·2 는 이 파일에 없어 지표가 통째로 안 잡혔다. ai-process-ceiling-cause.md
+  #    §3-1 이 이미 워커마다 CPU 사용량이 8.91~9.94 vCPU(11%)로 갈린다는 것을 쟀으므로
+  #    "워커 0 이 나머지를 대표한다"는 전제가 약하다 — 타깃을 워커별로 분리해 실제 격차를
+  #    보이게 한다. nginx-ai/default.conf 와 같은 한계 — 이 파일도 정적이라 AI_WORKER_COUNT
+  #    를 못 읽는다. 3을 넘기면 아래에 줄을 추가해야 한다(entrypoint.sh 의 base+인덱스 공식과
+  #    맞춰서).
   - job_name: shadowfit-ai
     static_configs:
       - targets: ["shadowfit-ai:8000"]
+        labels:
+          application: shadowfit
+          worker: "0"
+      - targets: ["shadowfit-ai:8001"]
+        labels:
+          application: shadowfit
+          worker: "1"
+      - targets: ["shadowfit-ai:8002"]
+        labels:
+          application: shadowfit
+          worker: "2"
+
+  # 컨테이너별 CPU·메모리 시계열. 2026-08-28 추가 — docker-compose.yml 의 cadvisor 서비스 주석
+  # 참고. obs 프로파일에서만 뜨므로 그 없이 Prometheus 만 켜면 DOWN 이다(mysqld-exporter와 같음).
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["shadowfit-cadvisor:8080"]
+        labels:
+          application: shadowfit
+
+  # 호스트 레벨 지표(메모리·스왑·OOM killer). 2026-08-28 추가 — docker-compose.yml 의
+  # node-exporter 서비스 주석 참고.
+  - job_name: node
+    static_configs:
+      - targets: ["shadowfit-node-exporter:9100"]
         labels:
           application: shadowfit
 
