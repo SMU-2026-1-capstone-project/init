@@ -200,6 +200,19 @@ services:
       # 워커 프로세스 수 — entrypoint.sh 가 이 값으로 몇 개를 띄우고 포트를 어떻게 나눌지 정한다.
       # 위 shadowfit-backend 의 AI_CHANNEL_POOL_SIZE 와 같은 소스(${AI_WORKER_COUNT})를 쓴다.
       AI_WORKER_COUNT: ${AI_WORKER_COUNT:-3}
+      # 프레임 경로 계측 노브 — config.py 가 환경변수로 읽는데 여기 없어서 컨테이너로 띄운
+      # AI 는 계측을 켤 수단이 없었다(#399). EC2 배포(bootstrap.sh ROLE=p6-target)가 정확히
+      # 이 compose 로 뜬다. 기본값은 config.py 와 동일하게 전부 꺼진 채로 둔다 — 상시로 두면
+      # 안 되는 계측이라는 게 config.py 의 계약이다. 켜려면 .env 나 셸에서 값만 실어보내면 됨.
+      FRAME_PATH_METRICS: ${FRAME_PATH_METRICS:-false}
+      FRAME_PATH_SAMPLES: ${FRAME_PATH_SAMPLES:-4096}
+      GIL_SWITCH_INTERVAL: ${GIL_SWITCH_INTERVAL:-0}
+      GIL_PROBE_INTERVAL: ${GIL_PROBE_INTERVAL:-0}
+      RESPONSE_MODE: ${RESPONSE_MODE:-model}
+      POSE_NULL_HANDLER: ${POSE_NULL_HANDLER:-false}
+      # POSE_DETECTOR_POOL_SIZE 는 일부러 안 넘긴다 — 기본값 0 이면 config.py 가 cgroup
+      # 메모리 한도에서 상한을 유도한다(mediapipe_detector.py:170-179). 여기서 숫자를
+      # 강제하면 그 자동유도가 죽는다.
     healthcheck:
       # AI 서버용 파이썬 방식 헬스체크 적용 (curl 대신)
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
