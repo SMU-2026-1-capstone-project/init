@@ -23,7 +23,12 @@ spring:
     #    결과: loadtest/results/session-spread-aws-2026-08-17/
     url: jdbc:mysql://${DB_HOST:shadowfit-mysql}:${DB_PORT:3306}/${DB_NAME:shadowfit}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&rewriteBatchedStatements=true
     username: ${DB_USERNAME:shadowfit}
-    password: ${DB_PASSWORD:shadowfit}
+    # 기본값 없음(의도) — docker-compose.prod.yml 은 이미 ${DB_PASSWORD:?운영 배포에는 필수}로
+    # 막아뒀지만, 그건 compose 레이어의 방어라 jar 를 직접 띄우는 등 그 레이어를 안 거치면
+    # 뚫린다. 여기 기본값이 있으면 그 경로에서 비번 없이도 'shadowfit'으로 조용히 접속을
+    # 시도했다 — 실제 로컬/배포 흐름(.env.example 의 DB_PASSWORD=CHANGE_ME)도 이 기본값에
+    # 기대지 않으므로 죽은 안전망이었다. 없으면 플레이스홀더 해석 실패로 기동 자체가 죽는다.
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       # 근거 (2026-08-09 4차 실측, docs/decisions/commit-count-and-mysql-metrics.md §0-1-ㄹ,

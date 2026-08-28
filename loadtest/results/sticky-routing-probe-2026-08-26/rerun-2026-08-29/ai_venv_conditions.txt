@@ -1,0 +1,71 @@
+생성   : 2026-08-28T15:55:48Z UTC
+커밋   : 3ebc9d96bb934764de4016ae42bda778d8823cc3 (3ebc9d96bb934764de4016ae42bda778d8823cc3)
+박스   : 16 vCPU · 30.8GB
+         Model name:                              Intel(R) Xeon(R) Platinum 8488C
+         BIOS Model name:                         Intel(R) Xeon(R) Platinum 8488C
+         Thread(s) per core:                      2
+         Core(s) per socket:                      8
+python : Python 3.12.13 (/root/init/ai-server/.venv/bin/python)
+도커   : 데몬 미기동 (ROLE=ai-venv)
+샘플러 : /usr/bin/pidstat
+--- pip freeze ---
+absl-py==2.5.0
+annotated-types==0.8.0
+anyio==4.14.2
+attrs==26.1.0
+certifi==2026.7.22
+cffi==2.1.1
+click==8.5.0
+contourpy==1.3.3
+cycler==0.12.1
+dtaidistance==2.3.12
+fastapi==0.115.12
+flatbuffers==25.12.19
+fonttools==4.63.0
+grpcio==1.83.1
+grpcio-tools==1.62.3
+h11==0.16.0
+httpcore==1.0.9
+httptools==0.8.0
+httpx==0.28.1
+idna==3.19
+jax==0.7.1
+jaxlib==0.7.1
+kiwisolver==1.5.1
+matplotlib==3.11.1
+mediapipe==0.10.21
+ml_dtypes==0.5.4
+numpy==1.26.4
+opencv-contrib-python==4.11.0.86
+opencv-python-headless==4.11.0.86
+opt_einsum==3.4.0
+packaging==26.3
+pillow==12.3.0
+prometheus_client==0.21.1
+protobuf==4.25.8
+pycparser==3.0
+pydantic==2.11.3
+pydantic-settings==2.9.1
+pydantic_core==2.33.1
+pyparsing==3.3.2
+python-dateutil==2.9.0.post0
+python-dotenv==1.2.3
+python-multipart==0.0.32
+PyYAML==6.0.3
+scipy==1.17.1
+sentencepiece==0.2.2
+setuptools==84.0.0
+six==1.17.0
+sounddevice==0.5.6
+starlette==0.46.2
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+uvicorn==0.34.3
+uvloop==0.22.1
+watchfiles==1.2.0
+websockets==17.1
+
+--- 박스 보정 (#255 축 0) ---
+ts	commit	ncpu	physical	python	model	axis	rate	unit	sec	note
+2026-08-28T15:55:51Z	None	16	8	3.12.13	Intel(R) Xeon(R) Platinum 8488C	cpu	18748923.0	iter/s	0.16	
+2026-08-28T15:55:51Z	None	16	8	3.12.13	Intel(R) Xeon(R) Platinum 8488C	infer	55.54	fps	1.8005	0.10.21
