@@ -2,7 +2,7 @@
 
 작성일: 2026-08-26
 상태: ✅ **워커별 서킷 분리 구현 완료(2026-08-27, 사용자 confirm)** — 분석·실측 경위는 아래 그대로 둔다.
-대상: [이슈 #556](https://github.com/Shadowfit/init/issues/556)(OPEN)
+대상: [이슈 #556](https://github.com/Shadowfit/init/issues/556)(CLOSED, 2026-08-26)
 연관: [`./ai-channel-pool-hardening.md`](./ai-channel-pool-hardening.md) §2-4(이 문서의 핵심 근거),
 [`./ai-multiprocess-deployment-review.md`](./ai-multiprocess-deployment-review.md) §2-4(#556의 최초 출처),
 `ExerciseAnalysisService.java:166-170`, [[project_r6_gil_vs_cache_ride_along]]

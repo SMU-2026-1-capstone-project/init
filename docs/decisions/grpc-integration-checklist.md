@@ -77,7 +77,7 @@ proto 는 Spring·AI 양쪽 파일이 **완전히 동일**하다(diff 무차이)
 
 ## 3. 관련 문서
 - [`../architecture/ai-backend-integration.md`](../architecture/ai-backend-integration.md) — 결합 현황 스냅샷
-- [`./ai-backend-coupling.md`](./ai-backend-coupling.md) — 결합 방식 트레이드오프(OPEN)
+- [`./ai-backend-coupling.md`](./ai-backend-coupling.md) — 결합 방식 트레이드오프(9개 분기 중 6개 닫힘, 2026-08-17 상태줄 재정리 — 이 줄의 "OPEN"은 낡은 표기였다)
 - [`./production-signal-checklist.md`](./production-signal-checklist.md) §2-3 — 서킷브레이커 구현·실측
 - [`./report-read-path.md`](./report-read-path.md) — ②번 축(보고서 조회), 동일 형식의 체크리스트
 - [`../tasks/22-backend-tasks-detail.md`](../tasks/22-backend-tasks-detail.md) BE-10 — 갱신 완료(§2-1)
