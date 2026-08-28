@@ -1,0 +1,15 @@
+AI 워커 부하-중 장애 빈도 라운드 — 인스턴스 기록 (터미네이트 전까지 이 파일을 지우지 말 것)
+
+시작: 2026-08-28T07:07:08Z UTC
+리전: ap-northeast-2
+target (c7i.2xlarge, ROLE=p6-target): i-049fc27ab2a98bc0e
+loader (c7i.xlarge, ROLE=p6-loader):  i-0079eae9c7cfd72db
+보안그룹: sg-0382132d2f8b5f6ce (shadowfit-measure-sg)
+키페어: shadowfit-measure
+
+부하 시작 예정 시각·종료 예정 시각은 START.txt 에 기동 직후 기록한다.
+🔴 이 라운드가 끝나면 반드시:
+  aws ec2 terminate-instances --region ap-northeast-2 --instance-ids i-049fc27ab2a98bc0e i-0079eae9c7cfd72db
+
+=== 종료 확인 ===
+2026-08-28T08:17:16Z 양쪽 terminated 확인 (aws ec2 describe-instances State=terminated)

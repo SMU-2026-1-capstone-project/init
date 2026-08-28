@@ -5,7 +5,7 @@ import com.shadowfit.dto.report.record.DailyActivityResponseDto;
 import com.shadowfit.dto.report.record.DailyLogRequestDto;
 import com.shadowfit.dto.report.record.WeeklyActivityResponseDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
-import com.shadowfit.service.Exercise.SessionService;
+import com.shadowfit.service.Exercise.SessionActivityQueryService;
 import com.shadowfit.service.Report.DailyLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,7 +27,7 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 @Slf4j
 public class ExerciseRecordController {
-    private final SessionService sessionService;
+    private final SessionActivityQueryService sessionActivityQueryService;
     private final DailyLogService dailyLogService;
     private final WeeklySummaryService weeklySummaryService;
 
@@ -50,7 +50,7 @@ public class ExerciseRecordController {
     public ResponseEntity<WeeklyActivityResponseDto> getWeeklySummary(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
         // 서비스 로직에서 주간 통계 및 오늘 운동 리스트를 계산해서 반환
         Long memberId = customUserDetails.getMember().getId();
-        WeeklyActivityResponseDto response = sessionService.getWeeklyActivity(memberId);
+        WeeklyActivityResponseDto response = sessionActivityQueryService.getWeeklyActivity(memberId);
         // A층 요약은 기준일 없이(=오늘이 속한 주) 부른다 — 위 집계와 같은 주를 보게 하려는 것이다.
         response.setSummary(weeklySummaryService.getWeeklySummary(memberId, null));
         return ResponseEntity.ok(response);
@@ -63,7 +63,7 @@ public class ExerciseRecordController {
             @RequestParam int year,
             @RequestParam int month) {
         Long memberId = customUserDetails.getMember().getId();
-        CalendarMainResponseDto response = sessionService.getCalendarMain(memberId, year, month);
+        CalendarMainResponseDto response = sessionActivityQueryService.getCalendarMain(memberId, year, month);
         return ResponseEntity.ok(response);
     }
 
@@ -73,7 +73,7 @@ public class ExerciseRecordController {
             @AuthenticationPrincipal CustomUserDetails customUserDetails,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         Long memberId = customUserDetails.getMember().getId();
-        DailyActivityResponseDto response = sessionService.getDailyActivity(memberId, date);
+        DailyActivityResponseDto response = sessionActivityQueryService.getDailyActivity(memberId, date);
         return ResponseEntity.ok(response);
     }
 

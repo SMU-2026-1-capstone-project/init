@@ -1,0 +1,22 @@
+부하 시작: 2026-08-28T07:32:00Z (UTC, 근사)
+워커(계정) 수: 193 / 목표 203 (95% — 캐너리 판과의 레이트리밋 창 겹침으로 초반 10개 로그인 실패, 안정화 후 실패 없음)
+hold_sec: 900 (15분)
+종료 예정: 2026-08-28T10:31:54Z (epoch 1787913114)
+모니터 시작: 2026-08-28T07:21:32Z, base_restart_count=0
+모니터 관찰 종료 예정(꼬리 10분 포함): 약 2026-08-28T10:41:32Z
+대상 컨테이너 캡(실측, docker inspect): shadowfit-ai cpus=4 mem=20GB(20971520000B) · shadowfit-backend cpus=4 mem=2GB(2147483648B) · shadowfit-mysql 무제한
+호스트: c7i.2xlarge 8vCPU 15GiB RAM(target) / c7i.xlarge(loader)
+
+=== 🔴 사고 기록 (진행 중 발견) ===
+07:32 부하 시작 (워커 193개).
+07:32~07:43 사이 어느 시점부터 대상 박스가 SSH·앱 포트(8080/8000/9090) 전부 무응답이 됨.
+  - AWS describe-instance-status: 전 구간 State=running, SystemStatus=ok, InstanceStatus=ok (호스트 헬시)
+  - CloudWatch(사용자 직접 확인): CPUUtilization 최고 24%(포화 아님) · StatusCheckFailed 0 전 구간
+    · NetworkIn 16:01·16:06(JST, ≈07:01·07:06Z 표기 오차 있을 수 있음— 원문 그대로 기록) 폭증(546MB·271MB/5분,
+    부하 절정) 후 거의 0으로 급락, 이후 유지
+  - 직접 TCP 체크: 22(SSH)만 열림, 8080·8000·9090 전부 닫힘/무응답
+  - 정황상 컨테이너 OOM-killer 의심(호스트는 건강한데 무거운 프로세스만 죽고 sshd만 생존하는 전형적 모양) —
+    🔴 단 dmesg/journalctl 로 직접 확인은 못 했다(SSH 자체가 끝내 안 붙음, 90초 타임아웃도 실패)
+07:54 loader 의 부하 스크립트를 강제 종료(pkill) — 이후로도 10분 이상 SSH 계속 실패
+08:06:38Z aws ec2 reboot-instances 로 소프트 리부트 (사용자 승인, EBS 보존) — dmesg 유실 가능성 있음(재부팅 전
+  SSH 를 한 번도 못 붙여 로그를 못 건짐)
