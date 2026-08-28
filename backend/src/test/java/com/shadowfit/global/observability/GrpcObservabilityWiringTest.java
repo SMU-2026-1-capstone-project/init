@@ -37,4 +37,11 @@ class GrpcObservabilityWiringTest {
         assertThat(applicationContext.getBeansWithAnnotation(GrpcGlobalClientInterceptor.class).values())
                 .anyMatch(GrpcCorrelationClientInterceptor.class::isInstance);
     }
+
+    @Test
+    @DisplayName("[#598] in-flight 호출 수 서버 인터셉터가 전역으로 등록돼 있다")
+    void inflightCallInterceptorIsRegisteredGlobally() {
+        assertThat(applicationContext.getBeansWithAnnotation(GrpcGlobalServerInterceptor.class).values())
+                .anyMatch(GrpcInflightCallInterceptor.class::isInstance);
+    }
 }

@@ -2,6 +2,7 @@ package com.shadowfit.global.observability;
 
 import io.grpc.ClientInterceptor;
 import io.grpc.ServerInterceptor;
+import io.micrometer.core.instrument.MeterRegistry;
 import net.devh.boot.grpc.client.interceptor.GrpcGlobalClientInterceptor;
 import net.devh.boot.grpc.server.interceptor.GrpcGlobalServerInterceptor;
 import org.springframework.context.annotation.Bean;
@@ -31,5 +32,16 @@ public class GrpcObservabilityConfig {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public ClientInterceptor grpcCorrelationClientInterceptor() {
         return new GrpcCorrelationClientInterceptor();
+    }
+
+    /**
+     * [#598] in-flight 호출 수 관측용. 인증 인터셉터보다 먼저 돌아야 인증 거부분도 잡힌다는 점은
+     * {@link #grpcCorrelationServerInterceptor()}와 같은 이유라 같은 우선순위에 둔다.
+     */
+    @Bean
+    @GrpcGlobalServerInterceptor
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    public ServerInterceptor grpcInflightCallInterceptor(MeterRegistry registry) {
+        return new GrpcInflightCallInterceptor(registry);
     }
 }
