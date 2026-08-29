@@ -16,6 +16,14 @@
 # 인스턴스가 하나도 없으면 완전히 조용하다(매 세션 시작마다 잡음을 내지 않기 위함).
 set -uo pipefail
 
+# 발동 자체를 남기는 로그 — 인스턴스가 없을 때는 systemMessage 도 안 뜨기 때문에
+# (잡음 방지), 이 로그가 없으면 "훅이 안 돈다"와 "돌지만 조용하다"를 구분할 수 없다.
+# .claude/logs/ 는 .gitignore 예외 목록(hooks/·settings.json·skills/)에 없어서
+# 항상 로컬 전용으로 남는다.
+LOG_FILE=".claude/logs/aws-cost-tripwire.log"
+mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$1" >> "$LOG_FILE" 2>/dev/null || true; }
+
 input=$(cat 2>/dev/null || true)
 
 # PreToolUse(Bash) 이벤트에는 tool_name 이 있다 — 그 경우 run-instances 명령일 때만
@@ -23,8 +31,12 @@ input=$(cat 2>/dev/null || true)
 # 처럼 tool_name 이 없는 이벤트는 무조건 조회한다.
 if printf '%s' "$input" | grep -q '"tool_name"'; then
   if ! printf '%s' "$input" | grep -qE 'run-instances'; then
+    log "skip (run-instances 아닌 Bash 호출)"
     exit 0
   fi
+  TRIGGER="run-instances 직전"
+else
+  TRIGGER="SessionStart"
 fi
 
 ROWS=$(aws ec2 describe-instances \
@@ -33,6 +45,7 @@ ROWS=$(aws ec2 describe-instances \
   --output text 2>/dev/null)
 
 if [ -z "$ROWS" ]; then
+  log "조회함 (${TRIGGER}) — 실행 중 인스턴스 0대"
   exit 0
 fi
 
@@ -57,5 +70,6 @@ done <<< "$ROWS"
 MSG="AWS 비용 관측: Project=shadowfit-measure 태그 인스턴스 ${COUNT}대 실행 중${LINES}"
 ESCAPED=$(printf '%s' "$MSG" | python -c "import json,sys; print(json.dumps(sys.stdin.read()))")
 
+log "조회함 (${TRIGGER}) — 실행 중 인스턴스 ${COUNT}대, systemMessage 출력함"
 printf '{"systemMessage":%s}\n' "$ESCAPED"
 exit 0
