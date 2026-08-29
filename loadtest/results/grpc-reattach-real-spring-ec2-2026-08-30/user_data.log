@@ -1,0 +1,551 @@
++ RUN_ID=grpc-reattach-real-spring-ec2-2026-08-30
++ S3_BASE=s3://shadowfit-measure-055447613012/shadowfit
++ REF=c83de660e10437bd3b296e256f1a66d21af0595b
++ BOOT_TOKEN=reattach-sizing-probe-internal-token
++ PUB_TOKEN=reattach-sizing-probe-public-token
++ PW=1234
++ DB_NAME=shadowfit
++ MAX_RUNTIME_SEC=3300
++ dnf -y install docker git awscli sysstat
++ sleep 3300
++ systemctl enable --now docker
++ mkdir -p /usr/libexec/docker/cli-plugins
++ docker compose version
+++ uname -m
++ curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/libexec/docker/cli-plugins/docker-compose
++ chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+++ docker buildx version
+++ grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+'
+++ head -1
+++ tr -d v
++ BX_VER=0.12.1
+++ awk -v v=0.12.1 'BEGIN{split(v,a,"."); print (a[1]>0 || a[2]>=17) ? 1 : 0}'
++ BX_OK=0
++ '[' 0 '!=' 1 ']'
++ case "$(uname -m)" in
+++ uname -m
++ BX_ARCH=amd64
++ curl -fsSL https://github.com/docker/buildx/releases/download/v0.19.3/buildx-v0.19.3.linux-amd64 -o /usr/libexec/docker/cli-plugins/docker-buildx
++ chmod +x /usr/libexec/docker/cli-plugins/docker-buildx
++ WORKDIR=/root/init
++ git clone -q https://github.com/Shadowfit/init.git /root/init
++ git -C /root/init checkout -q c83de660e10437bd3b296e256f1a66d21af0595b
++ cd /root/init
++ cat
++ docker compose --project-directory /root/init config
++ docker compose up -d mysql
+time="2026-08-29T16:07:29Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Image mysql:8.0 Pulling 
+ edf85873f64e Pulling fs layer 0B
+ 6ef6c7b50a93 Pulling fs layer 0B
+ e3e5d1ac74c1 Pulling fs layer 0B
+ 0d74d296605b Pulling fs layer 0B
+ 297d04cfe470 Pulling fs layer 0B
+ 4c8a3e0d4e4b Pulling fs layer 0B
+ a63160a5eda1 Pulling fs layer 0B
+ 7534d1db9f8d Pulling fs layer 0B
+ 49ec2dab01d9 Pulling fs layer 0B
+ ab24264a27e9 Pulling fs layer 0B
+ 96d30d9fbee8 Pulling fs layer 0B
+ a63160a5eda1 Waiting 0B
+ 7534d1db9f8d Waiting 0B
+ 0d74d296605b Waiting 0B
+ 96d30d9fbee8 Waiting 0B
+ 297d04cfe470 Waiting 0B
+ 4c8a3e0d4e4b Waiting 0B
+ ab24264a27e9 Waiting 0B
+ 49ec2dab01d9 Waiting 0B
+ 6ef6c7b50a93 Download complete 0B
+ e3e5d1ac74c1 Downloading 15.74kB
+ e3e5d1ac74c1 Downloading 783.6kB
+ e3e5d1ac74c1 Verifying Checksum 0B
+ e3e5d1ac74c1 Download complete 0B
+ edf85873f64e Downloading 474.5kB
+ edf85873f64e Downloading 38.96MB
+ edf85873f64e Verifying Checksum 0B
+ edf85873f64e Download complete 0B
+ edf85873f64e Extracting 491.5kB
+ edf85873f64e Extracting 6.39MB
+ edf85873f64e Extracting 10.81MB
+ edf85873f64e Extracting 20.64MB
+ 0d74d296605b Downloading 64.9kB
+ 0d74d296605b Download complete 0B
+ edf85873f64e Extracting 30.47MB
+ 297d04cfe470 Downloading 2.607kB
+ 297d04cfe470 Verifying Checksum 0B
+ 297d04cfe470 Download complete 0B
+ 4c8a3e0d4e4b Downloading 335B
+ 4c8a3e0d4e4b Verifying Checksum 0B
+ 4c8a3e0d4e4b Download complete 0B
+ edf85873f64e Extracting 41.29MB
+ edf85873f64e Extracting 44.24MB
+ edf85873f64e Extracting 47.31MB
+ edf85873f64e Pull complete 0B
+ 6ef6c7b50a93 Extracting 884B
+ 6ef6c7b50a93 Extracting 884B
+ 6ef6c7b50a93 Pull complete 0B
+ e3e5d1ac74c1 Extracting 32.77kB
+ e3e5d1ac74c1 Extracting 783.6kB
+ e3e5d1ac74c1 Extracting 783.6kB
+ e3e5d1ac74c1 Pull complete 0B
+ 0d74d296605b Extracting 65.54kB
+ 0d74d296605b Extracting 5.505MB
+ 0d74d296605b Extracting 6.173MB
+ a63160a5eda1 Downloading 507.3kB
+ 0d74d296605b Pull complete 0B
+ 297d04cfe470 Extracting 2.607kB
+ 297d04cfe470 Extracting 2.607kB
+ 297d04cfe470 Pull complete 0B
+ 4c8a3e0d4e4b Extracting 335B
+ 4c8a3e0d4e4b Extracting 335B
+ 4c8a3e0d4e4b Pull complete 0B
+ 7534d1db9f8d Downloading 316B
+ 7534d1db9f8d Verifying Checksum 0B
+ 7534d1db9f8d Download complete 0B
+ a63160a5eda1 Downloading 41.65MB
+ a63160a5eda1 Verifying Checksum 0B
+ a63160a5eda1 Download complete 0B
+ a63160a5eda1 Extracting 524.3kB
+ 49ec2dab01d9 Downloading 537.5kB
+ 49ec2dab01d9 Downloading 38.73MB
+ a63160a5eda1 Extracting 8.913MB
+ 49ec2dab01d9 Downloading 63.58MB
+ a63160a5eda1 Extracting 17.83MB
+ 49ec2dab01d9 Downloading 102.8MB
+ a63160a5eda1 Extracting 27.26MB
+ 49ec2dab01d9 Verifying Checksum 0B
+ 49ec2dab01d9 Download complete 0B
+ a63160a5eda1 Extracting 36.18MB
+ ab24264a27e9 Downloading 3.501kB
+ ab24264a27e9 Downloading 5.327kB
+ ab24264a27e9 Verifying Checksum 0B
+ ab24264a27e9 Download complete 0B
+ a63160a5eda1 Extracting 44.04MB
+ 96d30d9fbee8 Downloading 120B
+ 96d30d9fbee8 Verifying Checksum 0B
+ 96d30d9fbee8 Download complete 0B
+ a63160a5eda1 Extracting 49.93MB
+ a63160a5eda1 Pull complete 0B
+ 7534d1db9f8d Extracting 316B
+ 7534d1db9f8d Extracting 316B
+ 7534d1db9f8d Pull complete 0B
+ 49ec2dab01d9 Extracting 557.1kB
+ 49ec2dab01d9 Extracting 9.47MB
+ 49ec2dab01d9 Extracting 18.38MB
+ 49ec2dab01d9 Extracting 24.51MB
+ 49ec2dab01d9 Extracting 30.64MB
+ 49ec2dab01d9 Extracting 32.31MB
+ 49ec2dab01d9 Extracting 33.42MB
+ 49ec2dab01d9 Extracting 34.54MB
+ 49ec2dab01d9 Extracting 35.65MB
+ 49ec2dab01d9 Extracting 36.77MB
+ 49ec2dab01d9 Extracting 37.88MB
+ 49ec2dab01d9 Extracting 38.99MB
+ 49ec2dab01d9 Extracting 40.11MB
+ 49ec2dab01d9 Extracting 41.22MB
+ 49ec2dab01d9 Extracting 42.34MB
+ 49ec2dab01d9 Extracting 43.45MB
+ 49ec2dab01d9 Extracting 44.56MB
+ 49ec2dab01d9 Extracting 45.68MB
+ 49ec2dab01d9 Extracting 46.79MB
+ 49ec2dab01d9 Extracting 49.58MB
+ 49ec2dab01d9 Extracting 54.03MB
+ 49ec2dab01d9 Extracting 61.28MB
+ 49ec2dab01d9 Extracting 68.52MB
+ 49ec2dab01d9 Extracting 75.2MB
+ 49ec2dab01d9 Extracting 81.89MB
+ 49ec2dab01d9 Extracting 87.46MB
+ 49ec2dab01d9 Extracting 95.81MB
+ 49ec2dab01d9 Extracting 104.2MB
+ 49ec2dab01d9 Extracting 112.5MB
+ 49ec2dab01d9 Extracting 122.6MB
+ 49ec2dab01d9 Extracting 129.4MB
+ 49ec2dab01d9 Pull complete 0B
+ ab24264a27e9 Extracting 5.327kB
+ ab24264a27e9 Extracting 5.327kB
+ ab24264a27e9 Pull complete 0B
+ 96d30d9fbee8 Extracting 120B
+ 96d30d9fbee8 Extracting 120B
+ 96d30d9fbee8 Pull complete 0B
+ Image mysql:8.0 Pulled 
+ Network init_shadowfit-net Creating 
+ Volume init_mysql_data Creating 
+ Volume init_mysql_data Creating 
+ Network init_shadowfit-net Creating 
+ Volume init_mysql_data Created 
+ Volume init_mysql_data Created 
+ Network init_shadowfit-net Created 
+ Network init_shadowfit-net Created 
+ Container shadowfit-mysql Creating 
+ Container shadowfit-mysql Created 
+ Container shadowfit-mysql Starting 
+ Container shadowfit-mysql Started 
++ mysql_ready=0
+++ seq 1 90
++ for _ in $(seq 1 90)
++ docker exec -e MYSQL_PWD=1234 shadowfit-mysql mysql -uroot -h 127.0.0.1 --protocol=TCP -N -e 'SELECT 1'
++ mysql_ready=0
++ sleep 5
++ for _ in $(seq 1 90)
++ docker exec -e MYSQL_PWD=1234 shadowfit-mysql mysql -uroot -h 127.0.0.1 --protocol=TCP -N -e 'SELECT 1'
++ mysql_ready=0
++ sleep 5
++ for _ in $(seq 1 90)
++ docker exec -e MYSQL_PWD=1234 shadowfit-mysql mysql -uroot -h 127.0.0.1 --protocol=TCP -N -e 'SELECT 1'
++ mysql_ready=1
++ '[' 1 -ge 2 ']'
++ sleep 5
++ for _ in $(seq 1 90)
++ docker exec -e MYSQL_PWD=1234 shadowfit-mysql mysql -uroot -h 127.0.0.1 --protocol=TCP -N -e 'SELECT 1'
++ mysql_ready=2
++ '[' 2 -ge 2 ']'
++ break
++ '[' 2 -ge 2 ']'
++ MIG=/root/init/backend/src/main/resources/db/migration
++ docker run --rm --network host -v /root/init/backend/src/main/resources/db/migration:/flyway/sql:ro flyway/flyway '-url=jdbc:mysql://127.0.0.1:3306/shadowfit?allowPublicKeyRetrieval=true&useSSL=false' -user=root -password=1234 -connectRetries=10 migrate
+Unable to find image 'flyway/flyway:latest' locally
+latest: Pulling from flyway/flyway
+0926a8eb0e60: Pulling fs layer
+22f329e4db3f: Pulling fs layer
+c256661d95c1: Pulling fs layer
+989e0d98c975: Pulling fs layer
+507729e6d2c5: Pulling fs layer
+7c9fb65f1d91: Pulling fs layer
+a2ee5cb34fcc: Pulling fs layer
+507729e6d2c5: Waiting
+7c9fb65f1d91: Waiting
+a2ee5cb34fcc: Waiting
+989e0d98c975: Waiting
+22f329e4db3f: Verifying Checksum
+22f329e4db3f: Download complete
+0926a8eb0e60: Download complete
+c256661d95c1: Verifying Checksum
+c256661d95c1: Download complete
+989e0d98c975: Verifying Checksum
+989e0d98c975: Download complete
+507729e6d2c5: Verifying Checksum
+0926a8eb0e60: Pull complete
+7c9fb65f1d91: Verifying Checksum
+7c9fb65f1d91: Download complete
+22f329e4db3f: Pull complete
+c256661d95c1: Pull complete
+989e0d98c975: Pull complete
+507729e6d2c5: Pull complete
+7c9fb65f1d91: Pull complete
+a2ee5cb34fcc: Verifying Checksum
+a2ee5cb34fcc: Download complete
+a2ee5cb34fcc: Pull complete
+Digest: sha256:ffc79dde4eff1c67d116de55cc959238f8e6f46d878d357e0d9bb428f76dc67d
+Status: Downloaded newer image for flyway/flyway:latest
+WARNING: Storing migrations in 'sql' is not recommended and default scanning of this location may be deprecated in a future release
+Flyway OSS Edition 13.4.0 by Redgate
+
+See release notes here: https://help.red-gate.com/help/flyway-cli13/help_4.aspx?topic=release-notes-and-older-versions/release-notes-for-flyway-engine
+Database: ******** (MySQL 8.0)
+Schema history table `shadowfit`.`flyway_schema_history` does not exist yet
+Successfully validated 10 migrations (execution time 00:00.026s)
+Creating Schema History table `shadowfit`.`flyway_schema_history` ...
+Current version of schema `shadowfit`: << Empty Schema >>
+Migrating schema `shadowfit` to version "1 - baseline"
+Migrating schema `shadowfit` to version "2 - seed master data"
+Migrating schema `shadowfit` to version "3 - add refresh token rotation"
+Migrating schema `shadowfit` to version "4 - seed squat reference"
+Migrating schema `shadowfit` to version "5 - feedback log rep key"
+Migrating schema `shadowfit` to version "6 - add pose data idempotency key"
+Migrating schema `shadowfit` to version "7 - hash refresh token"
+Migrating schema `shadowfit` to version "8 - add session nonce"
+Migrating schema `shadowfit` to version "9 - normalize pose created at"
+Migrating schema `shadowfit` to version "10 - add categories table"
+Successfully applied 10 migrations to schema `shadowfit`, now at version v10 (execution time 00:00.791s)
++ docker compose build shadowfit-backend
+time="2026-08-29T16:08:14Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Image init-shadowfit-backend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 526B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 783B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/gradle:jdk21
+#3 DONE 1.8s
+
+#4 [internal] load metadata for docker.io/library/eclipse-temurin:21-jre
+#4 DONE 1.8s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 172B done
+#5 DONE 0.0s
+
+#6 [stage-1 1/3] FROM docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+#6 resolve docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037 0.0s done
+#6 ...
+
+#7 [internal] load build context
+#7 transferring context: 1.85MB 0.0s done
+#7 DONE 0.1s
+
+#6 [stage-1 1/3] FROM docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+#6 sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037 5.92kB / 5.92kB done
+#6 sha256:57a04a45584adac49fd9384a21e542ef47652030ff2168fab59d1bdf2a027c96 8.72kB / 8.72kB done
+#6 sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 0B / 41.57MB 0.1s
+#6 sha256:d1d7f43094ea37e9ae77ea3ca40026bc1de1bf1dc2cad37b08d66b9a016a2ea6 2.13kB / 2.13kB done
+#6 sha256:f3db1cd940786339b09d8a60e47c66fea9502d788e6fab5bec91a4a77d4ced1c 0B / 393B 0.1s
+#6 sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be 0B / 20.13MB 0.1s
+#6 sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 36.70MB / 41.57MB 0.3s
+#6 sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 41.57MB / 41.57MB 0.3s done
+#6 extracting sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 0.1s
+#6 sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d 0B / 53.10MB 0.4s
+#6 sha256:f3db1cd940786339b09d8a60e47c66fea9502d788e6fab5bec91a4a77d4ced1c 393B / 393B 0.4s done
+#6 sha256:74d4de9c947ffb50bb6447a5c09e24df5e1685b1137f82406f33e6f44bba79d6 0B / 160B 0.5s
+#6 sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be 7.34MB / 20.13MB 0.6s
+#6 sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be 20.13MB / 20.13MB 0.7s done
+#6 sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d 29.36MB / 53.10MB 0.7s
+#6 sha256:74d4de9c947ffb50bb6447a5c09e24df5e1685b1137f82406f33e6f44bba79d6 160B / 160B 0.6s done
+#6 sha256:f6795b7189ec73f2774735d97a688bf9205d69cf49ceeb539654ddd7d70efe53 0B / 2.46kB 0.7s
+#6 sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d 53.10MB / 53.10MB 0.8s done
+#6 sha256:f6795b7189ec73f2774735d97a688bf9205d69cf49ceeb539654ddd7d70efe53 2.46kB / 2.46kB 0.8s done
+#6 extracting sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 1.3s done
+#6 extracting sha256:f3db1cd940786339b09d8a60e47c66fea9502d788e6fab5bec91a4a77d4ced1c done
+#6 extracting sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be 0.1s
+#6 extracting sha256:85685ec585baa5d5d2bc7a9b75a44b2a9633d8bafa3cf68a74e00f17cfd247be 0.4s done
+#6 extracting sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d
+#6 extracting sha256:369da5fd35f25c0fb072631703d8d88a171650f488410bd5e789af82b6b64b2d 0.6s done
+#6 extracting sha256:74d4de9c947ffb50bb6447a5c09e24df5e1685b1137f82406f33e6f44bba79d6 done
+#6 extracting sha256:f6795b7189ec73f2774735d97a688bf9205d69cf49ceeb539654ddd7d70efe53 done
+#6 DONE 3.6s
+
+#8 [builder 1/5] FROM docker.io/library/gradle:jdk21@sha256:c0ce93e022ea2e705332dabe090019c749356576fc8fe39c38129b2aae9ed68f
+#8 resolve docker.io/library/gradle:jdk21@sha256:c0ce93e022ea2e705332dabe090019c749356576fc8fe39c38129b2aae9ed68f 0.0s done
+#8 sha256:0f30df1d5d811a28bf9e104a9aedfff998ea15173e4dc5951178c7eaba9e611d 3.08kB / 3.08kB done
+#8 sha256:fecde584fdf1f751f44d71ae9834cfdaf4fb6a38713bb974948979972e35e982 13.69kB / 13.69kB done
+#8 sha256:06e9d71331fb2b620a4f6c8064e0f84b284bb69a42c7c57b1c962bd4a4cdee76 41.57MB / 41.57MB 0.3s done
+#8 sha256:c0ce93e022ea2e705332dabe090019c749356576fc8fe39c38129b2aae9ed68f 5.23kB / 5.23kB done
+#8 sha256:f3db1cd940786339b09d8a60e47c66fea9502d788e6fab5bec91a4a77d4ced1c 393B / 393B 0.4s done
+#8 sha256:f0b5b340c424d98e3a02290e6a6d5f1b75a6f9c958b90306a38d393a57383967 24.04MB / 24.04MB 1.0s done
+#8 sha256:0886d33635652d1c82ee07ca689366976c3607cdf8dd077db7da18e60d144112 160B / 160B 1.2s done
+#8 sha256:3deee1eac5f9e22d16671d5a8f91662f01c661aa71eee241a888361b8738b493 158.12MB / 158.12MB 1.7s done
+#8 sha256:32c4ecfebe88c2d6748ee3d8062096ebccc73773ff44eef745b58ea9135618df 2.46kB / 2.46kB 1.4s done
+#8 sha256:14869128bd9caad7374e20648e3920cfa7599a3fbd879fa8effd67135766adc0 1.29kB / 1.29kB 1.4s done
+#8 sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 32B / 32B 1.7s done
+#8 sha256:8eed98b1b29cea1e7fbcb9a8dc3b0141da14524f3180a1ca7deadd07682b7488 69.98MB / 69.98MB 2.2s done
+#8 sha256:6a6943842a0f48c39734c30be980a303e9fe81707e10a0f4e2958a9fc152e50a 151.35MB / 151.35MB 3.4s done
+#8 sha256:59a651cadc2305c4e22263bb32d11b0b786e760ec6e14448a7524a227f0451c7 25.61kB / 25.61kB 2.2s done
+#8 extracting sha256:f3db1cd940786339b09d8a60e47c66fea9502d788e6fab5bec91a4a77d4ced1c done
+#8 extracting sha256:f0b5b340c424d98e3a02290e6a6d5f1b75a6f9c958b90306a38d393a57383967 0.5s done
+#8 extracting sha256:3deee1eac5f9e22d16671d5a8f91662f01c661aa71eee241a888361b8738b493 1.2s done
+#8 extracting sha256:0886d33635652d1c82ee07ca689366976c3607cdf8dd077db7da18e60d144112
+#8 extracting sha256:0886d33635652d1c82ee07ca689366976c3607cdf8dd077db7da18e60d144112 done
+#8 extracting sha256:32c4ecfebe88c2d6748ee3d8062096ebccc73773ff44eef745b58ea9135618df
+#8 extracting sha256:32c4ecfebe88c2d6748ee3d8062096ebccc73773ff44eef745b58ea9135618df done
+#8 extracting sha256:14869128bd9caad7374e20648e3920cfa7599a3fbd879fa8effd67135766adc0
+#8 extracting sha256:14869128bd9caad7374e20648e3920cfa7599a3fbd879fa8effd67135766adc0 done
+#8 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1
+#8 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 done
+#8 extracting sha256:8eed98b1b29cea1e7fbcb9a8dc3b0141da14524f3180a1ca7deadd07682b7488
+#8 extracting sha256:8eed98b1b29cea1e7fbcb9a8dc3b0141da14524f3180a1ca7deadd07682b7488 1.4s done
+#8 ...
+
+#9 [stage-1 2/3] WORKDIR /app
+#9 DONE 5.6s
+
+#8 [builder 1/5] FROM docker.io/library/gradle:jdk21@sha256:c0ce93e022ea2e705332dabe090019c749356576fc8fe39c38129b2aae9ed68f
+#8 extracting sha256:6a6943842a0f48c39734c30be980a303e9fe81707e10a0f4e2958a9fc152e50a 0.1s
+#8 extracting sha256:6a6943842a0f48c39734c30be980a303e9fe81707e10a0f4e2958a9fc152e50a 0.7s done
+#8 extracting sha256:59a651cadc2305c4e22263bb32d11b0b786e760ec6e14448a7524a227f0451c7 done
+#8 DONE 10.0s
+
+#10 [builder 2/5] WORKDIR /app
+#10 DONE 2.2s
+
+#11 [builder 3/5] COPY . .
+#11 DONE 0.0s
+
+#12 [builder 4/5] RUN chmod +x ./gradlew
+#12 DONE 0.2s
+
+#13 [builder 5/5] RUN ./gradlew bootJar -x test --no-daemon
+#13 0.385 Downloading https://services.gradle.org/distributions/gradle-8.14.5-bin.zip
+#13 1.000 .............10%.............20%.............30%.............40%.............50%..............60%.............70%.............80%.............90%.............100%
+#13 2.641 
+#13 2.641 Welcome to Gradle 8.14.5!
+#13 2.641 
+#13 2.641 Here are the highlights of this release:
+#13 2.641  - Java 24 support
+#13 2.641  - GraalVM Native Image toolchain selection
+#13 2.642  - Enhancements to test reporting
+#13 2.642  - Build Authoring improvements
+#13 2.642 
+#13 2.642 For more details see https://docs.gradle.org/8.14.5/release-notes.html
+#13 2.642 
+#13 2.741 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+#13 3.541 Daemon will be stopped at the end of the build 
+#13 23.84 > Task :protobufDummy UP-TO-DATE
+#13 25.74 > Task :extractIncludeProto
+#13 25.74 > Task :extractProto
+#13 26.04 > Task :generateProto
+#13 33.44 
+#13 33.44 > Task :compileJava
+#13 33.44 Note: Some input files use or override a deprecated API.
+#13 33.44 Note: Recompile with -Xlint:deprecation for details.
+#13 86.24 
+#13 86.24 > Task :processProtoResources
+#13 86.24 > Task :processResources
+#13 86.24 > Task :classes
+#13 86.24 > Task :resolveMainClassName
+#13 89.02 > Task :bootJar
+#13 89.02 
+#13 89.02 [Incubating] Problems report is available at: file:///app/build/reports/problems/problems-report.html
+#13 89.02 
+#13 89.02 BUILD SUCCESSFUL in 1m 28s
+#13 89.02 8 actionable tasks: 8 executed
+#13 DONE 89.3s
+
+#14 [stage-1 3/3] COPY --from=builder /app/build/libs/*.jar app.jar
+#14 DONE 0.0s
+
+#15 exporting to image
+#15 exporting layers
+#15 exporting layers 0.5s done
+#15 writing image sha256:7c6c3d2c6084b9e713f56ac50fb4a7cba5ac04797b0ed8824208870ab311b8d4
+#15 writing image sha256:7c6c3d2c6084b9e713f56ac50fb4a7cba5ac04797b0ed8824208870ab311b8d4 done
+#15 naming to docker.io/library/init-shadowfit-backend done
+#15 DONE 0.5s
+
+#16 resolving provenance for metadata file
+#16 DONE 0.0s
+ Image init-shadowfit-backend Built 
++ docker compose up -d shadowfit-backend
+time="2026-08-29T16:09:59Z" level=warning msg="/root/init/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container shadowfit-mysql Running 
+ Container shadowfit-backend Creating 
+ Container shadowfit-backend Created 
+ Container shadowfit-mysql Waiting 
+ Container shadowfit-mysql Healthy 
+ Container shadowfit-backend Starting 
+ Container shadowfit-backend Started 
++ echo -n '백엔드 헬스체크 대기'
+백엔드 헬스체크 대기+ backend_ready=0
+++ seq 1 60
++ for _ in $(seq 1 60)
++ curl -sf --max-time 3 http://127.0.0.1:9090/actuator/health
++ sleep 5
++ for _ in $(seq 1 60)
++ curl -sf --max-time 3 http://127.0.0.1:9090/actuator/health
++ sleep 5
++ for _ in $(seq 1 60)
++ curl -sf --max-time 3 http://127.0.0.1:9090/actuator/health
++ backend_ready=1
++ break
++ '[' 1 -eq 1 ']'
++ echo '백엔드 준비됨'
+백엔드 준비됨
++ export BACKEND_GRPC_ADDRESS=127.0.0.1:6565
++ BACKEND_GRPC_ADDRESS=127.0.0.1:6565
++ dnf -y install mesa-libGL glib2
+++ command -v python3.12
+++ true
++ AI_PY_BIN=
++ '[' -z '' ']'
++ dnf -y install python3.12
+++ command -v python3.12
++ AI_PY_BIN=/usr/bin/python3.12
++ '[' -n /usr/bin/python3.12 ']'
++ AI_VENV=/root/init/ai-server/.venv
++ /usr/bin/python3.12 -m venv /root/init/ai-server/.venv
++ /root/init/ai-server/.venv/bin/python -m pip install -q --upgrade pip
++ /root/init/ai-server/.venv/bin/python -m pip install -q -r /root/init/ai-server/requirements.txt
++ cd /root/init/ai-server
++ VENV_PY=/root/init/ai-server/.venv/bin/python
++ bash scripts/gen_proto.sh
+생성기: grpc_tools ok, protobuf 4.25.8
+생성됨:
+exercise_pb2.py
+exercise_pb2_grpc.py
+  exercise_pb2 -> /root/init/ai-server/exercise_pb2.py
+  exercise_pb2_grpc -> /root/init/ai-server/exercise_pb2_grpc.py
+
+✅ backend/ai-server .proto 동일
++ tail -5
++ /root/init/ai-server/.venv/bin/python -m pip install -q py-spy
++ OUT=/root/gil-probe-spring-out
++ mkdir -p /root/gil-probe-spring-out
++ cd /root/init
++ echo '=== AI 프로브 서버 기동 (--cycle, BACKEND_GRPC_ADDRESS=127.0.0.1:6565) ==='
+=== AI 프로브 서버 기동 (--cycle, BACKEND_GRPC_ADDRESS=127.0.0.1:6565) ===
++ nohup /root/init/ai-server/.venv/bin/python loadtest/measure_grpc_threadpool_sizing_reattach.py --python /root/init/ai-server/.venv/bin/python --serve-only --bind 127.0.0.1 --cycle --concurrencies 100
+++ seq 1 60
++ for i in $(seq 1 60)
++ curl -fsS -m 2 http://127.0.0.1:8310/health
++ sleep 1
++ for i in $(seq 1 60)
++ curl -fsS -m 2 http://127.0.0.1:8310/health
++ break
+++ pgrep -f 'uvicorn app.main:app'
+++ head -1
++ SERVER_PID=32381
++ echo SERVER_PID=32381
++ tee -a /root/gil-probe-spring-out/serve.log
+SERVER_PID=32381
++ '[' -n 32381 ']'
++ echo '=== 지속 부하 시작 (동시성 100 · 60판) ==='
+=== 지속 부하 시작 (동시성 100 · 60판) ===
++ LOAD_PID=32428
++ sleep 3
++ nohup /root/init/ai-server/.venv/bin/python loadtest/measure_grpc_threadpool_sizing_reattach.py --python /root/init/ai-server/.venv/bin/python --target-host 127.0.0.1 --cycle --concurrencies 100 --repeats 60 --timeout-sec 15
++ PIDSTAT_PID=33909
++ pidstat -t -p 32381 1 90
++ PYSPY=/root/init/ai-server/.venv/bin/py-spy
++ for i in 1 2 3 4 5
+++ date -u +%FT%T.%NZ
++ echo '=== dump 1 — 2026-08-29T16:10:50.772784774Z ==='
++ /root/init/ai-server/.venv/bin/py-spy dump --pid 32381 --nonblocking
++ sleep 15
++ for i in 1 2 3 4 5
+++ date -u +%FT%T.%NZ
++ echo '=== dump 2 — 2026-08-29T16:11:05.931018240Z ==='
++ /root/init/ai-server/.venv/bin/py-spy dump --pid 32381 --nonblocking
++ sleep 15
++ for i in 1 2 3 4 5
+++ date -u +%FT%T.%NZ
++ echo '=== dump 3 — 2026-08-29T16:11:20.966836411Z ==='
++ /root/init/ai-server/.venv/bin/py-spy dump --pid 32381 --nonblocking
++ sleep 15
++ for i in 1 2 3 4 5
+++ date -u +%FT%T.%NZ
++ echo '=== dump 4 — 2026-08-29T16:11:35.971000119Z ==='
++ /root/init/ai-server/.venv/bin/py-spy dump --pid 32381 --nonblocking
++ sleep 15
++ for i in 1 2 3 4 5
+++ date -u +%FT%T.%NZ
++ echo '=== dump 5 — 2026-08-29T16:11:50.974980277Z ==='
++ /root/init/ai-server/.venv/bin/py-spy dump --pid 32381 --nonblocking
++ sleep 15
++ wait 32428
++ echo '지속 부하 종료 (rc=0)'
+지속 부하 종료 (rc=0)
++ wait 33909
++ free -m
++ docker exec -e MYSQL_PWD=1234 shadowfit-mysql mysql -uroot -h 127.0.0.1 --protocol=TCP shadowfit -e 'SHOW TABLES;'
++ for t in exercise_sessions sessions reports
++ docker exec -e MYSQL_PWD=1234 shadowfit-mysql mysql -uroot -h 127.0.0.1 --protocol=TCP shadowfit -e 'SELECT COUNT(*) AS cnt FROM exercise_sessions;'
++ echo '-- table: exercise_sessions --'
++ for t in exercise_sessions sessions reports
++ docker exec -e MYSQL_PWD=1234 shadowfit-mysql mysql -uroot -h 127.0.0.1 --protocol=TCP shadowfit -e 'SELECT COUNT(*) AS cnt FROM sessions;'
++ echo '-- table: sessions --'
++ for t in exercise_sessions sessions reports
++ docker exec -e MYSQL_PWD=1234 shadowfit-mysql mysql -uroot -h 127.0.0.1 --protocol=TCP shadowfit -e 'SELECT COUNT(*) AS cnt FROM reports;'
++ echo '-- table: reports --'
++ echo '=== S3 업로드 ==='
+=== S3 업로드 ===
++ aws s3 cp /root/gil-probe-spring-out s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-real-spring-ec2-2026-08-30/ --recursive
+Completed 207 Bytes/269.0 KiB (2.4 KiB/s) with 7 file(s) remainingupload: ../gil-probe-spring-out/mem_final.txt to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-real-spring-ec2-2026-08-30/mem_final.txt
+Completed 207 Bytes/269.0 KiB (2.4 KiB/s) with 6 file(s) remainingCompleted 17.9 KiB/269.0 KiB (211.4 KiB/s) with 6 file(s) remainingupload: ../gil-probe-spring-out/pyspy_dumps.txt to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-real-spring-ec2-2026-08-30/pyspy_dumps.txt
+Completed 17.9 KiB/269.0 KiB (211.4 KiB/s) with 5 file(s) remainingCompleted 18.1 KiB/269.0 KiB (211.6 KiB/s) with 5 file(s) remainingupload: ../gil-probe-spring-out/db_counts.txt to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-real-spring-ec2-2026-08-30/db_counts.txt
+Completed 18.1 KiB/269.0 KiB (211.6 KiB/s) with 4 file(s) remainingCompleted 19.1 KiB/269.0 KiB (207.7 KiB/s) with 4 file(s) remainingupload: ../gil-probe-spring-out/sustained_load.log to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-real-spring-ec2-2026-08-30/sustained_load.log
+Completed 19.1 KiB/269.0 KiB (207.7 KiB/s) with 3 file(s) remainingCompleted 268.6 KiB/269.0 KiB (2.8 MiB/s) with 3 file(s) remaining upload: ../gil-probe-spring-out/pidstat_threads.txt to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-real-spring-ec2-2026-08-30/pidstat_threads.txt
+Completed 268.6 KiB/269.0 KiB (2.8 MiB/s) with 2 file(s) remainingCompleted 268.8 KiB/269.0 KiB (2.8 MiB/s) with 2 file(s) remainingupload: ../gil-probe-spring-out/serve.log to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-real-spring-ec2-2026-08-30/serve.log
+Completed 268.8 KiB/269.0 KiB (2.8 MiB/s) with 1 file(s) remainingCompleted 269.0 KiB/269.0 KiB (2.8 MiB/s) with 1 file(s) remainingupload: ../gil-probe-spring-out/db_tables.txt to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-real-spring-ec2-2026-08-30/db_tables.txt
++ UPLOAD_RC=0
++ aws s3 cp /var/log/user-data.log s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-real-spring-ec2-2026-08-30/user_data.log
