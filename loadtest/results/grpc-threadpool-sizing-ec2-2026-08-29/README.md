@@ -1,3 +1,8 @@
+🔴 **정정(2026-08-30)**: 이 문서 §2(ReattachAnalysis)의 "원인 미확정"은 이후
+[`grpc-reattach-split-statelog-ec2-2026-08-30/README.md`](../grpc-reattach-split-statelog-ec2-2026-08-30/README.md)에서
+**서버 프로세스 OOM-kill**로 확정됐다(검출기 메모리를 0.1MB로 잘못 가정 — 실측 ~104.5MB).
+§2 이하는 원래 기록대로 남겨두되, 원인 부분은 위 문서를 우선한다.
+
 # gRPC 스레드풀 max_workers=10 — EC2 재현 (#593 후속 · PR #601 test plan 잔여)
 
 측정일: 2026-08-29 (UTC 12:54~13:21) · 박스: `c7i.4xlarge` 1대(`i-036e17262038d6cff`) — 16 vCPU ·

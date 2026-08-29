@@ -16,8 +16,16 @@ IN_PROGRESS 세션을 자동 재부착하는 경로(#581) — 는 `StopAnalysis`
 1. `resolve_exercise_type` — dict 조회 (싸다)
 2. `_parse_reference_poses` → `extract_angles` — 기준 좌표 JSON 파싱 + 각도 계산 (파이썬 루프)
 3. **`get_pool().acquire(session_id)`** — 처음 보는 세션이면 `PoseDetector()`를 **새로
-   생성한다**(MediaPipe 그래프 초기화, C++ 쪽 작업 — 메모리는 0.1MB뿐이지만 CPU 비용은
-   dict pop과 차원이 다르다)
+   생성한다**(MediaPipe 그래프 초기화, C++ 쪽 작업 — CPU 비용이 dict pop과 차원이 다르다)
+
+   🔴 **정정(2026-08-30, #613)**: 이 줄은 원래 "메모리는 0.1MB뿐"이라고 적혀 있었다 —
+   **틀렸다.** EC2(`c7i.4xlarge`, 16vCPU/30.8GB)에서 실측(`grpc-reattach-split-statelog-
+   ec2-2026-08-30/README.md`)하니 **detector당 약 104.5MB**(OOM 시점 RSS 31.47GB ÷
+   301개)였다 — `bootstrap.sh`가 딴 자리에서 이미 실측해 둔 "98.7MB/개"와 자릿수가 맞는다.
+   이 스크립트가 `POSE_DETECTOR_POOL_SIZE`를 "넉넉히" 크게 잡는 이유(§ 아래)가 바로 이
+   틀린 가정 위에 서 있었다 — **누적 세션 수 × 실제 100MB/개가 박스 RAM을 넘으면 서버가
+   OOM-kill 당한다.** 이 판을 30.8GB 박스에서 돌릴 땐 총 세션 수(≈동시성 합 × 반복 수)를
+   `RAM_GB × 1024 / 105`(대략 박스 RAM MB의 절반 이하) 밑으로 잡을 것.
 4. `get_registry().create_if_absent` — 세션 상태 딕셔너리 생성
 
 즉 이 판은 StopAnalysis 판보다 **"gRPC 스레드풀이 실제로 뭘 큐잉시키는가"에 더 가깝다** —

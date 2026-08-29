@@ -1,3 +1,10 @@
+🔴 **정정(2026-08-30)**: 이 문서 §2·§3의 "원인 미확정"(fail-fast 가설)은 이후
+[`grpc-reattach-split-statelog-ec2-2026-08-30/README.md`](../grpc-reattach-split-statelog-ec2-2026-08-30/README.md)에서
+**서버 프로세스 OOM-kill**로 확정됐다 — 채널이 TRANSIENT_FAILURE로 "플래핑"한 게 아니라
+서버가 죽은 뒤 계속 그 상태였을 뿐이다. 아래 §2의 "성공보다 완료가 많다"는 관측 자체는
+유효하다(OOM 이전 배치는 정상 완료, 그 응답이 늦게 도착했거나 그 사이 다른 배치가
+UNAVAILABLE로 실패한 것과 섞여 집계된 것으로 재해석).
+
 # ReattachAnalysis — 2대 분리 재현 (#613 후속)
 
 측정일: 2026-08-29 (UTC 14:26~14:29) · 대상: `c7i.4xlarge`(`i-00522da2a372233ec`, 16vCPU/물리8,
