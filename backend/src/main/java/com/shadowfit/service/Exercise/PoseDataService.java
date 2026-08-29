@@ -68,6 +68,10 @@ public class PoseDataService {
     @Value("${pose-data.downsample-window:5}")
     private int downsampleWindow = 5;   // 초기값도 둔다 — Spring 밖에서 만들면 0 이 되고, 그 0 은 아래 루프에서 무한 루프다
 
+    // load-test-strategy.md §3.3.2 E2E 상호작용 실험 전용 손잡이. 기본 0=off, 운영 동작 불변.
+    @Value("${pose-data.inject-delay-ms:0}")
+    private int injectDelayMs = 0;
+
     /**
      * [실시간 저장] FastAPI가 주기적으로 쏴주는 분석 좌표 데이터 묶음을 DB에 저장합니다.
      *
@@ -83,6 +87,16 @@ public class PoseDataService {
     @Transactional
     public void savePoseDataBatch(Long sessionId, List<com.shadowfit.grpc.PoseDataRequest> grpcList) {
         if (grpcList == null || grpcList.isEmpty()) return;
+
+        // §3.3.2 실험 전용 — 콜백이 동기 blocking이므로(ai-load-budget.md §4.4) 여기서 지연시키면
+        // 그만큼 AI worker 스레드가 이 gRPC 응답을 기다리는 시간이 늘어난다. 기본값 0이면 무동작.
+        if (injectDelayMs > 0) {
+            try {
+                Thread.sleep(injectDelayMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
 
         // 세션 존재 검증 — pose_data는 파티셔닝을 위해 FK(CASCADE)를 제거해서(2026-07-20,
         // docs/decisions/pose-data-partition-fk-tradeoff.md), 이 체크가 DB의 백업이 아니라

@@ -378,6 +378,9 @@ pose-data:
   #    다세션에서 팔을 바꿔 재려면 재빌드가 필요했고, 그 재빌드가 실험을 막고 있었다(P2).
   #    값을 바꾸는 것은 측정 조건이지 채택이 아니다.
   downsample-window: 5
+  # E2E 상호작용 실험용 측정 손잡이(load-test-strategy.md §3.3.2) — 콜백 처리에 인위 지연을
+  # 얹어 "Spring이 느려지면 AI worker까지 막히는가"를 실측하기 위한 것. 기본 0=off, 운영 동작 불변.
+  inject-delay-ms: ${POSE_INJECT_DELAY_MS:0}
   partition:
     # 이번 달 + 이 개월 수만큼은 보존(버퍼), 그보다 오래된 파티션은 드롭
     retention-buffer-months: 1
