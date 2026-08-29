@@ -89,8 +89,7 @@ INTERNAL_TOKEN = "reattach-sizing-probe-internal-token"
 HTTP_PORT = 8310
 GRPC_PORT = 8786
 
-DEPLOYED_MAX_WORKERS = 10  # 표시용 — server.py를 건드리지 않는다
-EXERCISE_ID = 1            # analyzer_registry.py: 1 = squat (유일하게 분석기가 있는 종목)
+EXERCISE_ID = 1  # analyzer_registry.py: 1 = squat (유일하게 분석기가 있는 종목)
 
 # 검출기 풀 크기 — 이 실행이 만들어낼 수 있는 총 세션 수(discard 포함)보다 훨씬 크게.
 # 실제 계산은 main()에서 스윕 크기로 하지만, 상한을 여기 넉넉히 박아둔다.
@@ -138,24 +137,33 @@ def wait_health(addr: str, deadline_sec: float = 90) -> bool:
     return False
 
 
-def boot(py: str, bind: str, pool_size: int):
+def boot(py: str, bind: str, pool_size: int, http_port: int = HTTP_PORT, grpc_port: int = GRPC_PORT,
+         max_workers: int = 10, log_suffix: str = ""):
+    """서버를 서브프로세스로 띄운다.
+
+    max_workers(#593 후속)는 `GRPC_MAX_WORKERS` 환경변수로 넘긴다 — `app/config.py`가
+    `settings.GRPC_MAX_WORKERS`(기본 10)로 읽어 `server.py`의 스레드풀 크기를 정한다.
+    포트를 바꿀 수 있게 한 이유는 max_workers 여러 값을 **같은 박스에서 동시에** 띄워
+    비교하기 위해서다(라운드를 4번 새로 안 띄운다).
+    """
     env = dict(os.environ)
     env.update({
         "AI_PUBLIC_TOKEN": PUBLIC_TOKEN,
         "INTERNAL_API_TOKEN": INTERNAL_TOKEN,
         "POSE_DETECTOR_POOL_SIZE": str(pool_size),
-        "AI_GRPC_PORT": str(GRPC_PORT),
+        "AI_GRPC_PORT": str(grpc_port),
+        "GRPC_MAX_WORKERS": str(max_workers),
         "FRAME_PATH_METRICS": "false",
         "GIL_SWITCH_INTERVAL": "0.0",
         "GIL_PROBE_INTERVAL": "0.0",
         "POSE_NULL_HANDLER": "false",
         "PYTHONUNBUFFERED": "1",
     })
-    log_path = "grpc_threadpool_sizing_reattach_ai.log"
+    log_path = f"grpc_threadpool_sizing_reattach_ai{log_suffix}.log"
     log = open(log_path, "ab")
     p = subprocess.Popen(
         [py, "-m", "uvicorn", "app.main:app", "--host", bind,
-         "--port", str(HTTP_PORT), "--log-level", "warning"],
+         "--port", str(http_port), "--log-level", "warning"],
         cwd=os.path.join(ROOT, "ai-server"), env=env, stdout=log, stderr=log,
     )
     return p, log, log_path
@@ -249,11 +257,11 @@ def stat(ms: list[float]) -> dict:
 
 
 async def run_sweep(concurrencies: list[int], repeats: int, timeout_sec: float, host: str = "127.0.0.1",
-                     cycle: bool = False):
+                     cycle: bool = False, grpc_port: int = GRPC_PORT):
     import grpc
     import exercise_pb2_grpc  # noqa: F401
 
-    ch = grpc.aio.insecure_channel(f"{host}:{GRPC_PORT}")
+    ch = grpc.aio.insecure_channel(f"{host}:{grpc_port}")
     stub = exercise_pb2_grpc.ExerciseServiceStub(ch)
     if cycle:
         # #613 후속 — 검출기를 매 배치 반납하므로 세션 id를 무한히 늘릴 이유가 없다.
@@ -295,8 +303,12 @@ async def run_sweep(concurrencies: list[int], repeats: int, timeout_sec: float, 
 
 
 def report_and_save(runs, all_outcomes, concurrencies: list[int], a, pool_size: int | None,
-                     state_log: list | None = None, call_log: list | None = None) -> int:
-    """스윕 결과를 표로 찍고 JSON으로 저장한다. 서버 동거/분리 두 모드가 공유한다."""
+                     state_log: list | None = None, call_log: list | None = None,
+                     max_workers: int = 10, out_suffix: str = "") -> int:
+    """스윕 결과를 표로 찍고 JSON으로 저장한다. 서버 동거/분리 두 모드가 공유한다.
+
+    out_suffix(#593 — max_workers 5·10·20·40 비교)를 주면 산출물 파일명이 겹치지 않는다.
+    """
     print()
     print(f"| {'동시성':>6} | {'n':>5} | {'평균ms':>8} | {'p50':>8} | {'p95':>8} "
           f"| {'최대ms':>8} | {'success':>8} |")
@@ -312,7 +324,7 @@ def report_and_save(runs, all_outcomes, concurrencies: list[int], a, pool_size: 
             baseline_p50 = st["p50"]
         ok = sum(1 for o in all_outcomes[c] if o == "ok")
         total = len(all_outcomes[c])
-        mark = " 🔴" if c > DEPLOYED_MAX_WORKERS and baseline_p50 \
+        mark = " 🔴" if c > max_workers and baseline_p50 \
             and st["p50"] > baseline_p50 * 1.5 else ""
         print(f"| {c:>6} | {st['n']:>5} | {st['mean']:>8.2f} | {st['p50']:>8.2f} "
               f"| {st['p95']:>8.2f} | {st['mx']:>8.2f} | {ok:>4}/{total:<3} |{mark}")
@@ -322,7 +334,7 @@ def report_and_save(runs, all_outcomes, concurrencies: list[int], a, pool_size: 
 
     print()
     print(f"기준(동시성 {concurrencies[0]}) p50: {baseline_p50:.2f}ms")
-    print(f"🔴 표시 = p50이 기준의 1.5배를 넘고 max_workers({DEPLOYED_MAX_WORKERS})를 "
+    print(f"🔴 표시 = p50이 기준의 1.5배를 넘고 max_workers({max_workers})를 "
           f"넘는 동시성 — 큐잉 신호 후보. docstring의 '못 가르는 것' 절을 반드시 같이 읽을 것.")
     any_fail = any(s["success"] < s["total"] for s in summary)
     if any_fail:
@@ -331,10 +343,10 @@ def report_and_save(runs, all_outcomes, concurrencies: list[int], a, pool_size: 
     else:
         print(f"실패(비-success) 없음 — 타임아웃({a.timeout_sec}s 상한) 포함 전부 success.")
 
-    out_path = "grpc_threadpool_sizing_reattach_result.json"
+    out_path = f"grpc_threadpool_sizing_reattach_result{out_suffix}.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump({
-            "deployed_max_workers": DEPLOYED_MAX_WORKERS,
+            "deployed_max_workers": max_workers,
             "pool_size": pool_size,
             "target_host": getattr(a, "target_host", "") or "127.0.0.1(동거)",
             "concurrencies": concurrencies,
@@ -347,7 +359,7 @@ def report_and_save(runs, all_outcomes, concurrencies: list[int], a, pool_size: 
     # #613 — 채널 상태 전환·개별 호출 타임스탬프. 집계표만으로는 "몇 시에 무슨 일이
     # 있었는지"를 못 보여준다. TRANSIENT_FAILURE 플래핑 가설을 직접 확인하려는 계측.
     if state_log is not None:
-        state_path = "grpc_channel_state_log.json"
+        state_path = f"grpc_channel_state_log{out_suffix}.json"
         with open(state_path, "w", encoding="utf-8") as f:
             json.dump(state_log, f, ensure_ascii=False, indent=2)
         transitions = [s["state"] for s in state_log]
@@ -355,7 +367,7 @@ def report_and_save(runs, all_outcomes, concurrencies: list[int], a, pool_size: 
         print(f"채널 상태 전환: {len(state_log)}회 (TRANSIENT_FAILURE 진입 {n_transient}회) "
               f"— {state_path}")
     if call_log is not None:
-        call_path = "grpc_call_log.json"
+        call_path = f"grpc_call_log{out_suffix}.json"
         with open(call_path, "w", encoding="utf-8") as f:
             json.dump(call_log, f, ensure_ascii=False, indent=2)
         print(f"개별 호출 {len(call_log)}건 — {call_path}")
@@ -380,6 +392,14 @@ def main() -> int:
     ap.add_argument("--cycle", action="store_true",
                      help="배치마다 ReattachAnalysis 후 StopAnalysis로 반납한다. "
                           "세션 id를 max(concurrencies)개로 순환 — 메모리가 안 는다")
+    # #593 — max_workers 5·10·20·40 비교. 포트·산출물 접미사를 같이 주면 같은 박스에
+    # 여러 max_workers 서버를 동시에 띄우고 순서대로 재는 것도 된다(라운드를 4번 안 띄운다).
+    ap.add_argument("--max-workers", type=int, default=10,
+                     help="서버 스레드풀 크기(GRPC_MAX_WORKERS로 넘긴다). --serve-only/동거 전용")
+    ap.add_argument("--http-port", type=int, default=HTTP_PORT)
+    ap.add_argument("--grpc-port", type=int, default=GRPC_PORT)
+    ap.add_argument("--out-suffix", default="",
+                     help="산출물 파일명 접미사 — 같은 박스에서 여러 max_workers를 돌릴 때 안 겹치게")
     a = ap.parse_args()
 
     py = resolve_python(a.python)
@@ -388,10 +408,12 @@ def main() -> int:
     if a.serve_only:
         pool_size = a.pool_size or (max(int(x) for x in a.concurrencies.split(",")) + 10 if a.cycle else 5000)
         print(f"[serve-only] 인터프리터: {py}")
-        print(f"[serve-only] bind={a.bind} · gRPC {GRPC_PORT}(HTTP {HTTP_PORT}) · pool={pool_size}")
-        p, log, log_path = boot(py, a.bind, pool_size)
+        print(f"[serve-only] bind={a.bind} · gRPC {a.grpc_port}(HTTP {a.http_port}) "
+              f"· max_workers={a.max_workers} · pool={pool_size}")
+        p, log, log_path = boot(py, a.bind, pool_size, http_port=a.http_port, grpc_port=a.grpc_port,
+                                 max_workers=a.max_workers, log_suffix=a.out_suffix)
         try:
-            if not wait_health(f"http://127.0.0.1:{HTTP_PORT}"):
+            if not wait_health(f"http://127.0.0.1:{a.http_port}"):
                 print(f"🔴 서버가 안 떴다 — 로그 확인: {log_path}")
                 return 2
             print("SERVER READY — Ctrl+C 로 종료")
@@ -412,18 +434,20 @@ def main() -> int:
 
     # ── 부하기 박스: 서버 없이 원격으로 붙는다 ─────────────────────────
     if a.target_host:
-        print(f"[target-host={a.target_host}] gRPC {GRPC_PORT}(HTTP {HTTP_PORT}) 로 붙는다"
-              f" — 이 박스는 서버를 안 띄운다")
+        print(f"[target-host={a.target_host}] gRPC {a.grpc_port}(HTTP {a.http_port}) 로 붙는다"
+              f" — 이 박스는 서버를 안 띄운다 · (대상이 max_workers={a.max_workers}로 떴다고 가정)")
         print(f"동시성 스윕: {concurrencies} · {a.repeats}판(+버림판 1) · 판마다 순서를 뒤집는다"
               + (" · --cycle: 배치마다 반납" if a.cycle else ""))
-        if not wait_health(f"http://{a.target_host}:{HTTP_PORT}"):
-            print(f"🔴 대상 서버({a.target_host})가 응답하지 않는다 — --serve-only 로 먼저 띄웠는지,"
-                  f" 보안그룹이 {HTTP_PORT}/{GRPC_PORT} 를 열었는지 확인할 것")
+        if not wait_health(f"http://{a.target_host}:{a.http_port}"):
+            print(f"🔴 대상 서버({a.target_host}:{a.http_port})가 응답하지 않는다 — --serve-only 로 먼저 띄웠는지,"
+                  f" 보안그룹이 {a.http_port}/{a.grpc_port} 를 열었는지 확인할 것")
             return 2
         runs, all_outcomes, state_log, call_log = asyncio.run(
-            run_sweep(concurrencies, a.repeats, a.timeout_sec, host=a.target_host, cycle=a.cycle))
+            run_sweep(concurrencies, a.repeats, a.timeout_sec, host=a.target_host, cycle=a.cycle,
+                      grpc_port=a.grpc_port))
         return report_and_save(runs, all_outcomes, concurrencies, a, pool_size=None,
-                                state_log=state_log, call_log=call_log)
+                                state_log=state_log, call_log=call_log,
+                                max_workers=a.max_workers, out_suffix=a.out_suffix)
 
     # ── 기본: 한 박스에 서버·클라이언트 동거(기존 동작) ────────────────
     if a.cycle:
@@ -434,8 +458,7 @@ def main() -> int:
         pool_size = total_calls + POOL_SIZE_MARGIN
 
     print(f"인터프리터: {py}")
-    print(f"gRPC 포트 {GRPC_PORT} (HTTP {HTTP_PORT}) · 서버 실제 max_workers={DEPLOYED_MAX_WORKERS}"
-          f"(server.py를 건드리지 않는다)")
+    print(f"gRPC 포트 {a.grpc_port} (HTTP {a.http_port}) · 서버 max_workers={a.max_workers}")
     print(f"POSE_DETECTOR_POOL_SIZE={pool_size}"
           + (" (--cycle: max(concurrencies)+10, 반납하며 돈다)" if a.cycle else
              f" (예상 총 호출 {max(concurrencies) + (a.repeats * sum(concurrencies))} + 여유"
@@ -443,16 +466,18 @@ def main() -> int:
     print(f"동시성 스윕: {concurrencies} · {a.repeats}판(+버림판 1) · 판마다 순서를 뒤집는다"
           + (" · --cycle: 배치마다 반납" if a.cycle else ""))
 
-    p, log, log_path = boot(py, a.bind, pool_size)
+    p, log, log_path = boot(py, a.bind, pool_size, http_port=a.http_port, grpc_port=a.grpc_port,
+                             max_workers=a.max_workers, log_suffix=a.out_suffix)
     try:
-        if not wait_health(f"http://127.0.0.1:{HTTP_PORT}"):
+        if not wait_health(f"http://127.0.0.1:{a.http_port}"):
             print(f"🔴 서버가 안 떴다 — 로그 확인: {log_path}")
             return 2
 
         runs, all_outcomes, state_log, call_log = asyncio.run(
-            run_sweep(concurrencies, a.repeats, a.timeout_sec, cycle=a.cycle))
+            run_sweep(concurrencies, a.repeats, a.timeout_sec, cycle=a.cycle, grpc_port=a.grpc_port))
         return report_and_save(runs, all_outcomes, concurrencies, a, pool_size=pool_size,
-                                state_log=state_log, call_log=call_log)
+                                state_log=state_log, call_log=call_log,
+                                max_workers=a.max_workers, out_suffix=a.out_suffix)
     finally:
         p.terminate()
         try:
