@@ -129,7 +129,10 @@ public enum ErrorCode {
     DATABASE_LOCK_FAILURE(500, "I003", "데이터베이스 트랜잭션 처리 중 오류가 발생했습니다."),
 
     //Report
-    REPORT_NOT_FOUND(404,"R001","리포트를 찾을 수 없습니다");
+    REPORT_NOT_FOUND(404,"R001","리포트를 찾을 수 없습니다"),
+
+    // --- 트레이너 실시간 모니터링(SSE) ---
+    NOT_ASSIGNED_TRAINER(403, "T001", "담당 사용자가 아닙니다.");
 
     private final int status;
     private final String code;
