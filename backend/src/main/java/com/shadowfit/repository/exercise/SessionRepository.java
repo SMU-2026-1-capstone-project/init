@@ -279,4 +279,23 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
     List<LocalDateTime> findStartTimesByMemberAndRange(@Param("memberId") Long memberId,
                                                         @Param("start") LocalDateTime start,
                                                         @Param("end") LocalDateTime end);
+
+    /**
+     * intensity-trend(세션3) 전용 — 주 단위 평균 syncRate·총 시간 집계에 필요한 값만 뽑는다.
+     * {@code avgSyncRate IS NOT NULL}로 미완료·rep 미측정 세션을 걸러 애초에 집계 모수에서 뺀다
+     * (2026-08-30 사용자 확인 — totalMinutes도 같은 필터를 공유해 한 행이 "실제로 측정된 운동"만
+     * 대표하게 한다). {@link com.shadowfit.model.exercise.Session#complete} 가 avgSyncRate·endTime을
+     * 같은 호출에서 함께 채우므로 avgSyncRate가 non-null이면 endTime도 항상 non-null이다.
+     */
+    interface IntensitySample {
+        LocalDateTime getStartTime();
+        LocalDateTime getEndTime();
+        java.math.BigDecimal getAvgSyncRate();
+    }
+
+    @Query("SELECT s.startTime AS startTime, s.endTime AS endTime, s.avgSyncRate AS avgSyncRate FROM Session s "
+         + "WHERE s.member.id = :memberId AND s.avgSyncRate IS NOT NULL AND s.startTime BETWEEN :start AND :end")
+    List<IntensitySample> findIntensitySamplesByMemberAndRange(@Param("memberId") Long memberId,
+                                                                @Param("start") LocalDateTime start,
+                                                                @Param("end") LocalDateTime end);
 }

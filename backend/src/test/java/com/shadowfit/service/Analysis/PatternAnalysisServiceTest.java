@@ -1,5 +1,6 @@
 package com.shadowfit.service.Analysis;
 
+import com.shadowfit.dto.pattern.IntensityTrendResponseDto;
 import com.shadowfit.dto.pattern.PeriodicityResponseDto;
 import com.shadowfit.dto.pattern.TimeBucket;
 import com.shadowfit.repository.exercise.SessionRepository;
@@ -10,13 +11,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @DisplayName("PatternAnalysisService 테스트")
@@ -113,5 +118,65 @@ class PatternAnalysisServiceTest {
 
         assertThat(endCaptor.getValue()).isBetween(before, after);
         assertThat(startCaptor.getValue()).isBetween(before.minusWeeks(4), after.minusWeeks(4));
+    }
+
+    @Test
+    @DisplayName("getIntensityTrend — 항상 4주 고정 배열을 월요일 시작으로 오름차순 반환한다")
+    void getIntensityTrend_returnsFourWeeksInOrder() {
+        when(sessionRepository.findIntensitySamplesByMemberAndRange(eq(MEMBER_ID), any(), any()))
+                .thenReturn(List.of());
+
+        IntensityTrendResponseDto result = service.getIntensityTrend(MEMBER_ID);
+
+        assertThat(result.weeklyTrend()).hasSize(4);
+        LocalDate thisMonday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        assertThat(result.weeklyTrend().get(3).weekStart()).isEqualTo(thisMonday);
+        assertThat(result.weeklyTrend().get(0).weekStart()).isEqualTo(thisMonday.minusWeeks(3));
+        for (int i = 1; i < 4; i++) {
+            assertThat(result.weeklyTrend().get(i).weekStart())
+                    .isEqualTo(result.weeklyTrend().get(i - 1).weekStart().plusWeeks(1));
+        }
+    }
+
+    @Test
+    @DisplayName("getIntensityTrend — 세션 없는 주는 avgSyncRate=null, totalMinutes=0")
+    void getIntensityTrend_emptyWeek_nullAvgZeroMinutes() {
+        when(sessionRepository.findIntensitySamplesByMemberAndRange(eq(MEMBER_ID), any(), any()))
+                .thenReturn(List.of());
+
+        IntensityTrendResponseDto result = service.getIntensityTrend(MEMBER_ID);
+
+        assertThat(result.weeklyTrend()).allSatisfy(w -> {
+            assertThat(w.avgSyncRate()).isNull();
+            assertThat(w.totalMinutes()).isZero();
+        });
+    }
+
+    @Test
+    @DisplayName("getIntensityTrend — 같은 주 샘플들의 syncRate 평균과 총 분을 집계한다")
+    void getIntensityTrend_aggregatesWithinWeek() {
+        LocalDate thisMonday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDateTime day1 = thisMonday.atTime(7, 0);
+        LocalDateTime day2 = thisMonday.plusDays(2).atTime(7, 0);
+
+        SessionRepository.IntensitySample s1 = mock(SessionRepository.IntensitySample.class);
+        when(s1.getStartTime()).thenReturn(day1);
+        when(s1.getEndTime()).thenReturn(day1.plusMinutes(20));
+        when(s1.getAvgSyncRate()).thenReturn(new BigDecimal("80.00"));
+
+        SessionRepository.IntensitySample s2 = mock(SessionRepository.IntensitySample.class);
+        when(s2.getStartTime()).thenReturn(day2);
+        when(s2.getEndTime()).thenReturn(day2.plusMinutes(30));
+        when(s2.getAvgSyncRate()).thenReturn(new BigDecimal("90.00"));
+
+        when(sessionRepository.findIntensitySamplesByMemberAndRange(eq(MEMBER_ID), any(), any()))
+                .thenReturn(List.of(s1, s2));
+
+        IntensityTrendResponseDto result = service.getIntensityTrend(MEMBER_ID);
+
+        IntensityTrendResponseDto.WeeklyIntensity thisWeek = result.weeklyTrend().get(3);
+        assertThat(thisWeek.weekStart()).isEqualTo(thisMonday);
+        assertThat(thisWeek.avgSyncRate()).isEqualByComparingTo("85.00");
+        assertThat(thisWeek.totalMinutes()).isEqualTo(50);
     }
 }
