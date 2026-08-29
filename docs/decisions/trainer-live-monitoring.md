@@ -126,8 +126,8 @@ CRUD와 다른 종류의 어려움이 새로 생긴다 — "요청 하나 처리
 | 세션 | 작업 | 단독 | Claude 병행 | 마일스톤 |
 |---|---|:--:|:--:|---|
 | 1 ✅ | ~~`Member.role` 필드 추가(Flyway)~~ → `UserRole`에 `TRAINER` 추가(필드 자체는 기존재, Flyway 불필요로 축소) + 트레이너-사용자 배정 테이블(`trainer_assignments`, V11)/엔티티(`TrainerAssignment`) + `dev-seed.sql` 테스트 배정 시드 + 레포지토리 테스트 4건 | ~~3~4h~~ | 완료(2026-08-30) | DB에 배정 관계 존재, role 기반 인가 골격 확보 — **완료** |
-| 2 | 기존 인증에 role=TRAINER 체크 통합 + 권한 검증 로직·테스트 | 3h | 2h | 권한 없는 트레이너 접근이 403으로 막힘 |
-| 3 | `GET /coaching/trainer/{userId}/stream` 컨트롤러(`SseEmitter`) + 연결 등록 레지스트리 + 생명주기 콜백 | 4h | 2.5h | 연결이 열리고 유지됨(더미 데이터로 확인) |
+| 2 ✅ | ~~기존 인증에 role=TRAINER 체크 통합~~ → 신규 로직 불필요(세션3에서 `@PreAuthorize` 재사용) + `TrainerAuthorizationService`(배정 소유권 검증, `NOT_ASSIGNED_TRAINER` 403) + 유닛 테스트 2건 | ~~3h~~ | 완료(2026-08-30) | 권한 없는 트레이너 접근이 403으로 막힘 — **완료(세션3에서 HTTP 레벨로 확인)** |
+| 3 ✅ | `GET /coaching/trainer/{userId}/stream` 컨트롤러(`SseEmitter`) + `TrainerConnectionRegistry`(userId 키, 다중 디바이스 허용) + 생명주기 콜백 + MockMvc 비동기 통합테스트 3건 | 4h | 완료(2026-08-30) | 연결이 열리고 유지됨(더미 `connected` 이벤트로 확인) — **완료** |
 | 4 | 기존 AI 콜백(`PoseDataService.savePoseDataBatch`)에서 emitter로 결과 중계, 전송 포맷 설계(rep 수·sync_rate·위험 플래그) | 4h | 2.5h | 실제 운동 시 트레이너 화면에 실시간 값 도착 |
 | 5 | heartbeat·정리 로직, 백프레셔 정책(간단히: 실패 시 드롭) | 3h | 2h | 좀비 연결 없이 정리됨 |
 | 6 | SSE 통합 테스트(연결·권한 실패·끊김 케이스) | 3~4h | 2~2.5h | 회귀 고정 |
