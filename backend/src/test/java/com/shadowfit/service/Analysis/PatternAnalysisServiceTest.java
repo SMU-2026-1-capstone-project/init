@@ -1,8 +1,10 @@
 package com.shadowfit.service.Analysis;
 
+import com.shadowfit.dto.pattern.ConsistencyResponseDto;
 import com.shadowfit.dto.pattern.IntensityTrendResponseDto;
 import com.shadowfit.dto.pattern.PeriodicityResponseDto;
 import com.shadowfit.dto.pattern.TimeBucket;
+import com.shadowfit.model.exercise.Status;
 import com.shadowfit.repository.exercise.SessionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -178,5 +180,80 @@ class PatternAnalysisServiceTest {
         assertThat(thisWeek.weekStart()).isEqualTo(thisMonday);
         assertThat(thisWeek.avgSyncRate()).isEqualByComparingTo("85.00");
         assertThat(thisWeek.totalMinutes()).isEqualTo(50);
+    }
+
+    @Test
+    @DisplayName("getConsistency — COMPLETED만 활동일로 카운트한다(Status.COMPLETED로 조회)")
+    void getConsistency_queriesCompletedOnly() {
+        when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
+                .thenReturn(List.of());
+
+        service.getConsistency(MEMBER_ID);
+
+        org.mockito.Mockito.verify(sessionRepository)
+                .findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any());
+    }
+
+    @Test
+    @DisplayName("getConsistency — 오늘까지 연속이면 그 일수를 스트릭으로 반환한다")
+    void getConsistency_streakEndingToday() {
+        LocalDate today = LocalDate.now();
+        List<java.sql.Date> activeDates = List.of(
+                java.sql.Date.valueOf(today),
+                java.sql.Date.valueOf(today.minusDays(1)),
+                java.sql.Date.valueOf(today.minusDays(2))
+        );
+        when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
+                .thenReturn(activeDates);
+
+        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID);
+
+        assertThat(result.currentStreakDays()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("getConsistency — 오늘 활동이 없어도 어제까지 이어졌으면 스트릭을 유지한다")
+    void getConsistency_lenientOnToday() {
+        LocalDate today = LocalDate.now();
+        List<java.sql.Date> activeDates = List.of(
+                java.sql.Date.valueOf(today.minusDays(1)),
+                java.sql.Date.valueOf(today.minusDays(2))
+        );
+        when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
+                .thenReturn(activeDates);
+
+        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID);
+
+        assertThat(result.currentStreakDays()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("getConsistency — 오늘도 어제도 활동이 없으면 스트릭은 0")
+    void getConsistency_gapBreaksStreak() {
+        LocalDate today = LocalDate.now();
+        List<java.sql.Date> activeDates = List.of(java.sql.Date.valueOf(today.minusDays(3)));
+        when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
+                .thenReturn(activeDates);
+
+        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID);
+
+        assertThat(result.currentStreakDays()).isZero();
+    }
+
+    @Test
+    @DisplayName("getConsistency — 결측일은 28에서 활동일 수를 뺀 값이다")
+    void getConsistency_missedDaysIsWindowMinusActive() {
+        LocalDate today = LocalDate.now();
+        List<java.sql.Date> activeDates = List.of(
+                java.sql.Date.valueOf(today),
+                java.sql.Date.valueOf(today.minusDays(5)),
+                java.sql.Date.valueOf(today.minusDays(10))
+        );
+        when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
+                .thenReturn(activeDates);
+
+        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID);
+
+        assertThat(result.missedDaysInLast4Weeks()).isEqualTo(28 - 3);
     }
 }

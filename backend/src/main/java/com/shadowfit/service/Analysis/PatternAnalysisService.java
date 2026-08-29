@@ -4,6 +4,7 @@ import com.shadowfit.dto.pattern.ConsistencyResponseDto;
 import com.shadowfit.dto.pattern.IntensityTrendResponseDto;
 import com.shadowfit.dto.pattern.PeriodicityResponseDto;
 import com.shadowfit.dto.pattern.TimeBucket;
+import com.shadowfit.model.exercise.Status;
 import com.shadowfit.repository.exercise.SessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,6 +31,7 @@ public class PatternAnalysisService {
 
     private static final int PERIODICITY_WINDOW_WEEKS = 4;
     private static final int INTENSITY_TREND_WEEKS = 4;
+    private static final int CONSISTENCY_WINDOW_DAYS = 28;
 
     private final SessionRepository sessionRepository;
 
@@ -104,8 +107,48 @@ public class PatternAnalysisService {
                 .sum();
     }
 
-    // 세션 4 — 골격만. 연속일수·결측일 계산은 다음 세션에서 구현.
+    // 연속 운동일 수·결측일. "활동일"은 COMPLETED만 카운트(2026-08-30 사용자 확인 — periodicity의
+    // 전체 status 관례와 달리, 시작만 하고 중단한 세션까지 "운동함"으로 잡으면 스트릭이 부풀어
+    // consistency 취지와 안 맞음). 윈도우는 rolling 28일(오늘 포함, 사용자 확인).
+    //
+    // ⚠️ 윈도우가 28일이라 streak도 최대 28로 캡된다 — 28일 내내 매일 COMPLETED면 실제로 더 길게
+    // 이어졌어도 이 endpoint에서는 28로 보인다. BE-07 원 문서가 애초에 "최소 4주" 프레임을 전제해
+    // 이 endpoint의 다른 두 지표(periodicity·intensity-trend)와 창을 맞췄다.
     public ConsistencyResponseDto getConsistency(Long memberId) {
-        return new ConsistencyResponseDto(0, 0);
+        LocalDate today = LocalDate.now();
+        LocalDate windowStartDate = today.minusDays(CONSISTENCY_WINDOW_DAYS - 1L);
+        LocalDateTime windowStart = windowStartDate.atStartOfDay();
+        LocalDateTime windowEnd = LocalDateTime.now();
+
+        List<java.sql.Date> activeDates = sessionRepository.findDistinctActiveDates(
+                memberId, List.of(Status.COMPLETED), windowStart, windowEnd);
+        Set<LocalDate> activeDaySet = activeDates.stream()
+                .map(java.sql.Date::toLocalDate)
+                .collect(Collectors.toSet());
+
+        int missedDays = CONSISTENCY_WINDOW_DAYS - activeDaySet.size();
+        int streak = calculateStreak(activeDaySet, today);
+
+        return new ConsistencyResponseDto(streak, missedDays);
+    }
+
+    // 오늘 활동이 없어도 어제까지 이어졌으면 스트릭을 유지한다(관대한 정의, 2026-08-30 사용자 확인)
+    // — 조회 시점(아침/밤)에 따라 스트릭이 끊긴 것처럼 보이는 걸 방지.
+    private static int calculateStreak(Set<LocalDate> activeDaySet, LocalDate today) {
+        LocalDate anchor;
+        if (activeDaySet.contains(today)) {
+            anchor = today;
+        } else if (activeDaySet.contains(today.minusDays(1))) {
+            anchor = today.minusDays(1);
+        } else {
+            return 0;
+        }
+        int streak = 0;
+        LocalDate cursor = anchor;
+        while (activeDaySet.contains(cursor)) {
+            streak++;
+            cursor = cursor.minusDays(1);
+        }
+        return streak;
     }
 }
