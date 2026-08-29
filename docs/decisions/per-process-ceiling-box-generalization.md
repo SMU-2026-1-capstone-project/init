@@ -1,7 +1,10 @@
 # GIL·N=3 결론의 박스 일반화 (#589) — 뭘 어떻게 다르게 띄울까
 
-상태: **분석용 (결정 아님) — 사용자 확인 대기**
+상태: **축 A(SMT 끄기) 실행 완료(2026-08-29) — 축 B(크기)는 여전히 사용자 확인 대기**
 작성일: 2026-08-29
+축 A 결과: **N=3은 SMT에 매인 값이었다 — SMT 끄면 N=2에서 포화.** 원인(GIL)은 재현됨.
+전문: [`../../loadtest/results/proc-count-sweep-smtoff-2026-08-29/README.md`](../../loadtest/results/proc-count-sweep-smtoff-2026-08-29/README.md) ·
+이슈 코멘트: [#589](https://github.com/Shadowfit/init/issues/589#issuecomment-5460728684)
 배경: [`per-process-ceiling-cause.md`](./per-process-ceiling-cause.md) §8·§9(2026-08-24)가
 `c7i.4xlarge`(16 vCPU·물리 8) **한 박스**에서 GIL 원인(`rho≥0.939`, 1.04 vCPU 바닥)과
 N=3 최적을 확정했다. §9-4가 명시적으로 남긴 미답 중 스티키 라우팅(#590)·RAM/N(#591)·
