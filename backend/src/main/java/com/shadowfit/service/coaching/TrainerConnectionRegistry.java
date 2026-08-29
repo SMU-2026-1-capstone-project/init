@@ -1,5 +1,6 @@
 package com.shadowfit.service.coaching;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -22,6 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 인스턴스에 붙은 연결은 못 찾는다 — 지금 규모(DAU 1,000)에서는 해당하지 않는 제약이라
  * 여기서는 다루지 않는다.
  */
+@Slf4j
 @Component
 public class TrainerConnectionRegistry {
 
@@ -38,8 +40,29 @@ public class TrainerConnectionRegistry {
         });
     }
 
-    /** 세션4(AI 콜백 중계)가 쓸 조회 — 지금은 아무도 안 부른다. */
     public List<SseEmitter> getConnections(Long userId) {
         return connectionsByUserId.getOrDefault(userId, new CopyOnWriteArrayList<>());
+    }
+
+    /**
+     * {@code userId}를 보고 있는 모든 트레이너 연결에 이벤트를 보낸다 (세션4).
+     *
+     * <p>실패는 이 메서드 밖으로 절대 나가지 않는다 — 호출자(PoseDataService)는 저장이 이미
+     * 끝난 뒤 커밋 후 훅에서 이 메서드를 부르므로, 트레이너 화면 갱신이 실패해도 저장된 데이터엔
+     * 영향이 없어야 한다. 실패한 연결은 죽은 것으로 보고 레지스트리에서 제거한다.
+     */
+    public void broadcast(Long userId, String eventName, Object payload) {
+        List<SseEmitter> emitters = connectionsByUserId.get(userId);
+        if (emitters == null || emitters.isEmpty()) return;
+
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(SseEmitter.event().name(eventName).data(payload));
+            } catch (Exception e) {
+                log.warn("트레이너 SSE 전송 실패, 연결 제거: userId={}", userId, e);
+                remove(userId, emitter);
+                emitter.completeWithError(e);
+            }
+        }
     }
 }
