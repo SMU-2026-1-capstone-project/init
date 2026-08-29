@@ -162,18 +162,24 @@ def boot(py: str, bind: str, pool_size: int):
 
 
 async def fire_batch(stub, n: int, id_gen, ref_poses_json: str, timeout_sec: float,
-                      batch_tag: str = "", call_log: list | None = None):
+                      batch_tag: str = "", call_log: list | None = None,
+                      release_after: bool = False):
     """n개의 ReattachAnalysis를 동시에 쏘고 (지연ms 목록, 결과분류 목록)을 반환한다.
 
     call_log가 주어지면 호출마다 벽시계 타임스탬프까지 남긴다(#613 — 채널 상태 전환과
     개별 호출을 시간축으로 맞춰보기 위해서다. 집계 통계만으로는 "몇 시에 무슨 일이
     있었는지"를 못 본다).
+
+    release_after=True면(#613 후속 — 실제 검출기 반납 스윕) 이 배치가 acquire한
+    session_id들을 배치가 끝난 뒤 StopAnalysis로 전부 반납한다. id_gen이 유한한 범위를
+    순환하는 생성기라는 전제 — 반납 안 하면 #613이 밝힌 OOM이 그대로 재현된다.
     """
     import grpc
     import exercise_pb2
 
-    async def one():
-        sid = next(id_gen)
+    sids = [next(id_gen) for _ in range(n)]
+
+    async def one(sid: int):
         req = exercise_pb2.ReattachRequest(
             exercise_id=EXERCISE_ID,
             session_id=sid,
@@ -198,9 +204,21 @@ async def fire_batch(stub, n: int, id_gen, ref_poses_json: str, timeout_sec: flo
                               "latency_ms": ms, "outcome": outcome})
         return ms, outcome
 
-    results = await asyncio.gather(*(one() for _ in range(n)))
+    results = await asyncio.gather(*(one(sid) for sid in sids))
     latencies = [r[0] for r in results]
     outcomes = [r[1] for r in results]
+
+    if release_after:
+        async def release_one(sid: int):
+            req = exercise_pb2.StopRequest(session_id=sid)
+            md = (("authorization", f"Bearer {INTERNAL_TOKEN}"),)
+            try:
+                await stub.StopAnalysis(req, metadata=md, timeout=timeout_sec)
+            except grpc.aio.AioRpcError:
+                pass  # 반납 실패는 이 판의 관심사가 아니다 — 다음 배치가 같은 자리를
+                      # 재요청하면 acquire()가 새로 만든다(자리가 안 비었으면 거절될 뿐).
+        await asyncio.gather(*(release_one(sid) for sid in sids))
+
     return latencies, outcomes
 
 
@@ -230,13 +248,21 @@ def stat(ms: list[float]) -> dict:
     )
 
 
-async def run_sweep(concurrencies: list[int], repeats: int, timeout_sec: float, host: str = "127.0.0.1"):
+async def run_sweep(concurrencies: list[int], repeats: int, timeout_sec: float, host: str = "127.0.0.1",
+                     cycle: bool = False):
     import grpc
     import exercise_pb2_grpc  # noqa: F401
 
     ch = grpc.aio.insecure_channel(f"{host}:{GRPC_PORT}")
     stub = exercise_pb2_grpc.ExerciseServiceStub(ch)
-    id_gen = itertools.count(800_000_001)  # StopAnalysis 판과 겹치지 않는 별도 범위
+    if cycle:
+        # #613 후속 — 검출기를 매 배치 반납하므로 세션 id를 무한히 늘릴 이유가 없다.
+        # max(concurrencies)개 자리를 순환한다 — 배치 하나(<= 그 개수) 안에서는 절대
+        # 겹치지 않고, 배치가 끝나면 release_after가 전부 반납한 뒤 다음 배치로 넘어간다.
+        pool_capacity = max(concurrencies)
+        id_gen = itertools.cycle(range(800_000_001, 800_000_001 + pool_capacity))
+    else:
+        id_gen = itertools.count(800_000_001)  # StopAnalysis 판과 겹치지 않는 별도 범위
     ref_poses_json = _synthetic_reference_poses()
 
     state_log: list = []
@@ -245,7 +271,7 @@ async def run_sweep(concurrencies: list[int], repeats: int, timeout_sec: float, 
 
     # 버림판
     await fire_batch(stub, max(concurrencies), id_gen, ref_poses_json, timeout_sec,
-                      "discard", call_log)
+                      "discard", call_log, release_after=cycle)
 
     runs: dict[int, list[list[float]]] = {c: [] for c in concurrencies}
     all_outcomes: dict[int, list[str]] = {c: [] for c in concurrencies}
@@ -255,7 +281,7 @@ async def run_sweep(concurrencies: list[int], repeats: int, timeout_sec: float, 
         for c in seq:
             tag = f"r{r}_c{c}"
             latencies, outcomes = await fire_batch(stub, c, id_gen, ref_poses_json, timeout_sec,
-                                                     tag, call_log)
+                                                     tag, call_log, release_after=cycle)
             runs[c].append(latencies)
             all_outcomes[c].extend(outcomes)
 
@@ -347,16 +373,20 @@ def main() -> int:
     ap.add_argument("--serve-only", action="store_true",
                      help="서버만 띄우고 대기한다(스윕 없음) — 대상 박스에서 쓴다")
     ap.add_argument("--pool-size", type=int, default=0,
-                     help="--serve-only 전용. 0이면 5000(여유 큰 고정값)")
+                     help="--serve-only 전용. 0이면 --cycle 여부로 자동(순환:max+10, 아니면 5000)")
     ap.add_argument("--target-host", default="",
                      help="주어지면 서버를 안 띄우고 이 호스트(:%d)로 붙는다 — 부하기 박스에서 쓴다" % GRPC_PORT)
+    # #613 후속 — 검출기를 실제로 반납하며 도는 스윕(OOM 없이 max_workers=10을 다시 잰다).
+    ap.add_argument("--cycle", action="store_true",
+                     help="배치마다 ReattachAnalysis 후 StopAnalysis로 반납한다. "
+                          "세션 id를 max(concurrencies)개로 순환 — 메모리가 안 는다")
     a = ap.parse_args()
 
     py = resolve_python(a.python)
 
     # ── 대상 박스: 서버만 띄우고 대기 ──────────────────────────────────
     if a.serve_only:
-        pool_size = a.pool_size or 5000
+        pool_size = a.pool_size or (max(int(x) for x in a.concurrencies.split(",")) + 10 if a.cycle else 5000)
         print(f"[serve-only] 인터프리터: {py}")
         print(f"[serve-only] bind={a.bind} · gRPC {GRPC_PORT}(HTTP {HTTP_PORT}) · pool={pool_size}")
         p, log, log_path = boot(py, a.bind, pool_size)
@@ -384,26 +414,34 @@ def main() -> int:
     if a.target_host:
         print(f"[target-host={a.target_host}] gRPC {GRPC_PORT}(HTTP {HTTP_PORT}) 로 붙는다"
               f" — 이 박스는 서버를 안 띄운다")
-        print(f"동시성 스윕: {concurrencies} · {a.repeats}판(+버림판 1) · 판마다 순서를 뒤집는다")
+        print(f"동시성 스윕: {concurrencies} · {a.repeats}판(+버림판 1) · 판마다 순서를 뒤집는다"
+              + (" · --cycle: 배치마다 반납" if a.cycle else ""))
         if not wait_health(f"http://{a.target_host}:{HTTP_PORT}"):
             print(f"🔴 대상 서버({a.target_host})가 응답하지 않는다 — --serve-only 로 먼저 띄웠는지,"
                   f" 보안그룹이 {HTTP_PORT}/{GRPC_PORT} 를 열었는지 확인할 것")
             return 2
         runs, all_outcomes, state_log, call_log = asyncio.run(
-            run_sweep(concurrencies, a.repeats, a.timeout_sec, host=a.target_host))
+            run_sweep(concurrencies, a.repeats, a.timeout_sec, host=a.target_host, cycle=a.cycle))
         return report_and_save(runs, all_outcomes, concurrencies, a, pool_size=None,
                                 state_log=state_log, call_log=call_log)
 
     # ── 기본: 한 박스에 서버·클라이언트 동거(기존 동작) ────────────────
-    total_calls = max(concurrencies) + (a.repeats * sum(concurrencies))
-    pool_size = total_calls + POOL_SIZE_MARGIN
+    if a.cycle:
+        # #613 — 반납하며 도니까 세션 수가 안 는다. 자리는 max(concurrencies)+여유10이면 된다.
+        pool_size = max(concurrencies) + 10
+    else:
+        total_calls = max(concurrencies) + (a.repeats * sum(concurrencies))
+        pool_size = total_calls + POOL_SIZE_MARGIN
 
     print(f"인터프리터: {py}")
     print(f"gRPC 포트 {GRPC_PORT} (HTTP {HTTP_PORT}) · 서버 실제 max_workers={DEPLOYED_MAX_WORKERS}"
           f"(server.py를 건드리지 않는다)")
-    print(f"POSE_DETECTOR_POOL_SIZE={pool_size} (예상 총 호출 {total_calls} + 여유"
-          f" {POOL_SIZE_MARGIN} — 풀 고갈이 신호에 안 섞이게)")
-    print(f"동시성 스윕: {concurrencies} · {a.repeats}판(+버림판 1) · 판마다 순서를 뒤집는다")
+    print(f"POSE_DETECTOR_POOL_SIZE={pool_size}"
+          + (" (--cycle: max(concurrencies)+10, 반납하며 돈다)" if a.cycle else
+             f" (예상 총 호출 {max(concurrencies) + (a.repeats * sum(concurrencies))} + 여유"
+             f" {POOL_SIZE_MARGIN} — 풀 고갈이 신호에 안 섞이게)"))
+    print(f"동시성 스윕: {concurrencies} · {a.repeats}판(+버림판 1) · 판마다 순서를 뒤집는다"
+          + (" · --cycle: 배치마다 반납" if a.cycle else ""))
 
     p, log, log_path = boot(py, a.bind, pool_size)
     try:
@@ -412,7 +450,7 @@ def main() -> int:
             return 2
 
         runs, all_outcomes, state_log, call_log = asyncio.run(
-            run_sweep(concurrencies, a.repeats, a.timeout_sec))
+            run_sweep(concurrencies, a.repeats, a.timeout_sec, cycle=a.cycle))
         return report_and_save(runs, all_outcomes, concurrencies, a, pool_size=pool_size,
                                 state_log=state_log, call_log=call_log)
     finally:
