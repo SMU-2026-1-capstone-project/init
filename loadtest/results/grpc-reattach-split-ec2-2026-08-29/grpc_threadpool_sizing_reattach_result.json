@@ -1,0 +1,137 @@
+{
+  "deployed_max_workers": 10,
+  "pool_size": null,
+  "target_host": "172.31.8.78",
+  "concurrencies": [
+    1,
+    5,
+    8,
+    10,
+    12,
+    15,
+    20,
+    30,
+    50
+  ],
+  "repeats": 5,
+  "timeout_sec": 10.0,
+  "results": [
+    {
+      "concurrency": 1,
+      "n": 5,
+      "mean": 2.3986007999951653,
+      "p50": 0.19506799999646773,
+      "p95": 11.228260999999407,
+      "mx": 11.228260999999407,
+      "success": 1,
+      "total": 5,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 5,
+      "n": 25,
+      "mean": 7.219554840000342,
+      "p50": 0.257127000011792,
+      "p95": 43.95142799999974,
+      "mx": 43.994670000003566,
+      "success": 5,
+      "total": 25,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 8,
+      "n": 40,
+      "mean": 14.279642124999725,
+      "p50": 0.34754899999711597,
+      "p95": 87.74653300000068,
+      "mx": 88.53597099999888,
+      "success": 8,
+      "total": 40,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 10,
+      "n": 50,
+      "mean": 11.388005219999116,
+      "p50": 0.3977669999954969,
+      "p95": 90.56642800000247,
+      "mx": 90.6401680000073,
+      "success": 10,
+      "total": 50,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 12,
+      "n": 60,
+      "mean": 17.423878549999234,
+      "p50": 0.3718650000053003,
+      "p95": 108.4138490000015,
+      "mx": 118.4979960000021,
+      "success": 12,
+      "total": 60,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 15,
+      "n": 75,
+      "mean": 19.406573226666904,
+      "p50": 0.5389650000040547,
+      "p95": 131.19480100000658,
+      "mx": 153.80310599999802,
+      "success": 15,
+      "total": 75,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 20,
+      "n": 100,
+      "mean": 125.12412288999911,
+      "p50": 0.6695699999994531,
+      "p95": 1174.023696000006,
+      "mx": 1174.1165050000006,
+      "success": 33,
+      "total": 100,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 30,
+      "n": 150,
+      "mean": 74.99625521333353,
+      "p50": 0.9799150000020518,
+      "p95": 299.2126970000015,
+      "mx": 316.1210449999885,
+      "success": 60,
+      "total": 150,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 50,
+      "n": 250,
+      "mean": 117.90666519600006,
+      "p50": 3.094005999997762,
+      "p95": 488.62958899999853,
+      "mx": 508.05342799999664,
+      "success": 100,
+      "total": 250,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    }
+  ]
+}
