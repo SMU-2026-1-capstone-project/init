@@ -1,0 +1,177 @@
++ RUN_ID=grpc-reattach-thread-cpu-ec2-2026-08-30
++ S3_BASE=s3://shadowfit-measure-055447613012/shadowfit
++ REF=c83de660e10437bd3b296e256f1a66d21af0595b
++ BOOT_URL=https://raw.githubusercontent.com/Shadowfit/init/c83de660e10437bd3b296e256f1a66d21af0595b/loadtest/aws/bootstrap.sh
++ MAX_RUNTIME_SEC=2700
++ curl -fsSL https://raw.githubusercontent.com/Shadowfit/init/c83de660e10437bd3b296e256f1a66d21af0595b/loadtest/aws/bootstrap.sh -o /root/bootstrap.sh
++ sleep 2700
++ grep -q ai-venv /root/bootstrap.sh
++ cd /root
++ REF=c83de660e10437bd3b296e256f1a66d21af0595b
++ ROLE=ai-venv
++ bash /root/bootstrap.sh
+
+──── 패키지 ────
+  buildx 0.12.1 → 0.19.3 으로 올린다 (compose build 는 0.17+ 를 요구한다)
+  ROLE=ai-venv — docker 데몬을 안 띄운다 (이 박스의 CPU 가 측정 대상이다)
+
+──── 저장소 — https://github.com/Shadowfit/init.git @ c83de660e10437bd3b296e256f1a66d21af0595b ────
+  커밋: c83de66
+
+──── .env ────
+/root/bootstrap.sh: line 158: compose: command not found
+/root/bootstrap.sh: line 158: shadowfit-ai: command not found
+/root/bootstrap.sh: line 158: INTERNAL_API_TOKEN:?: command not found
+/root/bootstrap.sh: line 158: MYSQL_EXPORTER_PASSWORD: command not found
+/root/bootstrap.sh: line 158: :?: command not found
+  MYSQL_ROOT_PASSWORD 를 rig 기본값과 맞췄다 (+ 해석만 되면 되는 변수들)
+  compose 해석 확인 ✅ (mysql 만 띄워도 파일 전체가 해석된다)
+
+──── 파이썬 3.12 — 버전이 측정 조건이다 ────
+  python3.12 이 없다 — 배포판 패키지로 시도한다
+  /usr/bin/python3.12 → Python 3.12.13
+
+──── OpenCV 런타임 의존성 ────
+  pidstat ✅ /usr/bin/pidstat
+
+──── venv — /root/init/ai-server/.venv ────
+
+──── 의존성 — requirements.txt (mediapipe 때문에 3~8분) ────
+
+──── proto 스텁 재생성 ────
+생성기: grpc_tools ok, protobuf 4.25.8
+생성됨:
+exercise_pb2.py
+exercise_pb2_grpc.py
+  exercise_pb2 -> /root/init/ai-server/exercise_pb2.py
+  exercise_pb2_grpc -> /root/init/ai-server/exercise_pb2_grpc.py
+
+✅ backend/ai-server .proto 동일
+
+──── 확인 — import 와 버전 ────
+  python     3.12.13
+  mediapipe  0.10.21
+  opencv     4.11.0
+  numpy      1.26.4
+  grpcio     1.83.1
+
+──── 라운드 조건 기록 ────
+  /root/ai_venv_conditions.txt — 🔴 **결과 디렉터리에 같이 넣을 것**
+
+──── 박스 보정 (#255 축 0) ────
+  INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+  WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+  W0000 00:00:1788018525.427560   30427 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+  W0000 00:00:1788018525.455929   30427 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+  W0000 00:00:1788018525.470839   30437 landmark_projection_calculator.cc:186] Using NORM_RECT without IMAGE_DIMENSIONS is only supported for the square ROI. Provide IMAGE_DIMENSIONS or use PROJECTION_MATRIX.
+  ── 박스 보정 ──
+    박스   : 16 vCPU · 물리 8 · Intel(R) Xeon(R) Platinum 8488C
+    스택   : python 3.12.13 · 커밋 None
+    cpu    : 19,319,307.9 iter/s  (0.1553s)
+    infer  :       70.5 fps  (1.4187s)
+    🔴 판정에 안 쓰더라도 결과 디렉터리에 남길 것 (#255 축 0)
+  조건 파일에 붙였다 — 이 값이 라운드를 건너 비교된다
+  검출기 98.7MB/개(실측) → 풀 201 이면 19.4GB · 이 박스 RAM 30.8GB
+
+──── AI venv 준비됨 (從 R10-a) ────
+  작업 디렉터리 : /root/init
+  커밋          : c83de66 (c83de660e10437bd3b296e256f1a66d21af0595b)
+  인터프리터    : /root/init/ai-server/.venv/bin/python
+  frames.json   : ✅ 커밋본
+  조건 파일     : /root/ai_venv_conditions.txt  ← 결과 디렉터리에 같이 넣을 것
+  CPU 샘플러    : /usr/bin/pidstat  (도커가 없어 docker stats 를 못 쓴다, #400 ⑤)
+
+  다음 — R10-a(1대 동거). 무대 결정은 docs/decisions/r10-loadgen-topology.md §7:
+  cd /root/init &&   nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py     --sessions 160 --dur 90 --pool 201     --plan "A,A,B,A@0.0005,A@0.05,B@0.0005,B,A@0.0005,A@0.05,B@0.0005,A,A@0.0005,A@0.05,B@0.0005,A,B,A@0.05,B@0.0005,A,B,A@0.0005,B@0.0005,A,B,A@0.0005,A@0.05"     --discard 1     --out loadtest/results/frame-path-r10a-$(date +%F) > /root/r10a.log 2>&1 &
+
+  🔴 규모는 **기존 라운드와 같은 조건**이라야 비교가 된다 — 160세션 · 90초 · 풀 201
+     (ai-receive-path-scaling.md §8-2 표 · 풀 201 은 §「그러면 이게 결함 신호다」).
+     rig 기본은 8세션 · 45초 · 풀=세션+4 라 **안 주면 다른 판이 된다.**
+
+  🔴 이 판의 정본은 설계 §13 이다(docs/decisions/ai-receive-path-scaling.md) — 위 문자열은
+     거기서 옮긴 것이고, 바꾸려면 **설계부터** 고칠 것.
+     팔 다섯: A(계측 OFF·GIL 기본) · B(계측 ON) · A@0.0005 · A@0.05(GIL 을 **양방향**으로) ·
+     B@0.0005(계측×GIL **상호작용** — 2×2 를 닫는 칸).
+     5×5 라틴 방격 + 버림 1 = **26판**. 구간 비율·lease 는 **B 계열에서만** 걷힌다.
+  ⏱ 판당 120초면 52분, 160초면 69분. setup(160세션 여는 시간)이 미측정이라 **버림판이 처음 준다.**
+  🔴 handler_concurrency 는 이 판의 판정선이 아니다 — 부하기가 동거해서 절대값이 다친다(§7).
+  ⚠️ nohup 없이 & 만 붙이면 SSH 가 끊길 때 같이 죽는다.
++ BOOT_RC=0
++ '[' 0 -ne 0 ']'
++ WORKDIR=/root/init
++ AI_VENV_PY=/root/init/ai-server/.venv/bin/python
++ OUT=/root/gil-probe-out
++ mkdir -p /root/gil-probe-out
++ cd /root/init
++ dnf -y install sysstat
++ /root/init/ai-server/.venv/bin/python -m pip install -q py-spy
++ tail -5
++ echo '=== 서버 기동 (max_workers=10 기본, --cycle, pool=110) ==='
+=== 서버 기동 (max_workers=10 기본, --cycle, pool=110) ===
++ nohup /root/init/ai-server/.venv/bin/python loadtest/measure_grpc_threadpool_sizing_reattach.py --python /root/init/ai-server/.venv/bin/python --serve-only --bind 127.0.0.1 --cycle --concurrencies 100
+++ seq 1 60
++ for i in $(seq 1 60)
++ curl -fsS -m 2 http://127.0.0.1:8310/health
++ sleep 1
++ for i in $(seq 1 60)
++ curl -fsS -m 2 http://127.0.0.1:8310/health
++ break
+++ pgrep -f 'uvicorn app.main:app'
+++ head -1
++ SERVER_PID=30456
++ echo SERVER_PID=30456
++ tee -a /root/gil-probe-out/serve.log
+SERVER_PID=30456
++ '[' -z 30456 ']'
++ echo '=== 지속 부하 시작 (동시성 100 · 60판, 백그라운드) ==='
+=== 지속 부하 시작 (동시성 100 · 60판, 백그라운드) ===
++ LOAD_PID=30525
++ sleep 3
++ nohup /root/init/ai-server/.venv/bin/python loadtest/measure_grpc_threadpool_sizing_reattach.py --python /root/init/ai-server/.venv/bin/python --target-host 127.0.0.1 --cycle --concurrencies 100 --repeats 60 --timeout-sec 15
++ echo '=== pidstat -t 샘플링 시작 (스레드별 CPU%, 90초) ==='
+=== pidstat -t 샘플링 시작 (스레드별 CPU%, 90초) ===
++ PIDSTAT_PID=35332
++ PYSPY=/root/init/ai-server/.venv/bin/py-spy
++ echo '=== py-spy 덤프 5회(15초 간격) — /root/init/ai-server/.venv/bin/py-spy ==='
++ pidstat -t -p 30456 1 90
+=== py-spy 덤프 5회(15초 간격) — /root/init/ai-server/.venv/bin/py-spy ===
++ for i in 1 2 3 4 5
+++ date -u +%FT%T.%NZ
++ echo '=== dump 1 — 2026-08-29T15:48:51.930872469Z ==='
++ /root/init/ai-server/.venv/bin/py-spy dump --pid 30456 --nonblocking
++ sleep 15
++ for i in 1 2 3 4 5
+++ date -u +%FT%T.%NZ
++ echo '=== dump 2 — 2026-08-29T15:49:07.188219484Z ==='
++ /root/init/ai-server/.venv/bin/py-spy dump --pid 30456 --nonblocking
++ sleep 15
++ for i in 1 2 3 4 5
+++ date -u +%FT%T.%NZ
++ echo '=== dump 3 — 2026-08-29T15:49:22.359870358Z ==='
++ /root/init/ai-server/.venv/bin/py-spy dump --pid 30456 --nonblocking
++ sleep 15
++ for i in 1 2 3 4 5
+++ date -u +%FT%T.%NZ
++ echo '=== dump 4 — 2026-08-29T15:49:37.593459719Z ==='
++ /root/init/ai-server/.venv/bin/py-spy dump --pid 30456 --nonblocking
++ sleep 15
++ for i in 1 2 3 4 5
+++ date -u +%FT%T.%NZ
++ echo '=== dump 5 — 2026-08-29T15:49:52.903524673Z ==='
++ /root/init/ai-server/.venv/bin/py-spy dump --pid 30456 --nonblocking
++ sleep 15
++ wait 30525
++ echo '지속 부하 종료 (rc=0)'
+지속 부하 종료 (rc=0)
++ wait 35332
++ free -m
++ echo '=== S3 업로드 ==='
+=== S3 업로드 ===
++ aws s3 cp /root/gil-probe-out s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-thread-cpu-ec2-2026-08-30/ --recursive
+Completed 1.0 MiB/8.3 MiB (32.6 MiB/s) with 5 file(s) remainingCompleted 1.5 MiB/8.3 MiB (41.3 MiB/s) with 5 file(s) remainingCompleted 2.5 MiB/8.3 MiB (42.5 MiB/s) with 5 file(s) remainingCompleted 3.5 MiB/8.3 MiB (54.6 MiB/s) with 5 file(s) remainingCompleted 4.5 MiB/8.3 MiB (66.5 MiB/s) with 5 file(s) remainingCompleted 4.5 MiB/8.3 MiB (63.6 MiB/s) with 5 file(s) remainingCompleted 5.5 MiB/8.3 MiB (77.7 MiB/s) with 5 file(s) remainingupload: ../gil-probe-out/mem_final.txt to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-thread-cpu-ec2-2026-08-30/mem_final.txt
+Completed 5.5 MiB/8.3 MiB (77.7 MiB/s) with 4 file(s) remainingCompleted 6.5 MiB/8.3 MiB (87.3 MiB/s) with 4 file(s) remainingCompleted 7.5 MiB/8.3 MiB (96.6 MiB/s) with 4 file(s) remainingCompleted 7.5 MiB/8.3 MiB (95.0 MiB/s) with 4 file(s) remainingupload: ../gil-probe-out/sustained_load.log to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-thread-cpu-ec2-2026-08-30/sustained_load.log
+Completed 7.5 MiB/8.3 MiB (95.0 MiB/s) with 3 file(s) remainingCompleted 7.5 MiB/8.3 MiB (94.2 MiB/s) with 3 file(s) remainingupload: ../gil-probe-out/serve.log to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-thread-cpu-ec2-2026-08-30/serve.log
+Completed 7.5 MiB/8.3 MiB (94.2 MiB/s) with 2 file(s) remainingCompleted 8.3 MiB/8.3 MiB (103.6 MiB/s) with 2 file(s) remainingupload: ../gil-probe-out/pyspy_dumps.txt to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-thread-cpu-ec2-2026-08-30/pyspy_dumps.txt
+Completed 8.3 MiB/8.3 MiB (103.6 MiB/s) with 1 file(s) remainingupload: ../gil-probe-out/pidstat_threads.txt to s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-thread-cpu-ec2-2026-08-30/pidstat_threads.txt
++ UPLOAD_RC=0
++ aws s3 cp /var/log/user-data.log s3://shadowfit-measure-055447613012/shadowfit/grpc-reattach-thread-cpu-ec2-2026-08-30/user_data.log
