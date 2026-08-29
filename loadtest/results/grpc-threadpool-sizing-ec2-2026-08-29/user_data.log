@@ -1,0 +1,142 @@
++ RUN_ID=grpc-threadpool-sizing-ec2-2026-08-29
++ S3_BASE=s3://shadowfit-measure-055447613012/shadowfit
++ REF=6d744e1e55530f456bb39c40471a77779d625204
++ BOOT_URL=https://raw.githubusercontent.com/Shadowfit/init/6d744e1e55530f456bb39c40471a77779d625204/loadtest/aws/bootstrap.sh
++ MAX_RUNTIME_SEC=2700
++ WATCHDOG_PID=3736
++ echo '=== bootstrap.sh 받기 (commit SHA 고정) ==='
+=== bootstrap.sh 받기 (commit SHA 고정) ===
++ curl -fsSL https://raw.githubusercontent.com/Shadowfit/init/6d744e1e55530f456bb39c40471a77779d625204/loadtest/aws/bootstrap.sh -o /root/bootstrap.sh
++ sleep 2700
++ grep -q 'ROLE=${ROLE:-db}' /root/bootstrap.sh
++ grep -q ai-venv /root/bootstrap.sh
++ echo 'bootstrap.sh 검증 통과'
+bootstrap.sh 검증 통과
++ echo '=== bootstrap 실행 (ROLE=ai-venv) ==='
+=== bootstrap 실행 (ROLE=ai-venv) ===
++ cd /root
++ REF=6d744e1e55530f456bb39c40471a77779d625204
++ ROLE=ai-venv
++ bash /root/bootstrap.sh
+
+──── 패키지 ────
+  buildx 0.12.1 → 0.19.3 으로 올린다 (compose build 는 0.17+ 를 요구한다)
+  ROLE=ai-venv — docker 데몬을 안 띄운다 (이 박스의 CPU 가 측정 대상이다)
+
+──── 저장소 — https://github.com/Shadowfit/init.git @ 6d744e1e55530f456bb39c40471a77779d625204 ────
+  커밋: 6d744e1
+
+──── .env ────
+/root/bootstrap.sh: line 149: compose: command not found
+/root/bootstrap.sh: line 149: shadowfit-ai: command not found
+/root/bootstrap.sh: line 149: INTERNAL_API_TOKEN:?: command not found
+/root/bootstrap.sh: line 149: MYSQL_EXPORTER_PASSWORD: command not found
+/root/bootstrap.sh: line 149: :?: command not found
+  MYSQL_ROOT_PASSWORD 를 rig 기본값과 맞췄다 (+ 해석만 되면 되는 변수들)
+  compose 해석 확인 ✅ (mysql 만 띄워도 파일 전체가 해석된다)
+
+──── 파이썬 3.12 — 버전이 측정 조건이다 ────
+  python3.12 이 없다 — 배포판 패키지로 시도한다
+  /usr/bin/python3.12 → Python 3.12.13
+
+──── OpenCV 런타임 의존성 ────
+  pidstat ✅ /usr/bin/pidstat
+
+──── venv — /root/init/ai-server/.venv ────
+
+──── 의존성 — requirements.txt (mediapipe 때문에 3~8분) ────
+
+──── proto 스텁 재생성 ────
+생성기: grpc_tools ok, protobuf 4.25.8
+생성됨:
+exercise_pb2.py
+exercise_pb2_grpc.py
+  exercise_pb2 -> /root/init/ai-server/exercise_pb2.py
+  exercise_pb2_grpc -> /root/init/ai-server/exercise_pb2_grpc.py
+
+✅ backend/ai-server .proto 동일
+
+──── 확인 — import 와 버전 ────
+  python     3.12.13
+  mediapipe  0.10.21
+  opencv     4.11.0
+  numpy      1.26.4
+  grpcio     1.83.1
+
+──── 라운드 조건 기록 ────
+  /root/ai_venv_conditions.txt — 🔴 **결과 디렉터리에 같이 넣을 것**
+
+──── 박스 보정 (#255 축 0) ────
+  INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+  WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+  W0000 00:00:1788008055.696560   30422 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+  W0000 00:00:1788008055.728506   30422 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+  W0000 00:00:1788008055.747786   30421 landmark_projection_calculator.cc:186] Using NORM_RECT without IMAGE_DIMENSIONS is only supported for the square ROI. Provide IMAGE_DIMENSIONS or use PROJECTION_MATRIX.
+  ── 박스 보정 ──
+    박스   : 16 vCPU · 물리 8 · Intel(R) Xeon(R) Platinum 8488C
+    스택   : python 3.12.13 · 커밋 None
+    cpu    : 17,655,936.1 iter/s  (0.1699s)
+    infer  :       50.5 fps  (1.981s)
+    🔴 판정에 안 쓰더라도 결과 디렉터리에 남길 것 (#255 축 0)
+  조건 파일에 붙였다 — 이 값이 라운드를 건너 비교된다
+  검출기 98.7MB/개(실측) → 풀 201 이면 19.4GB · 이 박스 RAM 30.8GB
+
+──── AI venv 준비됨 (從 R10-a) ────
+  작업 디렉터리 : /root/init
+  커밋          : 6d744e1 (6d744e1e55530f456bb39c40471a77779d625204)
+  인터프리터    : /root/init/ai-server/.venv/bin/python
+  frames.json   : ✅ 커밋본
+  조건 파일     : /root/ai_venv_conditions.txt  ← 결과 디렉터리에 같이 넣을 것
+  CPU 샘플러    : /usr/bin/pidstat  (도커가 없어 docker stats 를 못 쓴다, #400 ⑤)
+
+  다음 — R10-a(1대 동거). 무대 결정은 docs/decisions/r10-loadgen-topology.md §7:
+  cd /root/init &&   nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py     --sessions 160 --dur 90 --pool 201     --plan "A,A,B,A@0.0005,A@0.05,B@0.0005,B,A@0.0005,A@0.05,B@0.0005,A,A@0.0005,A@0.05,B@0.0005,A,B,A@0.05,B@0.0005,A,B,A@0.0005,B@0.0005,A,B,A@0.0005,A@0.05"     --discard 1     --out loadtest/results/frame-path-r10a-$(date +%F) > /root/r10a.log 2>&1 &
+
+  🔴 규모는 **기존 라운드와 같은 조건**이라야 비교가 된다 — 160세션 · 90초 · 풀 201
+     (ai-receive-path-scaling.md §8-2 표 · 풀 201 은 §「그러면 이게 결함 신호다」).
+     rig 기본은 8세션 · 45초 · 풀=세션+4 라 **안 주면 다른 판이 된다.**
+
+  🔴 이 판의 정본은 설계 §13 이다(docs/decisions/ai-receive-path-scaling.md) — 위 문자열은
+     거기서 옮긴 것이고, 바꾸려면 **설계부터** 고칠 것.
+     팔 다섯: A(계측 OFF·GIL 기본) · B(계측 ON) · A@0.0005 · A@0.05(GIL 을 **양방향**으로) ·
+     B@0.0005(계측×GIL **상호작용** — 2×2 를 닫는 칸).
+     5×5 라틴 방격 + 버림 1 = **26판**. 구간 비율·lease 는 **B 계열에서만** 걷힌다.
+  ⏱ 판당 120초면 52분, 160초면 69분. setup(160세션 여는 시간)이 미측정이라 **버림판이 처음 준다.**
+  🔴 handler_concurrency 는 이 판의 판정선이 아니다 — 부하기가 동거해서 절대값이 다친다(§7).
+  ⚠️ nohup 없이 & 만 붙이면 SSH 가 끊길 때 같이 죽는다.
++ BOOT_RC=0
++ '[' 0 -ne 0 ']'
++ WORKDIR=/root/init
++ AI_VENV_PY=/root/init/ai-server/.venv/bin/python
++ OUT=/root/grpc-sweep-out
++ mkdir -p /root/grpc-sweep-out
++ cd /root/init
++ echo '=== StopAnalysis 동시성 스윕 ==='
+=== StopAnalysis 동시성 스윕 ===
++ /root/init/ai-server/.venv/bin/python loadtest/measure_grpc_threadpool_sizing.py --python /root/init/ai-server/.venv/bin/python --concurrencies 1,5,8,10,12,15,20,30,50 --repeats 5
++ echo 'StopAnalysis rc=0'
+StopAnalysis rc=0
++ cp grpc_threadpool_sizing_result.json /root/grpc-sweep-out/
++ cp grpc_threadpool_sizing_ai.log /root/grpc-sweep-out/stop_analysis_ai.log
++ echo '=== ReattachAnalysis 동시성 스윕 ==='
+=== ReattachAnalysis 동시성 스윕 ===
++ /root/init/ai-server/.venv/bin/python loadtest/measure_grpc_threadpool_sizing_reattach.py --python /root/init/ai-server/.venv/bin/python --concurrencies 1,5,8,10,12,15,20,30,50 --repeats 5
++ echo 'Reattach rc=0'
+Reattach rc=0
++ cp grpc_threadpool_sizing_reattach_result.json /root/grpc-sweep-out/
++ cp grpc_threadpool_sizing_reattach_ai.log /root/grpc-sweep-out/reattach_ai.log
++ cp /root/ai_venv_conditions.txt /root/grpc-sweep-out/
++ cp /root/calibration.tsv /root/grpc-sweep-out/
++ echo '=== S3 업로드 ==='
+=== S3 업로드 ===
++ aws s3 cp /root/grpc-sweep-out s3://shadowfit-measure-055447613012/shadowfit/grpc-threadpool-sizing-ec2-2026-08-29/ --recursive
+Completed 263 Bytes/475.5 KiB (2.9 KiB/s) with 8 file(s) remainingupload: ../grpc-sweep-out/calibration.tsv to s3://shadowfit-measure-055447613012/shadowfit/grpc-threadpool-sizing-ec2-2026-08-29/calibration.tsv
+Completed 263 Bytes/475.5 KiB (2.9 KiB/s) with 7 file(s) remainingCompleted 3.0 KiB/475.5 KiB (33.2 KiB/s) with 7 file(s) remaining upload: ../grpc-sweep-out/grpc_threadpool_sizing_reattach_result.json to s3://shadowfit-measure-055447613012/shadowfit/grpc-threadpool-sizing-ec2-2026-08-29/grpc_threadpool_sizing_reattach_result.json
+Completed 3.0 KiB/475.5 KiB (33.2 KiB/s) with 6 file(s) remainingCompleted 5.2 KiB/475.5 KiB (56.4 KiB/s) with 6 file(s) remainingupload: ../grpc-sweep-out/grpc_threadpool_sizing_result.json to s3://shadowfit-measure-055447613012/shadowfit/grpc-threadpool-sizing-ec2-2026-08-29/grpc_threadpool_sizing_result.json
+Completed 5.2 KiB/475.5 KiB (56.4 KiB/s) with 5 file(s) remainingCompleted 217.0 KiB/475.5 KiB (2.3 MiB/s) with 5 file(s) remainingupload: ../grpc-sweep-out/reattach_ai.log to s3://shadowfit-measure-055447613012/shadowfit/grpc-threadpool-sizing-ec2-2026-08-29/reattach_ai.log
+Completed 217.0 KiB/475.5 KiB (2.3 MiB/s) with 4 file(s) remainingCompleted 218.7 KiB/475.5 KiB (2.2 MiB/s) with 4 file(s) remainingupload: ../grpc-sweep-out/reattach_sweep.log to s3://shadowfit-measure-055447613012/shadowfit/grpc-threadpool-sizing-ec2-2026-08-29/reattach_sweep.log
+Completed 218.7 KiB/475.5 KiB (2.2 MiB/s) with 3 file(s) remainingCompleted 220.1 KiB/475.5 KiB (2.2 MiB/s) with 3 file(s) remainingupload: ../grpc-sweep-out/stop_analysis_sweep.log to s3://shadowfit-measure-055447613012/shadowfit/grpc-threadpool-sizing-ec2-2026-08-29/stop_analysis_sweep.log
+Completed 220.1 KiB/475.5 KiB (2.2 MiB/s) with 2 file(s) remainingCompleted 221.9 KiB/475.5 KiB (2.2 MiB/s) with 2 file(s) remainingupload: ../grpc-sweep-out/ai_venv_conditions.txt to s3://shadowfit-measure-055447613012/shadowfit/grpc-threadpool-sizing-ec2-2026-08-29/ai_venv_conditions.txt
+Completed 221.9 KiB/475.5 KiB (2.2 MiB/s) with 1 file(s) remainingCompleted 475.5 KiB/475.5 KiB (4.4 MiB/s) with 1 file(s) remainingupload: ../grpc-sweep-out/stop_analysis_ai.log to s3://shadowfit-measure-055447613012/shadowfit/grpc-threadpool-sizing-ec2-2026-08-29/stop_analysis_ai.log
++ UPLOAD_RC=0
++ aws s3 cp /var/log/user-data.log s3://shadowfit-measure-055447613012/shadowfit/grpc-threadpool-sizing-ec2-2026-08-29/user_data.log
