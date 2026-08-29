@@ -6,3 +6,7 @@ loadtest/**/*.sh text eol=lf
 # ai-server 셸 스크립트도 같은 이유로 LF 고정 (#586) — entrypoint.sh 가 CRLF 로 풀리면
 # 셰뱅(`#!/bin/bash\r`)이 깨져 컨테이너가 "no such file or directory" 로 즉시 크래시루프에 빠진다.
 ai-server/**/*.sh text eol=lf
+
+# Claude Code 훅도 같은 이유로 LF 고정 — Windows 체크아웃에서 CRLF 가 붙으면 훅이
+# 조용히 깨지거나(비교 실패) bash 파싱이 어긋난다.
+.claude/hooks/**/*.sh text eol=lf

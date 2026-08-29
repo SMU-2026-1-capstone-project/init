@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-ec2-terminate.sh",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
