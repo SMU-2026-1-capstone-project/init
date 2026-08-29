@@ -1,0 +1,14 @@
+[target-host=127.0.0.1] gRPC 8786(HTTP 8310) 로 붙는다 — 이 박스는 서버를 안 띄운다 · (대상이 max_workers=10로 떴다고 가정)
+동시성 스윕: [100] · 60판(+버림판 1) · 판마다 순서를 뒤집는다 · --cycle: 배치마다 반납
+
+|    동시성 |     n |     평균ms |      p50 |      p95 |     최대ms |  success |
+|--------|-------|----------|----------|----------|----------|----------|
+|    100 |  6000 |   427.83 |   418.64 |   798.48 |  1666.72 | 5893/6000 |
+
+기준(동시성 100) p50: 418.64ms
+🔴 표시 = p50이 기준의 1.5배를 넘고 max_workers(10)를 넘는 동시성 — 큐잉 신호 후보. docstring의 '못 가르는 것' 절을 반드시 같이 읽을 것.
+🔴 success가 total보다 작은 동시성이 있다 — 어느 동시성부터인지, non_ok_kinds가 rpcerror(타임아웃 등)인지 fail(정상 거절)인지 JSON에서 확인할 것.
+
+결과: grpc_threadpool_sizing_reattach_result.json
+채널 상태 전환: 4회 (TRANSIENT_FAILURE 진입 1회) — grpc_channel_state_log.json
+개별 호출 6100건 — grpc_call_log.json
