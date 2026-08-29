@@ -265,4 +265,18 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
             + "WHERE s.startTime >= :from AND s.startTime < :to")
     long countDistinctActiveMembersBetween(@Param("from") LocalDateTime from,
                                            @Param("to") LocalDateTime to);
+
+    // ─── 패턴 분석 (BE-07, pattern-analysis-implementation.md §3) ──────────────────
+
+    /**
+     * periodicity 집계 전용 — 요일·시간대 그룹핑에는 {@code startTime} 스칼라 하나만 필요해
+     * {@code findDistinctActiveDates}와 같은 이유로 엔티티 전체를 안 문다. status 필터는 없다 —
+     * "활동"의 정의를 {@code findDistinctActiveDates}(호출부가 {@code Status.values()} 전부를 넘김)와
+     * 동일하게 세션 시작 여부로 본다.
+     */
+    @Query("SELECT s.startTime FROM Session s "
+         + "WHERE s.member.id = :memberId AND s.startTime BETWEEN :start AND :end")
+    List<LocalDateTime> findStartTimesByMemberAndRange(@Param("memberId") Long memberId,
+                                                        @Param("start") LocalDateTime start,
+                                                        @Param("end") LocalDateTime end);
 }
