@@ -197,11 +197,11 @@ def stat(ms: list[float]) -> dict:
     )
 
 
-async def run_sweep(concurrencies: list[int], repeats: int, timeout_sec: float):
+async def run_sweep(concurrencies: list[int], repeats: int, timeout_sec: float, host: str = "127.0.0.1"):
     import grpc
     import exercise_pb2_grpc  # noqa: F401
 
-    ch = grpc.aio.insecure_channel(f"127.0.0.1:{GRPC_PORT}")
+    ch = grpc.aio.insecure_channel(f"{host}:{GRPC_PORT}")
     stub = exercise_pb2_grpc.ExerciseServiceStub(ch)
     id_gen = itertools.count(800_000_001)  # StopAnalysis 판과 겹치지 않는 별도 범위
     ref_poses_json = _synthetic_reference_poses()
@@ -223,6 +223,57 @@ async def run_sweep(concurrencies: list[int], repeats: int, timeout_sec: float):
     return runs, all_outcomes
 
 
+def report_and_save(runs, all_outcomes, concurrencies: list[int], a, pool_size: int | None) -> int:
+    """스윕 결과를 표로 찍고 JSON으로 저장한다. 서버 동거/분리 두 모드가 공유한다."""
+    print()
+    print(f"| {'동시성':>6} | {'n':>5} | {'평균ms':>8} | {'p50':>8} | {'p95':>8} "
+          f"| {'최대ms':>8} | {'success':>8} |")
+    print("|" + "-" * 8 + "|" + "-" * 7 + "|" + "-" * 10 + "|" + "-" * 10 + "|"
+          + "-" * 10 + "|" + "-" * 10 + "|" + "-" * 10 + "|")
+
+    summary = []
+    baseline_p50 = None
+    for c in concurrencies:
+        flat = [x for batch in runs[c] for x in batch]
+        st = stat(flat)
+        if baseline_p50 is None:
+            baseline_p50 = st["p50"]
+        ok = sum(1 for o in all_outcomes[c] if o == "ok")
+        total = len(all_outcomes[c])
+        mark = " 🔴" if c > DEPLOYED_MAX_WORKERS and baseline_p50 \
+            and st["p50"] > baseline_p50 * 1.5 else ""
+        print(f"| {c:>6} | {st['n']:>5} | {st['mean']:>8.2f} | {st['p50']:>8.2f} "
+              f"| {st['p95']:>8.2f} | {st['mx']:>8.2f} | {ok:>4}/{total:<3} |{mark}")
+        non_ok = sorted(set(o for o in all_outcomes[c] if o != "ok"))
+        summary.append({"concurrency": c, **st, "success": ok, "total": total,
+                         "non_ok_kinds": non_ok})
+
+    print()
+    print(f"기준(동시성 {concurrencies[0]}) p50: {baseline_p50:.2f}ms")
+    print(f"🔴 표시 = p50이 기준의 1.5배를 넘고 max_workers({DEPLOYED_MAX_WORKERS})를 "
+          f"넘는 동시성 — 큐잉 신호 후보. docstring의 '못 가르는 것' 절을 반드시 같이 읽을 것.")
+    any_fail = any(s["success"] < s["total"] for s in summary)
+    if any_fail:
+        print("🔴 success가 total보다 작은 동시성이 있다 — 어느 동시성부터인지, "
+              "non_ok_kinds가 rpcerror(타임아웃 등)인지 fail(정상 거절)인지 JSON에서 확인할 것.")
+    else:
+        print(f"실패(비-success) 없음 — 타임아웃({a.timeout_sec}s 상한) 포함 전부 success.")
+
+    out_path = "grpc_threadpool_sizing_reattach_result.json"
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump({
+            "deployed_max_workers": DEPLOYED_MAX_WORKERS,
+            "pool_size": pool_size,
+            "target_host": getattr(a, "target_host", "") or "127.0.0.1(동거)",
+            "concurrencies": concurrencies,
+            "repeats": a.repeats,
+            "timeout_sec": a.timeout_sec,
+            "results": summary,
+        }, f, ensure_ascii=False, indent=2)
+    print(f"\n결과: {out_path}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--python", default="")
@@ -230,14 +281,60 @@ def main() -> int:
     ap.add_argument("--concurrencies", default="1,5,8,10,12,15,20,30,50")
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--timeout-sec", type=float, default=10.0)
+    # 2대 분리 판(#613 — 클라이언트·서버 동거가 교란 요인인지 가른다).
+    ap.add_argument("--serve-only", action="store_true",
+                     help="서버만 띄우고 대기한다(스윕 없음) — 대상 박스에서 쓴다")
+    ap.add_argument("--pool-size", type=int, default=0,
+                     help="--serve-only 전용. 0이면 5000(여유 큰 고정값)")
+    ap.add_argument("--target-host", default="",
+                     help="주어지면 서버를 안 띄우고 이 호스트(:%d)로 붙는다 — 부하기 박스에서 쓴다" % GRPC_PORT)
     a = ap.parse_args()
 
+    py = resolve_python(a.python)
+
+    # ── 대상 박스: 서버만 띄우고 대기 ──────────────────────────────────
+    if a.serve_only:
+        pool_size = a.pool_size or 5000
+        print(f"[serve-only] 인터프리터: {py}")
+        print(f"[serve-only] bind={a.bind} · gRPC {GRPC_PORT}(HTTP {HTTP_PORT}) · pool={pool_size}")
+        p, log, log_path = boot(py, a.bind, pool_size)
+        try:
+            if not wait_health(f"http://127.0.0.1:{HTTP_PORT}"):
+                print(f"🔴 서버가 안 떴다 — 로그 확인: {log_path}")
+                return 2
+            print("SERVER READY — Ctrl+C 로 종료")
+            p.wait()
+            return 0
+        except KeyboardInterrupt:
+            return 0
+        finally:
+            p.terminate()
+            try:
+                p.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                p.kill()
+            log.close()
+
     concurrencies = [int(x) for x in a.concurrencies.split(",")]
-    # 총 호출 수(버림판 포함) 만큼은 최소한 풀에 자리가 있어야 "풀 고갈"이 안 섞인다.
+    sys.path.insert(0, os.path.join(ROOT, "ai-server"))
+
+    # ── 부하기 박스: 서버 없이 원격으로 붙는다 ─────────────────────────
+    if a.target_host:
+        print(f"[target-host={a.target_host}] gRPC {GRPC_PORT}(HTTP {HTTP_PORT}) 로 붙는다"
+              f" — 이 박스는 서버를 안 띄운다")
+        print(f"동시성 스윕: {concurrencies} · {a.repeats}판(+버림판 1) · 판마다 순서를 뒤집는다")
+        if not wait_health(f"http://{a.target_host}:{HTTP_PORT}"):
+            print(f"🔴 대상 서버({a.target_host})가 응답하지 않는다 — --serve-only 로 먼저 띄웠는지,"
+                  f" 보안그룹이 {HTTP_PORT}/{GRPC_PORT} 를 열었는지 확인할 것")
+            return 2
+        runs, all_outcomes = asyncio.run(
+            run_sweep(concurrencies, a.repeats, a.timeout_sec, host=a.target_host))
+        return report_and_save(runs, all_outcomes, concurrencies, a, pool_size=None)
+
+    # ── 기본: 한 박스에 서버·클라이언트 동거(기존 동작) ────────────────
     total_calls = max(concurrencies) + (a.repeats * sum(concurrencies))
     pool_size = total_calls + POOL_SIZE_MARGIN
 
-    py = resolve_python(a.python)
     print(f"인터프리터: {py}")
     print(f"gRPC 포트 {GRPC_PORT} (HTTP {HTTP_PORT}) · 서버 실제 max_workers={DEPLOYED_MAX_WORKERS}"
           f"(server.py를 건드리지 않는다)")
@@ -251,55 +348,8 @@ def main() -> int:
             print(f"🔴 서버가 안 떴다 — 로그 확인: {log_path}")
             return 2
 
-        sys.path.insert(0, os.path.join(ROOT, "ai-server"))
         runs, all_outcomes = asyncio.run(run_sweep(concurrencies, a.repeats, a.timeout_sec))
-
-        print()
-        print(f"| {'동시성':>6} | {'n':>5} | {'평균ms':>8} | {'p50':>8} | {'p95':>8} "
-              f"| {'최대ms':>8} | {'success':>8} |")
-        print("|" + "-" * 8 + "|" + "-" * 7 + "|" + "-" * 10 + "|" + "-" * 10 + "|"
-              + "-" * 10 + "|" + "-" * 10 + "|" + "-" * 10 + "|")
-
-        summary = []
-        baseline_p50 = None
-        for c in concurrencies:
-            flat = [x for batch in runs[c] for x in batch]
-            st = stat(flat)
-            if baseline_p50 is None:
-                baseline_p50 = st["p50"]
-            ok = sum(1 for o in all_outcomes[c] if o == "ok")
-            total = len(all_outcomes[c])
-            mark = " 🔴" if c > DEPLOYED_MAX_WORKERS and baseline_p50 \
-                and st["p50"] > baseline_p50 * 1.5 else ""
-            print(f"| {c:>6} | {st['n']:>5} | {st['mean']:>8.2f} | {st['p50']:>8.2f} "
-                  f"| {st['p95']:>8.2f} | {st['mx']:>8.2f} | {ok:>4}/{total:<3} |{mark}")
-            non_ok = sorted(set(o for o in all_outcomes[c] if o != "ok"))
-            summary.append({"concurrency": c, **st, "success": ok, "total": total,
-                             "non_ok_kinds": non_ok})
-
-        print()
-        print(f"기준(동시성 {concurrencies[0]}) p50: {baseline_p50:.2f}ms")
-        print(f"🔴 표시 = p50이 기준의 1.5배를 넘고 max_workers({DEPLOYED_MAX_WORKERS})를 "
-              f"넘는 동시성 — 큐잉 신호 후보. docstring의 '못 가르는 것' 절을 반드시 같이 읽을 것.")
-        any_fail = any(s["success"] < s["total"] for s in summary)
-        if any_fail:
-            print("🔴 success가 total보다 작은 동시성이 있다 — 어느 동시성부터인지, "
-                  "non_ok_kinds가 rpcerror(타임아웃 등)인지 fail(정상 거절)인지 JSON에서 확인할 것.")
-        else:
-            print(f"실패(비-success) 없음 — 타임아웃({a.timeout_sec}s 상한) 포함 전부 success.")
-
-        out_path = "grpc_threadpool_sizing_reattach_result.json"
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "deployed_max_workers": DEPLOYED_MAX_WORKERS,
-                "pool_size": pool_size,
-                "concurrencies": concurrencies,
-                "repeats": a.repeats,
-                "timeout_sec": a.timeout_sec,
-                "results": summary,
-            }, f, ensure_ascii=False, indent=2)
-        print(f"\n결과: {out_path}")
-        return 0
+        return report_and_save(runs, all_outcomes, concurrencies, a, pool_size=pool_size)
     finally:
         p.terminate()
         try:
