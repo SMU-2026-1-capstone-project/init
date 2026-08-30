@@ -1,8 +1,8 @@
 # 백엔드 포폴 서사 구조 (Spring)
 
 작성일: 2026-06-08
-상태: 서사 구조 확정 — 세부는 진행 중. **최종 동기화: 2026-08-07**(outbox·회복탄력성 완료 반영, keyset 적용 여부 정정, 빈칸 재정리)
-관련: [`realmysql-experiments.md`](./realmysql-experiments.md), [`db-deep-dive.md`](./db-deep-dive.md), [`db-portfolio-roadmap.md`](../decisions/db-portfolio-roadmap.md), [`reference-style-and-caching.md`](../decisions/reference-style-and-caching.md), [`FINAL-REPORT.md`](../FINAL-REPORT.md)
+상태: 서사 구조 확정 — 세부는 진행 중. **최종 동기화: 2026-08-30**(outbox·회복탄력성 완료 반영, keyset 적용 여부 정정, 빈칸 재정리 / 트레이너 SSE 모니터링 추가 — PR #622, main 병합분 반영)
+관련: [`realmysql-experiments.md`](./realmysql-experiments.md), [`db-deep-dive.md`](./db-deep-dive.md), [`db-portfolio-roadmap.md`](../decisions/db-portfolio-roadmap.md), [`reference-style-and-caching.md`](../decisions/reference-style-and-caching.md), [`trainer-live-monitoring.md`](../decisions/trainer-live-monitoring.md), [`FINAL-REPORT.md`](../FINAL-REPORT.md)
 
 > 포지셔닝: AI 아닌 **백엔드(Spring) 신입** 지원. MediaPipe·TTS·포즈는 **무대(substrate)** 일 뿐 셀링 포인트가 아니다.
 
@@ -53,10 +53,12 @@
   > **면접에서 팔 것은 수치가 아니라 두 겹의 의심이다.** ① *"내 최적화가 내 벤치마크를 무효화했을 수 있다"* 를 의심해 재측정했고, ② **그 재측정의 결론도 같은 날 리뷰에서 철회했다** — 처음엔 *"병목이 백엔드 CPU 로 옮겨갔다"* 고 적었는데, 근거로 든 수치(백엔드 128% / MySQL 53%)가 **커밋한 원본에 없었다.** MySQL 지표는 아예 수집하지 않았고, 시계열 전체 창의 최댓값을 실험 구간의 값처럼 인용했다.
   > ✅ **끝까지 파서 천장을 특정했다 — 커밋 `fsync` 였다.** 내구성 설정만 바꿔 **231.6 → 803.1 RPS (3.47배)**. 가는 길에 후보를 하나씩 소거했다: 커넥션 풀(pool 5 vs 20 동일) → 백엔드 CPU(27~37%) → 부하기(`--connections` 1→16 무변화, ghz CPU 13~20%) → **세 박스 전부 유휴인데 처리량 고정 = «계산» 이 아니라 «대기»** → 커밋 경로. [원본](../../loadtest/results/ceiling-fsync-2026-08-08/)
   >
-  > 🔴 **그런데 채택하지 않았다.** 그 3.5배는 **데이터 안전을 판 대가**이고, DAU 1,000 가정에서 231 RPS 는 한참 위다. 안 아픈 것을 고치면서 안전을 파는 셈이라 **«천장의 위치를 안다»로 닫았다.**
+  > 🔴 **그런데 채택하지 않았다.** 그 3.5배는 **데이터 안전을 판 대가**다. 완화 말고 처리량을 올릴 다른 경로가 있는지부터 확인하기로 했다.
   >
   > 🔴 **그리고 다음 날, 그 3.5배가 «내 부하 시나리오의 성질» 이었다는 것을 찾아냈다 (2026-08-09).** 같은 rig·같은 코드·같은 행수에서 **페이로드만** 바꿨다 — 모든 요청이 한 세션으로 가던 것을 100세션에 분산하니 **완화 효과가 3.47배 → 1.03배로 사라졌고**, 처리량 자체가 220 → 649 RPS 로 **2.9배** 올랐다. 한 인덱스 리프에 쓰기가 몰리면 커밋이 직렬화돼 **그룹 커밋이 안 먹는다**(`fsync/커밋` 0.50 vs 0.16). 즉 내가 잰 «천장» 은 시스템의 천장이 아니라 **내 부하 생성기의 천장**이었다.
   > **결정적인 건 그 경고가 이미 우리 저장소 안에 있었다는 것이다** — 두 달 전 내가 만든 다세션 생성기의 헤더에 *"단일 세션에 몰리면 가짜 천장이 생긴다"* 고 적혀 있는데, 정작 두 번의 측정이 그 파일을 안 썼다. **도구는 있었고 안 쓴 것이다.** ([#166](https://github.com/Shadowfit/init/issues/166))
+  >
+  > ✅ **그래서 완화는 필요 없어졌다.** 안전을 유지한 채로도 원인(직렬화)만 없애면 220→649 RPS(2.9배)가 나온다 — «DAU 대비 필요 없다» 가 아니라 **«원인을 없애는 쪽이 안전까지 파는 쪽보다 낫다»** 는 판단이다.
   >
   > ✅ **미측정으로 남겼던 «커밋 횟수 줄이기» 레버도 같이 닫혔다 — 기대와 반대 방향으로.** 여러 rep 을 한 트랜잭션으로 묶으면 처리량이 **27~32% 떨어지고 p99 가 50배** 나빠진다. 총 fsync 는 줄었는데 처리량이 떨어졌으니 fsync 가 구속 조건이 아니고, **커밋을 줄이면 그룹 커밋에 묶일 상대도 같이 줄어**(`fsync/커밋` 0.15 → 0.71) 레버가 자기 발등을 찍는다. [원본](../../loadtest/results/commit-count-2026-08-09/)
   >
@@ -77,6 +79,7 @@
 | **관측성** | **correlation id 전파**(@Async·gRPC 콜백·스케줄러·FastAPI 왕복) + Actuator + **커스텀 지표 9종** + **Prometheus·Grafana 시계열** | 🟢 1차 완료(2026-07-28, [문서](../decisions/observability-correlation-id.md)) · 🟢 **2차 — 관측 스택 (2026-08-08)**. 지표는 3종 → **9종**(아웃박스 3·pose 고아 2 추가). 스냅샷만 보던 것이 시계열이 됐다 — 적체의 *기울기*, 고아 창의 *꼬리(p99)*, 락 충돌의 *부하 상관*은 시계열이라야 답이 나온다. JSON 구조화는 수집기 도입 시. ✅ **같은 날 실전 투입 — 그리고 그 자리에서 «관측의 한계»도 같이 배웠다.** 부하 실험에서 `hikaricp_*` 시계열이 *"풀은 포화인데 `timeout_total` 은 0"* 을 보여줬다(**포화 ≠ 붕괴** — 실패 0 하나만 보면 한가한 것과 버티는 것이 같아 보인다). 🔴 **단 처음 인용한 수치는 틀렸다** — 시계열 전체 창의 최댓값을 실험 구간의 값처럼 적었고, 실제로는 다른 구간(옛 코드 대조군)의 값이었다. 게다가 **스크레이프 15초 vs 판 10초**라 게이지를 판별로 귀속시킬 수 없다. *"지표가 있다"와 "지표를 그 구간에 귀속할 수 있다"는 다르다* — [경위](../../loadtest/results/pool-cliff-2026-08-08/README.md) |
 | **캐싱** | 기준 좌표·TTS 템플릿 = 카탈로그 패턴(유한·불변·공유). 로컬 Caffeine → 다중 인스턴스 시 Redis | 🔶 설계됨 |
 | **보안** | JWT + RefreshToken + blacklist + BCrypt + role | 🟢 있음 |
+| **실시간 스트리밍(SSE)** | 트레이너 라이브 모니터링 — gRPC-Web/WebSocket/WebFlux 검토 후 `Spring MVC` + `SseEmitter` 채택(단방향 1:1엔 WebSocket이 과함). 연결 생명주기(`onCompletion`/`onTimeout`/`onError`) + 30초 하트비트로 half-open 좀비 정리 + 배정 관계 기반 권한 검증(`TrainerAuthorizationService`) | 🟢 **구현·측정 완료(2026-08-30, PR #622)** — [문서](../decisions/trainer-live-monitoring.md). 캐파시티 실측: N=500 동시 연결까지 heartbeat 틱이 30초 예산의 19%(최대 5.7초) — 단 틱 스프레드가 N에 거의 선형이라(50배 → 스프레드 약 45~76배) 외삽하면 N≈2,500~3,000에서 예산에 근접(**외삽이지 실측 아님**), 원인 후보 하나(공유 스케줄러 풀 경합)는 정황만 있고 미확정으로 남김 |
 
 ---
 
@@ -103,7 +106,7 @@
 
 | 구분 | 항목 |
 |---|---|
-| ✅ Built·측정 | 세션 정합성(낙관락·멱등·afterCommit), RealMySQL 카드(배치·인덱스·keyset·파티션·락·MVCC·JSON트림·버퍼풀), JWT/보안, **관측성**(correlation id·커스텀 메트릭, 2026-07-28), **outbox exactly-once**(2026-07-29), **gRPC deadline·서킷브레이커**, **인덱스 구성 통합**(2026-08-07, #110) |
+| ✅ Built·측정 | 세션 정합성(낙관락·멱등·afterCommit), RealMySQL 카드(배치·인덱스·keyset·파티션·락·MVCC·JSON트림·버퍼풀), JWT/보안, **관측성**(correlation id·커스텀 메트릭, 2026-07-28), **outbox exactly-once**(2026-07-29), **gRPC deadline·서킷브레이커**, **인덱스 구성 통합**(2026-08-07, #110), **트레이너 실시간 모니터링(SSE)**(연결 생명주기·하트비트·권한검증·캐파시티실측 N선형, 2026-08-30, PR #622) |
 | 🔶 설계·보강 대상 | 캐싱(카탈로그), 선택형 스타일 기준 |
 | 🔴 빈칸 | TestController 점검·N+1 점검, 구조화 로깅(JSON, 수집기 도입 시), **keyset 페이지네이션**(실험 카드는 있으나 앱 코드엔 없음), **외부 통합 0개**, **CD 워크플로** |
 
