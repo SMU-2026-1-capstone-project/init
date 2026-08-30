@@ -129,7 +129,12 @@ public enum ErrorCode {
     DATABASE_LOCK_FAILURE(500, "I003", "데이터베이스 트랜잭션 처리 중 오류가 발생했습니다."),
 
     //Report
-    REPORT_NOT_FOUND(404,"R001","리포트를 찾을 수 없습니다");
+    REPORT_NOT_FOUND(404,"R001","리포트를 찾을 수 없습니다"),
+
+    // --- 운동 목표 (BE-06) ---
+    GOAL_NOT_FOUND(404, "GL001", "존재하지 않는 목표입니다."),
+    // goalType당 목표 1개 제약(GoalRepository.existsByMemberIdAndGoalType) — 위반 시 이 코드.
+    GOAL_TYPE_DUPLICATION(409, "GL002", "이미 같은 종류의 목표가 있습니다.");
 
     private final int status;
     private final String code;

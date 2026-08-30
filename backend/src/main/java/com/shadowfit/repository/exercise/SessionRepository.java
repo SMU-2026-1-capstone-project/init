@@ -265,4 +265,24 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
             + "WHERE s.startTime >= :from AND s.startTime < :to")
     long countDistinctActiveMembersBetween(@Param("from") LocalDateTime from,
                                            @Param("to") LocalDateTime to);
+
+    // ─── 목표 진척 (BE-06, goal-domain-design.md §4·§7) ──────────────────────────
+
+    /**
+     * 목표 진척 조회 전용 — 최근 N일간(rolling window) COMPLETED 세션의 시작·종료 시각.
+     * WEEKLY_SESSIONS(개수)·WEEKLY_MINUTES(분) 두 goalType을 이 한 번의 조회 결과로
+     * {@code GoalService}가 같이 계산한다(list.size() / Duration 합산 — 별도 컬럼·저장 없이
+     * 조회 시점 직접 계산, 2026-08-30 사용자 confirm). exercise 종목은 안 가린다 — squat-first라
+     * 사실상 스쿼트뿐이지만, 목표는 "총 운동량"이라 종목 무관이 맞다(goal-domain-design.md §3).
+     */
+    interface CompletedSessionWindow {
+        LocalDateTime getStartTime();
+        LocalDateTime getEndTime();
+    }
+
+    @Query("SELECT s.startTime AS startTime, s.endTime AS endTime FROM Session s "
+         + "WHERE s.member.id = :memberId AND s.status = com.shadowfit.model.exercise.Status.COMPLETED "
+         + "AND s.startTime >= :since")
+    List<CompletedSessionWindow> findCompletedSessionWindowsSince(@Param("memberId") Long memberId,
+                                                                   @Param("since") LocalDateTime since);
 }
