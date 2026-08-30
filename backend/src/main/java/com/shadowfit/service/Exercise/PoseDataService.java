@@ -72,6 +72,10 @@ public class PoseDataService {
     @Value("${pose-data.downsample-window:5}")
     private int downsampleWindow = 5;   // 초기값도 둔다 — Spring 밖에서 만들면 0 이 되고, 그 0 은 아래 루프에서 무한 루프다
 
+    // load-test-strategy.md §3.3.2 E2E 상호작용 실험 전용 손잡이. 기본 0=off, 운영 동작 불변.
+    @Value("${pose-data.inject-delay-ms:0}")
+    private int injectDelayMs = 0;
+
     /**
      * [실시간 저장] FastAPI가 주기적으로 쏴주는 분석 좌표 데이터 묶음을 DB에 저장합니다.
      *
@@ -91,6 +95,18 @@ public class PoseDataService {
         // 형식·범위 검증(BE-11) — 세션 조회보다 먼저다. 소유권과 무관한 순수 데이터 검증이라
         // DB를 안 만지고도 판정 가능하고, 어차피 거부할 배치라면 세션 조회조차 낭비다.
         poseDataValidationGate.validate(sessionId, grpcList);
+
+        // §3.3.2 실험 전용 — 콜백이 동기 blocking이므로(ai-load-budget.md §4.4) 여기서 지연시키면
+        // 그만큼 AI worker 스레드가 이 gRPC 응답을 기다리는 시간이 늘어난다. 기본값 0이면 무동작.
+        // 검증(BE-11) 뒤에 둔 이유: 거부될 배치까지 지연시키면 "지연이 AI p99에 미치는 영향"이라는
+        // 실험 취지와 안 맞는 요인(거부 지연)이 섞인다 — 검증 통과한 배치만 지연시켜야 순수하다.
+        if (injectDelayMs > 0) {
+            try {
+                Thread.sleep(injectDelayMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
 
         // 세션 존재 검증 — pose_data는 파티셔닝을 위해 FK(CASCADE)를 제거해서(2026-07-20,
         // docs/decisions/pose-data-partition-fk-tradeoff.md), 이 체크가 DB의 백업이 아니라

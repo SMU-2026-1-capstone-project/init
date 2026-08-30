@@ -140,6 +140,9 @@ services:
       # 이것도 측정용 손잡이다: 위쪽 상한이 «더 던지는데 안 벌리는» 이유 후보를 재려면 팔이 필요하다.
       SHADOWFIT_POSE_DEADLOCK_BACKOFF_MS: ${POSE_DEADLOCK_BACKOFF_MS:-0}
       SHADOWFIT_POSE_DEADLOCK_BACKOFF_JITTER: ${POSE_DEADLOCK_BACKOFF_JITTER:-false}
+      # §3.3.2 E2E 상호작용 실험 손잡이. 기본 0=off — 콜백에 인위 지연을 얹어 AI worker 가
+      # 얼마나 막히는지 잰다(load-test-strategy.md).
+      POSE_INJECT_DELAY_MS: ${POSE_INJECT_DELAY_MS:-0}
     depends_on:
       mysql:
         condition: service_healthy
