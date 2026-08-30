@@ -59,6 +59,7 @@
 - **파티션 TTL 자동화** — 만료 파티션 DROP + 미래 파티션 선확보. `pfuture MAXVALUE`로 적재 실패 자체를 구조적으로 차단
 - **자원 상한을 «실측에서 유도»한다** — 동시 세션 상한을 숫자로 박지 않고 `(컨테이너 메모리 한도 − 기본 RSS) ÷ 검출기 1개 98.7MB`([실측](../../loadtest/results/detector-memory-2026-08-11/))로 계산한다. 환경(로컬/EC2)이 바뀌어도 코드가 안 바뀌고, **근거 없는 기준값이 코드에 안 들어간다.** 한도도 설정도 없으면 기동을 거부한다
 - **관측성** — correlation id 5단계 전파 + 커스텀 지표 **9종**(코드 확인: [`SessionMetrics.java`](../../backend/src/main/java/com/shadowfit/global/observability/SessionMetrics.java) — 상태전이·낙관락충돌·배치행수·AI중단결과·아웃박스 3종·고아행 2종) + Prometheus·Grafana
+- **실시간 트레이너 모니터링(SSE)** — 위험 자세 반복 시 트레이너가 세션 종료 전에 실시간 관찰. gRPC-Web/WebSocket/WebFlux 검토 후 기존 Spring MVC 스택 위 `SseEmitter` 채택(단방향 1:1엔 WebSocket이 과함). 연결 생명주기·30초 하트비트(좀비 정리)·배정 관계 기반 권한 검증까지 구현·측정 완료(2026-08-30, PR #622, [문서](../decisions/trainer-live-monitoring.md)). 캐파시티 실측: N=500 동시 연결까지 heartbeat 틱이 30초 예산의 19%(최대 5.7초), 단 틱 스프레드는 N에 거의 선형 — [결과](../../loadtest/results/trainer-sse-capacity-2026-08-30/README.md)
 
 ## 정직하게 적는 한계
 
@@ -87,7 +88,7 @@
 | **인덱스 설계·검증** | `EXPLAIN`으로 이미 최적임을 확인 후 **가설 폐기**, `IGNORE INDEX` 강제 풀스캔과 직접 대조 | 약 9,000배 (조건: ①표) | [§②① · 조건](./realmysql-experiments.md#index-9000x) · ⚠️ **rig 없음**(2026-07-20 ad-hoc) |
 | **보존정책 운영** | 월별 RANGE 파티션 + 자동 DROP/선확보 스케줄러 | DELETE 대비 625배 (조건: ①표) | [§②d · 조건](./realmysql-experiments.md#drop-partition-625x) |
 | **용량 산정** | 커넥션 풀 사이징 EC2 4차 실측 · **자원 상한을 실측 상수에서 유도**(메모리 한도 ÷ 98.7MB) | plateau 시작점 = 10 · 코어당 16.4세션 (조건: ①표) | [§5-1(9)](../decisions/pose-ingest-downsampling.md) · [`ai-recalibrate`](../../loadtest/results/ai-recalibrate-2026-08-11/) |
-| **내구성 트레이드오프** | fsync 완화 시 3.47배 — **채택하지 않음** | 안 아픈 것을 고치며 데이터 안전을 파는 셈이라 판단. ⚠️ **3.47배는 단일 핫세션 조건의 값**이고 다세션에선 1.03배로 사라진다 | [`ceiling-fsync`](../../loadtest/results/ceiling-fsync-2026-08-08/) · [#166](https://github.com/Shadowfit/init/issues/166) |
+| **내구성 트레이드오프** | fsync 완화 시 3.47배 — **채택하지 않음** | 원인(핫세션 직렬화)을 페이로드 분산으로 없애자 완화 없이 220→649 RPS(2.9배)가 나와, 데이터 안전을 파는 대안은 불필요. ⚠️ **3.47배는 단일 핫세션 조건의 값**이고 다세션에선 1.03배로 사라진다 | [`ceiling-fsync`](../../loadtest/results/ceiling-fsync-2026-08-08/) · [#166](https://github.com/Shadowfit/init/issues/166) |
 | **대용량 데이터 이관** | 1억 행 시딩 파이프라인 가속 | 48분 → 16분. **조건**: 2026-06-03 로컬, 1억 행(133,334세션 × 750행) 더미 JSON 시딩, **세션 범위 3분할 동시 INSERT** 레버 하나만의 몫. 같은 작업의 다른 레버 셋(버퍼풀 128MB→2GB — 기본값은 64행/s, 2GB는 1만행/s · 인덱스 후행 빌드 375만 청크 3.4분→2분 · `innodb_sort_buffer_size` 1M→64M)은 **별도로 잰 것이고 이 배수에 안 들어 있다** | [§3 · 조건](./realmysql-experiments.md#seed-48-16) · rig [`seed/README.md`](../../loadtest/seed/README.md) |
 | **스키마 변경 운영** | 차단 ALTER를 pt-osc와 대조 — **무중단이 무엇을 사고 무엇을 파는지** | 쓰기 정지 **최소 187배 단축**, 대가는 DDL 1.64배 + binlog 441MB. 디스크는 두 팔이 동일 (조건: ①표) | [결과](../../loadtest/results/online-ddl-aws-2026-08-12/README.md) · [`online-ddl-vs-blocking-alter.md`](../decisions/online-ddl-vs-blocking-alter.md) |
 | **백업·복구 운영** | 논리·물리 백업을 같은 rig 에서 대조하고 **PITR 로 사고 직전까지 되돌림** | 복구 약 21분(논리) · **약 2.9분(물리, 약 7배)** · 백업 중 쓰기 정지 42~126ms · RPO 는 사고 직전, 상한 binlog 30일 (조건: ①표) | [결과](../../loadtest/results/backup-restore-aws-2026-08-13/README.md) · [교정](../../loadtest/results/restore-reflink-2026-08-14/README.md) · [`backup-restore-rto-rpo.md`](../decisions/backup-restore-rto-rpo.md) |
