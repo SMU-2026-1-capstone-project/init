@@ -1,5 +1,6 @@
 package com.shadowfit.service.group;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.CloseStatus;
@@ -27,7 +28,7 @@ class GroupSocketRegistryTest {
     private static final Long GROUP_ID = 1L;
     private static final long AWAIT_MS = 2000;
 
-    private final GroupSocketRegistry registry = new GroupSocketRegistry();
+    private final GroupSocketRegistry registry = new GroupSocketRegistry(new SimpleMeterRegistry());
     private final AtomicInteger idSeq = new AtomicInteger();
 
     @Test

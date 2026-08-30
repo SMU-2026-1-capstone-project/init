@@ -1,5 +1,7 @@
 package com.shadowfit.service.group;
 
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -46,6 +48,22 @@ public class GroupSocketRegistry {
     }
 
     private final Map<Long, Map<String, Entry>> sessionsByGroup = new ConcurrentHashMap<>();
+
+    /**
+     * docs/decisions/group-websocket-heartbeat.md §6 — heartbeat 도입 전, "비정상 종료를
+     * 감지하는 데 실제로 얼마나 걸리는가"를 실측하기 위한 게이지. deregister()가 불릴 때만
+     * 줄어들므로, TCP만으로 감지되는 시간(§9-3의 "60~120초 사이 어딘가")을 이 값이 베이스라인으로
+     * 돌아오는 시점으로 직접 관측할 수 있다.
+     */
+    public GroupSocketRegistry(MeterRegistry registry) {
+        Gauge.builder("shadowfit.group.ws.active.sessions", this, GroupSocketRegistry::totalSessionCount)
+                .description("이 인스턴스가 들고 있는 그룹 WebSocket 활성 세션 수(전체 그룹 합산)")
+                .register(registry);
+    }
+
+    private double totalSessionCount() {
+        return sessionsByGroup.values().stream().mapToInt(Map::size).sum();
+    }
 
     public void register(Long groupId, WebSocketSession session) {
         Entry entry = new Entry(
