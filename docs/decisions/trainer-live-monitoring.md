@@ -128,7 +128,7 @@ CRUD와 다른 종류의 어려움이 새로 생긴다 — "요청 하나 처리
 | 1 ✅ | ~~`Member.role` 필드 추가(Flyway)~~ → `UserRole`에 `TRAINER` 추가(필드 자체는 기존재, Flyway 불필요로 축소) + 트레이너-사용자 배정 테이블(`trainer_assignments`, V11)/엔티티(`TrainerAssignment`) + `dev-seed.sql` 테스트 배정 시드 + 레포지토리 테스트 4건 | ~~3~4h~~ | 완료(2026-08-30) | DB에 배정 관계 존재, role 기반 인가 골격 확보 — **완료** |
 | 2 ✅ | ~~기존 인증에 role=TRAINER 체크 통합~~ → 신규 로직 불필요(세션3에서 `@PreAuthorize` 재사용) + `TrainerAuthorizationService`(배정 소유권 검증, `NOT_ASSIGNED_TRAINER` 403) + 유닛 테스트 2건 | ~~3h~~ | 완료(2026-08-30) | 권한 없는 트레이너 접근이 403으로 막힘 — **완료(세션3에서 HTTP 레벨로 확인)** |
 | 3 ✅ | `GET /coaching/trainer/{userId}/stream` 컨트롤러(`SseEmitter`) + `TrainerConnectionRegistry`(userId 키, 다중 디바이스 허용) + 생명주기 콜백 + MockMvc 비동기 통합테스트 3건 | 4h | 완료(2026-08-30) | 연결이 열리고 유지됨(더미 `connected` 이벤트로 확인) — **완료** |
-| 4 | 기존 AI 콜백(`PoseDataService.savePoseDataBatch`)에서 emitter로 결과 중계, 전송 포맷 설계(rep 수·sync_rate·위험 플래그) | 4h | 2.5h | 실제 운동 시 트레이너 화면에 실시간 값 도착 |
+| 4 ✅ | 기존 AI 콜백(`PoseDataService.savePoseDataBatch`)에서 emitter로 결과 중계, 전송 포맷 설계(`TrainerRepEventDto`: rep 수·sync_rate·위험 플래그) + 커밋 후에만 발동하는 게이팅을 `TestTransaction`으로 검증(2건) + `TrainerConnectionRegistry` 유닛 테스트 6건 | 4h | 완료(2026-08-30) | 실제 운동 시 트레이너 화면에 실시간 값 도착 — **완료(커밋/롤백 게이팅 테스트로 확인, 컨트롤러 레벨 종단 검증은 세션6)** |
 | 5 | heartbeat·정리 로직, 백프레셔 정책(간단히: 실패 시 드롭) | 3h | 2h | 좀비 연결 없이 정리됨 |
 | 6 | SSE 통합 테스트(연결·권한 실패·끊김 케이스) | 3~4h | 2~2.5h | 회귀 고정 |
 | 7~8 | 캐파시티 실측(동시 연결 N개, 스레드풀·지연 관찰) + `docs/decisions/`에 결과 문서화 | 5~10h | 4~7h | "동시 연결 X개까지 버틴다" 실측치 확보 |
