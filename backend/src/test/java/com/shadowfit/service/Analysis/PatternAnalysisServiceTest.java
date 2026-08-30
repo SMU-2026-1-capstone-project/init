@@ -33,6 +33,9 @@ class PatternAnalysisServiceTest {
     private PatternAnalysisService service;
 
     private static final Long MEMBER_ID = 1L;
+    // 대부분의 테스트는 집계 로직 자체를 검증하는 것이라, sufficientData 판정에 걸리지 않도록
+    // 가입한 지 오래된 계정으로 고정한다(세션7). sufficientData 자체의 경계값은 별도 테스트에서.
+    private static final LocalDateTime OLD_ACCOUNT_CREATED_AT = LocalDateTime.now().minusYears(1);
 
     @BeforeEach
     void setUp() {
@@ -52,7 +55,7 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findStartTimesByMemberAndRange(eq(MEMBER_ID), any(), any()))
                 .thenReturn(startTimes);
 
-        PeriodicityResponseDto result = service.getPeriodicity(MEMBER_ID);
+        PeriodicityResponseDto result = service.getPeriodicity(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         assertThat(result.byDayOfWeek()).hasSize(2);
         assertThat(result.byDayOfWeek())
@@ -78,7 +81,7 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findStartTimesByMemberAndRange(eq(MEMBER_ID), any(), any()))
                 .thenReturn(startTimes);
 
-        PeriodicityResponseDto result = service.getPeriodicity(MEMBER_ID);
+        PeriodicityResponseDto result = service.getPeriodicity(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         assertThat(result.byTimeOfDay()).hasSize(4);
         assertThat(result.byTimeOfDay())
@@ -97,7 +100,7 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findStartTimesByMemberAndRange(eq(MEMBER_ID), any(), any()))
                 .thenReturn(List.of());
 
-        PeriodicityResponseDto result = service.getPeriodicity(MEMBER_ID);
+        PeriodicityResponseDto result = service.getPeriodicity(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         assertThat(result.byDayOfWeek()).isEmpty();
         assertThat(result.byTimeOfDay()).isEmpty();
@@ -110,7 +113,7 @@ class PatternAnalysisServiceTest {
                 .thenReturn(List.of());
 
         LocalDateTime before = LocalDateTime.now();
-        service.getPeriodicity(MEMBER_ID);
+        service.getPeriodicity(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
         LocalDateTime after = LocalDateTime.now();
 
         ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
@@ -128,7 +131,7 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findIntensitySamplesByMemberAndRange(eq(MEMBER_ID), any(), any()))
                 .thenReturn(List.of());
 
-        IntensityTrendResponseDto result = service.getIntensityTrend(MEMBER_ID);
+        IntensityTrendResponseDto result = service.getIntensityTrend(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         assertThat(result.weeklyTrend()).hasSize(4);
         LocalDate thisMonday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
@@ -146,7 +149,7 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findIntensitySamplesByMemberAndRange(eq(MEMBER_ID), any(), any()))
                 .thenReturn(List.of());
 
-        IntensityTrendResponseDto result = service.getIntensityTrend(MEMBER_ID);
+        IntensityTrendResponseDto result = service.getIntensityTrend(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         assertThat(result.weeklyTrend()).allSatisfy(w -> {
             assertThat(w.avgSyncRate()).isNull();
@@ -174,7 +177,7 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findIntensitySamplesByMemberAndRange(eq(MEMBER_ID), any(), any()))
                 .thenReturn(List.of(s1, s2));
 
-        IntensityTrendResponseDto result = service.getIntensityTrend(MEMBER_ID);
+        IntensityTrendResponseDto result = service.getIntensityTrend(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         IntensityTrendResponseDto.WeeklyIntensity thisWeek = result.weeklyTrend().get(3);
         assertThat(thisWeek.weekStart()).isEqualTo(thisMonday);
@@ -188,7 +191,7 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
                 .thenReturn(List.of());
 
-        service.getConsistency(MEMBER_ID);
+        service.getConsistency(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         org.mockito.Mockito.verify(sessionRepository)
                 .findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any());
@@ -206,7 +209,7 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
                 .thenReturn(activeDates);
 
-        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID);
+        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         assertThat(result.currentStreakDays()).isEqualTo(3);
     }
@@ -222,7 +225,7 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
                 .thenReturn(activeDates);
 
-        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID);
+        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         assertThat(result.currentStreakDays()).isEqualTo(2);
     }
@@ -235,7 +238,7 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
                 .thenReturn(activeDates);
 
-        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID);
+        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         assertThat(result.currentStreakDays()).isZero();
     }
@@ -252,8 +255,56 @@ class PatternAnalysisServiceTest {
         when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
                 .thenReturn(activeDates);
 
-        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID);
+        ConsistencyResponseDto result = service.getConsistency(MEMBER_ID, OLD_ACCOUNT_CREATED_AT);
 
         assertThat(result.missedDaysInLast4Weeks()).isEqualTo(28 - 3);
+    }
+
+    // ─── sufficientData(세션7) — 가입일 기준 4주 경과 여부, 실제 세션 존재 여부와 무관 ───
+
+    @Test
+    @DisplayName("sufficientData — 가입한 지 28일 미만이면 세션이 있어도 false")
+    void sufficientData_falseWhenAccountYoungerThan4Weeks() {
+        LocalDateTime recentSignup = LocalDateTime.now().minusDays(3);
+        when(sessionRepository.findStartTimesByMemberAndRange(eq(MEMBER_ID), any(), any()))
+                .thenReturn(List.of(LocalDateTime.now()));
+        when(sessionRepository.findIntensitySamplesByMemberAndRange(eq(MEMBER_ID), any(), any()))
+                .thenReturn(List.of());
+        when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
+                .thenReturn(List.of(java.sql.Date.valueOf(LocalDate.now())));
+
+        assertThat(service.getPeriodicity(MEMBER_ID, recentSignup).sufficientData()).isFalse();
+        assertThat(service.getIntensityTrend(MEMBER_ID, recentSignup).sufficientData()).isFalse();
+        assertThat(service.getConsistency(MEMBER_ID, recentSignup).sufficientData()).isFalse();
+    }
+
+    @Test
+    @DisplayName("sufficientData — 가입한 지 28일 이상이면 세션이 0건이어도 true")
+    void sufficientData_trueWhenAccountOlderThan4WeeksEvenWithNoSessions() {
+        when(sessionRepository.findStartTimesByMemberAndRange(eq(MEMBER_ID), any(), any()))
+                .thenReturn(List.of());
+        when(sessionRepository.findIntensitySamplesByMemberAndRange(eq(MEMBER_ID), any(), any()))
+                .thenReturn(List.of());
+        when(sessionRepository.findDistinctActiveDates(eq(MEMBER_ID), eq(List.of(Status.COMPLETED)), any(), any()))
+                .thenReturn(List.of());
+
+        assertThat(service.getPeriodicity(MEMBER_ID, OLD_ACCOUNT_CREATED_AT).sufficientData()).isTrue();
+        assertThat(service.getIntensityTrend(MEMBER_ID, OLD_ACCOUNT_CREATED_AT).sufficientData()).isTrue();
+        assertThat(service.getConsistency(MEMBER_ID, OLD_ACCOUNT_CREATED_AT).sufficientData()).isTrue();
+    }
+
+    @Test
+    @DisplayName("sufficientData — 28일 경계 바로 안쪽(false)과 바로 바깥쪽(true)이 갈린다")
+    void sufficientData_boundaryAround28Days() {
+        when(sessionRepository.findStartTimesByMemberAndRange(eq(MEMBER_ID), any(), any()))
+                .thenReturn(List.of());
+
+        // 정확히 28일째에 real-clock 두 번의 now() 호출(테스트 vs 서비스) 오차로 흔들리는 걸
+        // 피하려고, 경계에서 몇 초 여유를 두고 안쪽/바깥쪽을 각각 검증한다.
+        LocalDateTime justUnder28Days = LocalDateTime.now().minusDays(28).plusSeconds(10);
+        LocalDateTime justOver28Days = LocalDateTime.now().minusDays(28).minusSeconds(10);
+
+        assertThat(service.getPeriodicity(MEMBER_ID, justUnder28Days).sufficientData()).isFalse();
+        assertThat(service.getPeriodicity(MEMBER_ID, justOver28Days).sufficientData()).isTrue();
     }
 }

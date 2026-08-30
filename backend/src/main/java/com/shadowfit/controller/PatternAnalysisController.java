@@ -27,7 +27,8 @@ public class PatternAnalysisController {
     public ResponseEntity<PeriodicityResponseDto> getPeriodicity(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return ResponseEntity.ok(patternAnalysisService.getPeriodicity(userDetails.getMember().getId()));
+        return ResponseEntity.ok(patternAnalysisService.getPeriodicity(
+                userDetails.getMember().getId(), userDetails.getMember().getCreatedAt()));
     }
 
     @Operation(summary = "강도 추세", description = "최근 4주간 주 단위 평균 syncRate·총 운동 시간 추세")
@@ -35,7 +36,8 @@ public class PatternAnalysisController {
     public ResponseEntity<IntensityTrendResponseDto> getIntensityTrend(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return ResponseEntity.ok(patternAnalysisService.getIntensityTrend(userDetails.getMember().getId()));
+        return ResponseEntity.ok(patternAnalysisService.getIntensityTrend(
+                userDetails.getMember().getId(), userDetails.getMember().getCreatedAt()));
     }
 
     @Operation(summary = "연속성", description = "연속 운동일 수, 최근 4주 내 빠진 날 수")
@@ -43,6 +45,7 @@ public class PatternAnalysisController {
     public ResponseEntity<ConsistencyResponseDto> getConsistency(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return ResponseEntity.ok(patternAnalysisService.getConsistency(userDetails.getMember().getId()));
+        return ResponseEntity.ok(patternAnalysisService.getConsistency(
+                userDetails.getMember().getId(), userDetails.getMember().getCreatedAt()));
     }
 }

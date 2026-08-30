@@ -33,11 +33,21 @@ public class PatternAnalysisService {
     private static final int INTENSITY_TREND_WEEKS = 4;
     private static final int CONSISTENCY_WINDOW_DAYS = 28;
 
+    // 세 endpoint 공통 "데이터 충분" 기준(세션7, 2026-08-30 사용자 확인) — 각 endpoint의 조회
+    // 윈도우(4주=28일)와 같은 길이. 가입일 기준이라 실제 세션 수와는 무관하다: 가입 4주 미만이면
+    // 세션이 많아도 false(창 자체가 아직 안 채워짐), 4주 이상이면 세션이 0건이어도 true
+    // (그건 "충분히 오래 썼는데 활동이 없다"는 별개의 사실이라 결측일·스트릭 0으로 그대로 표현).
+    private static final int MIN_ACCOUNT_AGE_DAYS_FOR_SUFFICIENT_DATA = 28;
+
     private final SessionRepository sessionRepository;
+
+    private static boolean hasSufficientData(LocalDateTime memberCreatedAt) {
+        return memberCreatedAt.isBefore(LocalDateTime.now().minusDays(MIN_ACCOUNT_AGE_DAYS_FOR_SUFFICIENT_DATA));
+    }
 
     // 요일·시간대 그룹핑 집계. 최근 4주 고정(2026-08-30 사용자 확인 — intensity-trend와 창을 맞춰
     // 세 endpoint의 "최근 패턴"이라는 취지를 일관되게 유지).
-    public PeriodicityResponseDto getPeriodicity(Long memberId) {
+    public PeriodicityResponseDto getPeriodicity(Long memberId, LocalDateTime memberCreatedAt) {
         LocalDateTime end = LocalDateTime.now();
         LocalDateTime start = end.minusWeeks(PERIODICITY_WINDOW_WEEKS);
 
@@ -57,13 +67,13 @@ public class PatternAnalysisService {
                 .sorted(Comparator.comparing(PeriodicityResponseDto.TimeOfDayCount::bucket))
                 .toList();
 
-        return new PeriodicityResponseDto(dayCounts, bucketCounts);
+        return new PeriodicityResponseDto(hasSufficientData(memberCreatedAt), dayCounts, bucketCounts);
     }
 
     // 주 단위 평균 syncRate·총 운동 시간 추세. 월요일 시작 주 4개 고정 배열(2026-08-30 사용자
     // 확인) — 진행 중인 이번 주(월~오늘)를 마지막 버킷으로 포함한다. syncRate가 null인 세션(미완료·
     // rep 미측정)은 두 지표 모두에서 제외 — findIntensitySamplesByMemberAndRange가 DB에서 이미 거른다.
-    public IntensityTrendResponseDto getIntensityTrend(Long memberId) {
+    public IntensityTrendResponseDto getIntensityTrend(Long memberId, LocalDateTime memberCreatedAt) {
         LocalDate thisMonday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate windowStartDate = thisMonday.minusWeeks(INTENSITY_TREND_WEEKS - 1L);
         LocalDateTime windowStart = windowStartDate.atStartOfDay();
@@ -84,7 +94,7 @@ public class PatternAnalysisService {
             weeklyTrend.add(new IntensityTrendResponseDto.WeeklyIntensity(
                     weekStart, averageSyncRate(weekSamples), totalMinutes(weekSamples)));
         }
-        return new IntensityTrendResponseDto(weeklyTrend);
+        return new IntensityTrendResponseDto(hasSufficientData(memberCreatedAt), weeklyTrend);
     }
 
     private static LocalDate weekStartOf(LocalDateTime time) {
@@ -114,7 +124,7 @@ public class PatternAnalysisService {
     // ⚠️ 윈도우가 28일이라 streak도 최대 28로 캡된다 — 28일 내내 매일 COMPLETED면 실제로 더 길게
     // 이어졌어도 이 endpoint에서는 28로 보인다. BE-07 원 문서가 애초에 "최소 4주" 프레임을 전제해
     // 이 endpoint의 다른 두 지표(periodicity·intensity-trend)와 창을 맞췄다.
-    public ConsistencyResponseDto getConsistency(Long memberId) {
+    public ConsistencyResponseDto getConsistency(Long memberId, LocalDateTime memberCreatedAt) {
         LocalDate today = LocalDate.now();
         LocalDate windowStartDate = today.minusDays(CONSISTENCY_WINDOW_DAYS - 1L);
         LocalDateTime windowStart = windowStartDate.atStartOfDay();
@@ -129,7 +139,7 @@ public class PatternAnalysisService {
         int missedDays = CONSISTENCY_WINDOW_DAYS - activeDaySet.size();
         int streak = calculateStreak(activeDaySet, today);
 
-        return new ConsistencyResponseDto(streak, missedDays);
+        return new ConsistencyResponseDto(hasSufficientData(memberCreatedAt), streak, missedDays);
     }
 
     // 오늘 활동이 없어도 어제까지 이어졌으면 스트릭을 유지한다(관대한 정의, 2026-08-30 사용자 확인)
