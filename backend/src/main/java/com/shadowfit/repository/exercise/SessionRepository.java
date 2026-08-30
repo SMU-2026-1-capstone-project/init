@@ -2,6 +2,7 @@ package com.shadowfit.repository.exercise;
 
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -318,4 +319,18 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
          + "AND s.startTime >= :since")
     List<CompletedSessionWindow> findCompletedSessionWindowsSince(@Param("memberId") Long memberId,
                                                                    @Param("since") LocalDateTime since);
+
+    // ─── 다음 세션 강도 추천 (BE-08, recommendation-algorithm.md §6·§10) ──────────
+
+    /**
+     * 최근 완료 세션 N개(내림차순) — {@code RecommendationService}의 입력.
+     * {@code idx_session_member_status_start(member_id, status, start_time)}가 이미
+     * {@code member_id·status} 등치 + {@code start_time} 정렬을 지원해, {@code ORDER BY DESC}를
+     * 만나면 옵티마이저가 그 구간 끝으로 점프해 역순으로 걸으며 {@code LIMIT}에서 멈춘다
+     * (실측: {@code recommendation-algorithm.md} §10 — {@code member_id=1}, 1,680세션 계정에서
+     * {@code EXPLAIN ANALYZE} 0.4ms대, 읽은 행 3개. 계정 크기와 무관한 상수 비용이라 신규
+     * 인덱스·캐싱 둘 다 불필요로 확정됐다).
+     */
+    List<Session> findByMemberIdAndExerciseIdAndStatusOrderByStartTimeDesc(
+            Long memberId, Long exerciseId, Status status, Limit limit);
 }
