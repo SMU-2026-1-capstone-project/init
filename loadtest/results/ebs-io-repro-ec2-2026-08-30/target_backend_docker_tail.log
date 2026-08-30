@@ -1,0 +1,7114 @@
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:13.058  INFO [nio-8080-exec-9] [f1180868cdb8|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak177_1788023532@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:13.059  INFO [nio-8080-exec-9] [f1180868cdb8|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak177_1788023532@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:15.729  INFO [nio-8080-exec-5] [b190ec52c8aa|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak178_1788023535@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:15.730  INFO [nio-8080-exec-5] [b190ec52c8aa|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak178_1788023535@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:18.402  INFO [nio-8080-exec-2] [b8168f6b9a0b|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak179_1788023538@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:18.403  INFO [nio-8080-exec-2] [b8168f6b9a0b|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak179_1788023538@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:21.074  INFO [nio-8080-exec-7] [93b0713d836d|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak180_1788023540@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:21.075  INFO [nio-8080-exec-7] [93b0713d836d|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak180_1788023540@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:23.746  INFO [nio-8080-exec-3] [45cdb262e0c4|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak181_1788023543@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:23.747  INFO [nio-8080-exec-3] [45cdb262e0c4|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak181_1788023543@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:26.417  INFO [nio-8080-exec-9] [398ee99333c9|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak182_1788023546@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:26.419  INFO [nio-8080-exec-9] [398ee99333c9|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak182_1788023546@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:29.086  INFO [nio-8080-exec-5] [bbddff98dde7|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak183_1788023548@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:29.087  INFO [nio-8080-exec-5] [bbddff98dde7|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak183_1788023548@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:31.755  INFO [nio-8080-exec-2] [f7d17c322279|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak184_1788023551@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:31.756  INFO [nio-8080-exec-2] [f7d17c322279|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak184_1788023551@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:34.424  INFO [nio-8080-exec-7] [91ff33bef7b5|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak185_1788023554@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:34.425  INFO [nio-8080-exec-7] [91ff33bef7b5|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak185_1788023554@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:37.094  INFO [nio-8080-exec-3] [b15e692f76e8|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak186_1788023556@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:37.095  INFO [nio-8080-exec-3] [b15e692f76e8|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak186_1788023556@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:39.762  INFO [nio-8080-exec-9] [ab5cf357eb04|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak187_1788023559@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:39.763  INFO [nio-8080-exec-9] [ab5cf357eb04|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak187_1788023559@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:42.439  INFO [nio-8080-exec-5] [0420ac40cb15|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak188_1788023562@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:42.440  INFO [nio-8080-exec-5] [0420ac40cb15|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak188_1788023562@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:45.108  INFO [nio-8080-exec-2] [4e183ba2ab4c|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak189_1788023564@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:45.109  INFO [nio-8080-exec-2] [4e183ba2ab4c|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak189_1788023564@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:47.778  INFO [nio-8080-exec-7] [acc99b07a7d0|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak190_1788023567@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:47.780  INFO [nio-8080-exec-7] [acc99b07a7d0|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak190_1788023567@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:50.450  INFO [nio-8080-exec-3] [574b829da3d5|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak191_1788023570@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:50.451  INFO [nio-8080-exec-3] [574b829da3d5|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak191_1788023570@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+2026-08-30 02:12:51.358 DEBUG [fit-scheduler-3] [timeout-sweep-1b6309b8406c|·|·] c.s.s.Exercise.SessionTimeoutScheduler   : 세션 타임아웃 체크 시작 - 버퍼시간: 30분
+Hibernate: 
+    select
+        s1_0.id,
+        s1_0.start_time,
+        s1_0.last_active_at,
+        s1_0.member_id,
+        e1_0.name,
+        e1_0.expected_duration_minutes 
+    from
+        exercise_sessions s1_0 
+    join
+        exercises e1_0 
+            on e1_0.id=s1_0.exercise_id 
+    where
+        s1_0.status=?
+2026-08-30 02:12:51.359 DEBUG [fit-scheduler-3] [timeout-sweep-1b6309b8406c|·|·] c.s.s.Exercise.SessionTimeoutScheduler   : 타임아웃 체크 대상 세션 없음
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:53.124  INFO [nio-8080-exec-9] [65cbc7332ff2|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak192_1788023572@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:53.125  INFO [nio-8080-exec-9] [65cbc7332ff2|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak192_1788023572@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:55.795  INFO [nio-8080-exec-5] [052aa1c784ba|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak193_1788023575@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:55.796  INFO [nio-8080-exec-5] [052aa1c784ba|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak193_1788023575@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:58.465  INFO [nio-8080-exec-2] [8f54cbc9a6a5|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak194_1788023578@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:12:58.465  INFO [nio-8080-exec-2] [8f54cbc9a6a5|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak194_1788023578@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:01.137  INFO [nio-8080-exec-7] [40a0fd2a5f22|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak195_1788023580@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:01.138  INFO [nio-8080-exec-7] [40a0fd2a5f22|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak195_1788023580@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:03.807  INFO [nio-8080-exec-3] [6b6af461ed99|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak196_1788023583@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:03.808  INFO [nio-8080-exec-3] [6b6af461ed99|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak196_1788023583@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:06.478  INFO [nio-8080-exec-9] [2b2f92fc4355|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak197_1788023586@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:06.479  INFO [nio-8080-exec-9] [2b2f92fc4355|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak197_1788023586@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:09.152  INFO [nio-8080-exec-5] [42976b6c3155|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak198_1788023589@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:09.153  INFO [nio-8080-exec-5] [42976b6c3155|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak198_1788023589@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:11.822  INFO [nio-8080-exec-2] [7c82e10df1f6|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak199_1788023591@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:11.823  INFO [nio-8080-exec-2] [7c82e10df1f6|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak199_1788023591@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:14.492  INFO [nio-8080-exec-7] [d91b6e80418d|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak200_1788023594@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:14.493  INFO [nio-8080-exec-7] [d91b6e80418d|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak200_1788023594@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:17.159  INFO [nio-8080-exec-3] [c81aef241830|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak201_1788023597@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:17.159  INFO [nio-8080-exec-3] [c81aef241830|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak201_1788023597@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:19.828  INFO [nio-8080-exec-9] [fbb16c460d76|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak202_1788023599@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:19.829  INFO [nio-8080-exec-9] [fbb16c460d76|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak202_1788023599@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.email=? 
+    limit
+        ?
+Hibernate: 
+    select
+        m1_0.id 
+    from
+        users m1_0 
+    where
+        m1_0.username=? 
+    limit
+        ?
+Hibernate: 
+    insert 
+    into
+        users
+        (created_at, email, height, onboarding_completed, password, preferred_url, profile_image_url, role, selected_persona, sex, tts_enabled, tts_speed, updated_at, username, weight, workout_level) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:22.499  INFO [nio-8080-exec-5] [a5aa9e410b43|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak203_1788023602@test.local
+Hibernate: 
+    select
+        rt1_0.member_id,
+        rt1_0.rotated_at,
+        rt1_0.token,
+        rt1_0.token_version 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.member_id=?
+2026-08-30 02:13:22.500  INFO [nio-8080-exec-5] [a5aa9e410b43|·|·] c.shadowfit.global.security.jwt.JwtUtil  : @@@ Generating Token for User: aisoak203_1788023602@test.local
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (rotated_at, token, token_version, member_id) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.created_at,
+        m1_0.email,
+        m1_0.height,
+        m1_0.onboarding_completed,
+        m1_0.password,
+        m1_0.preferred_url,
+        m1_0.profile_image_url,
+        m1_0.role,
+        m1_0.selected_persona,
+        m1_0.sex,
+        m1_0.tts_enabled,
+        m1_0.tts_speed,
+        m1_0.updated_at,
+        m1_0.username,
+        m1_0.weight,
+        m1_0.workout_level 
+    from
+        users m1_0 
+    where
+        m1_0.email=?
+Hibernate: 
+    update
+        users 
+    set
+        email=?,
+        height=?,
+        onboarding_completed=?,
+        password=?,
+        preferred_url=?,
+        profile_image_url=?,
+        role=?,
+        selected_persona=?,
+        sex=?,
+        tts_enabled=?,
+        tts_speed=?,
+        updated_at=?,
+        username=?,
+        weight=?,
+        workout_level=? 
+    where
+        id=?
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+2026-08-30 02:13:51.360 DEBUG [fit-scheduler-4] [timeout-sweep-17382a1f67fe|·|·] c.s.s.Exercise.SessionTimeoutScheduler   : 세션 타임아웃 체크 시작 - 버퍼시간: 30분
+Hibernate: 
+    select
+        s1_0.id,
+        s1_0.start_time,
+        s1_0.last_active_at,
+        s1_0.member_id,
+        e1_0.name,
+        e1_0.expected_duration_minutes 
+    from
+        exercise_sessions s1_0 
+    join
+        exercises e1_0 
+            on e1_0.id=s1_0.exercise_id 
+    where
+        s1_0.status=?
+2026-08-30 02:13:51.361 DEBUG [fit-scheduler-4] [timeout-sweep-17382a1f67fe|·|·] c.s.s.Exercise.SessionTimeoutScheduler   : 타임아웃 체크 대상 세션 없음
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PROCESSING'   
+        AND lock_expires_at <= ? 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 
+Hibernate: 
+    SELECT
+        * 
+    FROM
+        outbox_events 
+    WHERE
+        status = 'PENDING'   
+        AND (
+            next_retry_at IS NULL 
+            OR next_retry_at <= ?
+        ) 
+    ORDER BY
+        id 
+    LIMIT
+        ? FOR UPDATE SKIP LOCKED 

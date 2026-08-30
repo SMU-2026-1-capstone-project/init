@@ -369,6 +369,16 @@ member:
     # 3분 더 기다림)보다 훨씬 나쁘다.
     active-workout-idle-seconds: 180
 
+# [5.6] 트레이너 SSE 하트비트 (trainer-live-monitoring.md §8 세션5)
+coaching:
+  trainer-stream:
+    # half-open TCP 좀비 연결(네트워크 단절 등으로 클라이언트가 FIN 없이 사라진 경우)을 다음
+    # broadcast 없이도 능동적으로 잡아내기 위한 주기. 리버스 프록시/ALB idle timeout 을 피하려는
+    # 값이 아니다 — 이 프로젝트엔 아직 그런 프록시가 없다(reverse-proxy-and-tls.md, 미결정).
+    # 30초는 실측이 아니라 SSE 하트비트 업계 관행값(2026-08-30 사용자 확인) — 프록시가 정해지거나
+    # §7~8 캐파시티 실측이 나오면 재검토.
+    heartbeat-interval-seconds: 30
+
 # [6] pose_data 파티션 TTL 설정 (report-read-path.md §9-B, 2026-07-24 확정)
 pose-data:
   # 저장 전 다운샘플 윈도우 크기(R). 창 하나에서 대표 프레임 1개만 남긴다.

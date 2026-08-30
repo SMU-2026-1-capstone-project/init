@@ -1,0 +1,138 @@
+{
+  "deployed_max_workers": 10,
+  "pool_size": 4805,
+  "concurrencies": [
+    1,
+    5,
+    8,
+    10,
+    12,
+    15,
+    20,
+    30,
+    50
+  ],
+  "repeats": 5,
+  "timeout_sec": 10.0,
+  "results": [
+    {
+      "concurrency": 1,
+      "n": 5,
+      "mean": 2.401616999989642,
+      "p50": 0.4544479998003226,
+      "p95": 10.824427999992281,
+      "mx": 10.824427999992281,
+      "success": 1,
+      "total": 5,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 5,
+      "n": 25,
+      "mean": 7.0365602800217175,
+      "p50": 0.5397170000378537,
+      "p95": 47.43206900000985,
+      "mx": 48.40951299999574,
+      "success": 5,
+      "total": 25,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 8,
+      "n": 40,
+      "mean": 11.197287400003475,
+      "p50": 0.6079960000988649,
+      "p95": 71.74633200000358,
+      "mx": 72.31987600000878,
+      "success": 8,
+      "total": 40,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 10,
+      "n": 50,
+      "mean": 15.838602979991947,
+      "p50": 0.42015999997602194,
+      "p95": 90.12469500000009,
+      "mx": 98.34033399999953,
+      "success": 10,
+      "total": 50,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 12,
+      "n": 60,
+      "mean": 121.64432033331707,
+      "p50": 0.4458559999420686,
+      "p95": 489.61679400008506,
+      "mx": 531.4918829999442,
+      "success": 12,
+      "total": 60,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 15,
+      "n": 75,
+      "mean": 245758.4915520533,
+      "p50": 0.599950999912835,
+      "p95": 1274322.6380309998,
+      "mx": 1274791.072026,
+      "success": 15,
+      "total": 75,
+      "non_ok_kinds": [
+        "rpcerror:DEADLINE_EXCEEDED",
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 20,
+      "n": 100,
+      "mean": 50013.41794646999,
+      "p50": 0.5780349999895407,
+      "p95": 294020.217199,
+      "mx": 294020.294662,
+      "success": 23,
+      "total": 100,
+      "non_ok_kinds": [
+        "rpcerror:DEADLINE_EXCEEDED",
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 30,
+      "n": 150,
+      "mean": 75.5573375066614,
+      "p50": 0.8966189998318441,
+      "p95": 296.80926400000374,
+      "mx": 325.3288800000007,
+      "success": 60,
+      "total": 150,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    },
+    {
+      "concurrency": 50,
+      "n": 250,
+      "mean": 111.60612709600099,
+      "p50": 2.900087999933021,
+      "p95": 474.7745760000015,
+      "mx": 500.00875000000633,
+      "success": 100,
+      "total": 250,
+      "non_ok_kinds": [
+        "rpcerror:UNAVAILABLE"
+      ]
+    }
+  ]
+}

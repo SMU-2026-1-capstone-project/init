@@ -37,6 +37,16 @@ public class SessionMetrics {
     private static final String POSE_BATCH_REJECTED = "shadowfit.pose.batch.rejected";
 
     /**
+     * pose 배치가 형식·범위 검증에서 거부된 건수 (BE-11, {@code PoseDataValidationGate}).
+     * tags: reason(batch_size/sync_rate_range/timestamp_range)
+     *
+     * <p>소유권 검증(#187, 남의 세션 주입)과는 다른 축이다 — 그건 세션 nonce가 채널①에서 이미
+     * 막는다({@code ai-session-ownership-verification.md}). 이 지표가 잡는 것은 신원은 맞는데
+     * <b>값 자체가 이상한</b> 배치 — AI 오작동·손상 전송 등.
+     */
+    private static final String POSE_BATCH_INVALID = "shadowfit.pose.batch.invalid";
+
+    /**
      * pose_data 배치 INSERT 가 만난 데드락과 그 재시도 결과. tags: outcome(retried/recovered/exhausted)
      *
      * <p>이 지표가 필요한 이유는 재시도 횟수를 «2회» 로 고정했기 때문이다 — 실측(#276)은
@@ -223,6 +233,11 @@ public class SessionMetrics {
      */
     public void poseBatchRejected(String status) {
         registry.counter(POSE_BATCH_REJECTED, "status", status).increment();
+    }
+
+    /** @param reason batch_size / sync_rate_range / timestamp_range 중 어떤 검증에서 걸렸는지. */
+    public void poseBatchInvalid(String reason) {
+        registry.counter(POSE_BATCH_INVALID, "reason", reason).increment();
     }
 
     private DistributionSummary frames(String stage) {
