@@ -1,5 +1,6 @@
 package com.shadowfit.service.Exercise;
 
+import com.shadowfit.dto.coaching.TrainerRepEventDto;
 import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.observability.CallCancellation;
 import com.shadowfit.global.error.ErrorCode;
@@ -12,6 +13,7 @@ import com.shadowfit.model.exercise.Status;
 import com.shadowfit.repository.exercise.ExerciseReferenceRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
+import com.shadowfit.service.coaching.TrainerConnectionRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -40,6 +42,7 @@ public class PoseDataService {
     private final ExerciseReferenceRepository referenceRepository;
     private final JdbcTemplate jdbcTemplate;
     private final SessionMetrics sessionMetrics;
+    private final TrainerConnectionRegistry trainerConnectionRegistry;
 
     // created_at 을 **명시적으로** 쓴다. DB DEFAULT 에 맡기면 재전송마다 값이 달라져
     // uk_pose_event 가 무력해진다 (#188, decisions/pose-batch-idempotency-implementation.md).
@@ -163,6 +166,11 @@ public class PoseDataService {
             }
         });
 
+        // 트레이너 SSE 중계 — 커밋 후에만 보낸다(recordOrphanWindow와 같은 이유: 이 트랜잭션이
+        // 롤백되면 저장되지 않은 rep을 트레이너에게 보여주게 된다). 담당 트레이너가 없으면
+        // TrainerConnectionRegistry.broadcast가 조용히 no-op이라 별도 존재 체크가 필요 없다.
+        registerTrainerRelay(session, downsampled);
+
         // 활동 시각 갱신 — 이 배치가 도착했다는 것 자체가 "사용자가 아직 운동 중"이라는 신호다
         // (session-liveness-vs-elapsed-time.md ㄷ안). 타임아웃·재부착 판정이 이 값을 앵커로 쓴다.
         //
@@ -200,6 +208,38 @@ public class PoseDataService {
             @Override
             public void afterCommit() {
                 sessionMetrics.poseOrphanWindow(Duration.ofNanos(System.nanoTime() - windowStartNanos));
+            }
+        });
+    }
+
+    /**
+     * 커밋 후에만 트레이너 SSE 중계를 실행하도록 등록한다 ({@code trainer-live-monitoring.md}
+     * §8 세션4). {@link #recordOrphanWindow}와 같은 이유로 커밋을 기다린다.
+     *
+     * <p>rep 수·sync_rate는 rep 안에서 상수라 대표 프레임(첫 프레임) 하나에서 뽑는다 —
+     * {@link #pickDeepest}가 고른 대표 프레임과는 다른 목적(그건 jointCoordinates 저장용,
+     * 이건 rep 메타데이터 조회용)이라 별도로 첫 프레임을 쓴다. 위험 플래그·메시지는 이 배치(rep)
+     * 안에서 {@code feedback_message}가 채워진 첫 프레임을 쓴다 — 구조화된 분류
+     * ({@code FeedbackType})가 아니라 자유 텍스트인 이유는 {@link TrainerRepEventDto} 참고.
+     */
+    private void registerTrainerRelay(Session session, List<PoseDataRequest> downsampled) {
+        if (downsampled.isEmpty() || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        PoseDataRequest representative = downsampled.get(0);
+        String message = downsampled.stream()
+                .map(PoseDataRequest::getFeedbackMessage)
+                .filter(m -> m != null && !m.isBlank())
+                .findFirst()
+                .orElse(null);
+        TrainerRepEventDto event = new TrainerRepEventDto(
+                representative.getRepNumber(), representative.getSyncRate(), message != null, message);
+        Long userId = session.getMember().getId();
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                trainerConnectionRegistry.broadcast(userId, "rep", event);
             }
         });
     }
