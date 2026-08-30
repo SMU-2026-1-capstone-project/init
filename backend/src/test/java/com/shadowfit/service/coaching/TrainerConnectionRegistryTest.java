@@ -87,6 +87,36 @@ class TrainerConnectionRegistryTest {
     }
 
     @Test
+    @DisplayName("heartbeat 는 모든 사용자의 모든 연결에 보낸다")
+    void heartbeat_sendsToEveryConnectionAcrossUsers() throws IOException {
+        registry.register(USER_ID, emitterA);
+        registry.register(OTHER_USER_ID, emitterB);
+
+        registry.heartbeat();
+
+        verify(emitterA, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+        verify(emitterB, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
+    @DisplayName("연결이 하나도 없으면 heartbeat 는 조용히 아무 일도 안 한다")
+    void heartbeat_noConnections_isNoop() {
+        assertThatCode(() -> registry.heartbeat()).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("heartbeat 전송이 실패한 연결도 broadcast 와 같은 방식으로 제거된다")
+    void heartbeat_removesDeadConnectionOnSendFailure() throws IOException {
+        registry.register(USER_ID, emitterA);
+        doThrow(new IOException("연결 끊김")).when(emitterA).send(any(SseEmitter.SseEventBuilder.class));
+
+        assertThatCode(() -> registry.heartbeat()).doesNotThrowAnyException();
+
+        verify(emitterA).completeWithError(any(IOException.class));
+        assertThat(registry.getConnections(USER_ID)).isEmpty();
+    }
+
+    @Test
     @DisplayName("remove 로 특정 연결만 지우면 나머지는 남는다")
     void remove_removesOnlyGivenEmitter() {
         registry.register(USER_ID, emitterA);

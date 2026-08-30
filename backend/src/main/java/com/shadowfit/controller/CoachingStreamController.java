@@ -22,9 +22,11 @@ import java.io.IOException;
  * {@code userId}를 담당하는가"는 role만으론 못 잡아 {@link TrainerAuthorizationService}가
  * 별도로 검증한다(세션2).
  *
- * <p>세션4(AI 콜백 중계)가 붙기 전까지는 연결이 열리고 유지되는 것만 확인할 수 있다 —
- * 연결 직후 {@code connected} 이벤트 하나만 보낸다. 타임아웃을 0(무제한)으로 둔 것과
- * 백프레셔·정리 정책은 세션5에서 다듬는다(§8 세션5).
+ * <p>연결 직후 {@code connected} 이벤트 하나를 보낸다. 이후 rep 결과 중계는 세션4
+ * ({@code PoseDataService.registerTrainerRelay}), 좀비 연결 정리(하트비트)와 백프레셔(실패 시
+ * 드롭)는 {@link TrainerConnectionRegistry} 쪽에서 처리한다(§8 세션5). 타임아웃은 0(무제한)을
+ * 그대로 유지 — 유한값으로 바꾸려면 프론트에 재연결 로직이 새로 필요해 이번 세션 범위 밖이다
+ * (2026-08-30 사용자 확인).
  */
 @Slf4j
 @RestController
