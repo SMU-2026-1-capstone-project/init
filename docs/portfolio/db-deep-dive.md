@@ -165,6 +165,17 @@
 - **정합성/이상현상 추론** = 🟢 진짜 (위 앵커 실재). **throughput 벤치마킹**(MVCC가 락보다 빠르다 류) = 🟡 합성(저경합).
 - RealMySQL 적합도: Ch.13 파티셔닝🟢 · Ch.8 인덱스🟢(이미 최적 발견 포함) · Ch.9·11 옵티마이저🟢 · Ch.18 운영🟢 · Ch.4·5 잠금/MVCC🟡 · Ch.16 복제🔴.
 
+### F. 패턴 분석 API — 계정 크기와 무관한 조회 ✅ 완료(2026-08-30)
+
+`GET /patterns/{periodicity,intensity-trend,consistency}` — 요일·시간대 분포, 4주 강도 추세, 연속운동일수. 기존 DB 강점(인덱스 실측·정직한 분포 한계 인지)을 새 기능에 그대로 적용한 사례.
+
+- **설계**: 균등분산 시드로는 이 기능 자체를 검증 못한다는 걸 먼저 인지 — [`pattern-analysis-implementation.md`](../decisions/pattern-analysis-implementation.md) §2가 "패턴 있는" 전용 시드([`gen_pattern_seed.py`](../../loadtest/seed/gen_pattern_seed.py))를 별도 작업으로 분리.
+- **EXPLAIN 실측** — `findStartTimesByMemberAndRange`·`findIntensitySamplesByMemberAndRange`는 `status` 등치 조건이 없어 기존 관례(`idx_session_member_status_start`가 등치 없이는 `start_time` seek 못 함, §D 인접 이슈 #541과 같은 함정)대로면 계정 전체 이력을 읽어야 정상인데, `Handler_read_next` 실측(5개 케이스 재현 포함)은 전부 **창 안의 행만 읽었다** — MySQL 8.0이 저카디널리티 컬럼에 등치 없이도 range 분해를 적용. 새 인덱스 불필요로 결론. [`report-query-explain-be07-2026-08-30`](../../loadtest/results/report-query-explain-be07-2026-08-30/README.md).
+- **응답시간 실측** — 16세션 계정과 2,000세션 계정(125배 차이)의 응답시간이 1.1~1.2배 차이뿐 — EXPLAIN이 예측한 "계정 크기 무관"이 응답시간에도 그대로 나타남. [`response-time-be07-2026-08-30`](../../loadtest/results/response-time-be07-2026-08-30/README.md).
+- **데이터 부족 신호** — 가입 4주 미만 신규 사용자는 `sufficientData:false`로 "아직 데이터가 없다"와 "충분히 썼는데 이번엔 조용하다"를 응답 모양으로 구분(세션7).
+- 🔴 **정직한 한계**: EXPLAIN·응답시간 둘 다 로컬 도커 단일 요청 실측([[project_loadtest_env_constraint]]) — 부하(동시 요청) 아래 p99는 범위 밖. 응답시간 판은 n=5로 얇다([[feedback_measure_design_needs_repeats]]) — "배수가 1에 가깝다"는 방향성 확인이지 정밀한 배수 확정이 아니다.
+- 면접: "왜 status 조건 없는 쿼리가 문제없다고 판단했나? → 처음엔 기존 findDistinctActiveDates 사례(#541)처럼 계정 전체 스캔을 의심했는데, Handler_read_next로 직접 재보니 아니었다. 가정으로 넘기지 않고 실측으로 뒤집은 사례."
+
 ---
 
 ## 3. 측정 방법론 원칙 (함정 회피)
@@ -183,3 +194,4 @@
 - [`../decisions/redis-introduction.md`](../decisions/redis-introduction.md) — Redis 도입 보류 결정 (안 하기로 한 결정)
 - [`../tasks/25-portfolio-strategy.md`](../tasks/25-portfolio-strategy.md) — 진로 전략 회고, 깊이 트랙 후보
 - 코드: `backend/.../service/Exercise/PoseDataService.java`(batch insert), `SessionTimeoutScheduler.java`(낙관적 락), `FeedbackLogService.java`(멱등성), `model/exercise/Session.java:66`(@Version)
+- [`pattern-analysis-implementation.md`](../decisions/pattern-analysis-implementation.md) — §F(패턴 분석 API) 구현 계획 전체, 9세션 진행 기록
