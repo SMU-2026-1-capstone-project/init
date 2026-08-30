@@ -132,7 +132,15 @@ public enum ErrorCode {
     REPORT_NOT_FOUND(404,"R001","리포트를 찾을 수 없습니다"),
 
     // --- 트레이너 실시간 모니터링(SSE) ---
-    NOT_ASSIGNED_TRAINER(403, "T001", "담당 사용자가 아닙니다.");
+    NOT_ASSIGNED_TRAINER(403, "T001", "담당 사용자가 아닙니다."),
+
+    // --- 다중사용자 실시간 동기화(그룹/파트너, WebSocket) ---
+    GROUP_NOT_FOUND(404, "G001", "존재하지 않는 그룹입니다."),
+    NOT_GROUP_MEMBER(403, "G002", "그룹 멤버만 접근할 수 있습니다."),
+    ALREADY_GROUP_MEMBER(409, "G003", "이미 그룹에 가입되어 있습니다."),
+    INVITATION_NOT_FOUND(404, "G004", "존재하지 않는 초대입니다."),
+    INVITATION_ALREADY_RESPONDED(409, "G005", "이미 응답한 초대입니다."),
+    INVITATION_ALREADY_PENDING(409, "G006", "이미 초대를 보냈습니다.");
 
     private final int status;
     private final String code;

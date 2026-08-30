@@ -72,3 +72,28 @@
 3. 재연결 백필 — "그동안 놓친 이벤트" 처리, 없으면 바로 드러남
 
 나머지(연결-그룹 매핑, 메시지 중복 처리)는 위 셋을 파는 과정에서 부산물로 드러날 가능성이 높다.
+
+---
+
+## 5. Raw `WebSocketHandler` vs STOMP — 왜 raw인가
+
+`WebSocketConfig.java` 주석이 이 근거를 "이 문서에 이미 정리돼 있다"고 인용하고 있었으나 실제로는 없었다(2026-08-30 지적으로 발견). 아래에 그 근거를 채운다. §1~4(SSE vs WebSocket, 어느 쪽을 팔지)와는 다른 질문 — **WebSocket을 쓰기로 한 뒤, 그 안에서 raw handler로 할지 STOMP로 할지**다.
+
+| | STOMP (`@EnableWebSocketMessageBroker`) | Raw `WebSocketHandler` |
+|---|---|---|
+| 멀티플렉싱 | 소켓 하나로 여러 destination 동시 구독 가능 | 연결 하나 = 핸들러 하나(지금 구조는 `/ws/groups/{groupId}`로 이미 1커넥션=1그룹 고정) |
+| 다중 인스턴스 릴레이 | 공식 지원은 STOMP 프레임을 이해하는 브로커(RabbitMQ, ActiveMQ)로 `enableStompBrokerRelay` | 뒷단이 뭐든(Redis pub/sub, 직접 만든 레지스트리) 내가 직접 어댑터를 짬 |
+| 메시지 포맷 | STOMP 프레임(COMMAND/헤더/바디)이 이미 정해져 있음 | 완전히 자유(지금은 JSON의 `type` 필드로 직접 분기) |
+| 연결 생명주기 제어 | 인터셉터로 가능하지만 한 레이어 더 거침 | `beforeHandshake`/`afterConnectionEstablished` 등 직접 제어(지금 `JwtHandshakeInterceptor`가 하는 것) |
+| 부가 기능(ACK·heartbeat·재전송) | 기본 제공 | 직접 구현 필요(지금은 `group_events.seq` 유니크 제약으로 순서·중복을 이미 직접 처리) |
+
+**핵심 근거: Redis 순수 pub/sub은 STOMP 브로커가 아니다.** STOMP 프레임 포맷을 모르고 바이트만 전달하므로, `enableStompBrokerRelay`가 기대하는 RabbitMQ/ActiveMQ 자리에 못 들어간다. Redis로 인스턴스 간 릴레이를 하려면 STOMP를 쓰든 안 쓰든 결국 "Redis 채널 구독 → 로컬 세션에 수동 전달"하는 어댑터 코드를 직접 짜야 한다 — 그럴 거면 STOMP가 주는 구독 관리(안 쓸 기능)를 얹을 이유가 없다.
+
+**이 프로젝트에 적용하면**:
+- 연결-토픽이 `/ws/groups/{groupId}`로 이미 1:1 고정이라, STOMP의 핵심 가치(멀티플렉싱)를 쓸 지점이 없다.
+- 순서·중복 처리를 `group_events.seq`(DB 유니크 제약)로, 재연결 백필을 REST(`GET /groups/{groupId}/events?afterSeq=`)로 이미 직접 구현했다 — STOMP의 ACK/재전송 기능도 대체할 게 없다.
+- Redis를 pub/sub 계층으로 쓰기로 이미 정해뒀으므로([`multiuser-realtime-sync.md`](./multiuser-realtime-sync.md) §2), STOMP 브로커 릴레이가 기대하는 브로커(RabbitMQ/ActiveMQ)와 애초에 안 맞는다.
+
+**반대로 STOMP가 나았을 상황**(참고, 이 프로젝트엔 해당 안 됨): 유저가 소켓 하나로 여러 그룹/채널을 동시에 구독해야 하거나, 표준 STOMP 클라이언트 생태계를 쓰고 싶거나, 브로커를 RabbitMQ·ActiveMQ로 갈 계획일 때.
+
+**결론**: raw `WebSocketHandler` 선택은 타당하고, 이미 `WebSocketConfig.java`·`GroupSocketHandler`·`GroupSocketRegistry`에 그대로 반영돼 있다. 이 절은 그 구현에 이미 존재하는 근거를 문서로 옮긴 것이지, 새로운 결정이 아니다.

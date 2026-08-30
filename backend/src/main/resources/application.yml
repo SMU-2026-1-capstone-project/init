@@ -263,6 +263,12 @@ security:
 # 기본값(30초)을 그대로 쓴다. 이 값으로도 위 재검증이 통과했다.
 server:
   shutdown: graceful
+  tomcat:
+    # 기본값(false)이면 Micrometer의 TomcatMetrics가 tomcat.threads.*·tomcat.global.*를
+    # 못 낸다 — 그 값들이 Tomcat의 ThreadPool MBean(JMX)에서 나오는데 MBean 등록 자체가
+    # 꺼져 있어서다. docs/decisions/group-websocket-capacity-deep-dive.md §1-1/§1-5 (2026-08-30).
+    mbeanregistry:
+      enabled: true
 
 # [6] Actuator — 캐시 히트율·서킷브레이커 상태 관측용
 management:
