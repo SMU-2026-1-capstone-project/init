@@ -43,6 +43,7 @@ public class PoseDataService {
     private final JdbcTemplate jdbcTemplate;
     private final SessionMetrics sessionMetrics;
     private final TrainerConnectionRegistry trainerConnectionRegistry;
+    private final PoseDataValidationGate poseDataValidationGate;
 
     // created_at 을 **명시적으로** 쓴다. DB DEFAULT 에 맡기면 재전송마다 값이 달라져
     // uk_pose_event 가 무력해진다 (#188, decisions/pose-batch-idempotency-implementation.md).
@@ -86,6 +87,10 @@ public class PoseDataService {
     @Transactional
     public void savePoseDataBatch(Long sessionId, List<com.shadowfit.grpc.PoseDataRequest> grpcList) {
         if (grpcList == null || grpcList.isEmpty()) return;
+
+        // 형식·범위 검증(BE-11) — 세션 조회보다 먼저다. 소유권과 무관한 순수 데이터 검증이라
+        // DB를 안 만지고도 판정 가능하고, 어차피 거부할 배치라면 세션 조회조차 낭비다.
+        poseDataValidationGate.validate(sessionId, grpcList);
 
         // 세션 존재 검증 — pose_data는 파티셔닝을 위해 FK(CASCADE)를 제거해서(2026-07-20,
         // docs/decisions/pose-data-partition-fk-tradeoff.md), 이 체크가 DB의 백업이 아니라

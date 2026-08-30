@@ -410,6 +410,11 @@ public class ExerciseGrpcService extends ExerciseServiceGrpc.ExerciseServiceImpl
     private static io.grpc.Status grpcStatusOf(com.shadowfit.global.error.BusinessException e) {
         switch (e.getErrorCode().getStatus()) {
             case 400: return io.grpc.Status.INVALID_ARGUMENT;
+            // 422(Unprocessable Entity) — 형식은 맞지만 값이 의미상 무효(BE-11 PoseDataValidationGate,
+            // DATA_INTEGRITY_VIOLATION). REST의 422는 gRPC에 대응 상태가 없고, 의미상 400과 같은
+            // "요청 자체가 문제"라 INVALID_ARGUMENT로 묶는다. 이전엔 이 case가 없어 default(INTERNAL)로
+            // 떨어졌다 — DATA_INTEGRITY_VIOLATION이 실제로 쓰이는 곳이 없었기 때문에 안 드러났었다.
+            case 422: return io.grpc.Status.INVALID_ARGUMENT;
             case 401: return io.grpc.Status.UNAUTHENTICATED;
             case 403: return io.grpc.Status.PERMISSION_DENIED;
             case 404: return io.grpc.Status.NOT_FOUND;

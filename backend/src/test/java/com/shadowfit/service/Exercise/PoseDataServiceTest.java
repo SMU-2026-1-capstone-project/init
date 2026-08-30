@@ -353,6 +353,20 @@ class PoseDataServiceTest {
     }
 
     @Test
+    @DisplayName("BE-11 — 범위를 벗어난 sync_rate는 세션 조회 전에 거부되고 아무 것도 삽입 안 함")
+    void savePoseDataBatch_invalidSyncRate_rejectsBeforeSessionLookup() {
+        // 세션 조회보다 검증이 먼저라, 존재하는 세션이어도 값이 이상하면 그대로 거부된다.
+        assertThatThrownBy(() -> poseDataService.savePoseDataBatch(session.getId(), List.of(frame(0.0, 150.0))))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.DATA_INTEGRITY_VIOLATION);
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pose_data WHERE session_id = ?", Integer.class, session.getId());
+        assertThat(count).isZero();
+    }
+
+    @Test
     @DisplayName("존재하지 않는 세션이면 SESSION_NOT_FOUND, 아무 것도 삽입 안 함")
     void savePoseDataBatch_unknownSession_throwsAndInsertsNothing() {
         assertThatThrownBy(() -> poseDataService.savePoseDataBatch(999999L, List.of(frame(0.0, 50.0))))
