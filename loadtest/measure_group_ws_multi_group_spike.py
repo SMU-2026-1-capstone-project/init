@@ -223,46 +223,65 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--groups", type=int, default=30)
     parser.add_argument("--members-per-group", type=int, default=4)
+    # 2026-08-31 §11 추가: 판 반복(feedback_measure_design_needs_repeats)마다 계정을 다시
+    # 만들면(레이트리밋 페이싱 1.25s/계정) 반복 비용이 계정 수에 그대로 비례해 이등분 탐색이
+    # 비현실적으로 느려진다. seed_group_members.py(k6용)와 같은 방식으로 계정/그룹 준비와
+    # 스파이크 실행을 분리한다 — 시딩은 1회, 반복은 그 시딩을 재사용.
+    parser.add_argument("--seed-out", help="계정/그룹 준비만 하고 member_tokens를 이 경로에 JSON으로 저장한 뒤 종료")
+    parser.add_argument("--seed-in", help="이 경로의 시딩을 읽어 계정/그룹 준비를 건너뛰고 바로 스파이크만 실행")
     args = parser.parse_args()
     g, m = args.groups, args.members_per_group
     total = g * m
 
+    if args.seed_in:
+        with open(args.seed_in, encoding="utf-8") as f:
+            seed = json.load(f)
+        member_tokens = [(gid, tok) for gid, tok in seed["member_tokens"]]
+        total = len(member_tokens)
+        print(f"[seed-in] {args.seed_in} 로부터 {total}개 연결(그룹 {seed.get('groups', '?')}개) 로드")
+    else:
+        run_id = uuid.uuid4().hex[:8]
+        print(f"[setup] run_id={run_id}, groups={g}, members/group={m}, 총 연결={total}개")
+
+        # 계정 생성은 스파이크 대상이 아니다 — AuthRateLimitFilter가 IP당 /member/signup·
+        # /member/login 각각 60건/60초로 막아둔다(application.yml security.rate-limit).
+        # 이 스크립트는 전부 같은 호스트(127.0.0.1)에서 쏘므로 그 한도를 그대로 받는다 —
+        # 병렬화 대신 한도 안에 들어오도록 순차 + 페이싱한다(분당 ~50건, 여유를 둠).
+        accounts = [None] * total
+        pace_s = 1.25
+        for i in range(total):
+            email = f"lt-mg-{run_id}-{i}@test.local"
+            token = signup_and_login(f"lt-mg-{run_id}-{i}", email)
+            accounts[i] = (email, token)
+            if (i + 1) % 10 == 0:
+                print(f"[setup] 계정 {i+1}/{total} 생성됨")
+            time.sleep(pace_s)
+        print(f"[setup] 계정 {total}개 생성 완료")
+
+        group_ids = []
+        member_tokens = []  # group_id, token 쌍의 평평한 리스트
+        for gi in range(g):
+            owner_email, owner_token = accounts[gi * m]
+            group_id = create_group(owner_token, f"spike-group-{run_id}-{gi}")["id"]
+            group_ids.append(group_id)
+            member_tokens.append((group_id, owner_token))
+            for mi in range(1, m):
+                email, tok = accounts[gi * m + mi]
+                member_id = member_id_for(email)
+                inv = invite(owner_token, group_id, member_id)
+                accept(tok, inv["id"])
+                member_tokens.append((group_id, tok))
+        print(f"[setup] 그룹 {g}개, 총 멤버십 {len(member_tokens)}건 준비 완료")
+
+        if args.seed_out:
+            with open(args.seed_out, "w", encoding="utf-8") as f:
+                json.dump({"groups": g, "members_per_group": m, "member_tokens": member_tokens}, f)
+            print(f"[seed-out] {args.seed_out} 에 저장 완료 — --seed-in {args.seed_out} 으로 반복 실행")
+            return
+
     baseline = read_metrics()
     print(f"[baseline] jvm_threads={baseline['jvm_threads']:.0f} "
           f"tomcat_busy={baseline['tomcat_busy']:.0f} hikari_pending={baseline['hikari_pending']:.0f}")
-
-    run_id = uuid.uuid4().hex[:8]
-    print(f"[setup] run_id={run_id}, groups={g}, members/group={m}, 총 연결={total}개")
-
-    # 계정 생성은 스파이크 대상이 아니다 — AuthRateLimitFilter가 IP당 /member/signup·
-    # /member/login 각각 60건/60초로 막아둔다(application.yml security.rate-limit).
-    # 이 스크립트는 전부 같은 호스트(127.0.0.1)에서 쏘므로 그 한도를 그대로 받는다 —
-    # 병렬화 대신 한도 안에 들어오도록 순차 + 페이싱한다(분당 ~50건, 여유를 둠).
-    accounts = [None] * total
-    pace_s = 1.25
-    for i in range(total):
-        email = f"lt-mg-{run_id}-{i}@test.local"
-        token = signup_and_login(f"lt-mg-{run_id}-{i}", email)
-        accounts[i] = (email, token)
-        if (i + 1) % 10 == 0:
-            print(f"[setup] 계정 {i+1}/{total} 생성됨")
-        time.sleep(pace_s)
-    print(f"[setup] 계정 {total}개 생성 완료")
-
-    group_ids = []
-    member_tokens = []  # group_id, token 쌍의 평평한 리스트
-    for gi in range(g):
-        owner_email, owner_token = accounts[gi * m]
-        group_id = create_group(owner_token, f"spike-group-{run_id}-{gi}")["id"]
-        group_ids.append(group_id)
-        member_tokens.append((group_id, owner_token))
-        for mi in range(1, m):
-            email, tok = accounts[gi * m + mi]
-            member_id = member_id_for(email)
-            inv = invite(owner_token, group_id, member_id)
-            accept(tok, inv["id"])
-            member_tokens.append((group_id, tok))
-    print(f"[setup] 그룹 {g}개, 총 멤버십 {len(member_tokens)}건 준비 완료")
 
     poller = Poller(interval_s=0.05)
     poller.start()
