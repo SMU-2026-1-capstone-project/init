@@ -131,6 +131,9 @@ public enum ErrorCode {
     //Report
     REPORT_NOT_FOUND(404,"R001","리포트를 찾을 수 없습니다"),
 
+    // --- 트레이너 실시간 모니터링(SSE) ---
+    NOT_ASSIGNED_TRAINER(403, "T001", "담당 사용자가 아닙니다."),
+
     // --- 운동 목표 (BE-06) ---
     GOAL_NOT_FOUND(404, "GL001", "존재하지 않는 목표입니다."),
     // goalType당 목표 1개 제약(GoalRepository.existsByMemberIdAndGoalType) — 위반 시 이 코드.

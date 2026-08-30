@@ -39,6 +39,7 @@ TRUNCATE TABLE session_feedback_logs;
 TRUNCATE TABLE exercise_sessions;
 TRUNCATE TABLE exercise_references;
 TRUNCATE TABLE refresh_token;
+TRUNCATE TABLE trainer_assignments;
 TRUNCATE TABLE users;
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -48,6 +49,14 @@ SET FOREIGN_KEY_CHECKS = 1;
 INSERT INTO users (email, password, username, role, onboarding_completed, preferred_url)
 VALUES ('test@test.com', '$2a$10$.mpvpjYHKGukSTvbCukWNusFWU/lHUBCmHjp3Un2mz6qjrOg9z/LC', '효재', 'USER', TRUE,
         'https://www.youtube.com/watch?v=q6hBSSis_60');
+
+-- 트레이너 계정 (ID 2번) — 같은 비밀번호 해시 재사용(dev 전용 픽스처라 편의상).
+-- trainer-live-monitoring.md §8 세션1의 "테스트용 배정 시드"가 이것과 아래 배정 INSERT.
+INSERT INTO users (email, password, username, role, onboarding_completed)
+VALUES ('trainer@test.com', '$2a$10$.mpvpjYHKGukSTvbCukWNusFWU/lHUBCmHjp3Un2mz6qjrOg9z/LC', '트레이너', 'TRAINER', TRUE);
+
+-- 트레이너(2번)가 테스트 사용자(1번)를 담당하도록 배정.
+INSERT INTO trainer_assignments (trainer_id, user_id) VALUES (2, 1);
 
 -- ---------------------------------------------------------------------------
 -- 2. 운동 세션 (4월 데이터)

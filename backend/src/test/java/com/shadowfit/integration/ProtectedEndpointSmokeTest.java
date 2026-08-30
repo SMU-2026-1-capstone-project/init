@@ -16,7 +16,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 나머지 컨트롤러들(ExerciseRecordController·ExerciseReportController·ExercisesController·
- * FeedbackTemplateController·PreferenceController·SessionFeedbackController)의 보호된
+ * FeedbackTemplateController·PreferenceController·SessionFeedbackController·
+ * PatternAnalysisController)의 보호된
  * 엔드포인트가 실제로 인증 없이는 401을 반환하는지 확인하는 저비용 스모크 테스트.
  * 비즈니스 로직 자체는 이미 서비스 단위테스트로 커버돼 있어, 여기서는 라우팅·보안설정
  * 자체가 살아있는지만 넓게 확인한다(라우팅 오타·화이트리스트 실수 등을 잡는 안전망).
@@ -104,5 +105,23 @@ class ProtectedEndpointSmokeTest {
     @DisplayName("GET /sessions/{id}/feedback-summary — 토큰 없으면 401")
     void sessionFeedbackSummary_noToken_401() throws Exception {
         mockMvc.perform(get("/sessions/1/feedback-summary")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /patterns/periodicity — 토큰 없으면 401")
+    void periodicity_noToken_401() throws Exception {
+        mockMvc.perform(get("/patterns/periodicity")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /patterns/intensity-trend — 토큰 없으면 401")
+    void intensityTrend_noToken_401() throws Exception {
+        mockMvc.perform(get("/patterns/intensity-trend")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /patterns/consistency — 토큰 없으면 401")
+    void consistency_noToken_401() throws Exception {
+        mockMvc.perform(get("/patterns/consistency")).andExpect(status().isUnauthorized());
     }
 }
