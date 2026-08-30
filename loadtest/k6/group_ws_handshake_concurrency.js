@@ -20,6 +20,12 @@
 //    VU 초기화 자체가 순차적이라 완벽한 동시 시작은 아니다. python 판(threading.Barrier)보다
 //    "동시성"이 느슨하다는 걸 결과 해석 시 감안할 것.
 //
+// 🔴 2026-08-31 AWS 라운드에서 실제로 이 느슨함이 걸렸다 — M=450까지도 hikari_pending이 항상
+//    0이었다(§9의 300연결 pending=15 를 재현 못 함). setup()에서 공유 목표 시각(startAt)을
+//    계산해 각 VU가 sleep()으로 그 시각까지 대기했다가 동시에 ws.connect()하도록 바꿔
+//    버스트를 조인다 — threading.Barrier와 동일하진 않지만(정밀도가 sleep() 해상도에 묶임),
+//    VU 초기화 순서에 그대로 노출되는 것보다는 낫다.
+//
 // 🔴 계정/그룹 시딩은 이 스크립트가 안 한다 — 별도로 분리했다. k6는 순수 HTTP 클라이언트라
 //    email -> memberId 조회 수단이 없다(이 앱은 GET /member/me가 없고, admin 조회 API는
 //    signup으로 admin 토큰을 못 만들어 못 씀 — MemberRequestDto 주석, 이슈 #138). 기존
@@ -87,7 +93,17 @@ export const options = {
   thresholds: { ws_connecting: ['p(95)<60000'] }, // 게이트 아님, 타임아웃 방지용 상한만
 };
 
-export function handshakeBurst() {
+// 공유 목표 시각 — 모든 VU가 이 시각까지 sleep()으로 대기했다가 동시에 발사한다.
+// 지연폭은 CONCURRENCY에 비례(VU 초기화 자체가 순차적이라 M이 클수록 마지막 VU가 늦게 뜬다).
+export function setup() {
+  const delayMs = Math.max(3000, CONCURRENCY * 10);
+  return { startAt: Date.now() + delayMs };
+}
+
+export function handshakeBurst(data) {
+  const wait = (data.startAt - Date.now()) / 1000;
+  if (wait > 0) sleep(wait);
+
   const idx = (exec.vu.idInTest - 1) % seedData.tokens.length;
   const token = seedData.tokens[idx];
   const url = `${WS_BASE}/ws/groups/${seedData.groupId}?token=${token}`;
