@@ -1,0 +1,51 @@
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 409.0
+python_gc_objects_collected_total{generation="1"} 91.0
+python_gc_objects_collected_total{generation="2"} 0.0
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 0.0
+python_gc_objects_uncollectable_total{generation="1"} 0.0
+python_gc_objects_uncollectable_total{generation="2"} 0.0
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 121.0
+python_gc_collections_total{generation="1"} 10.0
+python_gc_collections_total{generation="2"} 0.0
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="12",patchlevel="13",version="3.12.13"} 1.0
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 1.881104384e+09
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 7.51616e+07
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.78810080066e+09
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 1.38
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 10.0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 65535.0
+# HELP shadowfit_ai_spring_callback_total AI → Spring 콜백 결과. exhausted 는 «두 겹이 다 소진돼 유실» 을 뜻한다 (#151, #276 ③)
+# TYPE shadowfit_ai_spring_callback_total counter
+shadowfit_ai_spring_callback_total{outcome="ok",rpc="SavePoseDataBatch"} 1800.0
+shadowfit_ai_spring_callback_total{outcome="retried",rpc="SavePoseDataBatch"} 44.0
+shadowfit_ai_spring_callback_total{outcome="rejected",rpc="SavePoseDataBatch"} 0.0
+shadowfit_ai_spring_callback_total{outcome="exhausted",rpc="SavePoseDataBatch"} 0.0
+# HELP shadowfit_ai_spring_callback_created AI → Spring 콜백 결과. exhausted 는 «두 겹이 다 소진돼 유실» 을 뜻한다 (#151, #276 ③)
+# TYPE shadowfit_ai_spring_callback_created gauge
+shadowfit_ai_spring_callback_created{outcome="ok",rpc="SavePoseDataBatch"} 1.788100801576528e+09
+shadowfit_ai_spring_callback_created{outcome="retried",rpc="SavePoseDataBatch"} 1.7881008015765452e+09
+shadowfit_ai_spring_callback_created{outcome="rejected",rpc="SavePoseDataBatch"} 1.7881008015765548e+09
+shadowfit_ai_spring_callback_created{outcome="exhausted",rpc="SavePoseDataBatch"} 1.7881008015765615e+09
+# HELP shadowfit_ai_active_sessions in-memory session_state 에 살아 있는 세션 수 (#151)
+# TYPE shadowfit_ai_active_sessions gauge
+shadowfit_ai_active_sessions 0.0
