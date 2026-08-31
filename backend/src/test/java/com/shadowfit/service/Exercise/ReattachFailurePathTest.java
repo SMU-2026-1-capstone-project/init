@@ -72,16 +72,18 @@ class ReattachFailurePathTest {
         blockingStub = mock(ExerciseServiceGrpc.ExerciseServiceBlockingStub.class);
         when(blockingStub.withInterceptors(any(io.grpc.ClientInterceptor[].class))).thenReturn(blockingStub);
         when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
+        // reattachSession 의 DB 작업은 별도 빈 ReattachRequestBuilder 가 갖는다(이슈 #76, #175).
+        // 여기 mock 들(sessionService/poseDataRepository/referenceRepository)을 그대로 넣은
+        // 실제 인스턴스를 조립해서 넘긴다 — 트랜잭션 경계는 단위 테스트의 관심사가 아니고,
+        // 리포지토리가 전부 mock 이라 동작은 같다.
+        ReattachRequestBuilder reattachRequestBuilder =
+                new ReattachRequestBuilder(sessionService, poseDataRepository, referenceRepository);
         service = new ExerciseAnalysisService(sessionRepository, exercisesRepository,
-                memberRepository, sessionService, referenceRepository, poseDataRepository,
-                circuitBreakerRegistry, metrics, outboxEventRepository);
+                memberRepository, sessionService, referenceRepository,
+                circuitBreakerRegistry, metrics, outboxEventRepository, reattachRequestBuilder);
         ReflectionTestUtils.setField(service, "internalToken", "test-token");
         ReflectionTestUtils.setField(service, "aiChannelPoolSize", 1);
         ReflectionTestUtils.setField(service, "aiBlockingStubPool", List.of(blockingStub));
-        // reattachSession 은 DB 작업을 self.loadReattachRequest 로 분리해 트랜잭션을 gRPC 앞에서
-        // 닫는다(이슈 #76). 여기선 프록시가 없으니 자기 자신을 넣는다 — 트랜잭션 경계는 단위
-        // 테스트의 관심사가 아니고, 리포지토리가 전부 mock 이라 동작은 같다.
-        ReflectionTestUtils.setField(service, "self", service);
         when(sessionService.findReattachableSession(SESSION_ID, MEMBER_ID)).thenReturn(session());
         when(poseDataRepository.findMaxRepNumberBySessionId(eq(SESSION_ID), any())).thenReturn(3);
         when(referenceRepository.findByExerciseId(anyLong())).thenReturn(List.of());
@@ -259,15 +261,15 @@ class ReattachFailurePathTest {
     @DisplayName("gRPC 는 트랜잭션 밖에서 호출한다 — 커넥션을 쥔 채 AI 를 기다리지 않는다 (#76)")
     void gRPC는_트랜잭션_밖에서() throws NoSuchMethodException {
         var reattach = ExerciseAnalysisService.class.getMethod("reattachSession", Long.class, Long.class);
-        var load = ExerciseAnalysisService.class.getMethod("loadReattachRequest", Long.class, Long.class);
+        var build = ReattachRequestBuilder.class.getMethod("build", Long.class, Long.class);
 
         assertThat(reattach.getAnnotation(Transactional.class))
                 .as("reattachSession 에 @Transactional 이 붙으면 gRPC 왕복 내내 커넥션을 점유한다 (#76)")
                 .isNull();
-        assertThat(load.getAnnotation(Transactional.class))
-                .as("DB 작업은 loadReattachRequest 안에서 끝나야 한다")
+        assertThat(build.getAnnotation(Transactional.class))
+                .as("DB 작업은 ReattachRequestBuilder.build 안에서 끝나야 한다")
                 .isNotNull();
-        assertThat(load.getAnnotation(Transactional.class).readOnly())
+        assertThat(build.getAnnotation(Transactional.class).readOnly())
                 .as("재부착 준비는 읽기 전용이다")
                 .isTrue();
     }

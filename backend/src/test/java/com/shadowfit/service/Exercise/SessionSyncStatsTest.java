@@ -44,7 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("싱크 통계 집계 테스트 (#75)")
 class SessionSyncStatsTest {
 
-    @Autowired private SessionService sessionService;
+    @Autowired private SessionCompletionTx sessionCompletionTx;
     @Autowired private SessionRepository sessionRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private ExercisesRepository exercisesRepository;
@@ -96,7 +96,7 @@ class SessionSyncStatsTest {
     }
 
     private void completeWithAiReported(double aiAvgSyncRate) {
-        sessionService.applyComplete(SessionCompleteRequest.newBuilder()
+        sessionCompletionTx.applyComplete(SessionCompleteRequest.newBuilder()
                 .setSessionId(session.getId())
                 .setTotalReps(3)
                 .setAvgSyncRate(aiAvgSyncRate)

@@ -101,9 +101,9 @@ SessionMetricsRecordingTest {
         @Mock private MemberRepository memberRepository;
         @Mock private SessionService sessionService;
         @Mock private ExerciseReferenceRepository referenceRepository;
-        // 재부착 시 MAX(rep_number) 복원용 (이슈 #59 2단계). 이 테스트가 보는 경로는 안 쓴다.
-        @Mock private PoseDataRepository poseDataRepository;
         @Mock private OutboxEventRepository outboxEventRepository;
+        // 재부착 준비(ReattachRequestBuilder)는 이 테스트가 보는 경로가 안 쓴다.
+        @Mock private ReattachRequestBuilder reattachRequestBuilder;
 
         private CircuitBreakerRegistry circuitBreakerRegistry;
         private ExerciseServiceGrpc.ExerciseServiceStub stub;
@@ -124,8 +124,8 @@ SessionMetricsRecordingTest {
             when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
 
             service = new ExerciseAnalysisService(sessionRepository, exercisesRepository,
-                    memberRepository, sessionService, referenceRepository, poseDataRepository,
-                    circuitBreakerRegistry, metrics, outboxEventRepository);
+                    memberRepository, sessionService, referenceRepository,
+                    circuitBreakerRegistry, metrics, outboxEventRepository, reattachRequestBuilder);
             ReflectionTestUtils.setField(service, "internalToken", "test-token");
             ReflectionTestUtils.setField(service, "aiChannelPoolSize", 1);
             ReflectionTestUtils.setField(service, "aiAsyncStubPool", List.of(stub));
@@ -332,21 +332,18 @@ SessionMetricsRecordingTest {
     class SessionServiceConflicts {
 
         private SessionService service;
-        private SessionService self;
+        private SessionCompletionTx sessionCompletionTx;
 
         @BeforeEach
         void setUp() {
+            sessionCompletionTx = mock(SessionCompletionTx.class);
             service = new SessionService(mock(SessionRepository.class), mock(ExercisesRepository.class),
-                    mock(MemberRepository.class), mock(com.fasterxml.jackson.databind.ObjectMapper.class),
-                    mock(com.shadowfit.service.Report.DailyLogService.class),
+                    mock(MemberRepository.class),
                     mock(com.shadowfit.repository.exercise.PoseDataRepository.class),
-                    mock(com.shadowfit.service.Report.SessionAnalysisCalculator.class),
-                    mock(com.shadowfit.repository.report.ReportRepository.class),
                     metrics,
                     mock(com.shadowfit.repository.outbox.OutboxEventRepository.class),
-                    new com.shadowfit.global.security.SessionNonceGenerator());
-            self = mock(SessionService.class);
-            ReflectionTestUtils.setField(service, "self", self);
+                    new com.shadowfit.global.security.SessionNonceGenerator(),
+                    sessionCompletionTx);
         }
 
         @Test
@@ -354,7 +351,7 @@ SessionMetricsRecordingTest {
         void completeSession_conflictThenSuccess_recordsRetry() {
             doThrow(new ObjectOptimisticLockingFailureException(Session.class, 1L))
                     .doNothing()
-                    .when(self).applyComplete(any());
+                    .when(sessionCompletionTx).applyComplete(any());
 
             service.completeSession(com.shadowfit.grpc.SessionCompleteRequest.newBuilder().setSessionId(1L).build());
 
@@ -366,7 +363,7 @@ SessionMetricsRecordingTest {
         @DisplayName("AI 콜백 낙관락 충돌 — 3회 모두 실패하면 retry 2건 + exhausted 1건 후 예외 전파")
         void completeSession_alwaysConflict_recordsExhausted() {
             doThrow(new ObjectOptimisticLockingFailureException(Session.class, 2L))
-                    .when(self).applyComplete(any());
+                    .when(sessionCompletionTx).applyComplete(any());
 
             assertThatThrownBy(() -> service.completeSession(
                     com.shadowfit.grpc.SessionCompleteRequest.newBuilder().setSessionId(2L).build()))

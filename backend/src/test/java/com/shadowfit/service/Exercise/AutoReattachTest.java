@@ -79,15 +79,17 @@ class AutoReattachTest {
         blockingStub = mock(ExerciseServiceGrpc.ExerciseServiceBlockingStub.class);
         when(blockingStub.withInterceptors(any(io.grpc.ClientInterceptor[].class))).thenReturn(blockingStub);
         when(blockingStub.withDeadlineAfter(anyLong(), any())).thenReturn(blockingStub);
+        // reattachFromOutbox 의 DB 작업은 별도 빈 ReattachRequestBuilder 가 갖는다(이슈 #175).
+        // 여기 mock 들(sessionService/poseDataRepository/referenceRepository)을 그대로 넣은
+        // 실제 인스턴스를 조립해서 넘긴다 — ReattachFailurePathTest 와 같은 이유.
+        ReattachRequestBuilder reattachRequestBuilder =
+                new ReattachRequestBuilder(sessionService, poseDataRepository, referenceRepository);
         service = new ExerciseAnalysisService(sessionRepository, exercisesRepository,
-                memberRepository, sessionService, referenceRepository, poseDataRepository,
-                circuitBreakerRegistry, metrics, outboxEventRepository);
+                memberRepository, sessionService, referenceRepository,
+                circuitBreakerRegistry, metrics, outboxEventRepository, reattachRequestBuilder);
         ReflectionTestUtils.setField(service, "internalToken", "test-token");
         ReflectionTestUtils.setField(service, "aiChannelPoolSize", 1);
         ReflectionTestUtils.setField(service, "aiBlockingStubPool", List.of(blockingStub));
-        // reattachFromOutbox → self.loadReattachRequestById 를 부른다. 프록시가 없는 단위
-        // 테스트라 ReattachFailurePathTest 와 같은 이유로 자기 자신을 넣는다.
-        ReflectionTestUtils.setField(service, "self", service);
     }
 
     private Session session() {
