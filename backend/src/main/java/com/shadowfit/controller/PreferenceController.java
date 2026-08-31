@@ -2,7 +2,7 @@ package com.shadowfit.controller;
 
 import com.shadowfit.dto.preference.TtsPreferenceDto;
 import com.shadowfit.dto.preference.TtsPreferenceUpdateDto;
-import com.shadowfit.service.Member.PreferenceService;
+import com.shadowfit.service.member.PreferenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

@@ -168,11 +168,11 @@ fsync 레버는 안 먹었고(다세션에서 3.47배 → **1.03배**), 커밋 �
 
 | | |
 |---|---|
-| 쓰기 | [`PoseDataService.java:42`](../../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java) INSERT · `:221` gRPC 수신 — 프레임마다 |
+| 쓰기 | [`PoseDataService.java:42`](../../backend/src/main/java/com/shadowfit/service/exercise/PoseDataService.java) INSERT · `:221` gRPC 수신 — 프레임마다 |
 | 읽기 | [`PoseFrameProjection.java:18`](../../backend/src/main/java/com/shadowfit/dto/report/PoseFrameProjection.java) — *"`jointCoordinates` 를 싣지 않는 방침은 유지된다"* |
 | API 노출 | **없음.** report DTO 어디에도 좌표 필드가 없다 |
 
-그런데 [`SessionAnalysisCalculator.java:156`](../../backend/src/main/java/com/shadowfit/service/Report/SessionAnalysisCalculator.java) 은 용도를 명시한다:
+그런데 [`SessionAnalysisCalculator.java:156`](../../backend/src/main/java/com/shadowfit/service/report/SessionAnalysisCalculator.java) 은 용도를 명시한다:
 
 > *"이 선택은 두 가지를 결정한다: 리포트의 `timeStamp`, 그리고 그 프레임의 **`jointCoordinates`(= 앱이 그릴 자세)**"*
 

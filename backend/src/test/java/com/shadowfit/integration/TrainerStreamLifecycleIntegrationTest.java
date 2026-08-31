@@ -15,7 +15,7 @@ import com.shadowfit.repository.exercise.CategoryRepository;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.exercise.SessionRepository;
 import com.shadowfit.repository.member.MemberRepository;
-import com.shadowfit.service.Exercise.PoseDataService;
+import com.shadowfit.service.exercise.PoseDataService;
 import com.shadowfit.service.coaching.TrainerConnectionRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -104,7 +104,7 @@ Docker 네트워크는 `shadowfit-net` 브리지 한 개. 외부 노출은 backe
 
 | | 상태 | 근거 |
 |---|---|---|
-| **`ReportFeedbackBatch`** | **반쪽** — proto 양쪽 ✅ · Spring 수신부 ✅([`ExerciseGrpcService.java:120`](../../backend/src/main/java/com/shadowfit/service/Exercise/ExerciseGrpcService.java)) · **AI 호출부 ❌** | `ai-server/app/grpc/spring_client.py` 가 부르는 것은 `report_pose_data_batch`·`report_complete_analysis` **둘뿐**이고, `ai-server/` 전체에 `FeedbackBatch` 사용처가 0건이다 |
+| **`ReportFeedbackBatch`** | **반쪽** — proto 양쪽 ✅ · Spring 수신부 ✅([`ExerciseGrpcService.java:120`](../../backend/src/main/java/com/shadowfit/service/exercise/ExerciseGrpcService.java)) · **AI 호출부 ❌** | `ai-server/app/grpc/spring_client.py` 가 부르는 것은 `report_pose_data_batch`·`report_complete_analysis` **둘뿐**이고, `ai-server/` 전체에 `FeedbackBatch` 사용처가 0건이다 |
 | ~~**`user.proto` / `UserService.GetUserInfo`**~~ | **삭제됨 (2026-08-12, #133)** | 선언은 `backend/src/main/proto/user.proto` 에만 있었고 **양쪽 어디에도 구현·호출이 없었다**(전 저장소 검색 0건). `ai-server/app/proto/` 에는 파일 자체가 없었다 — 한 번도 양쪽 계약이 된 적이 없다. 지우는 쪽으로 닫았다 |
 
 > 📌 **`ReportFeedbackBatch` 는 이미 알려진 갭이다** — [`../tasks/30-ai-remaining-work.md`](../tasks/30-ai-remaining-work.md) §1 이 *"결함 분류 → 송신 통째로 미구현, 1순위"* 로 잡아뒀다. *"proto·테이블·시드가 다 있는데 AI 가 안 불러서 TTS 피드백 기능 전체가 시연용 더미로만 존재한다."* 이 문서에는 그 사실이 없어서, **결합 구조만 보면 동작하는 경로처럼 보였다.**

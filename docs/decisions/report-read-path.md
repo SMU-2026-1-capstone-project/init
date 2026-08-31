@@ -69,7 +69,7 @@
 
 ## 1. 현재 읽기 경로 (코드 기준)
 
-`ReportService.getSessionReport`([`ReportService.java:33`](../../backend/src/main/java/com/shadowfit/service/Report/ReportService.java))가 던지는 쿼리 4개:
+`ReportService.getSessionReport`([`ReportService.java:33`](../../backend/src/main/java/com/shadowfit/service/report/ReportService.java))가 던지는 쿼리 4개:
 
 ```
 GET /reports/sessions/{id}
@@ -79,7 +79,7 @@ GET /reports/sessions/{id}
  4. findFramesBySessionId ← pose_data 4컬럼 projection (2026-07-15 적용 당시 3컬럼, §7)
 ```
 
-이후 `buildReportResponse` → `selectWorstSection`([`:74`](../../backend/src/main/java/com/shadowfit/service/Report/ReportService.java))에서 연속 3프레임(`WORST_WINDOW_SIZE=3`) 슬라이딩으로 최저 syncRate 구간을 **자바 메모리에서 O(N) 재계산**.
+이후 `buildReportResponse` → `selectWorstSection`([`:74`](../../backend/src/main/java/com/shadowfit/service/report/ReportService.java))에서 연속 3프레임(`WORST_WINDOW_SIZE=3`) 슬라이딩으로 최저 syncRate 구간을 **자바 메모리에서 O(N) 재계산**.
 
 **데이터 모델**: pose_data 1행 = 분석 프레임 1개. `joint_coordinates`(@Lob TEXT, [`PoseData.java:26`](../../backend/src/main/java/com/shadowfit/model/exercise/PoseData.java))는 프레임당 33 랜드마크 JSON ≈ 2.3KB. 세션당 ~750행 → ~1.7MB.
 
@@ -91,7 +91,7 @@ GET /reports/sessions/{id}
 |---|------|------|-----------|
 | ① ([조건](../portfolio/realmysql-experiments.md#projection-98-7)) | ~~**fat 컬럼 over-fetch** — 풀엔티티 로드, worst 계산은 당시 `syncRate`·`timestampSec`·`feedbackMessage` 3개만 씀. `joint_coordinates`는 **한 번도 안 씀**~~ | **✅ 해결(2026-07-15)** | `findFramesBySessionId`(적용 당시 3컬럼 → **현재 4컬럼**, §7)로 교체. 실측(§②b): payload −98.7%, warm 쿼리 **8x**(로컬 412만 행) → **29~41x**(AWS 1억 행, 2026-07-15 재검증) |
 | ② | **재계산-on-read** — precompute 없이 매 GET마다 worst 구간 재계산 | ✅ 실재 | `selectWorstSection` 매 호출 |
-| ③ | **REPORT_NOT_FOUND 갭** — `completeAnalysis`가 `session`만 UPDATE, `reports`엔 안 씀 → 실제 세션은 Report 행 없음 → 404 | ✅ 실재(기능 끊김) | `applyCompleteFromApp`([`ExerciseAnalysisService.java:217`](../../backend/src/main/java/com/shadowfit/service/Exercise/ExerciseAnalysisService.java)) session만 UPDATE / `reports`는 [`data.sql:168`](../../mysql/data.sql) 시드뿐 |
+| ③ | **REPORT_NOT_FOUND 갭** — `completeAnalysis`가 `session`만 UPDATE, `reports`엔 안 씀 → 실제 세션은 Report 행 없음 → 404 | ✅ 실재(기능 끊김) | `applyCompleteFromApp`([`ExerciseAnalysisService.java:217`](../../backend/src/main/java/com/shadowfit/service/exercise/ExerciseAnalysisService.java)) session만 UPDATE / `reports`는 [`data.sql:168`](../../mysql/data.sql) 시드뿐 |
 | ④ | ~~**exercise_sessions 인덱스 갭** — `(member_id, start_time)` 등 복합 인덱스 없음(FK 단일뿐) → 캘린더·이전세션 쿼리 filesort~~ | **✅ 해결(2026-07-11)** | `idx_session_member_starttime` 추가([`schema.sql:71`](../../mysql/schema.sql)), 실측: 월간 조회 1675행 Filter → 143행 Index range scan(cost 91.4→64.6), 연간 조회는 Covering index scan으로 전환. 커밋 `dbb0fec`<br>🔀 **2026-08-07**: 이 인덱스는 `idx_session_member_status_start (member_id, status, start_time)` 로 통합돼 이름이 사라졌다([#110](https://github.com/Shadowfit/init/issues/110), [`session-index-composition.md`](./session-index-composition.md)). 갭 자체는 여전히 해결 상태 — 다만 `status` 를 건너뛰어야 해 읽는 행이 14 → 20 으로 늘었다(절대 0.03ms) |
 | ④-1 | ~~**"직전 동일 운동" 조회는 ④의 인덱스로 안 커버됨** — `findFirstByMemberIdAndExerciseIdAndStatusOrderByStartTimeDesc`(이전 기록 비교용)는 `member_id, exercise_id, status`로 필터하는데 `idx_session_member_starttime(member_id, start_time)`엔 `exercise_id`·`status`가 없어 member_id로 찾은 뒤 filter~~ | **✅ 해결(2026-07-15)** | 실측: 기존 인덱스만 있을 때 `rows=1675, filtered=5.19%, Using where`. `idx_session_member_exercise_status_start(member_id, exercise_id, status, start_time)` 추가 후 `filtered=100%`, filter 단계 제거(`schema.sql` `exercise_sessions`) |
 | ⑤ | **버퍼풀 오염** — cold 거대 raw를 서빙 경로가 건드려 핫 데이터 evict | 🔶 메커니즘 실재, 규모 미발동 | DAU 작아 리포트 조회 드묾 |
@@ -202,7 +202,7 @@ List<PoseFrameProjection> findFramesBySessionId(@Param("sessionId") Long session
 
 **③ ReportService** — `selectWorstSection`/`buildWorstReason`/`pickDominantFeedback` 시그니처를 `List<PoseFrameProjection>`로, 접근자 `getSyncRate()→syncRate()` 등으로 교체. 호출부(`:51`)를 `findFramesBySessionId`로.
 
-> 🔴 **③ 도 적용 시점 서술이다.** `pickDominantFeedback` 은 [#80](https://github.com/Shadowfit/init/issues/80) 으로 사라졌고, worst 구간 계산은 `ReportService` 를 떠나 [`SessionAnalysisCalculator`](../../backend/src/main/java/com/shadowfit/service/Report/SessionAnalysisCalculator.java) 로 옮겨 갔다(`ReportService:106`·`SessionService:327` 이 프로젝션을 읽어 넘긴다).
+> 🔴 **③ 도 적용 시점 서술이다.** `pickDominantFeedback` 은 [#80](https://github.com/Shadowfit/init/issues/80) 으로 사라졌고, worst 구간 계산은 `ReportService` 를 떠나 [`SessionAnalysisCalculator`](../../backend/src/main/java/com/shadowfit/service/report/SessionAnalysisCalculator.java) 로 옮겨 갔다(`ReportService:106`·`SessionService:327` 이 프로젝션을 읽어 넘긴다).
 
 > 기존 `findBySessionIdOrderByTimestampSecAsc`는 교체 후 미사용(테스트는 `findAll`/`count`만 씀) → 제거 선택.
 
@@ -256,7 +256,7 @@ precompute 도입 이전에 이미 `COMPLETED`된 세션들은 `reports` row가 
 
 ## 9-B. raw TTL(보존 정책) 설계 — 6가지 축 — ✅ 전부 완료(2026-07-24)
 
-> **2026-07-24 최종 갱신**: precompute-on-write(§9)가 먼저 구현되면서 ②(삭제 근거)가 풀렸고, 그 위에 TTL 자동화(⑤⑥) 및 나머지 안전장치(보존기간·아카이빙·안전마진·검증)까지 전부 결정·구현 완료. `PoseDataPartitionScheduler`(신규, `com.shadowfit.service.Exercise`) 참조.
+> **2026-07-24 최종 갱신**: precompute-on-write(§9)가 먼저 구현되면서 ②(삭제 근거)가 풀렸고, 그 위에 TTL 자동화(⑤⑥) 및 나머지 안전장치(보존기간·아카이빙·안전마진·검증)까지 전부 결정·구현 완료. `PoseDataPartitionScheduler`(신규, `com.shadowfit.service.exercise`) 참조.
 
 `pose_data` TTL(§6 ④)은 개념·실측([`realmysql-experiments.md` §②d · 조건](../portfolio/realmysql-experiments.md#drop-partition-625x), DROP PARTITION 625배)에 스키마 반영(PR #43)과 자동화까지 모두 끝났다. 6가지 축 — ①~④는 **정책 설계**, ⑤~⑥은 **운영 실행**.
 

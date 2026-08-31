@@ -4,7 +4,7 @@ import com.shadowfit.dto.exercises.session.ExercisesResponseDto;
 import com.shadowfit.dto.exercises.VideoRequestDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.model.exercise.Status;
-import com.shadowfit.service.Exercise.ExerciseAnalysisService;
+import com.shadowfit.service.exercise.ExerciseAnalysisService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

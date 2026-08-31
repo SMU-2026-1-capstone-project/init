@@ -10,7 +10,7 @@ import com.shadowfit.dto.admin.ExerciseThresholdResponseDto;
 import com.shadowfit.dto.admin.ExerciseUpdateDto;
 import com.shadowfit.dto.admin.ThresholdUpdateDto;
 import com.shadowfit.dto.common.PageResponse;
-import com.shadowfit.service.Exercise.AdminExerciseService;
+import com.shadowfit.service.exercise.AdminExerciseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;

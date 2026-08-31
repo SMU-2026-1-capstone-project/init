@@ -374,7 +374,7 @@ state.current_rep_frames.clear()                     # 전송 후 버퍼 비움 
 - **추정 (수치)**: R = (프론트 POST fps) × (rep 길이) ≈ 10fps × 2~3초 ≈ **20~30행/rep**. 세션당 ~1,500행.
   - rep 길이 ~2~3초: [`./latency-perception.md`](./latency-perception.md) §2 (도메인 상식)
   - POST fps ~10: [`config.py:18`](../../ai-server/app/config.py) `VIDEO_PROCESS_FPS=10` — **단, 이는 전처리 설정이고 실시간 POST 빈도는 코드로 강제 안 됨** ([`./ai-load-budget.md`](./ai-load-budget.md) §4.1). 카메라 최대 30fps(`config.py:17`)로 쏘면 R 이 60~90까지 열려 있음.
-- **정확값 확정 방법 = 실측**: 세션 1회 후 `spring_client.py:55-59` 의 `count=%d` 또는 Spring [`PoseDataService`](../../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java) 의 `"포즈 데이터 {}개 저장"` 로그 관찰.
+- **정확값 확정 방법 = 실측**: 세션 1회 후 `spring_client.py:55-59` 의 `count=%d` 또는 Spring [`PoseDataService`](../../backend/src/main/java/com/shadowfit/service/exercise/PoseDataService.java) 의 `"포즈 데이터 {}개 저장"` 로그 관찰.
 - 각 행 `joint_coordinates` = MediaPipe 33 랜드마크 JSON ~1~3KB.
 
 ### 4.6 살아남는 정직한 최적화 스토리 (인덱스 추가 대신)
@@ -382,7 +382,7 @@ state.current_rep_frames.clear()                     # 전송 후 버퍼 비움 
 인덱스가 이미 최적이라, "인덱스 추가" 보다 **더 고급** 스토리로 대체:
 
 1. **Projection — JSON blob 그만 끌어오기** ⭐ (가장 깨끗, R≈25 로 효과 확정)
-   - worst 구간 계산은 `syncRate`·`feedbackMessage`·`timestampSec` 3개만 쓰는데, [`ReportService`](../../backend/src/main/java/com/shadowfit/service/Report/ReportService.java) 가 엔티티 전체 로드 → `joint_coordinates`(JSON ~1~3KB)까지 끌어옴.
+   - worst 구간 계산은 `syncRate`·`feedbackMessage`·`timestampSec` 3개만 쓰는데, [`ReportService`](../../backend/src/main/java/com/shadowfit/service/report/ReportService.java) 가 엔티티 전체 로드 → `joint_coordinates`(JSON ~1~3KB)까지 끌어옴.
    - 세션당 ~1,500행 × ~2KB = **~3MB 를 매 조회마다 헛되이 전송·하이드레이션** (3개 스칼라만 필요한데).
    - → projection DTO(3컬럼만 select). "페이로드 3MB → 0.05MB, 응답 X→Y ms" 수치. **측정값이 헤드라인을 정한다** (사전 고정 금지).
 2. **Precompute-on-write — worst 구간을 세션 종료 시 1회 계산해 `Report` 에 저장**
@@ -492,7 +492,7 @@ state.current_rep_frames.clear()                     # 전송 후 버퍼 비움 
 
 - **RPC**: `ExerciseService.SavePoseDataBatch(PoseDataBatchRequest)` ([`backend/src/main/proto/exercise.proto`](../../backend/src/main/proto/exercise.proto) L20).
 - **인증**: [`InternalAuthInterceptor`](../../backend/src/main/java/com/shadowfit/global/config/InternalAuthInterceptor.java) 가 `Authorization: Bearer <internal.api.token>` 메타데이터 검사. 스크립트가 이 헤더만 붙이면 통과.
-- **전제조건**: [`PoseDataService.savePoseDataBatch`](../../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java) 가 `sessionRepository.findById(sessionId)` 로 세션을 먼저 조회 → **세션 row 가 미리 있어야 함** (REST `POST /sessions` 또는 DB 직접 seed).
+- **전제조건**: [`PoseDataService.savePoseDataBatch`](../../backend/src/main/java/com/shadowfit/service/exercise/PoseDataService.java) 가 `sessionRepository.findById(sessionId)` 로 세션을 먼저 조회 → **세션 row 가 미리 있어야 함** (REST `POST /sessions` 또는 DB 직접 seed).
 - **관련 콜백**: `ReportFeedbackBatch`(BT-SET), `CompleteAnalysis`, `StopAnalysis` — 현실적 세션 lifecycle 재현 시 함께.
 
 ### 5.1 왜 좋은 테스트 경계인가
@@ -760,4 +760,4 @@ y 는 정규화 좌표라 **1.0 이 화면 아래 끝**이다. 하체 3부위가
 - [`../tasks/25-portfolio-strategy.md`](../tasks/25-portfolio-strategy.md) — 깊이 트랙(A 간판 + C 무기), 수치 개선 패키지
 - [`../../backend/src/main/proto/exercise.proto`](../../backend/src/main/proto/exercise.proto) — gRPC 계약(SavePoseDataBatch 등)
 - [`../../backend/src/main/java/com/shadowfit/global/config/InternalAuthInterceptor.java`](../../backend/src/main/java/com/shadowfit/global/config/InternalAuthInterceptor.java) — 내부 서비스 인증(Bearer)
-- [`../../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java`](../../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java) — 적재 경로, 세션 전제조건, R 측정 지점
+- [`../../backend/src/main/java/com/shadowfit/service/exercise/PoseDataService.java`](../../backend/src/main/java/com/shadowfit/service/exercise/PoseDataService.java) — 적재 경로, 세션 전제조건, R 측정 지점

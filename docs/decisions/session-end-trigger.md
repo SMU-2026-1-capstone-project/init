@@ -121,7 +121,7 @@ ET-B 와 사실상 같음. 차이는 *endpoint 1개* 라는 명시적 합의:
 | AI 1초 다운 | Spring 은 endTime 기록 OK. AI batch 송신 안 됨 (다음 호출 시 재시도 가능?) | Spring 이 gRPC StopAnalysis 실패 응답 받음 → 재시도 큐 또는 timeout 스케줄러 의존 |
 | 둘 다 다운 | 클라 양쪽 실패 → 사용자 화면에 경고. 다음 접속 시 클라 재시도 가능 | 클라 endpoint 실패 → 사용자 화면에 경고. 다음 접속 시 재시도 |
 
-ET-A 의 **유일한 진짜 장점은 *Spring 다운 시 AI batch 손실 방지*** — 단 이는 [`SessionTimeoutScheduler`](../../backend/src/main/java/com/shadowfit/service/Exercise/SessionTimeoutScheduler.java) 와 AI 측 재시도 큐로 ET-B 에서도 보강 가능.
+ET-A 의 **유일한 진짜 장점은 *Spring 다운 시 AI batch 손실 방지*** — 단 이는 [`SessionTimeoutScheduler`](../../backend/src/main/java/com/shadowfit/service/exercise/SessionTimeoutScheduler.java) 와 AI 측 재시도 큐로 ET-B 에서도 보강 가능.
 
 ---
 

@@ -10,7 +10,7 @@ import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.UserRole;
 import com.shadowfit.repository.exercise.ExercisesRepository;
 import com.shadowfit.repository.member.MemberRepository;
-import com.shadowfit.service.Exercise.ExerciseAnalysisService;
+import com.shadowfit.service.exercise.ExerciseAnalysisService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

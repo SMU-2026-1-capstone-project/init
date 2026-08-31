@@ -1,6 +1,6 @@
 package com.shadowfit.global.observability;
 
-import com.shadowfit.service.Report.WeeklySentenceRuleId;
+import com.shadowfit.service.report.WeeklySentenceRuleId;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;

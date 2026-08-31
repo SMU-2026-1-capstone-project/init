@@ -3,7 +3,7 @@ package com.shadowfit.controller;
 import com.shadowfit.dto.exercises.feedback.FeedbackTemplateDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
 import com.shadowfit.model.member.SelectedPersona;
-import com.shadowfit.service.Exercise.FeedbackTemplateService;
+import com.shadowfit.service.exercise.FeedbackTemplateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

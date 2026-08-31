@@ -215,7 +215,7 @@ B3 잠정 추천이었으나, 실제로 시도해보니 `docker-compose.yml`의 
 - **Spring**:
   - `ExercisesController` 에 `POST /exercises/sessions/{sessionId}/frame` 추가
   - `dto/exercises/PoseFrameRequestDto` 신설 — `{ image: String(base64), timestampSec: Double, exerciseType: String }`
-  - `service/Exercise/PoseFrameProxyService` (가칭) — `WebClient` 로 `http://shadowfit-ai:8000/pose` 호출 후 응답 그대로 반환
+  - `service/exercise/PoseFrameProxyService` (가칭) — `WebClient` 로 `http://shadowfit-ai:8000/pose` 호출 후 응답 그대로 반환
 - **AI**: 무변경. 기존 `POST /pose` 가 그대로 받는다.
 - **docker-compose**: 무변경.
 

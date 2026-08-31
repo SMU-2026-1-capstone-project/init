@@ -41,7 +41,7 @@
 
 이건 #137 의 저장소 선택과 직접 얽힌다. 블랙리스트를 DB/Redis 로 옮기면 **access token 원문도 같은 성질의 저장물**이 되므로, 해싱 여부를 **그때 같이 정해야 한다**(지금은 힙에만 있어 덤프 대상이 아니다).
 
-**ㄴ. 로그아웃이 «요청자» 가 아니라 «본문» 을 믿는다.** [`MemberController.java:41-45`](../../backend/src/main/java/com/shadowfit/controller/MemberController.java) 는 `@AuthenticationPrincipal` 없이 본문의 `accessToken`·`refreshToken` 을 그대로 받고, [`MemberService.java:84`](../../backend/src/main/java/com/shadowfit/service/Member/MemberService.java) 가 소유권 확인 없이 `deleteByToken` 한다.
+**ㄴ. 로그아웃이 «요청자» 가 아니라 «본문» 을 믿는다.** [`MemberController.java:41-45`](../../backend/src/main/java/com/shadowfit/controller/MemberController.java) 는 `@AuthenticationPrincipal` 없이 본문의 `accessToken`·`refreshToken` 을 그대로 받고, [`MemberService.java:84`](../../backend/src/main/java/com/shadowfit/service/member/MemberService.java) 가 소유권 확인 없이 `deleteByToken` 한다.
 
 > 📌 **[#138](https://github.com/Shadowfit/init/issues/138) 과 같은 형태다** — «요청자에게서 받아야 할 것을 본문에서 받는다». 다만 **심각도는 훨씬 낮다**: 남의 토큰을 지우려면 그 토큰을 이미 알아야 하고, 알면 지우는 것보다 쓰는 게 낫다. 별도 이슈로 올릴 정도는 아니라고 보지만, **재발급을 붙일 때는 소유권 확인이 필수**라 그 작업에 자연스럽게 딸려온다.
 

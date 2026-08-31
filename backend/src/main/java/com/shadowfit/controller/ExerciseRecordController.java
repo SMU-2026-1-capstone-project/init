@@ -5,8 +5,8 @@ import com.shadowfit.dto.report.record.DailyActivityResponseDto;
 import com.shadowfit.dto.report.record.DailyLogRequestDto;
 import com.shadowfit.dto.report.record.WeeklyActivityResponseDto;
 import com.shadowfit.global.security.auth.CustomUserDetails;
-import com.shadowfit.service.Exercise.SessionActivityQueryService;
-import com.shadowfit.service.Report.DailyLogService;
+import com.shadowfit.service.exercise.SessionActivityQueryService;
+import com.shadowfit.service.report.DailyLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -17,7 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import com.shadowfit.service.Report.WeeklySummaryService;
+import com.shadowfit.service.report.WeeklySummaryService;
 
 import java.time.LocalDate;
 

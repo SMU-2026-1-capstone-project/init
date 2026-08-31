@@ -20,7 +20,7 @@
 |---|---|
 | `session_id` | 레벨이 정한다 |
 | `rep_number` | 생성기가 이 필드를 **안 보낸다** → proto3 기본값 **0** ([`gen_batch_multi.py`](../../loadtest/ghz/gen_batch_multi.py)) |
-| `timestamp_sec` | `f*0.1` 고정. `downsample()` 이 결정적이라 살아남는 5프레임도 같다 ([`PoseDataService.java:191`](../../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java)) |
+| `timestamp_sec` | `f*0.1` 고정. `downsample()` 이 결정적이라 살아남는 5프레임도 같다 ([`PoseDataService.java:191`](../../backend/src/main/java/com/shadowfit/service/exercise/PoseDataService.java)) |
 | `created_at` | **세션 시작 시각**. 세션당 값 하나 — 그게 멱등의 근거다 (`PoseDataService.java:87`) |
 
 `ON DUPLICATE KEY UPDATE` 는 에러가 아니라 **성공**이다. `fail=0` 에 RPS 도 정상으로 찍히므로

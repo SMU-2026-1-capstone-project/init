@@ -182,4 +182,4 @@ Handler_read_key=1, Handler_read_prev=2, Handler_read_next=0
 - [`./load-test-strategy.md`](./load-test-strategy.md) — pose_data perf 스토리 폐기(§4.3), sessions 이력 조회는 인덱스 여지(본 문서 §7)
 - [`../tasks/25-portfolio-strategy.md`](../tasks/25-portfolio-strategy.md) — 측정 함정·규칙 기반 권장, 깊이 트랙
 - [`../../backend/src/main/java/com/shadowfit/model/exercise/Session.java`](../../backend/src/main/java/com/shadowfit/model/exercise/Session.java) — 추천 입력 필드(difficultyLevel·avgSyncRate·totalReps)
-- [`../../backend/src/main/java/com/shadowfit/service/Report/ReportService.java`](../../backend/src/main/java/com/shadowfit/service/Report/ReportService.java) — `buildComparisonWithPrevious`·`findFirst...` 재사용 지점
+- [`../../backend/src/main/java/com/shadowfit/service/report/ReportService.java`](../../backend/src/main/java/com/shadowfit/service/report/ReportService.java) — `buildComparisonWithPrevious`·`findFirst...` 재사용 지점

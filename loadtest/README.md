@@ -48,7 +48,7 @@
    없으면 판이 «완주» 하고 `count` 는 찬 채 `OK 0` 인 결과가 남는다 — 실패로 안 보인다.
    그래서 스크립트가 판 시작 전에 **프리플라이트**로 막는다 (`-SkipPreflight` 로 해제).
    단일 핫세션 판(`batch.json`)을 쓸 때만 아래 더미 801 이 필요하다:
-   ([`PoseDataService.savePoseDataBatch`](../backend/src/main/java/com/shadowfit/service/Exercise/PoseDataService.java) 가 `findById` 로 세션 먼저 조회 → 없으면 `SESSION_NOT_FOUND`).
+   ([`PoseDataService.savePoseDataBatch`](../backend/src/main/java/com/shadowfit/service/exercise/PoseDataService.java) 가 `findById` 로 세션 먼저 조회 → 없으면 `SESSION_NOT_FOUND`).
    더미 801 은 [`mysql/dev-seed.sql`](../mysql/dev-seed.sql) 에 있다.
    ⚠️ **자동으로 안 들어간다** — Flyway 도입(이슈 #115) 후 initdb 마운트가 없어졌고, 이 픽스처는
    마이그레이션에서 일부러 제외했다(배포 환경에 가면 안 되는 데이터라서). 부하테스트 전에 직접 넣을 것:
