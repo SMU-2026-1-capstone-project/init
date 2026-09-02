@@ -221,6 +221,8 @@ DB_PASSWORD=$PW
 #    ROLE=db 뒤 (의도된 시나리오는 아니지만) 손으로 전체 스택을 올리면 재현된다(#578).
 #    그래서 고정 문자열 대신 **항상 독립적으로 랜덤 생성**해 둘이 우연히도 같아질 구조를 없앤다.
 #    ⚠️ p6-target 은 이 값을 그대로 쓴다 — 거기서 다시 만들면 아래(§217)의 echo 와 값이 어긋난다.
+[ -n "$AI_PUBLIC_TOKEN" ]    || AI_PUBLIC_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
+[ -n "$INTERNAL_API_TOKEN" ] || INTERNAL_API_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
 AI_PUBLIC_TOKEN=$AI_PUBLIC_TOKEN
 INTERNAL_API_TOKEN=$INTERNAL_API_TOKEN
 EOF
