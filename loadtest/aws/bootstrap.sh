@@ -172,10 +172,15 @@ DB_PASSWORD=$PW
 #    **새로 늘면서** ROLE=db 가 다시 깨졌다 — 즉 이건 «한 번 고치면 끝» 이 아니라
 #    **compose 에 `:?` 가 늘 때마다 여기가 따라와야 하는** 자리다.
 #
-#    값은 아무 문자열이어도 된다. 이 역할은 AI 를 안 띄우므로 아무도 이 토큰으로 인증하지 않는다.
-#    ⚠️ p6-target 은 아래에서 **진짜 값으로 덮어쓴다**(양쪽이 같아야 하는 자리라 거기선 생성한다).
-AI_PUBLIC_TOKEN=${AI_PUBLIC_TOKEN:-unused-in-this-role}
-INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-unused-in-this-role}
+#    이 역할은 AI 를 안 띄우므로 값 자체는 아무도 인증에 안 쓴다. 하지만 두 토큰이 같으면
+#    `shadowfit-ai` 가 기동 시 `INTERNAL_API_TOKEN 과 AI_PUBLIC_TOKEN 이 같다` 로 죽는다(#230) —
+#    ROLE=db 뒤 (의도된 시나리오는 아니지만) 손으로 전체 스택을 올리면 재현된다(#578).
+#    그래서 고정 문자열 대신 **항상 독립적으로 랜덤 생성**해 둘이 우연히도 같아질 구조를 없앤다.
+#    ⚠️ p6-target 은 이 값을 그대로 쓴다 — 거기서 다시 만들면 아래(§217)의 echo 와 값이 어긋난다.
+[ -n "$AI_PUBLIC_TOKEN" ]    || AI_PUBLIC_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
+[ -n "$INTERNAL_API_TOKEN" ] || INTERNAL_API_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
+AI_PUBLIC_TOKEN=$AI_PUBLIC_TOKEN
+INTERNAL_API_TOKEN=$INTERNAL_API_TOKEN
 EOF
 echo "  MYSQL_ROOT_PASSWORD 를 rig 기본값과 맞췄다 (+ 해석만 되면 되는 변수들)"
 
@@ -189,9 +194,7 @@ fi
 echo "  compose 해석 확인 ✅ (mysql 만 띄워도 파일 전체가 해석된다)"
 
 if [ "$ROLE" = "p6-target" ]; then
-  # 토큰은 없으면 만든다 — 값 자체는 아무 문자열이어도 되지만 **양쪽이 같아야** 한다.
-  [ -n "$AI_PUBLIC_TOKEN" ]    || AI_PUBLIC_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
-  [ -n "$INTERNAL_API_TOKEN" ] || INTERNAL_API_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
+  # 토큰은 위 .env 블록에서 이미 만들었다(없으면 랜덤 생성) — 여기서는 그 값을 그대로 쓴다.
   cat >> "$WORKDIR/.env" <<EOF
 AI_MEM_LIMIT=$AI_MEM_LIMIT
 POSE_DETECTOR_POOL_SIZE=$POSE_DETECTOR_POOL_SIZE
