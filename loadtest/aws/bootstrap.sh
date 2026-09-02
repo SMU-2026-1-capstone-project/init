@@ -714,6 +714,18 @@ if [ "$ROLE" = "p6-target" ]; then
   [ "$SEEDED" = "1000" ] \
     || die "세션 시드가 1000개가 아니다 ($SEEDED) — 이대로면 從 부하의 일부가 조용히 FK 로 죽는다"
   echo "  exercise_sessions 901~1900 · $SEEDED 개 확인"
+
+  # ── 관측 스택 이미지 선당김 (從 R9 준비) ─────────────────────────────────
+  #
+  # 🔴 팔 D(= 팔 C + `--profile obs`, `coresidency_sweep.sh:183`)가 처음 켜지는 순간이
+  #    측정 도중이면, prometheus·grafana·mysqld-exporter·cadvisor·node-exporter 다섯 이미지의
+  #    최초 pull 이 그 판의 소요에 섞인다 — «환경(네트워크) 지연» 이 «팔 D 의 비용» 으로
+  #    찍힐 수 있다. 여기서 미리 당겨 캐시에 놓으면 실제 판에서 `docker compose --profile
+  #    obs up -d` 는 로컬 이미지만 쓴다. 컨테이너는 안 띄운다(`pull` 뿐) — 팔 A·B·C 조건에
+  #    영향 없음.
+  step "관측 스택 이미지 선당김 (從 R9 — ARMS 에 D 를 넣을 때 대비)"
+  docker compose --profile obs pull \
+    || echo "  ⚠️ 관측 스택 이미지 pull 실패 — 팔 D 를 쓰려면 run_all.sh 단계 중 다시 당겨야 한다"
 fi
 
 # ── 요약 ─────────────────────────────────────────────────────────────────
