@@ -37,7 +37,33 @@ repo 루트에서 돌린다(rig 이 `ai-server` 를 sys.path 에 넣는다).
 
 🔴 **이 rig 은 서버와 부하기를 같은 박스에 둔다.** R10 이 재려는 것이 「16 vCPU 중 얼마를
 쓰나」라서 그 동거가 그대로 조작 변수가 된다 — 부하기를 떼려면 `--bind 0.0.0.0` 만으로는
-부족하고 «팔 전환(재기동)» 을 원격으로 하는 배선이 따로 필요하다. **아직 없다.**
+부족하고 «팔 전환(재기동)» 을 원격으로 하는 배선이 따로 필요하다.
+
+## 2026-09-02 이후 — R10-b(2대)를 위해 늘린 손잡이
+
+R10-a 가 「GIL 스위치 간격」을 반증하고, 곁다리 프로세스분리 판이 「16 중 9.5」를
+«프로세스당 천장»으로 답해버려서([`ai-receive-path-scaling.md`](../../../docs/decisions/ai-receive-path-scaling.md)),
+R10-b 가 원래 답하려던 것 중 남은 건 하나 — **`GRPC_MAX_WORKERS`(핸들러 동시성, 기본 10,
+`ai-server/app/config.py:28`)가 그 천장을 만드는 진짜 손잡이인가**다. 프로세스분리는 스레드풀도
+같이 두 배가 되므로 「GIL」과 「스레드풀 크기」 둘 다와 부합해 이것만으로는 못 가른다.
+
+    --remote-target <IP>   서버를 이 박스가 아니라 이 IP 에 둔다(대상 박스). 주면 boot·health·
+                           gRPC 부하·kill 이 전부 SSH/네트워크 경유로 바뀐다
+    --remote-ssh "<cmd>"   대상에 붙는 SSH 명령 전체(P4 의 REPLICA_SSH 와 같은 꼴).
+                           예) "ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<IP>"
+    --remote-root <path>   대상의 저장소 루트. 기본 /root/init
+    --remote-python <path> 대상의 인터프리터. 비우면 --remote-root 기준 venv 경로를 추정
+
+    --plan "B,B#20,B#5"    팔 문법에 `#<N>` 을 추가로 붙이면 그 판만 `GRPC_MAX_WORKERS=N` 으로
+                           띄운다. 안 붙이면 서버 기본값(10)을 그대로 둔다 — 08-23·R10-a 판과
+                           그대로 호환된다
+
+⚠️ **CPU 샘플링은 원격에서 축소판이다.** 로컬(`CpuSampler`)처럼 1초 간격 시계열·스레드
+분해를 얻지 못한다 — SSH 를 그 빈도로 왕복시키는 비용이 측정 자체를 흔든다. 대신 판
+시작·끝에 `/proc/<pid>/stat` 를 한 번씩만 읽어 **판 전체 평균 vCPU** 만 낸다(`cpu_remote`
+키). 🔴 **이 평균은 warmup 을 못 뺀다** — R10-a 의 `cpu`(warmup 제외 시계열)와 **같은
+자리에 놓고 비교하면 안 된다.** 이 축소판이 답하는 것은 어디까지나 **처리량·지연이
+`GRPC_MAX_WORKERS` 로 갈리는가**이지 CPU 정밀 계측이 아니다.
 """
 
 from __future__ import annotations
@@ -45,6 +71,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import subprocess
 import sys
 import threading
@@ -75,6 +102,14 @@ HTTP_PORT = 8100          # 8000 은 08-23 로컬 박스에서 이미 쓰이고 
 GRPC_PORT = 8685
 AI = None
 
+# R10-b(2대) 손잡이 — main() 이 --remote-* 로 덮는다. 비어 있으면(REMOTE_TARGET="") 기존
+# 08-23·R10-a 판과 완전히 같은 로컬 경로를 탄다.
+REMOTE_TARGET = ""
+REMOTE_SSH_ARGV: list[str] = []
+REMOTE_ROOT = "/root/init"
+REMOTE_PYTHON = ""
+CLK_TCK = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") else 100
+
 
 def resolve_python(explicit):
     if explicit:
@@ -91,16 +126,20 @@ def resolve_python(explicit):
 
 
 def parse_arm(tok):
-    """팔 표기를 «계측 ON/OFF» 와 «GIL 스위치 간격» 둘로 푼다.
+    """팔 표기를 «계측 ON/OFF» · «GIL 스위치 간격» · «핸들러 동시성» 셋으로 푼다.
 
     `A` = 계측 OFF · `B` = 계측 ON. 뒤에 `@<초>` 를 붙이면 `GIL_SWITCH_INTERVAL` 을
     같이 건다 — `A@0.001` · `B@0.02`. 안 붙이면 **0 = 파이썬 기본을 안 건드린다.**
+    맨 뒤에 `#<N>` 을 붙이면 그 판만 `GRPC_MAX_WORKERS=N` 으로 띄운다(R10-b) —
+    `B#5` · `A@0.001#20`. 안 붙이면 **서버 기본값(10)을 그대로 둔다.**
 
     🔴 이 자리가 R10 의 판정선 넷 중 하나다(설계 §12) — 그 값을 흔들어 처리량이 움직이면
     「서비스 경로 GIL」이 1순위로 확정된다. 08-23 판은 이 값을 `"0"` 으로 **고정**해서
-    그 팔을 아예 못 돌렸다.
+    그 팔을 아예 못 돌렸다. `#<N>` 은 그 뒤를 잇는 **다른 판정선**(핸들러 동시성)이다 —
+    R10-a 가 GIL 간격을 반증한 뒤 열렸다(R10-b, 위 모듈 docstring).
     """
-    base, _, gil = tok.partition("@")
+    rest, _, workers_s = tok.partition("#")
+    base, _, gil = rest.partition("@")
     if base not in ("A", "B"):
         raise SystemExit(f"🔴 모르는 팔: {tok!r} — A(계측 OFF) 또는 B(계측 ON) 로 시작한다")
     try:
@@ -109,12 +148,20 @@ def parse_arm(tok):
         raise SystemExit(f"🔴 GIL 간격이 숫자가 아니다: {tok!r}")
     if g < 0:
         raise SystemExit(f"🔴 GIL 간격이 음수다: {tok!r}")
-    return base == "B", g
+    workers = None
+    if workers_s:
+        try:
+            workers = int(workers_s)
+        except ValueError:
+            raise SystemExit(f"🔴 handler_concurrency(#) 가 정수가 아니다: {tok!r}")
+        if workers < 1:
+            raise SystemExit(f"🔴 handler_concurrency(#) 는 1 이상이어야 한다: {tok!r}")
+    return base == "B", g, workers
 
 
 def arm_slug(tok):
-    """파일 이름에 쓸 수 있는 꼴 — `B@0.001` → `B_gil0p001`."""
-    return tok.replace("@", "_gil").replace(".", "p")
+    """파일 이름에 쓸 수 있는 꼴 — `B@0.001#20` → `B_gil0p001_w20`."""
+    return tok.replace("@", "_gil").replace("#", "_w").replace(".", "p")
 
 PUBLIC_TOKEN = "overhead-rig-public-token"
 INTERNAL_TOKEN = "overhead-rig-internal-token"    # 🔴 둘이 같으면 앱이 기동을 거부한다(#230)
@@ -400,10 +447,10 @@ class CpuSampler(threading.Thread):
         return out
 
 
-def boot(arm, pool, bind):
-    metrics, gil = parse_arm(arm)
-    env = dict(os.environ)
-    env.update({
+def _arm_env(arm, pool):
+    """이 팔이 서버에 줄 환경변수 — 로컬·원격 공통."""
+    metrics, gil, workers = parse_arm(arm)
+    env = {
         "AI_PUBLIC_TOKEN": PUBLIC_TOKEN,
         "INTERNAL_API_TOKEN": INTERNAL_TOKEN,
         # 풀은 세션 수보다 넉넉히. 0 이면 cgroup 에서 «유도» 하는데 컨테이너 밖(venv)에는
@@ -423,7 +470,50 @@ def boot(arm, pool, bind):
         # 🔴 `FRAME_PATH_METRICS` 가 꺼진 팔에서는 담을 자리가 없어 안 뜬다(앱이 경고한다).
         "GIL_PROBE_INTERVAL": str(GIL_PROBE),
         "PYTHONUNBUFFERED": "1",
-    })
+    }
+    if workers is not None:
+        # R10-b 의 팔 — 안 주면 서버 기본값(10, ai-server/app/config.py:28)을 그대로 둔다.
+        env["GRPC_MAX_WORKERS"] = str(workers)
+    return env
+
+
+def _ssh_run(cmd, timeout=30, tolerate_timeout=False):
+    """`--remote-ssh` 로 받은 SSH 명령 뒤에 `cmd` 를 한 인자로 붙여 돌린다.
+
+    🔴 (2026-09-02, R10-b 리허설 실측) `nohup ... &` 로 원격에 백그라운드 job 을 남기는
+    명령은 PID 가 이미 파이프로 도착해 있는데도 **로컬 ssh 클라이언트 프로세스 자체가 안
+    끝난 것처럼 붙잡고 있는** 경우가 재현됐다 — stdin(`< /dev/null`)·stdout·stderr 를 전부
+    리다이렉트해도 마찬가지였고, 원인을 세션/채널 종료 시맨틱 쪽으로 좁히긴 했지만 정확한
+    조건은 못 갈랐다. 반면 대상 박스에서 `ss`/`ps` 로 직접 확인하면 서버는 이미 정상
+    기동돼 있다 — 즉 **명령은 성공했는데 로컬 클라이언트만 안 돌아온다.**
+    `tolerate_timeout=True` 면 타임아웃이 나도 부분 stdout 에서 값을 건질 수 있으면 그걸
+    성공으로 친다. 호출부(`_boot_remote`)가 이 값을 쓰는 자리에서만 켠다 — `kill` 같은
+    즉시-반환 명령까지 관대해지면 진짜 실패를 가릴 수 있다.
+    """
+    try:
+        r = subprocess.run(REMOTE_SSH_ARGV + [cmd], capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as e:
+        if not tolerate_timeout:
+            raise
+        partial = e.stdout or ""
+        if not partial.strip():
+            raise RuntimeError(f"ssh timeout, 부분 출력도 없다: {cmd!r}") from e
+        return partial
+    if r.returncode != 0:
+        raise RuntimeError(f"ssh 실패(rc={r.returncode}): {cmd!r}\nstderr: {r.stderr[-500:]}")
+    return r.stdout
+
+
+def boot(arm, pool, bind):
+    env_extra = _arm_env(arm, pool)
+    if REMOTE_TARGET:
+        return _boot_remote(env_extra, bind)
+    return _boot_local(env_extra, bind)
+
+
+def _boot_local(env_extra, bind):
+    env = dict(os.environ)
+    env.update(env_extra)
     log = open(os.path.join(OUT, f"server_{TAG}.log"), "ab")
     p = subprocess.Popen(
         [PY, "-m", "uvicorn", "app.main:app", "--host", bind,
@@ -433,13 +523,67 @@ def boot(arm, pool, bind):
     return p, log
 
 
+def _boot_remote(env_extra, bind):
+    """대상 박스에서 SSH 로 uvicorn 을 nohup 띄우고 PID 를 받아온다.
+
+    🔴 로컬처럼 `Popen` 객체를 돌려줄 수 없다 — 대신 `("remote", pid)` 를 돌려주고,
+    호출부가 그 태그로 로컬/원격 종료 경로를 가른다.
+    """
+    py = REMOTE_PYTHON or f"{REMOTE_ROOT}/ai-server/.venv/bin/python"
+    env_str = " ".join(f"{k}={shlex.quote(str(v))}" for k, v in env_extra.items())
+    cmd = (
+        f"cd {shlex.quote(REMOTE_ROOT)}/ai-server && "
+        f"nohup env {env_str} {shlex.quote(py)} -m uvicorn app.main:app "
+        f"--host {shlex.quote(bind)} --port {HTTP_PORT} --log-level warning "
+        f"> /root/server_{TAG}.log 2>&1 < /dev/null & echo $!"
+    )
+    out = _ssh_run(cmd, timeout=20, tolerate_timeout=True)
+    lines = [l for l in out.strip().splitlines() if l.strip().isdigit()]
+    if not lines:
+        raise RuntimeError(f"원격 기동 PID 를 못 읽었다 — 출력: {out!r}")
+    pid = int(lines[-1])
+    return ("remote", pid), None
+
+
+def _kill(p):
+    """`boot()` 의 반환값을 받아 로컬/원격에 맞게 끈다."""
+    if isinstance(p, tuple) and p[0] == "remote":
+        pid = p[1]
+        _ssh_run(f"kill {pid} 2>/dev/null; sleep 1; kill -9 {pid} 2>/dev/null; true")
+        return
+    p.terminate()
+    try:
+        p.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        p.kill()
+
+
+def _remote_pid(p):
+    return p[1] if isinstance(p, tuple) and p[0] == "remote" else p.pid
+
+
+def _proc_ticks_remote(pid):
+    """`/proc/<pid>/stat` 의 utime+stime — 실패(이미 죽음 등)는 None."""
+    out = _ssh_run(f"cat /proc/{pid}/stat 2>/dev/null || true")
+    if not out.strip():
+        return None
+    try:
+        rest = out[out.rindex(")") + 2:].split()
+        return int(rest[11]) + int(rest[12])
+    except (ValueError, IndexError):
+        return None
+
+
 def run_load(arm, round_no, sessions, fps, dur, warmup, sampler=None):
     label = f"{arm_slug(arm)}_r{round_no}"
     out_tsv = os.path.join(OUT, f"raw_{label}.tsv")
+    # 🔴 R10-a 는 부하기가 127.0.0.1 을 쳤다(동거) — R10-b(--remote-target)는 대상의
+    #    네트워크 주소를 친다. 부하기 자신은 **이 박스(로더)에 그대로 남는다.**
+    grpc_target = f"{REMOTE_TARGET}:{GRPC_PORT}" if REMOTE_TARGET else f"127.0.0.1:{GRPC_PORT}"
     # 🔴 run() 이 아니라 Popen 이다 — **부하기 자신의 pid** 가 필요하다. 1대 동거에서는
     #    부하기가 재려는 박스의 CPU 를 먹고, 그 크기가 아직 «미측정» 이다(무대 문서 §8).
     proc = subprocess.Popen(
-        [PY, RIG, "--ai", AI, "--grpc", f"127.0.0.1:{GRPC_PORT}",
+        [PY, RIG, "--ai", AI, "--grpc", grpc_target,
          "--token", PUBLIC_TOKEN, "--internal-token", INTERNAL_TOKEN,
          "--frames", FRAMES, "--sessions", str(sessions), "--fps", str(fps),
          "--dur", str(dur), "--warmup", str(warmup), "--label", label, "--out", out_tsv,
@@ -464,6 +608,7 @@ def run_load(arm, round_no, sessions, fps, dur, warmup, sampler=None):
 def main():
     global OUT, TAG, PY, AI, HTTP_PORT, GRPC_PORT, RESPONSE_MODE, TRANSPORT
     global NULL_HANDLER, GIL_PROBE, FLOOR_SEC
+    global REMOTE_TARGET, REMOTE_SSH_ARGV, REMOTE_ROOT, REMOTE_PYTHON
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)))
     ap.add_argument("--sessions", type=int, default=8)
@@ -479,10 +624,21 @@ def main():
     ap.add_argument("--pool", type=int, default=0,
                     help="검출기 풀 크기. 0 이면 세션 수 + 4")
     ap.add_argument("--plan", default=",".join(PLAN),
-                    help="팔 순서(쉼표). A=계측 OFF · B=계측 ON · @<초>로 GIL 간격. "
-                         "예: B,A,B,B,A,B,A,A,B  또는  A,A@0.001,A,A@0.001")
+                    help="팔 순서(쉼표). A=계측 OFF · B=계측 ON · @<초>로 GIL 간격 · "
+                         "#<N>으로 GRPC_MAX_WORKERS(R10-b). "
+                         "예: B,A,B,B,A,B,A,A,B  또는  A,A@0.001,A,A@0.001  또는  B,B#20,B#5")
     ap.add_argument("--discard", type=int, default=DISCARD_FIRST,
                     help="앞에서 버릴 판 수")
+    ap.add_argument("--remote-target", default="", dest="remote_target",
+                    help="R10-b — 서버를 이 박스가 아니라 이 IP 에 둔다(대상 박스 사설 IP). "
+                         "비우면 기존 로컬(동거) 경로 그대로")
+    ap.add_argument("--remote-ssh", default="", dest="remote_ssh",
+                    help="대상에 붙는 SSH 명령 전체(따옴표로 감싼 한 문자열). "
+                         "--remote-target 을 주면 필수")
+    ap.add_argument("--remote-root", default="/root/init", dest="remote_root",
+                    help="대상의 저장소 루트 (기본 /root/init)")
+    ap.add_argument("--remote-python", default="", dest="remote_python",
+                    help="대상의 인터프리터 경로. 비우면 --remote-root 기준 venv 를 추정")
     ap.add_argument("--response-mode", default="model", dest="response_mode",
                     choices=("model", "dict", "json"),
                     help="응답 생성 방식 — model(현행) · dict(검증 제거) · json(JSONResponse 직접). "
@@ -509,8 +665,27 @@ def main():
     a = ap.parse_args()
     OUT, TAG = a.out, a.tag
     HTTP_PORT, GRPC_PORT = a.http_port, a.grpc_port
-    AI = f"http://127.0.0.1:{HTTP_PORT}"
-    PY = resolve_python(a.python_bin)
+    REMOTE_TARGET = a.remote_target
+    REMOTE_ROOT = a.remote_root
+    REMOTE_PYTHON = a.remote_python
+    if REMOTE_TARGET:
+        if not a.remote_ssh:
+            raise SystemExit("🔴 --remote-target 을 주면 --remote-ssh 도 필수다")
+        REMOTE_SSH_ARGV = shlex.split(a.remote_ssh)
+        AI = f"http://{REMOTE_TARGET}:{HTTP_PORT}"
+        PY = a.python_bin or "(로더 박스 인터프리터 — 부하기 실행용, 서버는 --remote-python)"
+        if not a.python_bin:
+            # 로더 쪽도 overhead_rig.py 를 돌릴 인터프리터가 필요하다 — venv 탐색은 그대로 쓴다.
+            PY = resolve_python(a.python_bin)
+        # 🔴 (2026-09-02, R10-b 리허설에서 실측) `--bind` 기본값(127.0.0.1)은 R10-a(동거)
+        #    조건이다 — 원격 모드에서 그대로 두면 대상이 자기 자신에게만 응답해서 로더의
+        #    `wait_health()` 가 전부 실패한다("기동 실패"로만 보여 원인이 안 드러난다).
+        #    사용자가 --bind 를 직접 안 줬을 때만 0.0.0.0 으로 올려 잡는다.
+        if a.bind == "127.0.0.1":
+            a.bind = "0.0.0.0"
+            print("  --remote-target 이 있어 --bind 를 0.0.0.0 으로 올렸다(원격 헬스체크 전제)", flush=True)
+    else:
+        PY = resolve_python(a.python_bin)
     RESPONSE_MODE = a.response_mode
     TRANSPORT = a.transport
     NULL_HANDLER = a.null_handler
@@ -546,17 +721,37 @@ def main():
             # 🔴 바닥은 **부하 전** 이고 **샘플러 전** 이다 — 이 구간은 이 판의 값이
             #    아니다(축 5 계약 1). 걷고 나서 계측을 초기화하므로 아래 스냅샷에는 안 섞인다.
             floor = measure_floor(FLOOR_SEC) if (FLOOR_SEC > 0 and GIL_PROBE > 0) else None
-            # CPU 샘플러는 **헬스 통과 뒤** 시작한다 — 기동·모델 로드는 이 판의 부하가 아니다.
-            sampler = CpuSampler(a.cpu_interval)
-            sampler.track("ai", p.pid, threads=True)   # 🔑 루프/워커를 쪼갠다
-            sampler.start()
-            r = run_load(arm, rn, a.sessions, a.fps, a.dur, a.warmup, sampler)
-            sampler.stop()
-            sampler.join(timeout=10)
-            # 🔴 샘플러의 t0 는 «부하기 프로세스 시작» 이고, 부하기의 t0 는 «세션을 다 연 뒤» 다.
-            #    그 사이(setup_sec)를 안 빼면 세션 여는 구간이 평균에 섞인다. 부하기가 그 값을
-            #    돌려주므로 추론하지 않고 받아서 쓴다.
-            r["cpu"] = sampler.summary((r.get("setup_sec") or 0.0) + a.warmup)
+            if REMOTE_TARGET:
+                # R10-b — 로컬 CpuSampler 는 /proc 가 이 박스가 아니라 대상에 있어 못 쓴다.
+                # 판 시작·끝 /proc/<pid>/stat 딱 두 번만 SSH 로 읽어 «판 전체 평균 vCPU» 만 낸다.
+                # 🔴 warmup 을 못 뺀다 — R10-a 의 시계열 `cpu` 와 자릿수는 비슷해도 같은 자로
+                # 잰 값이 아니다. 아래 `cpu_remote.warning` 이 그 사실을 결과에도 박아둔다.
+                t_pid = _remote_pid(p)
+                ticks0 = _proc_ticks_remote(t_pid)
+                t0 = time.monotonic()
+                r = run_load(arm, rn, a.sessions, a.fps, a.dur, a.warmup, None)
+                ticks1 = _proc_ticks_remote(t_pid)
+                t1 = time.monotonic()
+                if ticks0 is not None and ticks1 is not None and t1 > t0:
+                    avg_vcpu = round(max(0, ticks1 - ticks0) / CLK_TCK / (t1 - t0), 2)
+                else:
+                    avg_vcpu = None
+                r["cpu_remote"] = {
+                    "avg_vcpu": avg_vcpu,
+                    "warning": "판 전체 평균(warmup 미제외) — R10-a 의 시계열 cpu 와 직접 비교 금지",
+                }
+            else:
+                # CPU 샘플러는 **헬스 통과 뒤** 시작한다 — 기동·모델 로드는 이 판의 부하가 아니다.
+                sampler = CpuSampler(a.cpu_interval)
+                sampler.track("ai", p.pid, threads=True)   # 🔑 루프/워커를 쪼갠다
+                sampler.start()
+                r = run_load(arm, rn, a.sessions, a.fps, a.dur, a.warmup, sampler)
+                sampler.stop()
+                sampler.join(timeout=10)
+                # 🔴 샘플러의 t0 는 «부하기 프로세스 시작» 이고, 부하기의 t0 는 «세션을 다 연 뒤» 다.
+                #    그 사이(setup_sec)를 안 빼면 세션 여는 구간이 평균에 섞인다. 부하기가 그 값을
+                #    돌려주므로 추론하지 않고 받아서 쓴다.
+                r["cpu"] = sampler.summary((r.get("setup_sec") or 0.0) + a.warmup)
             # 🔴 서버를 내리기 **전에** 계측을 걷는다. 이건 프로세스 메모리라 종료와 함께
             #    사라진다 — 첫 라운드(run1)가 정확히 이걸 안 해서 B 판 넷의 구간 분포를 버렸다.
             r["frame_path"] = fetch_snapshot() if parse_arm(arm)[0] else None
@@ -568,12 +763,9 @@ def main():
                 {k: r.get(k) for k in ("processed_fps", "rps", "p50_ms", "p95_ms",
                                        "requests", "error")}, ensure_ascii=False), flush=True)
         finally:
-            p.terminate()
-            try:
-                p.wait(timeout=20)
-            except subprocess.TimeoutExpired:
-                p.kill()
-            log.close()
+            _kill(p)
+            if log is not None:
+                log.close()
             time.sleep(a.settle)   # 포트·검출기 정리 여유
 
     path = os.path.join(OUT, f"arms_{TAG}.json")
@@ -584,6 +776,7 @@ def main():
         "response_mode": RESPONSE_MODE,
         "transport": TRANSPORT, "bind": a.bind, "python": PY,
         "null_handler": NULL_HANDLER, "gil_probe": GIL_PROBE, "floor_sec": FLOOR_SEC,
+        "remote_target": REMOTE_TARGET or None, "remote_root": REMOTE_ROOT if REMOTE_TARGET else None,
                    "results": results}, f, ensure_ascii=False, indent=2)
     print("\n결과:", path)
     return 0
