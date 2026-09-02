@@ -113,10 +113,20 @@ if st != 200:
     print(f"  🔴 온보딩 {st}: {body[:150]}  ← preferredUrl 없으면 세션이 400 이다"); sys.exit(1)
 st, body = http(base + "/exercises/sessions", "POST", {"exerciseId": 1}, auth)
 try:
-    sid = json.loads(body)["sessionId"]
+    session_json = json.loads(body)
+    sid = session_json["sessionId"]
 except Exception:
     print(f"  🔴 세션 생성 {st}: {body[:200]}"); sys.exit(1)
-print(f"  ✅ 세션 생성 — sessionId={sid}")
+# 🔴 (#651) worker 인덱스를 안 실으면 nginx 가 X-AI-Worker 헤더 없는 요청을 전부 워커 0으로
+#    보낸다(nginx-ai/default.conf 의 default). StartAnalysis(gRPC)는 세션마다 다른 워커로
+#    갈 수 있으므로, 헤더 없이 폴링하면 «분석기가 없습니다» 가 영원히 안 풀리는 것처럼
+#    보인다 — 안 붙은 게 아니라 다른 워커의 메모리를 보고 있었던 것이다. frontend/services/
+#    aiService.ts:82-88 이 실제 클라에서 이미 하는 것과 같은 처리를 여기서도 한다.
+worker_idx = session_json.get("aiWorkerIndex")
+pose_headers = {"Authorization": "Bearer " + token}
+if worker_idx is not None:
+    pose_headers["X-AI-Worker"] = str(worker_idx)
+print(f"  ✅ 세션 생성 — sessionId={sid}, aiWorkerIndex={worker_idx}")
 
 frames = json.load(open(framespath))["frames"]
 
@@ -130,7 +140,7 @@ waited = None
 while True:
     st, body = http(ai + "/api/v1/pose", "POST",
                     {"image": frames[0], "exercise_type": "squat", "session_id": sid,
-                     "timestamp_sec": 0.0}, {"Authorization": "Bearer " + token})
+                     "timestamp_sec": 0.0}, pose_headers)
     if st != 200:
         print(f"  🔴 프레임 {st}: {body[:150]}"); sys.exit(1)
     j = json.loads(body)
@@ -138,7 +148,13 @@ while True:
         waited = time.monotonic() - t0
         break
     msg = j.get("message", "")
-    if "분석기가 없습니다" not in msg:
+    # 🔴 (#651) "분석기가 없습니다"(NO_LEASE, get_pool())와 "시작되지 않았습니다"
+    #    (SESSION_NOT_FOUND, get_registry()) 둘 다 «StartAnalysis 가 아직 반영 안 됨» 의
+    #    표현이다 — gRPC 핸들러 안에서 acquire() 다음에 registry.create() 가 뒤이어 돌므로,
+    #    그 틈에 도착한 첫 폴링은 후자로도 튕길 수 있다. 문자열 대신 skip_reason 으로 판정
+    #    (app/models/pose.py 의 PoseSkipReason) — 메시지 문구가 바뀌어도 안 깨진다.
+    reason = j.get("skip_reason")
+    if reason not in ("NO_LEASE", "SESSION_NOT_FOUND"):
         print(f"  🔴 프레임이 거절됐다: {msg[:120]}"); sys.exit(1)
     if time.monotonic() - t0 >= ATTACH_SEC:
         print(f"  🔴 {ATTACH_SEC:.0f}s 안에 분석기가 안 붙었다: {msg[:120]}")
