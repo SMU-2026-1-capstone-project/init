@@ -24,6 +24,10 @@
       **대상 박스 전체가 두 번 다 응답 불능**에 빠졌다(MySQL 캡을 걸어도 재현). 원래 판정
       채널은 못 봤지만 MySQL 락 정체 가설은 반박됐고, EBS I/O 크레딧 소진이 새 후보로
       [#603](https://github.com/Shadowfit/init/issues/603)에 열려 있다 — 아래 R15·R16.
+      ✅ **2026-09-02 — 새 라운드 없이 CloudWatch 사후 조회로 닫혔다**
+      ([R15/R16 결과 §6-7](results/ai-worker-load-soak-2026-08-28/README.md#6-7-ebs-처리량-상한--cloudwatch-사후-확인-2026-09-02-추가)) —
+      두 사고 모두 EBS 볼륨이 gp3 기본 처리량 상한(125MiB/s)에 그대로 눌러붙어 있었다. 인과
+      방향(상한이 원인 vs 결과)은 여전히 안 갈렸다.
 연관: [`../docs/decisions/online-ddl-vs-blocking-alter.md`](../docs/decisions/online-ddl-vs-blocking-alter.md), [`../docs/portfolio/one-pager.md`](../docs/portfolio/one-pager.md), [`results/`](results/)
 
 ---
