@@ -123,10 +123,19 @@ except Exception:
 #    보인다 — 안 붙은 게 아니라 다른 워커의 메모리를 보고 있었던 것이다. frontend/services/
 #    aiService.ts:82-88 이 실제 클라에서 이미 하는 것과 같은 처리를 여기서도 한다.
 worker_idx = session_json.get("aiWorkerIndex")
+# 🔴 (#654) session_nonce 를 안 실으면 «세션 없음» 과 겉모습이 똑같은 거절을 받는다.
+#    AI 는 세션 소유권을 nonce 로 대조하는데(이슈 #187 안 (d), app/api/endpoints/pose.py:245-260),
+#    presented(요청의 session_nonce) 가 None 이면 무조건 실패로 떨어지고, 그 응답은 **의도적으로**
+#    SESSION_NOT_FOUND 와 같은 skip_reason·메시지를 쓴다 — session_id 를 훑어 살아있는 세션을
+#    열거하는 공격을 막으려는 설계다(pose.py:226-228 주석). 그래서 registry 에 세션이 실제로
+#    있어도(id(registry)·keys() 로 직접 확인함, 2026-09-03) 이 rig 은 «분석기가 안 붙는다»
+#    로 영원히 읽었다 — frontend/services/exercisesService.ts·app/(tabs)/exercise.tsx:293 가
+#    실제 클라에서 이미 이 값을 싣고 있다.
+session_nonce = session_json.get("sessionNonce")
 pose_headers = {"Authorization": "Bearer " + token}
 if worker_idx is not None:
     pose_headers["X-AI-Worker"] = str(worker_idx)
-print(f"  ✅ 세션 생성 — sessionId={sid}, aiWorkerIndex={worker_idx}")
+print(f"  ✅ 세션 생성 — sessionId={sid}, aiWorkerIndex={worker_idx}, sessionNonce={'있음' if session_nonce else '없음'}")
 
 frames = json.load(open(framespath))["frames"]
 
@@ -140,7 +149,7 @@ waited = None
 while True:
     st, body = http(ai + "/api/v1/pose", "POST",
                     {"image": frames[0], "exercise_type": "squat", "session_id": sid,
-                     "timestamp_sec": 0.0}, pose_headers)
+                     "session_nonce": session_nonce, "timestamp_sec": 0.0}, pose_headers)
     if st != 200:
         print(f"  🔴 프레임 {st}: {body[:150]}"); sys.exit(1)
     j = json.loads(body)
@@ -148,11 +157,15 @@ while True:
         waited = time.monotonic() - t0
         break
     msg = j.get("message", "")
-    # 🔴 (#651) "분석기가 없습니다"(NO_LEASE, get_pool())와 "시작되지 않았습니다"
-    #    (SESSION_NOT_FOUND, get_registry()) 둘 다 «StartAnalysis 가 아직 반영 안 됨» 의
-    #    표현이다 — gRPC 핸들러 안에서 acquire() 다음에 registry.create() 가 뒤이어 돌므로,
-    #    그 틈에 도착한 첫 폴링은 후자로도 튕길 수 있다. 문자열 대신 skip_reason 으로 판정
-    #    (app/models/pose.py 의 PoseSkipReason) — 메시지 문구가 바뀌어도 안 깨진다.
+    # "분석기가 없습니다"(NO_LEASE, get_pool())와 "시작되지 않았습니다"(SESSION_NOT_FOUND,
+    # get_registry()) 둘 다 «StartAnalysis 가 아직 반영 안 됨» 의 표현이라 재시도 대상으로
+    # 남겨둔다 — gRPC 핸들러 안에서 acquire() 다음에 registry.create() 가 뒤이어 돌아서, 그
+    # 틈에 도착한 첫 폴링은 후자로도 튕길 수 있다. 문자열 대신 skip_reason 으로 판정
+    # (app/models/pose.py 의 PoseSkipReason) — 메시지 문구가 바뀌어도 안 깨진다.
+    # 🔴 다만 (#654) session_nonce 를 안 실으면 **매번** SESSION_NOT_FOUND 와 겉모습이 같은
+    #    소유권 대조 실패가 나서, 이 재시도 루프가 ATTACH_SEC 내내 헛되이 돈다 — 위에서
+    #    session_nonce 를 싣는 것이 진짜 수정이고, 이 재시도 관용은 진짜 타이밍 창(수 초)만
+    #    커버하는 게 맞는다.
     reason = j.get("skip_reason")
     if reason not in ("NO_LEASE", "SESSION_NOT_FOUND"):
         print(f"  🔴 프레임이 거절됐다: {msg[:120]}"); sys.exit(1)
