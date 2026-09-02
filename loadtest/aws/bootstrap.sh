@@ -155,6 +155,14 @@ step ".env"
 #    서비스의 필수 변수까지 있어야 한다 — `docker-compose.yml:220` 의
 #    `MYSQL_EXPORTER_PASSWORD:?` 가 없으면 mysql 하나 띄우는 것도 실패한다.
 #    첫 EC2 실행(2026-08-13)이 정확히 여기서 죽었다.
+#
+# 🔴 (2026-09-02, R10-b 착수 중 발견) 아래 두 줄은 **heredoc 밖**에서 돌아야 한다. heredoc
+#    안에 있으면(예전 상태) `$( )` 만 명령 치환으로 실행되고 나머지 `[ -n ... ] || VAR=` 는
+#    **문자 그대로 `.env` 에 쓰인다** — 그 줄이 `docker compose config` 를 깨서
+#    「compose: command not found」처럼 엉뚱한 에러로 보였다. 값 생성은 먼저 끝내 두고,
+#    heredoc 안에는 이미 정해진 값을 넣기만 한다.
+[ -n "$AI_PUBLIC_TOKEN" ]    || AI_PUBLIC_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
+[ -n "$INTERNAL_API_TOKEN" ] || INTERNAL_API_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
 cat > "$WORKDIR/.env" <<EOF
 MYSQL_DATABASE=$DB_NAME
 MYSQL_USER=shadowfit
@@ -177,8 +185,6 @@ DB_PASSWORD=$PW
 #    ROLE=db 뒤 (의도된 시나리오는 아니지만) 손으로 전체 스택을 올리면 재현된다(#578).
 #    그래서 고정 문자열 대신 **항상 독립적으로 랜덤 생성**해 둘이 우연히도 같아질 구조를 없앤다.
 #    ⚠️ p6-target 은 이 값을 그대로 쓴다 — 거기서 다시 만들면 아래(§217)의 echo 와 값이 어긋난다.
-[ -n "$AI_PUBLIC_TOKEN" ]    || AI_PUBLIC_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
-[ -n "$INTERNAL_API_TOKEN" ] || INTERNAL_API_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
 AI_PUBLIC_TOKEN=$AI_PUBLIC_TOKEN
 INTERNAL_API_TOKEN=$INTERNAL_API_TOKEN
 EOF
