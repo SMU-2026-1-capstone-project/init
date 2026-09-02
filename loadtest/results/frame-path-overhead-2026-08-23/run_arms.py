@@ -477,9 +477,28 @@ def _arm_env(arm, pool):
     return env
 
 
-def _ssh_run(cmd):
-    """`--remote-ssh` 로 받은 SSH 명령 뒤에 `cmd` 를 한 인자로 붙여 돌린다."""
-    r = subprocess.run(REMOTE_SSH_ARGV + [cmd], capture_output=True, text=True, timeout=30)
+def _ssh_run(cmd, timeout=30, tolerate_timeout=False):
+    """`--remote-ssh` 로 받은 SSH 명령 뒤에 `cmd` 를 한 인자로 붙여 돌린다.
+
+    🔴 (2026-09-02, R10-b 리허설 실측) `nohup ... &` 로 원격에 백그라운드 job 을 남기는
+    명령은 PID 가 이미 파이프로 도착해 있는데도 **로컬 ssh 클라이언트 프로세스 자체가 안
+    끝난 것처럼 붙잡고 있는** 경우가 재현됐다 — stdin(`< /dev/null`)·stdout·stderr 를 전부
+    리다이렉트해도 마찬가지였고, 원인을 세션/채널 종료 시맨틱 쪽으로 좁히긴 했지만 정확한
+    조건은 못 갈랐다. 반면 대상 박스에서 `ss`/`ps` 로 직접 확인하면 서버는 이미 정상
+    기동돼 있다 — 즉 **명령은 성공했는데 로컬 클라이언트만 안 돌아온다.**
+    `tolerate_timeout=True` 면 타임아웃이 나도 부분 stdout 에서 값을 건질 수 있으면 그걸
+    성공으로 친다. 호출부(`_boot_remote`)가 이 값을 쓰는 자리에서만 켠다 — `kill` 같은
+    즉시-반환 명령까지 관대해지면 진짜 실패를 가릴 수 있다.
+    """
+    try:
+        r = subprocess.run(REMOTE_SSH_ARGV + [cmd], capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as e:
+        if not tolerate_timeout:
+            raise
+        partial = e.stdout or ""
+        if not partial.strip():
+            raise RuntimeError(f"ssh timeout, 부분 출력도 없다: {cmd!r}") from e
+        return partial
     if r.returncode != 0:
         raise RuntimeError(f"ssh 실패(rc={r.returncode}): {cmd!r}\nstderr: {r.stderr[-500:]}")
     return r.stdout
@@ -516,9 +535,9 @@ def _boot_remote(env_extra, bind):
         f"cd {shlex.quote(REMOTE_ROOT)}/ai-server && "
         f"nohup env {env_str} {shlex.quote(py)} -m uvicorn app.main:app "
         f"--host {shlex.quote(bind)} --port {HTTP_PORT} --log-level warning "
-        f"> /root/server_{TAG}.log 2>&1 & echo $!"
+        f"> /root/server_{TAG}.log 2>&1 < /dev/null & echo $!"
     )
-    out = _ssh_run(cmd)
+    out = _ssh_run(cmd, timeout=20, tolerate_timeout=True)
     lines = [l for l in out.strip().splitlines() if l.strip().isdigit()]
     if not lines:
         raise RuntimeError(f"원격 기동 PID 를 못 읽었다 — 출력: {out!r}")
@@ -658,6 +677,13 @@ def main():
         if not a.python_bin:
             # 로더 쪽도 overhead_rig.py 를 돌릴 인터프리터가 필요하다 — venv 탐색은 그대로 쓴다.
             PY = resolve_python(a.python_bin)
+        # 🔴 (2026-09-02, R10-b 리허설에서 실측) `--bind` 기본값(127.0.0.1)은 R10-a(동거)
+        #    조건이다 — 원격 모드에서 그대로 두면 대상이 자기 자신에게만 응답해서 로더의
+        #    `wait_health()` 가 전부 실패한다("기동 실패"로만 보여 원인이 안 드러난다).
+        #    사용자가 --bind 를 직접 안 줬을 때만 0.0.0.0 으로 올려 잡는다.
+        if a.bind == "127.0.0.1":
+            a.bind = "0.0.0.0"
+            print("  --remote-target 이 있어 --bind 를 0.0.0.0 으로 올렸다(원격 헬스체크 전제)", flush=True)
     else:
         PY = resolve_python(a.python_bin)
     RESPONSE_MODE = a.response_mode
