@@ -456,9 +456,30 @@ PHASES="framepath collect" \
 | ⏱ 소요 | 미실측 — R10-a(26판·52~69분)보다 판 수는 적지만(8판) SSH 왕복(원격 기동·종료·CPU 스냅샷)이 더 걸린다. 축소 리허설로 먼저 잰다 |
 | 게이트 | R10-a 의 다섯 + **여섯째**(대상 SSH·인터프리터·버전·부하기→대상 gRPC 포트) — `fp_gate()` §6 |
 
-⚠️ **이 절차로 실제로 띄워 본 적 없다.** `run_arms.py --remote-*` 는 로컬에서 `parse_arm`·
-`_arm_env`·원격 기동 명령 문자열 구성만 단위검증했다(SSH 왕복 자체는 안 태웠다). **축소
-리허설(`FP_SESSIONS=8` 등)을 EC2 에서 먼저 밟을 것** — R10-a 도 실제 라운드 전엔 같은 처지였다.
+✅ **2026-09-02 실전 라운드 완료** — [결과](../results/frame-path-r10b-2026-09-02/README.md).
+`GRPC_MAX_WORKERS`(5·10·20)는 처리량·지연을 안 움직인다(팔간 차이 2% 안, 잡음 수준) —
+R10-a 의 GIL 반증에 이어 이 후보도 지워지고 「16 중 9.5」는 **프로세스당 천장**만 남았다.
+리허설 중 원격 부팅 버그 셋(bootstrap.sh 의 `.env` heredoc 오염 · SSH `nohup` 응답 미분리 ·
+`--bind` 원격 자동전환 누락)을 실전에서 처음 걸러 고쳤다 — 로컬 단위검증만으론 못 잡는
+종류였다. 🔴 **깨진 채 남은 것**: 원격 CPU 계측(`cpu_remote`)이 전 판 실패
+([#647](https://github.com/Shadowfit/init/issues/647)) · 리허설도 `run_all.sh` 를 그대로
+태우면 AUTO_SHUTDOWN 대상이 되는데 **러너(부하기) 쪽에 취소용 root SSH 가 없었다**
+([#648](https://github.com/Shadowfit/init/issues/648), 아래 리허설 명령에 `AUTO_SHUTDOWN=0`
+을 넣은 이유).
+
+⚠️ **리허설은 `AUTO_SHUTDOWN=0` 을 꼭 넣을 것** — `PHASES` 에 무엇을 넣든 `run_all.sh` 를
+직접 부르면 끝에 자동종료 로직을 그대로 탄다(#648). 축소 리허설로 먼저 밟고, 문제없으면
+본판(위 「실행」 명령, `AUTO_SHUTDOWN` 기본값 1)을 돌린다.
+
+```bash
+cd /root/init
+AUTO_SHUTDOWN=0 \
+FP_REMOTE_TARGET=<대상 사설 IP> \
+FP_REMOTE_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>" \
+FP_SESSIONS=8 FP_DUR=15 FP_PLAN="B,B,B#5,B#20" \
+PHASES="framepath" \
+  bash loadtest/aws/run_all.sh
+```
 
 ## 설정
 
