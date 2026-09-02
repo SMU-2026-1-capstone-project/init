@@ -376,7 +376,7 @@ nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py \
 | 팔 | A(기준) · B(구간·`lease` + 앵커) · `A@0.0005`·`A@0.05`(GIL **양방향**) · `B@0.0005`(계측×GIL **상호작용**, 2×2 를 닫는 칸) 🔴 **정본은 [설계 §13](../../docs/decisions/ai-receive-path-scaling.md) 이고 위 판 문자열은 거기서 옮긴 것이다** — 바꾸려면 설계부터 고칠 것 |
 | 배열 | **5×5 라틴 방격 + 버림 1 = 26판.** 각 팔이 **각 위치에 정확히 한 번** 온다 — 재기동이 −24%, 판 순서가 −6.4% 를 흔들기 때문(설계 §9-4) |
 | ⏱ 소요 | 판당 120초면 **52분**, 160초면 **69분** — `setup`(160세션 여는 시간)이 미측정이라 **버림판이 처음 준다.** 인스턴스 1.5시간 |
-| 🔴 **안 읽는 값** | `handler_concurrency` — 부하기가 동거해서 **절대값이 다친다.** R10-b(2대)의 몫이다(§7) |
+| 🔴 **안 읽는 값** | `handler_concurrency` — 부하기가 동거해서 **절대값이 다친다.** R10-b(2대, 아래)의 몫이다(§7) |
 | 러너 | 🟢 **`PHASES="framepath collect"` 로 돈다** — 아래 「무인으로 돌리려면」. 위 손 명령도 그대로 유효하다(회수만 손으로) |
 
 ⚠️ **이 절차로 실제로 띄워 본 적은 없다.** ROLE 은 `bash -n` 과 역할 분기 검증만 거쳤고,
@@ -414,6 +414,73 @@ PHASES="framepath collect" \
 산출물은 `<OUTDIR>/framepath/` — `arms_<tag>.json` · `raw_*.tsv` · `server_*.log` ·
 `run_arms.log` · `ai_venv_conditions.txt`(부트스트랩이 만든 것을 복사한다).
 
+### R10-b — 2대 구성 (핸들러 동시성 · 최소 격자)
+
+🟢 **2026-09-02 코드 반영.** R10-a 가 GIL 스위치 간격을 반증하고, 곁다리 프로세스분리 판이
+「16 중 9.5」를 «프로세스당 천장»으로 이미 답해버려서
+([`ai-receive-path-scaling.md`](../../docs/decisions/ai-receive-path-scaling.md)), R10-b 가
+원래 답하려던 것 중 남은 건 **`GRPC_MAX_WORKERS`(핸들러 동시성, 기본 10,
+`ai-server/app/config.py:28`)가 그 천장을 만드는 손잡이인가** 하나다. 설계는
+[`r10-loadgen-topology.md` §7](../../docs/decisions/r10-loadgen-topology.md) — **착수(EC2 기동)
+는 이 코드 반영과 별개로 확인**받는다([[feedback_user_decides_not_claude]]).
+
+🔴 **자리가 R10-a 와 반대다.** R10-a 는 대상 박스 자신이 러너였는데, R10-b 는 **부하기가
+러너**다(P6·coresidency 와 같은 자리) — `run_arms.py` 가 `--remote-target`/`--remote-ssh` 로
+대상을 SSH 로 원격 기동·종료하고, 부하는 부하기 자신이 네트워크로 대상 gRPC 를 친다.
+
+```bash
+# 대상: ROLE=ai-venv (R10-a 와 같다) — MySQL·Spring·도커 없이 venv 만
+ROLE=ai-venv bash bootstrap.sh
+# 부하기: gRPC 클라이언트 + venv (서버는 안 띄운다). ROLE 은 대상과 같은 ai-venv 로 충분하다
+#         — run_arms.py 가 로더 쪽에서 필요로 하는 것도 같은 venv·proto 스텁이다
+ROLE=ai-venv bash bootstrap.sh
+```
+
+**실행 — 부하기에서**
+
+```bash
+cd /root/init
+S3_BASE=s3://내버킷/shadowfit \
+FP_REMOTE_TARGET=<대상 사설 IP> \
+FP_REMOTE_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>" \
+FP_PLAN="B,B,B#5,B#20,B#5,B#20,B,B#20,B,B#5" \
+PHASES="framepath collect" \
+  nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
+```
+
+| | |
+|---|---|
+| 최소 격자(사용자 확정, 2026-09-02) | **팔은 `GRPC_MAX_WORKERS` 값 하나**(계측은 켠 채 고정 — `B` 만 쓴다, `A/B` 대조는 R10-a 가 이미 닫았다). 기본(10) 대조군 + 5·20 두 값. 버림 1 + 각 3판, 위치 균형(`feedback_measure_design_needs_repeats`) — 위 `FP_PLAN` 예시가 그 배열이다 |
+| 규모 | R10-a 와 같은 조건(160세션·90초·풀201)을 유지할 것 — 다르면 비교가 안 된다 |
+| 🔴 CPU | **판 전체 평균만**(`cpu_remote.avg_vcpu`), warmup 미제외. R10-a 의 시계열 `cpu` 와 **같은 표에 놓지 말 것** — 이 판이 진짜 답하는 것은 처리량·지연이 `GRPC_MAX_WORKERS` 로 갈리는가다 |
+| ⏱ 소요 | 미실측 — R10-a(26판·52~69분)보다 판 수는 적지만(8판) SSH 왕복(원격 기동·종료·CPU 스냅샷)이 더 걸린다. 축소 리허설로 먼저 잰다 |
+| 게이트 | R10-a 의 다섯 + **여섯째**(대상 SSH·인터프리터·버전·부하기→대상 gRPC 포트) — `fp_gate()` §6 |
+
+✅ **2026-09-02 실전 라운드 완료** — [결과](../results/frame-path-r10b-2026-09-02/README.md).
+`GRPC_MAX_WORKERS`(5·10·20)는 처리량·지연을 안 움직인다(팔간 차이 2% 안, 잡음 수준) —
+R10-a 의 GIL 반증에 이어 이 후보도 지워지고 「16 중 9.5」는 **프로세스당 천장**만 남았다.
+리허설 중 원격 부팅 버그 셋(bootstrap.sh 의 `.env` heredoc 오염 · SSH `nohup` 응답 미분리 ·
+`--bind` 원격 자동전환 누락)을 실전에서 처음 걸러 고쳤다 — 로컬 단위검증만으론 못 잡는
+종류였다. 🔴 **깨진 채 남은 것**: 원격 CPU 계측(`cpu_remote`)이 전 판 실패
+([#647](https://github.com/Shadowfit/init/issues/647)) · 리허설도 `run_all.sh` 를 그대로
+태우면 AUTO_SHUTDOWN 대상이 되는데 **러너(부하기) 쪽에 취소용 root SSH 가 없었다**
+([#648](https://github.com/Shadowfit/init/issues/648), 아래 리허설 명령에 `AUTO_SHUTDOWN=0`
+을 넣은 이유).
+
+⚠️ **리허설은 `AUTO_SHUTDOWN=0` 을 꼭 넣을 것** — `PHASES` 에 무엇을 넣든 `run_all.sh` 를
+직접 부르면 끝에 자동종료 로직을 그대로 탄다(#648). 축소 리허설로 먼저 밟고, 문제없으면
+본판(위 「실행」 명령, `AUTO_SHUTDOWN` 기본값 1)을 돌린다.
+
+```bash
+cd /root/init
+AUTO_SHUTDOWN=0 \
+FP_REMOTE_TARGET=<대상 사설 IP> \
+FP_REMOTE_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>" \
+FP_SESSIONS=8 FP_DUR=15 FP_PLAN="B,B,B#5,B#20" \
+PHASES="framepath" \
+  bash loadtest/aws/run_all.sh
+```
+
 ## 설정
 
 | 변수 | 기본 | 비고 |
@@ -426,6 +493,9 @@ PHASES="framepath collect" \
 | `REPL_AZ_MODE` | (없음) | P4 — 조건 칸에 그대로 들어간다. 비면 경고(막지는 않는다) |
 | `REPL_SESSIONS` | `13334` | P4 무대 = 1,000만 행 |
 | `TIMEOUT_REPL_GATE` / `TIMEOUT_REPL` | `10800` / `14400` | 3시간 / 4시간 |
+| `FP_REMOTE_TARGET` | (없음) | R10-b — 대상 사설 IP. 비면 R10-a 와 같은 로컬(동거) 경로 |
+| `FP_REMOTE_SSH` | `ssh root@$FP_REMOTE_TARGET` | R10-b — 키를 쓰면 직접 지정 |
+| `FP_REMOTE_ROOT` | `/root/init` | R10-b — 대상의 저장소 루트 |
 | `AUTO_SHUTDOWN` | **`1`** | **업로드 성공 시에만** 정지. 기본이 켜짐(2026-08-24 결정) — 박스를 남기려면 `0` |
 | `SHUTDOWN_DELAY_MIN` | `5` | 정지까지의 유예(분). 취소: 박스 안에서 `pkill -f 'shutdown'` |
 | `SYNC_SEC` | `300` | S3 주기 업로드 간격 |
