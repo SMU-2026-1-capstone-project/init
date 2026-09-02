@@ -486,6 +486,43 @@ PHASES="framepath" \
   bash loadtest/aws/run_all.sh
 ```
 
+### 보정값 (從 R11) — 2026-09-02 부터 `calibration` 단계로 상설화
+
+[`round-to-round-nonreproducibility.md`](../../docs/decisions/round-to-round-nonreproducibility.md) §2·§5
+축0. **CPU% 는 시간이지 일의 양이 아니다** — 물리 호스트의 유효 클럭이 라운드마다 다르면
+같은 CPU% 로 다른 처리량이 나온다(08-17 관측: AI CPU 869.3%→869.0%인데 처리량 +17.7%).
+단일 스레드로 고정 프레임 수를 추론해 걸린 시간만 재면 그 박스가 초당 얼마나 일하는지가
+남는다 — R6 이 이미 이 방법으로 79.9fps 를 냈다. **판정에 쓰든 안 쓰든 무조건 기록한다**:
+지금 못 걸으면 그 박스가 사라진 뒤엔 영영 못 잰다(P6 1·2라운드 보정값을 그렇게 잃었다).
+
+🟢 **ROLE=ai-venv 라운드(R10-a·R10-b)는 `PHASES` 에 `calibration` 만 추가하면 된다**
+(소요 1~2분, 새 인스턴스 0):
+
+```bash
+PHASES="framepath calibration collect"
+```
+
+산출물은 `<OUTDIR>/calibration/` — `box.txt`(인스턴스 타입·ID·AZ) · `scaling_raw.txt`(전체
+표) · `scaling_1w.txt`(워커=1 행만, 라운드 간 대조용). 게이트: `FP_VENV` 실행 파일 존재
+(venv 3.12) · `CORES_RIG/frames.json` 존재 — 둘 다 R10 라운드가 이미 요구하는 것이라 추가
+준비가 없다.
+
+🔴 **P6(도커) 대상 박스는 이 phase 로 못 돈다** — mediapipe 가 host venv 가 아니라
+`shadowfit-ai` 컨테이너 안에 있다. 대상 박스에서 손으로 돌린다(부트스트랩 뒤, 측정 전후
+아무 때나 — 판정에 안 섞이므로 순서가 중요하지 않다):
+
+```bash
+# 대상 박스에서 — frames.json 을 컨테이너로 복사하고 그 안에서 돌린다
+docker cp loadtest/results/coresidency-2026-08-15/frames.json shadowfit-ai:/tmp/frames.json
+docker exec -i -e SCALING_WORKERS=1 -w /app shadowfit-ai \
+  python - /tmp/frames.json scaling < loadtest/results/ai-path-profile-2026-08-17/profile_e2e_and_scaling.py \
+  | tee coresidency/calibration_scaling.txt
+```
+
+⚠️ **이 손 명령은 아직 실제로 안 돌려봤다** — `docker exec` 로 stdin 스크립트를 먹이는 경로와
+컨테이너 안 import 경로(`WORKDIR /app`)는 Dockerfile 을 읽고 유도한 것이지 실측이 아니다.
+다음 P6 라운드에서 처음 밟을 때 이 줄이 안 되면 여기부터 고칠 것.
+
 ## 설정
 
 | 변수 | 기본 | 비고 |
@@ -507,6 +544,8 @@ PHASES="framepath" \
 | `WRITER_MAX_SEC` | `14400` | ⚠️ rig 기본은 5,400. 아래 참고 |
 | `TIMEOUT_DDL` | `43200` | 12시간 (로컬 추정 5.9시간 × 2) |
 | `REHEARSAL_SESSIONS` | `134` | 10만 행 |
+| `CALIB_RIG` | `results/ai-path-profile-2026-08-17/profile_e2e_and_scaling.py` | 從 R11 보정값 rig 경로 |
+| `TIMEOUT_CALIB` | `300` | 從 R11 — 실측 1~2분의 여유폭 |
 
 ---
 
