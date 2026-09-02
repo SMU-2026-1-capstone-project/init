@@ -686,6 +686,9 @@ def main():
             print("  --remote-target 이 있어 --bind 를 0.0.0.0 으로 올렸다(원격 헬스체크 전제)", flush=True)
     else:
         PY = resolve_python(a.python_bin)
+        # 🔴 (2026-09-02) --remote-target 이 없으면 AI 가 끝까지 None 으로 남아 wait_health()
+        #    가 매번 예외를 삼키고 "기동 실패"만 찍는다 — 서버는 실제로 떠 있어도 못 본다.
+        AI = f"http://{a.bind}:{HTTP_PORT}"
     RESPONSE_MODE = a.response_mode
     TRANSPORT = a.transport
     NULL_HANDLER = a.null_handler
