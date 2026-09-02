@@ -194,6 +194,11 @@ B 와 156 을 비교하게 되고, 그러면 **「동거 때문에 내려간 몫
 
 ### 4-1. 從 — 메모리 유도식의 «공식 밖 몫» ([#229](https://github.com/Shadowfit/init/issues/229))
 
+> ✅ **답변·반영 완료 (2026-09-02).** 아래는 이 라운드가 **묻던 시점**의 질문이라 그대로 둔다.
+> 결과·결정은 [`detector-pool-ceiling-formula.md`](detector-pool-ceiling-formula.md) —
+> 공식이 `100.5+98.7×N` 에서 실측 `708+106.74×N`(MiB)으로 바뀌었다
+> (`ai-server/app/core/mediapipe_detector.py`). 아래 §의 100.5·98.7 은 **그 시점의 옛 값**이다.
+
 **이 라운드에 얹으면 추가 비용이 거의 0 이다.** 이미 동시 세션을 ramp 하며 `docker stats` 로
 컨테이너별 메모리를 걷는다 — 필요한 것은 **걷은 값을 유도식과 대조하는 것뿐**이다.
 
