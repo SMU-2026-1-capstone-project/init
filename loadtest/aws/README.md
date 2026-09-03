@@ -275,6 +275,29 @@ PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
 `coresidency_rehearsal` 이 실패하면 **정판을 안 돈다** — 리허설 판정은 종료 코드가 아니라
 결과 표(`setup_fail`·`req`)로 한다.
 
+### 팔 D — 관측 스택 동거 비용 (從 R9, Q5·가설 H5)
+
+🟢 **코드는 이미 있다.** `CORES_ARMS`(기본 `"A B C"`)에 `D` 를 더하기만 하면 된다 —
+`ARMS 에 D 를 넣으려면 "A B C D"`(rig 헤더 주석), `run_all.sh` 도 `CORES_ARMS` 를 그대로
+`coresidency_sweep.sh` 의 `ARMS` 로 넘긴다. 팔 D = 팔 C + `docker compose --profile obs
+up -d`(prometheus·grafana·mysqld-exporter·cadvisor·node-exporter).
+
+```bash
+CORES_ARMS="A B C D" \
+PHASES="coresidency_preflight coresidency_rehearsal coresidency collect" \
+  ... (나머지는 위와 동일)
+```
+
+🔴 **1·2라운드 둘 다 「길어지면 뺀다」로 D 를 뺐다** — 판이 **+19개(+42분)** 는다
+([`AWS-RIDE-ALONG.md` §1 從-R9](../AWS-RIDE-ALONG.md)). **다음 P6 류 라운드를 돌리기 전에
+D 를 넣을지부터 정할 것** — 여유 시간이 없으면 `CORES_ARMS="A B C"` 로 그대로 두고, 있으면
+위처럼 `D` 를 더한다. 판정선은 설계 그대로: **D 가 C 대비 두 자릿수 % 내려가면 H5(관측
+스택이 AI 부하에서도 안 비싸다) 반증**([`ai-coresidency-capacity.md` §3(팔 D)](../../docs/decisions/ai-coresidency-capacity.md)).
+
+✅ **관측 스택 이미지는 부트스트랩이 미리 당겨둔다**(`bootstrap.sh` ROLE=p6-target, 2026-09-02
+추가) — 그래서 판 중간에 D 로 처음 전환해도 이미지 pull 지연이 그 판의 소요에 안 섞인다.
+⚠️ 이 사전 pull 자체는 아직 실제 EC2 에서 안 돌려봤다.
+
 ⚠️ **여기 적힌 절차로 2대를 실제로 띄워 본 적은 없다.** 포트·키 경로는 rig 코드에서 읽은 것이다.
 
 ### P4 — 2대 구성 (복제 지연 · 반동기)
