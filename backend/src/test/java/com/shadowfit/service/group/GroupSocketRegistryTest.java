@@ -8,6 +8,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -115,6 +116,43 @@ class GroupSocketRegistryTest {
         registry.broadcast(GROUP_ID, "payload");
 
         verify(session, timeout(AWAIT_MS)).close(CloseStatus.SERVER_ERROR);
+    }
+
+    @Test
+    @DisplayName("전송이 막힌 채로 대기열이 다 차면(짧은 버스트는 견디되) 그 세션을 정리한다"
+            + " (#623 후속 — 무제한 대기열 대신 유한 큐, 클래스 주석 \"대기열 상한\" 참고)")
+    void broadcast_queueSaturated_evictsSlowSession() throws Exception {
+        WebSocketSession session = openSession();
+        CountDownLatch firstSendStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirstSend = new CountDownLatch(1);
+        org.mockito.Mockito.doAnswer(inv -> {
+            firstSendStarted.countDown();
+            releaseFirstSend.await();
+            return null;
+        }).when(session).sendMessage(any(TextMessage.class));
+        registry.register(GROUP_ID, session);
+
+        registry.broadcast(GROUP_ID, "in-flight"); // 세션 전용 워커가 이걸 받아 즉시 실행·블록한다
+        org.assertj.core.api.Assertions.assertThat(
+                firstSendStarted.await(AWAIT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)).isTrue();
+
+        // 짧은 버스트(대기열 용량보다 훨씬 적은 수)는 거부 없이 큐에 쌓여야 한다 — 이게
+        // SynchronousQueue(대기 자리 0)에서 유한 큐로 바꾼 이유다(재연결 복구 통합테스트가
+        // 3건 연속 발행으로 이미 이 조건을 요구한다).
+        for (int i = 0; i < 3; i++) {
+            registry.broadcast(GROUP_ID, "burst-" + i);
+        }
+        verify(session, never()).close(any(CloseStatus.class));
+
+        // 대기열을 실제로 채워야(용량 이상) 거부·정리가 일어난다.
+        for (int i = 0; i < 64; i++) {
+            registry.broadcast(GROUP_ID, "overflow-" + i);
+        }
+
+        // 거부되면 이 세션을 registry에서 빼고 SERVER_ERROR로 닫는다(전송 실패와 같은 정리 경로).
+        verify(session, timeout(AWAIT_MS)).close(CloseStatus.SERVER_ERROR);
+
+        releaseFirstSend.countDown(); // 첫 전송을 마저 끝내 워커 스레드를 정리한다(테스트 정리)
     }
 
     private WebSocketSession openSession() {

@@ -76,12 +76,18 @@ public class GroupInvitationService {
 
         invitation.accept();
 
-        GroupMember member = groupMemberRepository.save(GroupMember.builder()
-                .group(invitation.getGroup())
-                .member(invitation.getInvitee())
-                .role(GroupRole.MEMBER)
-                .status(GroupMemberStatus.ACTIVE)
-                .build());
+        // leaveGroup() 은 기존 group_members 행을 LEFT 로만 남긴다 — 재초대·재수락 시 새 행을
+        // 또 넣으면 UNIQUE(group_id, member_id) 위반으로 트랜잭션이 통째로 실패한다(500).
+        // 기존 행(LEFT 포함)이 있으면 되살리고, 없을 때만 새로 만든다.
+        GroupMember member = groupMemberRepository
+                .findByGroupIdAndMemberId(invitation.getGroup().getId(), invitation.getInvitee().getId())
+                .map(existing -> { existing.rejoin(); return existing; })
+                .orElseGet(() -> groupMemberRepository.save(GroupMember.builder()
+                        .group(invitation.getGroup())
+                        .member(invitation.getInvitee())
+                        .role(GroupRole.MEMBER)
+                        .status(GroupMemberStatus.ACTIVE)
+                        .build()));
 
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("memberId", member.getMember().getId());

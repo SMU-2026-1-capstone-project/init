@@ -13,7 +13,9 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 그룹 id → 이 인스턴스가 들고 있는 로컬 WebSocket 세션 집합. 단일 인스턴스 전제라
@@ -36,6 +38,25 @@ import java.util.concurrent.Executors;
  * <b>트레이드오프</b>: 연결마다 스레드 하나를 상시 점유한다(스레드-커넥션 비율 1:1).
  * 그룹 규모가 지금(단일 인스턴스, 소규모)보다 훨씬 커지면 이 자체가 새 캐파시티
  * 질문이 된다 — 그때는 공유 스레드풀 + 세션별 큐로 바꾸는 편이 맞다.
+ *
+ * <p><b>대기열 상한(무제한 큐 방지)</b>. {@link Executors#newSingleThreadExecutor()}의 기본
+ * 큐({@code LinkedBlockingQueue})는 무제한이라, 느린 세션은 전송이 밀릴수록 대기 중인
+ * broadcast 작업이 힙에 계속 쌓인다({@code SEND_TIME_LIMIT_MS}는 "보내기 시작한" 전송에만
+ * 적용되고, 아직 실행을 못 잡은 큐 항목은 그 상한 밖이다). 그래서 유한 큐({@code
+ * LinkedBlockingQueue}, capacity {@link #QUEUE_CAPACITY})로 바꾸고 포화 시 거부 정책을 둔다.
+ *
+ * <p>⚠️ 처음엔 대기 자리를 아예 안 두려 했다({@code SynchronousQueue}) — 그런데
+ * {@code GroupWebSocketReconnectRecoveryIntegrationTest}가 실측으로 그 전제를 깼다: 같은
+ * 세션(발행자 자신)에게 온 REP_COMPLETED 3건이 반복문으로 연달아 도착하는 것만으로도, 앞
+ * 전송이 끝나기 전에 다음 broadcast가 오는 게(수백ms 이내) 실제로 일어난다 — "그룹 이벤트는
+ * 사람 행동 빈도라 거의 안 겹친다"는 가정이 이 이벤트 타입(운동 중 rep 완료, 초 단위가 아니라
+ * 그보다 촘촘할 수 있음)에는 안 맞았다. 그래서 {@link #QUEUE_CAPACITY}는 "얼마가 안전한
+ * 상한인가"를 실측한 값이 아니라, 이 테스트가 이미 요구하는 버스트를 깨지 않을 만큼의
+ * 여유(3건보다 넉넉히 위)를 둔 것뿐이다 — 대기열 깊이 자체의 근거는 없다는 걸 명시한다.
+ * 이 큐도 채워지면(진짜로 오래 못 따라오는 세션) 거부되고 그 세션은 정리된다
+ * ({@code broadcast()}의 {@code RejectedExecutionException} 처리). 동시 연결 수 자체의
+ * 상한은 이 변경의 범위 밖이다 — 그건 이 문서 위쪽이 이미 "다음 캐파시티 질문"으로 남겨둔
+ * 것과 같은 미해결 사안이다.
  */
 @Slf4j
 @Component
@@ -43,6 +64,9 @@ public class GroupSocketRegistry {
 
     private static final int SEND_TIME_LIMIT_MS = 10_000;
     private static final int BUFFER_SIZE_LIMIT_BYTES = 512 * 1024;
+    // 실측값 아님 — 위 클래스 javadoc "대기열 상한" 참고. 이미 검증된 버스트(3건, 반복 테스트)를
+    // 안 깨는 선에서 여유를 둔 것뿐이다.
+    private static final int QUEUE_CAPACITY = 32;
 
     private record Entry(ConcurrentWebSocketSessionDecorator session, ExecutorService executor) {
     }
@@ -68,8 +92,14 @@ public class GroupSocketRegistry {
     public void register(Long groupId, WebSocketSession session) {
         Entry entry = new Entry(
                 new ConcurrentWebSocketSessionDecorator(session, SEND_TIME_LIMIT_MS, BUFFER_SIZE_LIMIT_BYTES),
-                Executors.newSingleThreadExecutor());
+                newBoundedSingleThreadExecutor());
         sessionsByGroup.computeIfAbsent(groupId, id -> new ConcurrentHashMap<>()).put(session.getId(), entry);
+    }
+
+    // Executors.newSingleThreadExecutor()와 동일(스레드 1개)하되 큐가 무제한이 아니다 — 위 클래스
+    // javadoc "대기열 상한" 참고.
+    private static ExecutorService newBoundedSingleThreadExecutor() {
+        return new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(QUEUE_CAPACITY));
     }
 
     public void deregister(Long groupId, WebSocketSession session) {
@@ -100,7 +130,13 @@ public class GroupSocketRegistry {
             try {
                 entry.executor().execute(() -> send(groupId, sessionId, entry, message));
             } catch (java.util.concurrent.RejectedExecutionException ex) {
-                // deregister()가 이미 shutdownNow()를 부른 직후의 경합 — 이미 정리된 세션이니 무시.
+                // 두 경우가 같은 예외로 온다 — ①deregister()가 이미 shutdownNow()를 부른 직후의
+                // 경합(이미 정리된 세션, removeEntry가 안전하게 no-op) ②대기 자리가 없어(§클래스
+                // javadoc) 이번 전송을 못 받은 느린 세션(뒤처짐 신호, 지금 정리해야 하는 세션).
+                // 어느 쪽이든 이 세션에 이 메시지는 못 갔으니 정리하는 게 맞다 — send()가
+                // IOException일 때 하는 것과 같은 정리(레지스트리 제거 + 연결 종료).
+                removeEntry(groupId, sessionId, entry);
+                closeQuietly(entry.session());
             }
         }
     }

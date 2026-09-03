@@ -6,9 +6,11 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.group.Group;
 import com.shadowfit.model.group.GroupEvent;
+import com.shadowfit.model.group.GroupMemberStatus;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.UserRole;
 import com.shadowfit.repository.group.GroupEventRepository;
+import com.shadowfit.repository.group.GroupMemberRepository;
 import com.shadowfit.repository.group.GroupRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +48,7 @@ class GroupEventServiceTest {
     @Mock private GroupRepository groupRepository;
     @Mock private GroupEventRepository groupEventRepository;
     @Mock private MemberRepository memberRepository;
+    @Mock private GroupMemberRepository groupMemberRepository;
     @Mock private GroupSocketRegistry groupSocketRegistry;
 
     private Group group;
@@ -81,12 +84,32 @@ class GroupEventServiceTest {
     void publish_unknownSender_throws() {
         GroupEventService service = newService(new ObjectMapper());
         when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.of(group));
+        stubSenderIsActiveMember();
         when(memberRepository.findById(SENDER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.publish(GROUP_ID, SENDER_ID, "REP_COMPLETED", "{}"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("publish — senderId가 그룹의 ACTIVE 멤버가 아니면 NOT_GROUP_MEMBER, 저장·방송 모두 일어나지 않는다"
+            + " (핸드셰이크 이후 탈퇴하고도 살아있는 연결로 발행을 시도하는 경우)")
+    void publish_senderNotActiveMember_throwsAndSkipsSideEffects() {
+        GroupEventService service = newService(new ObjectMapper());
+        when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.of(group));
+        when(groupMemberRepository.existsByGroupIdAndMemberIdAndStatus(GROUP_ID, SENDER_ID, GroupMemberStatus.ACTIVE))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> service.publish(GROUP_ID, SENDER_ID, "REP_COMPLETED", "{}"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.NOT_GROUP_MEMBER);
+
+        verify(memberRepository, never()).findById(any());
+        verify(groupEventRepository, never()).save(any());
+        verify(groupSocketRegistry, never()).broadcast(anyLong(), anyString());
     }
 
     @Test
@@ -107,6 +130,7 @@ class GroupEventServiceTest {
     void publish_success_savesAndBroadcasts() {
         GroupEventService service = newService(new ObjectMapper());
         when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.of(group));
+        stubSenderIsActiveMember();
         when(memberRepository.findById(SENDER_ID)).thenReturn(Optional.of(sender));
         when(groupEventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -129,6 +153,7 @@ class GroupEventServiceTest {
     void publish_consecutiveCalls_incrementSeq() {
         GroupEventService service = newService(new ObjectMapper());
         when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.of(group));
+        stubSenderIsActiveMember();
         when(memberRepository.findById(SENDER_ID)).thenReturn(Optional.of(sender));
         when(groupEventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -147,6 +172,7 @@ class GroupEventServiceTest {
                 .thenThrow(new JsonProcessingException("boom") {});
         GroupEventService service = newService(failingMapper);
         when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.of(group));
+        stubSenderIsActiveMember();
         when(memberRepository.findById(SENDER_ID)).thenReturn(Optional.of(sender));
         when(groupEventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -158,6 +184,12 @@ class GroupEventServiceTest {
 
     private GroupEventService newService(ObjectMapper objectMapper) {
         return new GroupEventService(groupRepository, groupEventRepository, memberRepository,
-                groupSocketRegistry, objectMapper);
+                groupMemberRepository, groupSocketRegistry, objectMapper);
+    }
+
+    /** 발신자가 있는(senderId != null) 판의 기본 전제 — ACTIVE 멤버십 재검증을 통과시킨다. */
+    private void stubSenderIsActiveMember() {
+        when(groupMemberRepository.existsByGroupIdAndMemberIdAndStatus(GROUP_ID, SENDER_ID, GroupMemberStatus.ACTIVE))
+                .thenReturn(true);
     }
 }

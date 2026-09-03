@@ -7,7 +7,9 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.group.Group;
 import com.shadowfit.model.group.GroupInvitation;
+import com.shadowfit.model.group.GroupMember;
 import com.shadowfit.model.group.GroupMemberStatus;
+import com.shadowfit.model.group.GroupRole;
 import com.shadowfit.model.group.InvitationStatus;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.model.member.UserRole;
@@ -187,6 +189,25 @@ class GroupInvitationServiceTest {
         assertThat(invitation.getStatus()).isEqualTo(InvitationStatus.ACCEPTED);
         // 시스템이 발행하는 이벤트라 senderId 는 null 이어야 한다 — GroupEventService.publish 계약.
         verify(groupEventService).publish(eq(GROUP_ID), isNull(), eq("MEMBER_JOINED"), anyString());
+    }
+
+    @Test
+    @DisplayName("accept — 탈퇴(LEFT)했던 멤버가 재초대를 수락하면 새 행을 만들지 않고 기존 행을 되살린다"
+            + " (재삽입 시 UNIQUE(group_id, member_id) 위반으로 500이 나던 버그의 회귀 방지)")
+    void accept_rejoiningLeftMember_reactivatesExistingRow() {
+        GroupInvitation invitation = GroupInvitation.builder().group(group).inviter(inviter).invitee(invitee).build();
+        when(groupInvitationRepository.findById(INVITATION_ID)).thenReturn(Optional.of(invitation));
+
+        GroupMember left = GroupMember.builder().id(500L).group(group).member(invitee)
+                .role(GroupRole.MEMBER).status(GroupMemberStatus.LEFT).build();
+        when(groupMemberRepository.findByGroupIdAndMemberId(GROUP_ID, INVITEE_ID)).thenReturn(Optional.of(left));
+
+        service.accept(INVITATION_ID, INVITEE_ID);
+
+        assertThat(left.getStatus()).isEqualTo(GroupMemberStatus.ACTIVE);
+        assertThat(left.getRole()).isEqualTo(GroupRole.MEMBER);
+        // 기존 행을 그대로 되살렸다 — 새 행을 또 넣지 않았다(그게 원래 버그였다).
+        verify(groupMemberRepository, never()).save(any());
     }
 
     @Test

@@ -7,8 +7,10 @@ import com.shadowfit.global.error.BusinessException;
 import com.shadowfit.global.error.ErrorCode;
 import com.shadowfit.model.group.Group;
 import com.shadowfit.model.group.GroupEvent;
+import com.shadowfit.model.group.GroupMemberStatus;
 import com.shadowfit.model.member.Member;
 import com.shadowfit.repository.group.GroupEventRepository;
+import com.shadowfit.repository.group.GroupMemberRepository;
 import com.shadowfit.repository.group.GroupRepository;
 import com.shadowfit.repository.member.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class GroupEventService {
     private final GroupRepository groupRepository;
     private final GroupEventRepository groupEventRepository;
     private final MemberRepository memberRepository;
+    private final GroupMemberRepository groupMemberRepository;
     private final GroupSocketRegistry groupSocketRegistry;
     private final ObjectMapper objectMapper;
 
@@ -44,8 +47,14 @@ public class GroupEventService {
         Group group = groupRepository.findByIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
+        // WS 핸드셰이크 시점엔 ACTIVE 였어도 그 뒤 연결을 안 끊고 그룹을 탈퇴할 수 있다 —
+        // 세션이 살아있는 한 publish() 는 계속 불릴 수 있으므로 매 호출마다 다시 확인한다
+        // (핸드셰이크 시점 검사만으로는 탈퇴 후 발행을 못 막는다).
         Member sender = null;
         if (senderId != null) {
+            if (!groupMemberRepository.existsByGroupIdAndMemberIdAndStatus(groupId, senderId, GroupMemberStatus.ACTIVE)) {
+                throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
+            }
             sender = memberRepository.findById(senderId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         }

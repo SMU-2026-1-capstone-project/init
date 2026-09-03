@@ -51,4 +51,10 @@ public class GroupMember {
     public void leave() {
         this.status = GroupMemberStatus.LEFT;
     }
+
+    /** LEFT 상태였던 멤버가 초대를 다시 수락했을 때 — 새 행을 만들지 않고 기존 행을 되살린다. */
+    public void rejoin() {
+        this.status = GroupMemberStatus.ACTIVE;
+        this.role = GroupRole.MEMBER;
+    }
 }
