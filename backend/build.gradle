@@ -30,6 +30,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	// 다중사용자 실시간 동기화(그룹, WebSocket) — docs/decisions/multiuser-realtime-sync.md,
+	// 2026-08-30 사용자 confirm으로 채택 확정. Redis 스타터는 단일 인스턴스 1차 구현 범위 밖이라 안 넣는다.
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
 	// --- DB & Utility ---
 	runtimeOnly 'com.mysql:mysql-connector-j'

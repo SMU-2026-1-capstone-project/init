@@ -1,0 +1,33 @@
+# 격리된 로컬 스택 오버라이드 — 공유 shadowfit-* 컨테이너/볼륨을 안 건드리고 이 브랜치만
+# 따로 띄운다. 사용법:
+#   docker compose -p shadowfit-iso -f docker-compose.yml -f docker-compose.iso.yml up -d mysql shadowfit-backend
+#
+# AI(shadowfit-ai)는 일부러 안 띄운다 — 여기 목적은 swagger·API 확인이고, backend 는
+# mysql 에만 depends_on 이 걸려 있어(#598 조사에서 확인) AI 없이도 기동한다. gRPC 콜이 실제로
+# 필요해지면 그때 shadowfit-ai 도 이 오버라이드에 추가할 것.
+#
+# 🔴 ports 는 `!override` 로 덮어써야 한다 — compose 는 리스트 필드(ports 등)를 기본적으로
+#    "병합"이 아니라 "이어붙이기"한다. 그냥 ports: 를 새로 적으면 베이스 파일의 8080/6565/
+#    127.0.0.1:9090 도 그대로 남아있어서, 이미 그 포트를 쓰고 있는 공유 shadowfit-backend와
+#    바인드 충돌이 난다(2026-08-31 직접 겪음 — mysql 3306 이중 바인드로 기동 실패).
+# 🔴 DB_HOST 도 새로 지정한다 — 베이스 파일이 컨테이너명(shadowfit-mysql)을 문자열로 박아
+#    두는데, container_name 을 여기서 바꿨으니 그 이름은 이 네트워크 안에 없다. 서비스명
+#    (mysql)은 container_name 과 무관하게 항상 DNS 로 해석되므로 그걸 쓴다.
+#
+# named volume(mysql_data)·network(shadowfit-net)는 프로젝트명(-p)으로 자동 분리되므로
+# 여기서 손 안 댄다 — 새 볼륨이라 Flyway 가 V1 부터 깨끗하게 올라간다(공유 볼륨의 V11/V13
+# 불일치와 무관).
+services:
+  mysql:
+    container_name: shadowfit-iso-mysql
+    ports: !override
+      - "${ISO_MYSQL_PORT:-13306}:3306"
+
+  shadowfit-backend:
+    container_name: shadowfit-iso-backend
+    ports: !override
+      - "${ISO_BACKEND_PORT:-18080}:8080"
+      - "${ISO_GRPC_PORT:-16565}:6565"
+      - "127.0.0.1:${ISO_ACTUATOR_PORT:-19090}:9090"
+    environment:
+      DB_HOST: mysql
