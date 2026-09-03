@@ -33,7 +33,8 @@
 **완료됐다고 가정하는 것 (백엔드)**:
 - ~~BE-01 (프록시 endpoint)~~ 🗑️ 폐기 — 분기 **H2 (프론트 → AI 직결)** 채택 (2026-05-24)
 - BE-10 (AI 헬스체크 + Resilience4j Circuit Breaker, H2 부속)
-- BE-11 (콜백 PoseData 검증 게이트, H2 부속)
+- BE-11 (콜백 PoseData 검증 게이트, H2 부속) — 🔴 원 스펙(`PoseDataValidationGate`)은 안 만듦,
+  다만 막으려던 위협은 [#187](https://github.com/Shadowfit/init/issues/187)이 session_nonce 로 대체 완료(2026-08-24 확인)
 - 분기 I (인증 토큰 흐름) I1 잠정 — `INTERNAL_API_TOKEN` 정적 공유
 - BE-02 (worst 구간 보강)
 - BE-03 (GPT/Claude 리포트, LLM 제공자 결정 완료)
