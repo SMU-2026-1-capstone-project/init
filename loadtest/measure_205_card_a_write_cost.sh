@@ -58,6 +58,28 @@ for _m in ibuf_merges ibuf_merges_insert; do
 done
 echo "  [계기 확인] INNODB_METRICS.ibuf_* 읽힘 · enabled"
 
+# 🔴 2026-09-03: 꼬리(p50·p99) 계기. 설계(covering-index-write-throughput.md §3)의 판정 지표는
+#   «RPS·p50·p99» 인데 이 rig 은 판 전체 wall-clock `ms` 하나만 냈다 — 문 단위 분포가 없었다.
+#   R8 이 남긴 교훈이 정확히 그 자리다: 유니크 키의 대가는 처리량 −2.9% 인데 **p99 는 +98%** 였다.
+#   즉 평균만 보면 «싸다» 로 읽고 꼬리를 놓친다.
+#
+#   채널은 performance_schema 의 digest 통계다. 문마다 bash 로 시간을 재면 그 오버헤드가
+#   측정 대상 판에 그대로 얹히는데, digest 는 서버가 이미 세고 있는 값이라 판에 안 얹힌다.
+#
+#   ⚠️ **quantile 은 히스토그램 버킷의 상한**이다 — 보간값이 아니다. 버킷 경계가 로그 간격이라
+#      p99 가 «1000ms» 처럼 딱 떨어진 값으로 나올 수 있다. 그건 «정확히 1초» 가 아니라
+#      «그 버킷 안» 이라는 뜻이다. 팔 간 비교에는 쓸 수 있고, 절대값 인용에는 이 단서를 붙일 것.
+#   🔴 없으면 여기서 죽는다 — ibuf_merges 때처럼 «조용한 0» 을 만들지 않는다.
+_ps=$(DB -e "SELECT @@performance_schema;" | tr -d '[:space:]')
+[ "$_ps" = "1" ] || { echo "🔴 performance_schema 가 꺼져 있다 (값=[$_ps]) — p50·p99 를 못 잰다. 중단"; exit 1; }
+_dg=$(DB -e "SELECT ENABLED FROM performance_schema.setup_consumers WHERE NAME='statements_digest';" | tr -d '[:space:]')
+[ "$_dg" = "YES" ] || { echo "🔴 statements_digest 소비자가 꺼져 있다 (값=[$_dg]) — 중단"; exit 1; }
+_qc=$(DB -e "SELECT COUNT(*) FROM information_schema.columns
+   WHERE table_schema='performance_schema' AND table_name='events_statements_summary_by_digest'
+     AND column_name IN ('QUANTILE_95','QUANTILE_99');" | tr -d '[:space:]')
+[ "$_qc" = "2" ] || { echo "🔴 QUANTILE_95/99 열이 없다 (개수=[$_qc]) — MySQL 8.0 미만인가. 중단"; exit 1; }
+echo "  [계기 확인] performance_schema digest quantile 읽힘 (p50 은 histogram 으로 계산)"
+
 # 🔴 2026-08-20 2차 시도가 중단됐을 때 드러난 구멍: 스크립트를 죽여도 docker exec 로 띄운
 #   writer 가 컨테이너 «안에서» 계속 돌아 행을 넣는다. 바깥에서 지워봤자 뒤이어 다시 채워졌다.
 #   그래서 종료 시 DB 안의 writer 스레드를 먼저 죽이고, 그다음에 정리한다.
@@ -141,10 +163,37 @@ run_round(){ # $1=arm(A|B) $2=round $3=session_id
   #   플러시 타이밍·CPU 경합과 무관하다. log_write_requests 도 같은 성격이다.
   wr0=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_buffer_pool_write_requests';")
   lw0=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_log_write_requests';")
+  # 🔴 꼬리 계기 리셋 — 이 판의 문만 남기려면 직전에 비운다. summary 를 truncate 하면
+  #   histogram 도 같이 비워지지만(8.0 문서), 그 문서에 의존하지 않고 둘 다 명시적으로 비운다.
+  DB -e "TRUNCATE performance_schema.events_statements_summary_by_digest;" >/dev/null
+  DB -e "TRUNCATE performance_schema.events_statements_histogram_by_digest;" >/dev/null 2>&1
   local t0 t1
   t0=$(date +%s%3N)
   docker exec -i shadowfit-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadowfit < "$SC/w.sql" > /dev/null 2>"$SC/err"
   t1=$(date +%s%3N)
+  # 꼬리 판독 — 이 판의 INSERT digest 하나만. 사이에 낀 DB() 조회는 digest 가 달라 안 섞인다.
+  local q p95 p99 dcnt p50
+  q=$(DB -e "SELECT COUNT_STAR, ROUND(QUANTILE_95/1e9,3), ROUND(QUANTILE_99/1e9,3)
+        FROM performance_schema.events_statements_summary_by_digest
+       WHERE DIGEST_TEXT LIKE 'INSERT INTO \`pose_data\`%';")
+  dcnt=$(echo "$q" | awk '{print $1}'); p95=$(echo "$q" | awk '{print $2}'); p99=$(echo "$q" | awk '{print $3}')
+  # p50 은 QUANTILE_50 열이 없어서 히스토그램 누적으로 낸다 — 중앙값이 든 버킷의 상한이다.
+  p50=$(DB -e "SELECT ROUND(BUCKET_TIMER_HIGH/1e9,3) FROM (
+      SELECT h.BUCKET_TIMER_HIGH,
+             SUM(h.COUNT_BUCKET) OVER (ORDER BY h.BUCKET_NUMBER) AS cum,
+             SUM(h.COUNT_BUCKET) OVER () AS total
+        FROM performance_schema.events_statements_histogram_by_digest h
+        JOIN performance_schema.events_statements_summary_by_digest d
+          ON d.SCHEMA_NAME <=> h.SCHEMA_NAME AND d.DIGEST = h.DIGEST
+       WHERE d.DIGEST_TEXT LIKE 'INSERT INTO \`pose_data\`%' AND h.COUNT_BUCKET > 0) t
+     WHERE cum >= total*0.5 ORDER BY cum LIMIT 1;" | tr -d '[:space:]')
+  # 🔴 «몇 개를 봤나» 를 단언한다. digest 가 이 판의 문 수와 다르면 그 quantile 은 다른
+  #   문 집합을 설명하는 값이다 — 표에 멀쩡하게 실리므로 여기서 막는다.
+  if [ "${dcnt:-0}" != "$STMTS" ]; then
+    echo "🔴 digest 문 수가 안 맞는다: 본 것 [$dcnt] · 넣은 것 [$STMTS] — 꼬리 값을 신뢰할 수 없다. 중단" >&2
+    exit 1
+  fi
+  : "${p50:=-}" "${p95:=-}" "${p99:=-}"
   after=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_buffer_pool_reads';")
   local pw1 im1 wr1 lw1
   pw1=$(DB -e "SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_pages_written';")
@@ -162,25 +211,25 @@ run_round(){ # $1=arm(A|B) $2=round $3=session_id
   #   표가 판을 거치며 13% 커지므로 «순서 효과» 가 생길 수 있고, 그래서 ORDER 의 위치 균형이 필수다.
   #   판정 지표(bp_write_req)는 행당 논리 페이지 수정 수라 13% 증가로 B-tree 깊이가 바뀌지 않는 한 둔감하다.
   #   정리는 §3 에서 한 번에 한다.
-  local line="$arm $rd $ms $rows $((after-before)) $((pw1-pw0)) $((im1-im0)) $errs $((wr1-wr0)) $((lw1-lw0))"
+  local line="$arm $rd $ms $rows $((after-before)) $((pw1-pw0)) $((im1-im0)) $errs $((wr1-wr0)) $((lw1-lw0)) $p50 $p95 $p99"
   # 🔴 이 함수의 stdout 은 «데이터 한 줄» 뿐이어야 한다. 안내 문구가 섞이면 필드가 밀려
   #   표가 멀쩡한 채로 엉뚱한 값이 들어간다 — 2026-08-20 스모크에서 실제로 그랬다
   #   (set_cover 의 echo 가 여기 잡혀 ms 자리에 pages_written 이 들어갔다). 필드 수로 막는다.
-  if [ "$(echo "$line" | wc -w)" != "10" ]; then
-    echo "🔴 run_round 출력 필드가 10개가 아니다: [$line] — 중단" >&2; exit 1
+  if [ "$(echo "$line" | wc -w)" != "13" ]; then
+    echo "🔴 run_round 출력 필드가 13개가 아니다: [$line] — 중단" >&2; exit 1
   fi
   echo "$line"
 }
 
 echo
 echo "## [1] 판 순서: $ORDER (첫 판 버림) — 문 $STMTS · 행 $ROWS · 문당커밋 TXN_STMTS=$TXN_STMTS"
-echo "arm round ms rows bp_reads pages_written ibuf_merges errors bp_write_req log_write_req" > "$SC/raw.txt"
+echo "arm round ms rows bp_reads pages_written ibuf_merges errors bp_write_req log_write_req p50_ms p95_ms p99_ms" > "$SC/raw.txt"
 rd=0
 for a in $ORDER; do
   line=$(run_round "$a" "$rd" $((990000+rd)))
   echo "$line" >> "$SC/raw.txt"
   set -- $line
-  echo "  [$1] 판 $2 → ${3}ms · ${4}행 · 🔑 bp_write_req ${9} · log_write_req ${10} · bp_reads $5 · pages_written $6 · ibuf $7 · err $8$([ "$rd" = 0 ] && echo '   ← 버림')"
+  echo "  [$1] 판 $2 → ${3}ms · ${4}행 · 🔑 bp_write_req ${9} · log_write_req ${10} · 문당 p50 ${11}ms p99 ${13}ms · bp_reads $5 · pages_written $6 · ibuf $7 · err $8$([ "$rd" = 0 ] && echo '   ← 버림')"
   rd=$((rd+1))
 done
 
@@ -196,9 +245,12 @@ echo "## 조건"; echo; echo '```'; cat "$SC/cond.txt"; echo '```'
 echo
 echo "## 인덱스 크기"; echo; echo '```'; cat "$SC/idxsize.txt"; echo '```'
 echo
-echo "| 팔 | 판 | 🔑 bp_write_req | 🔑 log_write_req | ms | 행 | rows/s | bp_reads | pages_written | ibuf_merges | err |"
-echo "|---|---|---|---|---|---|---|---|---|---|---|"
-awk 'NR>1 {rs=($3>0)? sprintf("%.0f", $4/($3/1000)) : "ms=0-실패"; printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |%s\n", $1,$2,$9,$10,$3,$4,rs,$5,$6,$7,$8, ($2==0?" ← 버림":"")}' "$SC/raw.txt"
+echo "| 팔 | 판 | 🔑 bp_write_req | 🔑 log_write_req | ms | 행 | rows/s | 문당 p50 | 문당 p95 | 문당 p99 | bp_reads | pages_written | ibuf_merges | err |"
+echo "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"
+awk 'NR>1 {rs=($3>0)? sprintf("%.0f", $4/($3/1000)) : "ms=0-실패"; printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |%s\n", $1,$2,$9,$10,$3,$4,rs,$11,$12,$13,$5,$6,$7,$8, ($2==0?" ← 버림":"")}' "$SC/raw.txt"
+echo
+echo "⚠️ \`문당 p50/p95/p99\` 은 performance_schema digest 의 **히스토그램 버킷 상한**이다(보간 아님)."
+echo "버킷 경계가 로그 간격이라 값이 딱 떨어져 보일 수 있다 — 팔 간 비교용이고, 절대값 인용엔 이 단서를 붙일 것."
 echo
 echo "⚠️ \`ibuf_merges\` 가 0 이어도 «change buffer 를 안 쓴다» 로 읽으면 안 된다 — 이 페이로드는 한 세션에"
 echo "순차 삽입이라 인덱스 오른쪽 끝 한 자리만 치고, 그 페이지가 메모리에 머물러 조건 자체가 안 선다."
@@ -212,29 +264,39 @@ echo "| 🔑 log_write_req | " $(awk 'NR>1{printf "%s | ", $10}' "$SC/raw.txt")
 echo "| ms (참고) | " $(awk 'NR>1{printf "%s | ", $3}' "$SC/raw.txt")
 echo
 echo "**팔별 중앙값(첫 판 제외)** — 🔑 판정 지표는 bp_write_req 다(ms 아님)"; echo
-echo "| 팔 | 🔑 bp_write_req | 🔑 log_write_req | ms(참고) | rows/s | bp_reads | ibuf_merges |"
-echo "|---|---|---|---|---|---|---|"
+echo "| 팔 | 🔑 bp_write_req | 🔑 log_write_req | ms(참고) | rows/s | 문당 p50 | 문당 p99 | bp_reads | ibuf_merges |"
+echo "|---|---|---|---|---|---|---|---|---|"
 # 🔴 초판은 ms 로 정렬한 뒤 «그 행의» 다른 열 값을 중앙값이라 적었다 — 열마다 순위가 다르므로
 #   그건 중앙값이 아니다. 열별로 따로 정렬해서 낸다.
 med(){ awk -v x="$1" -v c="$2" 'NR>1 && $1==x && $2>0 {print $c}' "$SC/raw.txt" | sort -n \
      | awk '{v[NR]=$1} END{ if(NR==0){printf "-"; exit} printf "%.0f", (NR%2)? v[(NR+1)/2] : (v[NR/2]+v[NR/2+1])/2 }'; }
+# 꼬리 값은 ms 소수점이 의미를 갖는다(버킷 상한이 79.433 같은 값이다) — %.0f 로 뭉개지 않는다.
+medf(){ awk -v x="$1" -v c="$2" 'NR>1 && $1==x && $2>0 && $c!="-" {print $c}' "$SC/raw.txt" | sort -n \
+     | awk '{v[NR]=$1} END{ if(NR==0){printf "-"; exit} printf "%.3f", (NR%2)? v[(NR+1)/2] : (v[NR/2]+v[NR/2+1])/2 }'; }
 for a in A B; do
   n=$(awk -v x="$a" 'NR>1 && $1==x && $2>0' "$SC/raw.txt" | wc -l | tr -d '[:space:]')
-  if [ "$n" = "0" ]; then echo "| $a | — (유효 판 0) | — | — | — | — | — |"; continue; fi
+  if [ "$n" = "0" ]; then echo "| $a | — (유효 판 0) | — | — | — | — | — | — | — |"; continue; fi
   wr=$(med "$a" 9); lw=$(med "$a" 10); msd=$(med "$a" 3); bpd=$(med "$a" 5); ibd=$(med "$a" 7)
+  p50d=$(medf "$a" 11); p99d=$(medf "$a" 13)
   rws=$(awk -v x="$a" 'NR>1 && $1==x && $2>0 {print $4; exit}' "$SC/raw.txt")
   rs=$(awk -v m="$msd" -v r="$rws" 'BEGIN{ if(m>0) printf "%.0f", r/(m/1000); else printf "-" }')
-  echo "| $a | $wr | $lw | $msd | $rs | $bpd | $ibd |"
-  eval "WR_$a=\$wr; LW_$a=\$lw; MS_$a=\$msd"
+  echo "| $a | $wr | $lw | $msd | $rs | $p50d | $p99d | $bpd | $ibd |"
+  eval "WR_$a=\$wr; LW_$a=\$lw; MS_$a=\$msd; P50_$a=\$p50d; P99_$a=\$p99d"
 done
 echo
 if [ "${WR_B:-0}" != "0" ] && [ -n "${WR_A:-}" ]; then
   echo "**팔 대비 (A÷B)** — 커버링 인덱스가 무는 값. 1.00 이면 «대가 없음»"; echo
-  awk -v a="${WR_A}" -v b="${WR_B}" -v la="${LW_A:-0}" -v lb="${LW_B:-0}" -v ma="${MS_A:-0}" -v mb="${MS_B:-0}" 'BEGIN{
+  awk -v a="${WR_A}" -v b="${WR_B}" -v la="${LW_A:-0}" -v lb="${LW_B:-0}" -v ma="${MS_A:-0}" -v mb="${MS_B:-0}" \
+      -v qa="${P50_A:-0}" -v qb="${P50_B:-0}" -v ta="${P99_A:-0}" -v tb="${P99_B:-0}" 'BEGIN{
     printf "| 지표 | A(인덱스 있음) | B(없음) | A÷B |\n|---|---|---|---|\n";
     printf "| 🔑 bp_write_req | %d | %d | **%.3f** |\n", a, b, a/b;
     if (lb>0) printf "| 🔑 log_write_req | %d | %d | %.3f |\n", la, lb, la/lb;
-    if (mb>0) printf "| ms ⚠️ 잡음 2.9배 — 인용 금지 | %d | %d | %.2f |\n", ma, mb, ma/mb; }'
+    if (mb>0) printf "| ms ⚠️ 잡음 2.9배 — 인용 금지 | %d | %d | %.2f |\n", ma, mb, ma/mb;
+    if (qb>0) printf "| 문당 p50 (ms) | %.3f | %.3f | %.3f |\n", qa, qb, qa/qb;
+    if (tb>0) printf "| 🔑 문당 p99 (ms) — 꼬리 | %.3f | %.3f | **%.3f** |\n", ta, tb, ta/tb; }'
+  echo
+  echo "🔑 **꼬리를 따로 읽는 이유**: R8(유니크 키)은 처리량 −2.9% 인데 p99 는 **+98%** 였다."
+  echo "«대가가 평균에 없고 꼬리에 있다» 가 그 판의 결론이고, 이 판도 같은 구조일 수 있다."
 fi
 } | tee "$OUT/summary.md"
 
