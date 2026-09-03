@@ -79,6 +79,42 @@ case "$ROLE" in
   *) die "모르는 ROLE 이다: '$ROLE' — db · p6-target · p6-loader · ai-venv 중 하나여야 한다" ;;
 esac
 
+# ── root SSH (다른 박스가 이 박스로 root@ 로 붙는 라운드용, #642) ──────────
+#
+# 🔴 P4·P6·R10-b 처럼 인스턴스 2대를 쓰는 라운드는 한 박스가 다른 박스로
+#    `ssh root@<사설 IP>` 로 붙는다(aws/README.md 각 절차의 `TARGET_SSH`·
+#    `REPLICA_SSH`). AL2023 기본 이미지는 root 로그인을 막아뒀고(2026-09-02
+#    실측, #642), Ubuntu 클라우드 이미지도 기본이 같다 — 그래서 그때그때
+#    사람이 손으로 sshd_config 를 고치고 authorized_keys 를 복사해왔다
+#    (문서화 안 된 채, P4 08-22 라운드가 어떻게 넘겼는지도 기록이 없다).
+#    role 과 무관하게(어느 쪽이 걸어올지 미리 모르므로) 여기서 항상 연다 —
+#    비용은 없고(1회 sshd 재시작), 안 쓰이면 그냥 안 쓰인다.
+#
+#    비밀번호 로그인은 안 연다. 이 박스에 이미 로그인 가능한 키(운영자가
+#    `run-instances --key-name` 으로 지정해 `ec2-user`/`ubuntu` 의
+#    authorized_keys 에 이미 들어간 그 키)만 root 로도 쓸 수 있게 복사한다 —
+#    새 신뢰 관계를 만들지 않는다.
+step "root SSH (다른 박스가 이 박스로 붙는 라운드용, #642)"
+LOGIN_USER=""
+for u in ec2-user ubuntu; do
+  [ -s "/home/$u/.ssh/authorized_keys" ] && LOGIN_USER=$u && break
+done
+if [ -n "$LOGIN_USER" ]; then
+  mkdir -p /root/.ssh
+  touch /root/.ssh/authorized_keys
+  cat "/home/$LOGIN_USER/.ssh/authorized_keys" >> /root/.ssh/authorized_keys
+  sort -u /root/.ssh/authorized_keys -o /root/.ssh/authorized_keys
+  chmod 700 /root/.ssh
+  chmod 600 /root/.ssh/authorized_keys
+  sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+  grep -q '^PermitRootLogin' /etc/ssh/sshd_config || echo 'PermitRootLogin prohibit-password' >> /etc/ssh/sshd_config
+  systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null \
+    || echo "  ⚠️ sshd 재시작 실패 — 수동으로 확인할 것"
+  echo "  $LOGIN_USER 의 authorized_keys 를 root 로 복사, PermitRootLogin prohibit-password"
+else
+  echo "  ⚠️ ec2-user/ubuntu 의 authorized_keys 를 못 찾았다 — root SSH 는 그대로 막혀 있을 수 있다"
+fi
+
 # ── 패키지 ───────────────────────────────────────────────────────────────
 step "패키지"
 if command -v dnf >/dev/null 2>&1; then
