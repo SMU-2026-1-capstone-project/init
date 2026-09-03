@@ -54,8 +54,16 @@ S3_DEST="${S3_BASE%/}/$RUN_ID"
 #     (TARGET_HOST 를 안 준다 — MySQL 만 있으면 된다. 이 박스의 `docker exec shadowfit-mysql`
 #      을 직접 치고, 대상=측정 대상 박스 자체이므로 이 라운드는 **부하기가 없다** — 그게
 #      «조용한 박스» 전제다)
-#     🔴 **card_a·card_a_seed 는 이 라운드에 안 넣는다** — #205 쓰기 대가는 2026-08-22 에
-#        이미 닫혔다(A÷B=1.245). 다시 돌려도 같은 답을 반복할 뿐이다(설정 블록 참고).
+#     🔴 **card_a·card_a_seed 를 같은 PHASES 에 넣지 말 것** — 라운드가 둘 섞여서
+#        아래 결과 디렉터리 추론이 `exit 1` 로 막는다(#358). 같은 박스에 태우는 것 자체는
+#        맞고(둘 다 «조용한 박스» 처방이다), **러너를 두 번 부른다** —
+#        절차: `ROUND-2026-09-03-quiet-box.md` §3.
+#     ⚠️ **2026-09-03 정정.** 이 자리에 «#205 는 2026-08-22 에 닫혔으니 다시 돌려도 같은 답» 이
+#        적혀 있었는데 **절반만 맞다.** 닫힌 것은 «논리 카운터» 축이고(bp_write_req A÷B=1.245),
+#        같은 결과 문서 §3 이 **«ms 는 3.8배 잡음이라 못 쓴다 — 쓰기 처리량은 여전히 미측정,
+#        조용한 박스가 필요»** 를 스스로 남겼다. 그래서 card_a 는 **처리량 축에서 살아 있다.**
+#        설계: `docs/decisions/covering-index-write-throughput.md`
+#        (옛 주석을 그대로 두면 다음 운영자가 이 라운드를 «중복» 으로 읽고 접는다)
 #
 #   HTTP 읽기 p99 라운드 (從 R14) — **부하기 박스에서**, 위 라운드가 끝난 뒤 별도로:
 #     TARGET_HOST=<위 라운드를 돌린 대상 박스의 사설 IP> PHASES="httpread ridealong collect"
@@ -1268,11 +1276,87 @@ phase_ridealong() {
          FROM performance_schema.events_statements_summary_by_digest
          ORDER BY SUM_TIMER_WAIT DESC LIMIT 20;" > "$out/R2_top_digest.txt" 2>>"$err"
 
-  # R3 — 3-way 조인. reports/sessions/users 시딩이 선행이라 이번 라운드 범위 밖이다.
-  echo "미실행 — reports·exercise_sessions·users 시딩이 선행 조건. AWS-RIDE-ALONG.md §1 從-R3" \
-    > "$out/R3_hash_join.SKIPPED.txt"
+  # R3 — 3-way 조인 알고리즘 (reports ⋈ exercise_sessions ⋈ users)
+  #
+  # 🔴 2026-09-04 배선. 그 전까지 이 자리는 «무조건 스킵» 스텁이었고 라운드 둘을 그렇게
+  #    지나갔다. 스킵 «경로» 자체는 남긴다 — 시딩이 안 된 박스에서 «안 걷었다» 를 정직하게
+  #    남기는 것이 맞다. 바뀐 것은 **무조건 → 비어 있으면** 이다.
+  #
+  # 무엇을 묻나: 포폴 카드 ⑤(Ch.9 옵티마이저)가 «단일 테이블 선택도» 로 축소되며 남긴 절반 —
+  #   MySQL 8.0.18+ 의 **hash join** 이 이 3-way 조인에서 뽑히는가.
+  #
+  # 🔴 읽지 않는 것: 카디널리티 추정 정확도·선택도 기반 전환. 시딩이 단일 템플릿 복제라
+  #    값 분포가 균일하다(카드 ⑤ 자신이 같은 이유로 generated column 을 «미수행» 으로 박았다).
+  #    남는 것은 **플랜 모양** 이고, 아래 세 팔은 그 모양을 «구조적 레버» 로만 흔든다.
+  #
+  # 🔴 인덱스를 떼는 팔은 쓰지 않는다 — 조인 컬럼 둘 다 FK 가 걸려 있어(`exercise_sessions
+  #    .member_id → users.id` · `reports.session_id → exercise_sessions.id`) 스키마를 건드려야
+  #    한다. 대신 `IGNORE INDEX FOR JOIN` 으로 **세션 범위에서만** 같은 조건을 만든다.
+  local r3min
+  r3min=$($q -N -e "SELECT LEAST((SELECT COUNT(*) FROM reports),
+                                 (SELECT COUNT(*) FROM exercise_sessions),
+                                 (SELECT COUNT(*) FROM users));" 2>>"$err" | tr -d '[:space:]')
+  case "$r3min" in ''|*[!0-9]*) r3min=0 ;; esac
+  if [ "$r3min" -eq 0 ]; then
+    # 🔴 R1 이 두 라운드 내내 «전 테이블 0행» 을 답으로 착각한 자리다. 0행이면 답이 아니다.
+    { echo "미실행 — reports·exercise_sessions·users 중 최소 한 테이블이 0행이다."
+      echo "시딩 선행: loadtest/seed/seed_report_rig.sh (세션 1,000 × 750행)"
+      echo "🔴 users 행이 먼저 있어야 한다 — 시더는 member_id 를 참조만 하고 INSERT 하지 않는다."
+      echo "설계: AWS-RIDE-ALONG.md §1 從-R3 · loadtest/aws/ROUND-2026-09-03-quiet-box.md §3 판③"
+    } > "$out/R3_hash_join.SKIPPED.txt"
+    note "🔴 R3 미실행 — 세 테이블 중 빈 것이 있다(사유 기록). 시딩이 선행이다"
+  else
+    local qraw="timeout $TIMEOUT_RIDEALONG docker exec -i -e MYSQL_PWD=$PW $CONTAINER mysql --raw -uroot $DB_NAME"
+    # 🔴 `--raw` 가 필요하다 — 기본 출력은 TREE 의 개행을 리터럴 `\n` 두 글자로 이스케이프해서
+    #    플랜이 한 줄로 뭉친다(2026-09-04 로컬 확인).
+    local r3sel="SELECT r.id, s.start_time, u.id"
+    local r3nat="FROM reports r
+                   JOIN exercise_sessions s ON s.id = r.session_id
+                   JOIN users u ON u.id = r.member_id
+                  WHERE r.report_type='SESSION'"
+    local r3ign="FROM reports r
+                   JOIN exercise_sessions s IGNORE INDEX FOR JOIN (PRIMARY) ON s.id = r.session_id
+                   JOIN users u IGNORE INDEX FOR JOIN (PRIMARY) ON u.id = r.member_id
+                  WHERE r.report_type='SESSION'"
+    { echo "# R3 3-way 조인 알고리즘 — $(date -Is)"
+      echo "# 조인: reports ⋈ exercise_sessions ⋈ users"
+      echo "# 🔴 조건 — 시딩이 단일 템플릿 복제라 값 분포가 균일하다."
+      echo "#    플랜 «모양» 만 읽는다. 카디널리티 추정·선택도 결론 금지."
+      echo "# 🔴 오독 방지 — ㉡ 의 실행시간이 ㉠ 보다 느린 것은 «hash join 이 느리다» 가 아니다."
+      echo "#    ㉡ 는 인덱스를 **일부러** 안 쓴 팔이다. hash join 의 값을 보려면 ㉡-1 ↔ ㉡-2"
+      echo "#    (같은 인덱스 없는 조건에서 hash join 켬/끔)의 cost 를 비교할 것."
+      echo
+      echo "## 무대 (행 수 · 소유자 분산)"
+      $qraw -e "SELECT (SELECT COUNT(*) FROM reports) AS reports,
+                       (SELECT COUNT(*) FROM exercise_sessions) AS sessions,
+                       (SELECT COUNT(*) FROM users) AS users,
+                       (SELECT COUNT(DISTINCT member_id) FROM reports) AS distinct_owners;" 2>>"$err"
+      echo
+      echo "## 팔 ㉠ — 자연 선택 (인덱스 그대로)"
+      echo "#    hash join 이 «안 나오는 것» 도 답이다 — FK 인덱스가 있으면 조건이 안 선다"
+      $qraw -e "EXPLAIN FORMAT=TREE $r3sel $r3nat;" 2>>"$err"
+      $qraw -e "EXPLAIN ANALYZE $r3sel $r3nat;"      2>>"$err"
+      echo
+      echo "## 팔 ㉡-1 — IGNORE INDEX FOR JOIN (쓸 인덱스가 없는 equi-join)"
+      $qraw -e "EXPLAIN FORMAT=TREE $r3sel $r3ign;" 2>>"$err"
+      $qraw -e "EXPLAIN ANALYZE $r3sel $r3ign;"      2>>"$err"
+      echo
+      echo "## 팔 ㉡-2 — 같은 조건 + block_nested_loop=off (hash join 비활성)"
+      echo "#    ㉡-1 과의 cost 차이가 «옵티마이저가 hash join 을 고르는 이유» 다"
+      $qraw -e "SET SESSION optimizer_switch='block_nested_loop=off';
+                EXPLAIN FORMAT=TREE $r3sel $r3ign;" 2>>"$err"
+    } > "$out/R3_hash_join.txt"
+    # 🔴 «파일이 생겼다» 와 «플랜이 찍혔다» 는 다르다. 문자열로 단언한다.
+    if grep -q "hash join" "$out/R3_hash_join.txt"; then
+      note "R3 수집 — 세 팔. ㉡ 에서 «hash join» 확인됨 (무대 최소 행수 $r3min)"
+    elif grep -q "Nested loop" "$out/R3_hash_join.txt"; then
+      note "⚠️ R3 수집 — 플랜은 찍혔으나 «hash join» 문자가 없다. ㉠ 만 도는 조건일 수 있다"
+    else
+      note "🔴 R3 — 파일이 생겼는데 플랜 문자가 없다. \$err 를 볼 것"
+    fi
+  fi
 
-  note "R1·R2 수집, R3 은 미실행(사유 기록)"
+  note "R1·R2 수집, R3 $([ "$r3min" -eq 0 ] && echo '미실행' || echo '수집')"
   return 0
 }
 
