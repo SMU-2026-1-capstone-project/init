@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
+import org.springframework.boot.task.ThreadPoolTaskExecutorBuilder;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.CountDownLatch;
@@ -17,8 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 관측성에서 가장 깨지기 쉬운 지점 — MDC는 ThreadLocal이라 {@code @Async} 경계를 그냥은 못 넘는다.
  *
- * <p>테스트가 재구현이 아니라 <b>실제 프로덕션 배선</b>({@link AsyncConfig}의 커스터마이저)을
- * 그대로 적용해서 검증한다. 이 테스트가 깨지면 비동기 로그에서 correlation id가 통째로 사라진다.
+ * <p>테스트가 재구현이 아니라 <b>실제 프로덕션 배선</b>({@link AsyncConfig#applicationTaskExecutor}이
+ * 정의하는 빈)을 그대로 적용해서 검증한다. 이 테스트가 깨지면 비동기 로그에서 correlation id가
+ * 통째로 사라진다.
  */
 @DisplayName("@Async MDC 전파 테스트")
 class AsyncMdcPropagationTest {
@@ -26,10 +28,11 @@ class AsyncMdcPropagationTest {
     private ThreadPoolTaskExecutor executor;
 
     private ThreadPoolTaskExecutor newDecoratedExecutor() {
-        ThreadPoolTaskExecutor created = new ThreadPoolTaskExecutor();
-        created.setCorePoolSize(1);
-        created.setMaxPoolSize(1); // 스레드 재사용을 강제해 MDC 누수까지 검증
-        new AsyncConfig().mdcPropagatingTaskExecutorCustomizer().customize(created);
+        // 풀 크기 1·1 — 스레드 재사용을 강제해 MDC 누수까지 검증
+        ThreadPoolTaskExecutorBuilder builder = new ThreadPoolTaskExecutorBuilder()
+                .corePoolSize(1)
+                .maxPoolSize(1);
+        ThreadPoolTaskExecutor created = (ThreadPoolTaskExecutor) new AsyncConfig().applicationTaskExecutor(builder);
         created.initialize();
         return created;
     }
