@@ -1,0 +1,6 @@
+# cp terraform.tfvars.example terraform.tfvars 후 채울 것. tfvars 는 .gitignore 대상.
+
+region        = "ap-northeast-2"
+bucket_name   = "내버킷"   # loadtest/aws/README.md 의 S3_BASE=s3://내버킷/shadowfit 과 같은 버킷
+bucket_prefix = "shadowfit"
+create_bucket = true       # 이미 있는 버킷을 재사용하려면 false

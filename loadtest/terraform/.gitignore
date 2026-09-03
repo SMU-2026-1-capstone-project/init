@@ -1,0 +1,13 @@
+# 상태 파일 — 계정마다 다른 실제 리소스 ID가 들어간다, 커밋 대상 아님
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/crash.log
+**/crash.*.log
+
+# .terraform.lock.hcl 은 커밋한다 (provider 버전·해시 고정 — terraform 공식 권장)
+
+# 실제 값(버킷 이름·VPC/서브넷 ID·본인 IP) — .example 만 커밋
+**/terraform.tfvars
+**/*.auto.tfvars
+!**/examples/*.tfvars

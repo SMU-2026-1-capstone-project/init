@@ -1,0 +1,11 @@
+#!/bin/bash
+# terraform round 모듈이 생성 — loadtest/aws/README.md 「실행」 절의
+#   sudo -i; curl .../bootstrap.sh -o bootstrap.sh; bash bootstrap.sh
+# 를 부팅 시점에 대신한다. run_all.sh 실행은 자동화하지 않는다(라운드별 값이 SSH 로 사람이 넣어야 함).
+set -x
+export ROLE="${role}"
+export REF="${ref}"
+
+mkdir -p /root
+curl -fsSL "https://raw.githubusercontent.com/Shadowfit/init/$REF/loadtest/aws/bootstrap.sh" -o /root/bootstrap.sh
+bash /root/bootstrap.sh > /root/bootstrap.log 2>&1
