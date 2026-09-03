@@ -1,9 +1,7 @@
 # POST /pose 프레임 base64 비용 — 실측
 
-작성일: 2026-08-26 · 갱신: 2026-09-03 (§10 — pybase64 채택)
-상태: **측정 완료 — 착수 여부(해상도 캡 등)는 여전히 미결정.** §10만 예외로 채택까지 끝났다(정확도
-대가가 없는 순수 드롭인이라서). 이 문서는 갭을 메운다("미측정"→"측정됨"), 나머지는
-미결정으로 남긴다([[feedback_user_decides_not_claude]])
+작성일: 2026-08-26
+상태: **측정 완료 — 결정 없음.** 이 문서는 갭을 메운다("미측정"→"측정됨"), 착수 여부(해상도 캡 등)는 미결정으로 남긴다([[feedback_user_decides_not_claude]])
 대상: `docs/tasks/33-outbox-fastapi-spring-nginx-grpc-open-items.md` §2 "base64 프레임 HTTP POST 비용 — 미측정" 항목에 대한 답
 연관: [`load-test-strategy.md §4.2`](./load-test-strategy.md)(DAU 1,000 동접 공식 재사용), [`../../loadtest/measure_ai_concurrency.py`](../../loadtest/measure_ai_concurrency.py)(같은 방법론 — 합성 이미지·i3-6100 제약, `figure()`/`squat_cycle()` 재사용), [`../../ai-server/app/models/pose.py:49-58`](../../ai-server/app/models/pose.py)(이 갭을 먼저 자인한 주석), [`feedback-argmax-rules.md`](./feedback-argmax-rules.md)(깊이 판정 여지 3.5°, §8이 대조), [[project_loadtest_env_constraint]], [[feedback_state_assumption_design_to_it]], [[project_squat_first]]
 
@@ -200,46 +198,8 @@
 
 ---
 
-## 10. ✅ pybase64 채택 (2026-09-03) — base64 디코드만 별도로 교체
-
-배경: json→orjson 전환(핫패스 직렬화·역직렬화, `pose.py`/`exercise_servicer.py`/`reference_store.py`)
-작업 중 "다른 개선할 부분"으로 base64 디코드(`image_utils.base64_to_image`, §3-2가 격리해 둔
-"base64 자체만 5~11ms"의 그 구간)를 마저 확인했다.
-
-### 측정
-
-`c7i.4xlarge`(부하테스트 대상과 같은 인스턴스 타입) 위에서 §3-1의 실측 페이로드 크기(raw JPEG
-1,009,111B) 그대로 `base64.b64decode` vs `pybase64.b64decode`를 500회 반복 4판 독립 실행:
-
-| | p50 | p95 | mean |
-|---|---|---|---|
-| stdlib `base64.b64decode` | 0.822~0.824ms | 0.915~0.921ms | 0.843~0.846ms |
-| `pybase64.b64decode` | 0.332~0.335ms | 0.387~0.391ms | 0.342~0.344ms |
-
-**2.47배 빠르고 4판 모두 오차가 거의 없다.** 단 §3-2의 "5~11ms"(i3-6100 dev 박스, 동시 세션과
-동거)와는 절대값이 안 맞는다 — 호스트가 다르고([[project_loadtest_env_constraint]]) 그 값은
-격리 측정이 아니라 곁가지 언급이었다. **여기 c7i.4xlarge 단독 측정(0.82ms)을 더 신뢰한다.**
-
-### 판단 — 채택하되 기대치는 낮게
-
-정확도 대가가 전혀 없는 순수 드롭인 교체라 **막을 이유가 없어 채택**한다. 다만 §3-2가 이미
-밝힌 순서(decode 구간의 진짜 비용은 base64가 아니라 JPEG 압축 해제)는 이 결과로도 안 바뀐다
-— 절감폭은 프레임당 ~0.5ms, §4의 DAU 1,000 피크 가정(204.6 frame/s)에 곱해도 **~0.1 vCPU**
-수준이라 §4가 추산한 decode 전체 예산(11.8~25.7 vCPU)에는 사실상 안 잡힌다. "공짜라서 한다"
-이지 "이걸로 천장이 움직인다"가 아니다.
-
-적용: `app/utils/image_utils.py`의 `base64_to_image`(실제 호출 경로)만 교체 —
-`image_to_base64`(호출부 없는 죽은 코드)는 손대지 않았다. 같은 세션에서 `json`→`orjson`도
-`pose.py`·`exercise_servicer.py`·`reference_store.py` 전체(핫패스 2곳 + 저빈도 2곳)에 적용했고,
-`pose.py`의 BACK_BENT 재판정이 `joint_coordinates`(JSON)를 dumps 직후 같은 요청 안에서 다시
-loads하던 왕복도 `PerRepFrame`에 원본 landmarks를 같이 들려 보내는 방식으로 없앴다(테스트
-160개 전부 통과, 회귀 없음).
-
----
-
 ## 결정 로그
 
 - 2026-08-26: 최초 측정. `loadtest/measure_pose_frame_base64_cost.py` 작성, 4회 독립 실행. 착수 여부·해상도 캡 도입은 미결정으로 남긴다 — 이 문서는 "미측정" 갭을 메우는 것이 전부다.
 - 2026-08-26: 레버 ②(축소 디코드) 실측 추가. `measure_pose_frame_reduced_decode.py`(속도, §7) · `measure_pose_reduced_decode_accuracy.py`(정확도, §8). 속도 이득(2.2~2.4x)은 확인됐지만 각도 오차가 이 프로젝트의 기존 판정 여지(3.5°)를 넘어 — **"채택하면 이득"이 아니라 "속도-정확도 트레이드오프가 있다"로 결론을 바꾼다.** 착수 여부는 여전히 미결정.
 - 2026-08-26: 레버 ①(클라 해상도 캡) 실측 추가. `measure_pose_client_resolution_cap.py`(§9). "애초에 작게 찍으면 ②의 정확도 문제를 피할 것"이라는 가설이 **확인 안 됨** — 가장 완만한 캡도 판정 여지에 걸린다. 단 이 실험은 합성 렌더링 인공물 의심이 커서 절대 수치·해상도 순위는 신뢰도 낮음으로 명시 — **실기기 촬영본 검증이 남은 진짜 다음 단계**(이 세션 범위 밖). 이 문서는 여기서 측정을 마친다 — 착수 여부는 계속 미결정.
-- 2026-09-03: §10 추가 — pybase64 채택. json→orjson 전환 작업 중 나온 파생 질문("base64 자체도 더 빠르게 할 수 있나")에 c7i.4xlarge 격리 측정(4판)으로 답했다 — 2.47배, 정확도 대가 없음 → 드롭인 채택. §4의 decode CPU 예산(11.8~25.7 vCPU)에는 거의 안 잡히는 절감(~0.1 vCPU)이라는 것도 같이 못박아, "적용은 했지만 병목의 답은 아니다"를 분명히 한다.

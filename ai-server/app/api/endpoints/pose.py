@@ -4,12 +4,12 @@ session_id가 함께 오면 누적 분석 + rep 감지를 수행하고,
 rep 1회가 완성될 때마다 Spring에 PoseData 묶음을 콜백한다.
 """
 
+import json
 import logging
 import secrets
 import time
 
 import cv2
-import orjson
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -51,12 +51,12 @@ _BACK_BENT_TILT_THRESHOLD = 35.0
 
 
 def _landmarks_to_json(landmarks: list[Landmark]) -> str:
-    return orjson.dumps(
+    return json.dumps(
         [
             {"index": lm.index, "x": lm.x, "y": lm.y, "z": lm.z, "visibility": lm.visibility}
             for lm in landmarks
         ]
-    ).decode("utf-8")
+    )
 
 
 def flush_pending_feedback(state) -> None:
@@ -323,7 +323,6 @@ def _detect_pose(req: PoseRequest):
             joint_coordinates=_landmarks_to_json(landmarks),
             angles=angles,
             smoothed_knee_angle=smoothed_knee_angle,
-            landmarks=landmarks,
         )
         state.current_rep_frames.append(frame)
 
@@ -365,12 +364,21 @@ def _detect_pose(req: PoseRequest):
     if rep_event.feedback_message != "자세 양호" and rep_frames_snapshot:
         tilts = []
         for f in rep_frames_snapshot:
-            # f.landmarks 는 이 프레임을 만들 때 이미 감지된 원본 객체다 — joint_coordinates
-            # (Spring 전송용으로 직렬화해 둔 JSON)를 다시 파싱할 이유가 없다.
-            if not f.landmarks:
+            try:
+                raw_landmarks = json.loads(f.joint_coordinates)
+                lm_by_index = {
+                    item["index"]: Landmark(
+                        index=item["index"],
+                        x=item["x"],
+                        y=item["y"],
+                        z=item.get("z", 0.0),
+                        visibility=item.get("visibility", 1.0),
+                    )
+                    for item in raw_landmarks
+                }
+                tilts.append(_torso_tilt_degrees(lm_by_index))
+            except (json.JSONDecodeError, KeyError):
                 continue
-            lm_by_index = {lm.index: lm for lm in f.landmarks}
-            tilts.append(_torso_tilt_degrees(lm_by_index))
         if tilts and (sum(tilts) / len(tilts)) > _BACK_BENT_TILT_THRESHOLD:
             state.pending_feedback_events.append(
                 spring_client.PendingFeedbackEvent(

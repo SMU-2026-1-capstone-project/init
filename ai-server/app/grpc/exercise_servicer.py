@@ -8,11 +8,10 @@ Spring → FastAPI 진입점:
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
-
-import orjson
 
 import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -39,7 +38,7 @@ def _parse_reference_poses(
         if not ref.joint_coordinates:
             continue
         try:
-            raw = orjson.loads(ref.joint_coordinates)
+            raw = json.loads(ref.joint_coordinates)
             landmarks = [
                 Landmark(
                     index=item["index"],
@@ -51,7 +50,7 @@ def _parse_reference_poses(
                 for item in raw
             ]
             sequences.append(extract_angles(landmarks, exercise_type))
-        except (orjson.JSONDecodeError, KeyError, ValueError) as e:
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
             logger.warning("reference 좌표 파싱 실패: %s", e)
             continue
     return sequences
