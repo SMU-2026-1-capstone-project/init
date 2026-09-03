@@ -91,7 +91,7 @@
 | ~~**R13**~~ | ~~**HTTP 쓰기 경로 p99 — 판정선 대면**~~ ✅ **완료 (2026-08-24)** — [결과](results/http-write-p99-aws-2026-08-24/README.md). **가정 피크 ×180(13.5 세션시작/초)까지 p99 17ms**(목표 300ms 의 5.7%). 부하기 분리(c7i.xlarge) · 대상 c7i.2xlarge(관례값 아님 — vCPU 한도). ×360 은 **rig 천장**(계정 ÷ 완결 왕복)에 걸려 인용 불가. 🔴 이 라운드가 [#528](https://github.com/Shadowfit/init/issues/528)(StopAnalysis NameError → 세션이 IN_PROGRESS 에 갇힘)을 끄집어냈다 | [`measure_http_write_p99.sh`](measure_http_write_p99.sh) |
 | ~~**R14**~~ | ~~**HTTP 읽기 경로 p99 — 판정선 대면**~~ ✅ **완료 (2026-08-28)** — [결과](results/http-read-p99-ec2-2026-08-28/README.md) | **가정 피크의 360배(27/초)까지 네 엔드포인트 전부 p99 두 자릿수 ms**(최악 `session` p99 12ms) — 목표 1,000ms 의 1.2%. 부하기 분리(c7i.xlarge) · 대상 c7i.2xlarge · 게이트(bad_status·dropped) 3배수 전부 통과. ×360 은 이 실험이 건 상한이지 rig 천장이 아니다(쓰기축 R13과 달리 세션을 안 만들어 계정 완결 왕복 제약이 없음) — 더 큰 배수는 미실행. 🔴 **R14 최초 실행에서 rig 결함 셋을 걸렀다** — ① `run_all.sh` 예시 `PHASES` 의 `preflight` 가 DDL/backup 전용이라 부하기 박스에서 즉시 FAIL → 남은 단계 스킵 → 그래도 빈 결과 업로드가 성공해 `FINAL_OK=1` → **AUTO_SHUTDOWN 오작동으로 부하기 박스를 두 번 잃음**(원인 규명 전 terminate) ② `seed/seed_report_rig.sh` 가 git에 실행권한 없이(100644) 커밋돼 rc=126 ③ p6-target 부트스트랩이 `python` 심볼릭 링크를 안 만들어 시드 중 `python: command not found`. 셋 다 **박스에서 손으로 우회했을 뿐 저장소 소스는 안 고쳤다** — 다음 실행에서 재발함, 이슈 등록 여부는 미결 | [결과](results/http-read-p99-ec2-2026-08-28/README.md) · [로컬 판](results/http-read-p99-2026-08-23/README.md) · [`slo-baseline.md` §4-2](../docs/decisions/slo-baseline.md) · 재고표 Spring 축 1번 |
 | ~~**R15**~~ | ~~**AI 워커 부하-중 자발적 장애 빈도 — 가속 스트레스**~~ ✅ **완료 · 원 질문은 미답 (2026-08-28)** — [결과](results/ai-worker-load-soak-2026-08-28/README.md) | 동접 3배(≈203세션, 세션 시작/종료 반복)로 3시간 계획. **부하 시작 90초 만에 대상 박스 전체(SSH·전 앱 포트)가 응답 불능** — 원래 판정 채널(`shadowfit-ai`의 `RestartCount`/`OOMKilled`)은 대상이 먼저 죽어서 한 번도 못 봄. 소프트 리부트로 회수. 정황상 MySQL InnoDB 내부 락 정체 의심(로그가 "장기 세마포어 대기" 헤더에서 끊김) — 확정 아님, R16이 재검증 | [설계](../docs/decisions/ai-worker-load-soak-experiment.md) · 재고표 AI 축 |
-| ~~**R16**~~ | ~~**같은 실험 재현 — MySQL 캡 3072m + 실시간 계측**~~ ✅ **완료 · R15 가설 반박 (2026-08-28)** — [결과 §6](results/ai-worker-load-soak-2026-08-28/README.md) | MySQL에 `mem_limit=3072m` 걸고(근거: `innodb-buffer-pool-size=2G` 기준, idle 실측 583.7MiB는 InnoDB가 점진적으로 채워져서 하한 근거로 못 씀) `SHOW ENGINE INNODB STATUS`·스레드덤프 7초 간격 계측 추가해 45분 재현 시도. **캡은 못 막았다** — 10분 만에 재발. 그런데 사고 30~40초 전 직접 증거로 **MySQL은 완전 idle·healthy** — R15의 락 정체 가설을 반박. 대신 systemd 저널·INNODB 폴러·Prometheus 스크레이핑 셋이 같은 30초 창에서 동시에 멎는 패턴 발견(메모리는 평평) → EBS I/O 크레딧 소진을 새 후보로 [#603](https://github.com/Shadowfit/init/issues/603) 등록, 미검증. 이 라운드에서 obs 프로파일(Grafana·Prometheus·cAdvisor·node-exporter)도 처음 붙임(다른 작업과 겹쳐 깨끗한 단일변수 대조는 아님) | 재고표 AI 축 |
+| ~~**R16**~~ | ~~**같은 실험 재현 — MySQL 캡 3072m + 실시간 계측**~~ ✅ **완료 · R15 가설 반박 (2026-08-28)** — [결과 §6](results/ai-worker-load-soak-2026-08-28/README.md) | MySQL에 `mem_limit=3072m` 걸고(근거: `innodb-buffer-pool-size=2G` 기준, idle 실측 583.7MiB는 InnoDB가 점진적으로 채워져서 하한 근거로 못 씀) `SHOW ENGINE INNODB STATUS`·스레드덤프 7초 간격 계측 추가해 45분 재현 시도. **캡은 못 막았다** — 10분 만에 재발. 그런데 사고 30~40초 전 직접 증거로 **MySQL은 완전 idle·healthy** — R15의 락 정체 가설을 반박. 대신 systemd 저널·INNODB 폴러·Prometheus 스크레이핑 셋이 같은 30초 창에서 동시에 멎는 패턴 발견(메모리는 평평) → EBS I/O 크레딧 소진을 새 후보로 [#603](https://github.com/Shadowfit/init/issues/603) 등록. 🆕 **CloudWatch 사후 조회로 한 겹 좁혔다 (2026-09-02, [§6-7](results/ai-worker-load-soak-2026-08-28/README.md))** — «크레딧 소진» 이 아니라 **두 사고 모두에서 gp3 기본 처리량 상한(125MiB/s)에 도달**했다. 🔴 **인과는 여전히 미확정** — 상한에 닿는 것과 그것이 박스를 죽이는 것은 다른 주장이고, 애플리케이션 쓰기량을 안 걷어서 못 가른다. 이 라운드에서 obs 프로파일(Grafana·Prometheus·cAdvisor·node-exporter)도 처음 붙임(다른 작업과 겹쳐 깨끗한 단일변수 대조는 아님) | 재고표 AI 축 |
 
 ⚠️ **R1 과 R3 은 값 분포 한계에 걸린다.** 시딩이 단일 템플릿 복제라 카디널리티가 균일하다.
 분포에 의존하는 결론은 내지 말고, **구조·존재 여부만** 본다.
@@ -152,6 +152,11 @@
 - [ ] 절차 전문: [`aws/README.md` 「P6 — 2대 구성」](aws/README.md)
 
 **P6-b(2라운드) 추가분** — 위 목록에 얹는다 (설계 §11)
+
+> 🔴 **아래는 «과거 사전 실행 기록» 이다 — 지금 할 일 목록이 아니다.** P6-b 는 §7 이 적은 대로
+> **2026-08-17 에 탑승·완료**했고, 아홉 항목은 그 라운드에서 반영됐다. 체크박스가 빈 채로
+> 남아 있어서 다음 운영자가 이미 끝난 준비를 다시 하거나 «미실행» 으로 오독할 수 있다는
+> 지적을 받아 이 단서를 붙인다(2026-09-04). **다음 P6 계열 라운드를 열 때 재사용할 목록**으로 읽을 것.
 
 - [ ] 🔴 **rig 코드가 아직 2라운드 조건이 아니다.** 아홉 항목(§11) 전부 미반영 — 탑승 전 반영·리허설
 - [ ] 로컬에서 **`docker update --cpus` 가 물리는지** 먼저 확인. 안 되면 교대 비용이 +4분 → +23분
