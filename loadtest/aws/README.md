@@ -404,7 +404,7 @@ nohup python3 loadtest/results/frame-path-overhead-2026-08-23/run_arms.py \
 | 팔 | A(기준) · B(구간·`lease` + 앵커) · `A@0.0005`·`A@0.05`(GIL **양방향**) · `B@0.0005`(계측×GIL **상호작용**, 2×2 를 닫는 칸) 🔴 **정본은 [설계 §13](../../docs/decisions/ai-receive-path-scaling.md) 이고 위 판 문자열은 거기서 옮긴 것이다** — 바꾸려면 설계부터 고칠 것 |
 | 배열 | **5×5 라틴 방격 + 버림 1 = 26판.** 각 팔이 **각 위치에 정확히 한 번** 온다 — 재기동이 −24%, 판 순서가 −6.4% 를 흔들기 때문(설계 §9-4) |
 | ⏱ 소요 | 판당 120초면 **52분**, 160초면 **69분** — `setup`(160세션 여는 시간)이 미측정이라 **버림판이 처음 준다.** 인스턴스 1.5시간 |
-| 🔴 **안 읽는 값** | `handler_concurrency` — 부하기가 동거해서 **절대값이 다친다.** R10-b(2대, 아래)의 몫이다(§7) |
+| 🔴 **안 읽는 값** | `handler_concurrency` — 부하기가 동거해서 **절대값이 다친다.** R10-b(2대)의 몫이다(§7) |
 | 러너 | 🟢 **`PHASES="framepath collect"` 로 돈다** — 아래 「무인으로 돌리려면」. 위 손 명령도 그대로 유효하다(회수만 손으로) |
 
 ⚠️ **이 절차로 실제로 띄워 본 적은 없다.** ROLE 은 `bash -n` 과 역할 분기 검증만 거쳤고,
@@ -442,6 +442,7 @@ PHASES="framepath collect" \
 산출물은 `<OUTDIR>/framepath/` — `arms_<tag>.json` · `raw_*.tsv` · `server_*.log` ·
 `run_arms.log` · `ai_venv_conditions.txt`(부트스트랩이 만든 것을 복사한다).
 
+<<<<<<< HEAD
 ### R10-b — 2대 구성 (핸들러 동시성 · 최소 격자)
 
 🟢 **2026-09-02 코드 반영.** R10-a 가 GIL 스위치 간격을 반증하고, 곁다리 프로세스분리 판이
@@ -546,6 +547,8 @@ docker exec -i -e SCALING_WORKERS=1 -w /app shadowfit-ai \
 컨테이너 안 import 경로(`WORKDIR /app`)는 Dockerfile 을 읽고 유도한 것이지 실측이 아니다.
 다음 P6 라운드에서 처음 밟을 때 이 줄이 안 되면 여기부터 고칠 것.
 
+=======
+>>>>>>> 27b654d8 (Revert P4/R10-b/bootstrap 6개 커밋 — 다른 경로로 이미 반영됨)
 ## 설정
 
 | 변수 | 기본 | 비고 |
