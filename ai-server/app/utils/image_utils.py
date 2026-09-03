@@ -1,6 +1,6 @@
 """이미지 변환 유틸리티."""
 
-import base64
+import pybase64 as base64
 
 import cv2
 import numpy as np
