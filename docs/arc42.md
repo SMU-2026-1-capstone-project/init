@@ -33,11 +33,11 @@
 
 | 선택 | 근거 문서 |
 |---|---|
-| Spring ↔ FastAPI 간 gRPC(양방향) | [`decisions/grpc-vs-webclient.md`](./decisions/grpc-vs-webclient.md) |
-| 세션 종료 통보에 아웃박스 패턴 | [`decisions/outbox-reliable-messaging.md`](./decisions/outbox-reliable-messaging.md) |
+| Spring ↔ FastAPI 간 gRPC(양방향) | [`decisions/grpc-vs-webclient.md`](./decisions/grpc-vs-webclient.md) — ⚠️ **미확정** 분석 문서, 아직 ADR 없음(추천은 현행 유지) |
+| 세션 종료 통보에 아웃박스 패턴 | [`decisions/outbox-reliable-messaging.md`](./decisions/outbox-reliable-messaging.md) · [ADR-0001](./adr/0001-use-transactional-outbox-for-session-end-notification.md) |
 | 실시간 프레임은 프론트→AI 직결(Spring 우회), 세션 고정 라우팅 | [`c4/README.md`](./c4/README.md) "이 다이어그램에서만 보이는 것" |
-| AI 멀티프로세스 N=3 | [`decisions/ai-process-ceiling-cause.md`](./decisions/ai-process-ceiling-cause.md) |
-| 저장소는 MySQL 단일(Redis 미도입) | [`decisions/redis-adoption.md`](./decisions/redis-adoption.md), [`decisions/mysql-vs-postgresql.md`](./decisions/mysql-vs-postgresql.md) |
+| AI 멀티프로세스 N=3 | [`decisions/per-process-ceiling-cause.md`](./decisions/per-process-ceiling-cause.md)(원인·N 확정) · [ADR-0002](./adr/0002-split-ai-server-into-3-processes.md) — 이전엔 [`decisions/ai-process-ceiling-cause.md`](./decisions/ai-process-ceiling-cause.md)(원인 후보를 못 가른 선행 조사 문서)를 잘못 링크하고 있었다 |
+| 저장소는 MySQL 단일(Redis 미도입) | [`decisions/redis-adoption.md`](./decisions/redis-adoption.md), [`decisions/mysql-vs-postgresql.md`](./decisions/mysql-vs-postgresql.md) — ⚠️ **둘 다 미확정** 분석 문서, 아직 ADR 없음 |
 
 ## 5. 빌드 블록 뷰 (Building Block View)
 
