@@ -761,6 +761,33 @@ else
   fi
 fi
 
+# ── 從 부하용 세션 시드 901~1900 (DB·App 분리 라운드 전용, 기본 꺼짐) ──────
+#
+# 🔴 2026-09-04 풀 사이징 3대 재설계 첫 실행에서 **전 요청이 SESSION_NOT_FOUND 로 실패**했다
+#    (실측 확인 — 16판 100% fail). p6-target 은 이 시드를 자기 블록(§p6-target) 안에서 했는데,
+#    DB·App 을 분리하면서 그 자리를 옮길 곳을 놓쳤다 — batch_multi.json(부하기)이 참조하는
+#    세션 901~1900 이 DB 어디에도 안 만들어졌던 것. ROLE=db 는 P1·P3·P4 등 무관한 라운드에도
+#    쓰이므로 **기본은 끈다** — SEED_MULTI_SESSIONS=1 일 때만, 명시적으로 켠 라운드에서만 돈다.
+if [ "$ROLE" = "db" ] && [ "${SEED_MULTI_SESSIONS:-0}" = "1" ]; then
+  step "從 부하용 세션 시드 901~1900 (SEED_MULTI_SESSIONS=1)"
+  M="docker exec -i -e MYSQL_PWD=$PW shadowfit-mysql mysql -uroot $DB_NAME"
+
+  $M -e "INSERT INTO users (id, email, password, username, sex, role, selected_persona,
+                            preferred_url, onboarding_completed)
+         SELECT 1, 'loadtest@shadowfit.local', 'x', 'loadtest', 'MALE', 'USER', 'ADVANCED',
+                'https://www.youtube.com/watch?v=q6hBSSis_60', TRUE
+         FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = 1);" \
+    || die "member 1 시드 실패 — 세션 시드가 FK 로 전부 죽는다"
+
+  $M < "$WORKDIR/loadtest/seed/seed-multi-sessions.sql" \
+    || die "세션 시드 실패 (seed-multi-sessions.sql)"
+
+  SEEDED=$($M -N -e "SELECT COUNT(*) FROM exercise_sessions WHERE id BETWEEN 901 AND 1900;" | tr -d '[:space:]')
+  [ "$SEEDED" = "1000" ] \
+    || die "세션 시드가 1000개가 아니다 ($SEEDED) — 이대로면 從 부하의 일부가 조용히 FK 로 죽는다"
+  echo "  exercise_sessions 901~1900 · $SEEDED 개 확인"
+fi
+
 # ── 측정 대상 스택 (p6-target) ───────────────────────────────────────────
 #
 # 🔴 기존 라운드가 백엔드를 안 띄운 것은 «측정에 필요한 건 스키마지 애플리케이션이 아니» 어서였다.
