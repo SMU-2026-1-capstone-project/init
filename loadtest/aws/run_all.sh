@@ -77,19 +77,15 @@ S3_DEST="${S3_BASE%/}/$RUN_ID"
 #        업로드는 성공) `AUTO_SHUTDOWN` 이 그 성공을 「정상 종료」로 오인해 박스를 조기에
 #        꺼버릴 수 있다 — 실측을 시작도 못 한 판이 «측정 완료» 처럼 보인다.
 #
-#   풀 사이징 재실험 10~20 (docs/decisions/pool-sizing-10-20-experiment-design.md §10, 3대 구성 —
-#   DB·App 분리 + Loader) — **부하기 박스에서**, httpread 와 같은 이유(SSH 로 대상을 재기동·
-#   스크레이프한다). TARGET_SSH=App(ROLE=app) · DB_SSH=DB(ROLE=db) 로 **둘 다** 필요하다:
-#     TARGET_HOST=<App 박스 사설 IP> \
-#     TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<App 박스 사설 IP>" \
-#     DB_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<DB 박스 사설 IP>" \
-#     GHZ_TOKEN=<App .env 의 INTERNAL_API_TOKEN> GHZ_DATA=/root/batch_multi.json \
-#     PW=<DB .env 의 MYSQL_ROOT_PASSWORD> \
+#   풀 사이징 재실험 10~20 (docs/decisions/pool-sizing-10-20-experiment-design.md, 2대 구성) —
+#   **부하기 박스에서**, httpread 와 같은 이유(TARGET_SSH 로 대상을 재기동·스크레이프한다):
+#     TARGET_HOST=<대상 사설 IP> \
+#     TARGET_SSH="ssh -i /root/.ssh/measure.pem -o StrictHostKeyChecking=no root@<대상 사설 IP>" \
+#     GHZ_TOKEN=<대상 .env 의 INTERNAL_API_TOKEN> GHZ_DATA=/root/batch_multi.json \
+#     PW=<대상 .env 의 MYSQL_ROOT_PASSWORD> \
 #     PHASES="poolsizing collect" nohup bash loadtest/aws/run_all.sh > /root/run_all.log 2>&1 &
-#     🔴 이 phase(3대 구성)는 **오늘(2026-09-04) 코드만 작성됐고 실전에서 한 번도 안 돌았다** —
-#        `measure_poolsizing_10_20.sh` 머리의 "미검증" 목록을 실행 전 반드시 볼 것. 이전에 시도한
-#        2대(p6-target+p6-loader) 구성은 08-09 baseline과 아키텍처가 달라 비교가능성 문제로
-#        폐기됐다(§9-1 vs §10).
+#     🔴 이 phase 는 **오늘(2026-09-04) 코드만 작성됐고 실전에서 한 번도 안 돌았다** —
+#        `measure_poolsizing_10_20.sh` 머리의 "미검증" 목록을 실행 전 반드시 볼 것.
 #
 #   P6 동거 용량 라운드 (主-P6):
 #     TARGET_HOST=10.0.0.5 AI_PUBLIC_TOKEN=... \
@@ -350,8 +346,8 @@ CARD_A_TXN_STMTS=${CARD_A_TXN_STMTS:-1}
 CARD_A_ORDER=${CARD_A_ORDER:-"A B B A B A A B"}
 TIMEOUT_CARD_A=${TIMEOUT_CARD_A:-3600}
 
-# ── 풀 사이징 재실험 10~20 (docs/decisions/pool-sizing-10-20-experiment-design.md §10) ──
-# 3대 구성(DB·App 분리+Loader) — 러너는 부하기에서 돈다. 버림판 1 + 3라운드×5수준.
+# ── 풀 사이징 재실험 10~20 (docs/decisions/pool-sizing-10-20-experiment-design.md) ──
+# 2대 구성(p6-target+p6-loader) 재사용 — 러너는 부하기에서 돈다. 버림판 1 + 3라운드×5수준.
 TIMEOUT_POOLSIZING=${TIMEOUT_POOLSIZING:-3600}
 
 # ── 동거 용량 (主 P6) ────────────────────────────────────────────────────
@@ -1761,26 +1757,21 @@ phase_httpread() {
 }
 
 # 풀 사이징 재실험 10~20 — HikariCP maximum-pool-size 10/12/15/17/20, 라틴 방격 3라운드+버림판
-# 3대 구성(DB·App 분리+Loader) — 러너는 부하기에서 돈다. TARGET_SSH=App(ROLE=app 바 jar),
-# DB_SSH=DB(ROLE=db 의 MySQL 컨테이너). docs/decisions/pool-sizing-10-20-experiment-design.md §10.
+# httpwrite/httpread 와 같은 형태(부하기에서 돎, TARGET_HOST 필수) — 대신 gRPC(ghz 닫힌 루프)를 쓴다.
 phase_poolsizing() {
   local out=$OUTDIR/poolsizing
   mkdir -p "$out"
 
   if [ -z "$TARGET_HOST" ]; then
-    note "🔴 TARGET_HOST 가 없다 — App 박스 사설 IP. 멈춘다"
+    note "🔴 TARGET_HOST 가 없다 — 이 단계의 존재 이유가 «부하기와 대상 분리» 다. 멈춘다"
     return 1
   fi
   if [ -z "$TARGET_SSH" ]; then
-    note "🔴 TARGET_SSH 가 없다 — pool 재기동·actuator 스크레이프가 App 박스 SSH 로 돈다"
-    return 1
-  fi
-  if [ -z "$DB_SSH" ]; then
-    note "🔴 DB_SSH 가 없다 — MySQL 옆 지표(SHOW GLOBAL STATUS)가 DB 박스 SSH 로 돈다(3대 구성, §10)"
+    note "🔴 TARGET_SSH 가 없다 — pool 재기동·actuator 스크레이프가 대상 박스 SSH 로 돈다"
     return 1
   fi
   if [ -z "$GHZ_TOKEN" ]; then
-    note "🔴 GHZ_TOKEN 이 비었다(App .env 의 INTERNAL_API_TOKEN) — 전 요청이 401 이다"
+    note "🔴 GHZ_TOKEN 이 비었다(대상 .env 의 INTERNAL_API_TOKEN) — 전 요청이 401 이다"
     return 1
   fi
   if [ -z "$GHZ_DATA" ] || [ ! -f "$GHZ_DATA" ]; then
@@ -1789,14 +1780,13 @@ phase_poolsizing() {
   fi
 
   timeout $TIMEOUT_POOLSIZING env \
-      TARGET_HOST="$TARGET_HOST" TARGET_SSH="$TARGET_SSH" DB_SSH="$DB_SSH" \
+      TARGET_HOST="$TARGET_HOST" TARGET_SSH="$TARGET_SSH" TARGET_REPO_DIR="$TARGET_REPO_DIR" \
       GHZ_TOKEN="$GHZ_TOKEN" GHZ_DATA="$GHZ_DATA" GHZ_BIN="$GHZ_BIN" \
       MYSQL_CONTAINER="$CONTAINER" MYSQL_PW="$PW" OUT="$out" \
       bash "$ROOT/loadtest/measure_poolsizing_10_20.sh" > "$out/run.log" 2>&1
   local rc=$?
 
-  $TARGET_SSH "journalctl -u shadowfit-app --no-pager -n 2000 2>&1" > "$out/target-app.log" 2>&1 || true
-  $DB_SSH "docker logs --tail 500 $CONTAINER 2>&1" > "$out/db-mysql.log" 2>&1 || true
+  $TARGET_SSH "docker logs --tail 2000 shadowfit-backend 2>&1" > "$out/target-backend.log" 2>&1 || true
 
   if [ $rc -ne 0 ]; then
     note "🔴 풀 사이징 라운드 rc=$rc — run.log 를 볼 것"
