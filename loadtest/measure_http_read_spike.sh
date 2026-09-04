@@ -83,7 +83,8 @@ EPS="t_report_session t_weekly_summary t_calendar t_daily"
 PHASES="baseline rampup spike rampdown recovery"
 
 RAW="$OUT/raw.tsv"
-echo -e "rep\tendpoint\tphase\tp50\tp99\tmax" > "$RAW"
+# 🔴 실패(성공 아닌 응답) 레이턴시는 f_ 접두로 따로 둔다 — 성공 p50/p99 에 안 섞는다.
+echo -e "rep\tendpoint\tphase\tp50\tp99\tmax\tf_p50\tf_p99\tf_max" > "$RAW"
 
 echo
 echo "## [2] 실행"
@@ -109,7 +110,8 @@ for ((r=0; r<REPEATS; r++)); do
   for ep in $EPS; do
     for ph in $PHASES; do
       read -r p50 p99 mx <<< "$(extract_row "$jsonf" "$ep" "$ph")"
-      echo -e "${r}\t${ep}\t${ph}\t${p50}\t${p99}\t${mx}" >> "$RAW"
+      read -r fp50 fp99 fmx <<< "$(extract_row "$jsonf" "${ep}_fail" "$ph")"
+      echo -e "${r}\t${ep}\t${ph}\t${p50}\t${p99}\t${mx}\t${fp50}\t${fp99}\t${fmx}" >> "$RAW"
     done
   done
 done

@@ -149,7 +149,7 @@ run_one() {  # $1=배수  $2=블록
   ACCOUNT_PREFIX="$PREFIX" ARM_LABEL="x$mult" BLOCK="$blk" SUMMARY_OUT="$sum"   SIGNUP=0 K6_PASSWORD="$PASSWORD" \
     "$K6" run --quiet "$SCRIPT" > "$log" 2>&1
   if [ ! -s "$sum" ]; then
-    echo "x$mult $blk $rate NA NA NA NA NA NA NA NA 0 NA NA NA"
+    echo "x$mult $blk $rate NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA 0 NA NA NA"
     return
   fi
   cat "$sum"
@@ -157,7 +157,7 @@ run_one() {  # $1=배수  $2=블록
 
 echo
 echo "## [2] 스윕"
-echo "arm block rate s_p50 s_p95 s_p99 s_max e_p50 e_p95 e_p99 e_max iters failed dropped conflict" > "$RAW"
+echo "arm block rate s_p50 s_p95 s_p99 s_max sf_p50 sf_p95 sf_p99 sf_max e_p50 e_p95 e_p99 e_max ef_p50 ef_p95 ef_p99 ef_max iters failed dropped conflict" > "$RAW"
 mv_arr=($MULTS); mn=${#mv_arr[@]}
 for ((b=0;b<BLOCKS;b++)); do
   echo "  --- 블록 $b$([ "$b" = 0 ] && echo ' (버림)')"
@@ -167,7 +167,7 @@ for ((b=0;b<BLOCKS;b++)); do
     echo "    $line"
   done
   if [ "$b" = 0 ]; then
-    bad=$(awk 'NR>1 && $2==0 && ($6=="NA" || $12+0==0) {c++} END{print c+0}' "$RAW")
+    bad=$(awk 'NR>1 && $2==0 && ($6=="NA" || $20+0==0) {c++} END{print c+0}' "$RAW")
     if [ "$bad" -gt 0 ]; then
       echo
       echo "  🔴 버림 블록에서 $bad 팔이 표본을 못 만들었다 — 스윕을 계속해 봐야 빈 표가 나온다."
@@ -179,20 +179,45 @@ for ((b=0;b<BLOCKS;b++)); do
 done
 
 # ── 게이트 ──────────────────────────────────────────────────────────────────
+# 정책적 실패(policy failure) — 2xx 로 응답은 왔지만 SLO 를 넘긴 경우. 새 임계값을 만들지
+# 않고 docs/decisions/slo-baseline.md §4-2 의 기존 목표(300ms, latency-perception.md 의
+# Nielsen UX 앵커)를 그대로 쓴다 — 이 게이트를 켜는 것 자체가 §4-2 "목표→판정선 승격"
+# 결정(2026-09-04 사용자 confirm)이다. gRPC(ghz) 쪽은 #676 이 닫히기 전까지 보류한다
+# (SavePoseDataBatch 가 §4-1 이 가정한 "사용자 대면 아님"과 달리 rep마다 TTS 응답을
+# 막는 동기 호출이라는 게 드러났고, 유일한 실측(c=100)을 그대로 임계로 쓰면 순환논리다).
+POLICY_MS=300
+median_col() {  # $1=arm(예: x60) $2=컬럼(1-based)
+  awk -v a="$1" -v col="$2" '
+    NR>1 && $1==a && $2>0 { n++; v[n]=$col+0 }
+    function med(arr,   i,j,t,c) {
+      c=n; for(i=1;i<=c;i++) for(j=i+1;j<=c;j++) if(arr[j]<arr[i]) {t=arr[i];arr[i]=arr[j];arr[j]=t}
+      return (c%2) ? arr[int((c+1)/2)] : (arr[c/2]+arr[c/2+1])/2
+    }
+    END{ if(n==0){print "NA"; exit} printf "%.2f", med(v) }
+  ' "$RAW"
+}
 echo
-echo "## [3] 🔴 게이트 — 이 셋 중 하나라도 깨지면 그 팔의 지연은 인용 금지"
+echo "## [3] 🔴 게이트 — 이 넷 중 하나라도 깨지면 그 팔의 지연은 인용 금지"
 GATE_OK=1
 for m in $MULTS; do
-  d=$(awk -v a="x$m" 'NR>1 && $1==a && $2>0 {s+=$14} END{print s+0}' "$RAW")
-  c=$(awk -v a="x$m" 'NR>1 && $1==a && $2>0 {s+=$15} END{print s+0}' "$RAW")
-  f=$(awk -v a="x$m" 'NR>1 && $1==a && $2>0 {s+=$13} END{print s+0}' "$RAW")
+  d=$(awk -v a="x$m" 'NR>1 && $1==a && $2>0 {s+=$22} END{print s+0}' "$RAW")
+  c=$(awk -v a="x$m" 'NR>1 && $1==a && $2>0 {s+=$23} END{print s+0}' "$RAW")
+  f=$(awk -v a="x$m" 'NR>1 && $1==a && $2>0 {s+=$21} END{print s+0}' "$RAW")
+  sp99=$(median_col "x$m" 6)   # s_p99 (성공만)
+  ep99=$(median_col "x$m" 14)  # e_p99 (성공만)
   msg=""
   [ "$d" -gt 0 ] && { msg="$msg dropped=$d(도착률 미달성 → 「가정 피크 ×$m」 진술이 깨진다)"; GATE_OK=0; }
   [ "$c" -gt 0 ] && { msg="$msg conflict409=$c(계정이 안 풀렸다 — 완결 왕복 vs 도착률/계정수 를 볼 것)"; GATE_OK=0; }
   [ "$f" -gt 0 ] && { msg="$msg 실패요청=$f(시작/종료 중 2xx 가 아닌 것)"; GATE_OK=0; }
-  if [ -z "$msg" ]; then echo "  ✅ ×$m — 실패 0 · dropped 0 · 409 0"; else echo "  🔴 ×$m —$msg"; fi
+  if [ "$sp99" != "NA" ] && awk -v v="$sp99" -v t="$POLICY_MS" 'BEGIN{exit !(v>t)}'; then
+    msg="$msg 시작p99=${sp99}ms>${POLICY_MS}ms(정책적 실패 — §4-2 목표 초과)"; GATE_OK=0
+  fi
+  if [ "$ep99" != "NA" ] && awk -v v="$ep99" -v t="$POLICY_MS" 'BEGIN{exit !(v>t)}'; then
+    msg="$msg 종료p99=${ep99}ms>${POLICY_MS}ms(정책적 실패 — §4-2 목표 초과)"; GATE_OK=0
+  fi
+  if [ -z "$msg" ]; then echo "  ✅ ×$m — 실패 0 · dropped 0 · 409 0 · p99 ≤ ${POLICY_MS}ms"; else echo "  🔴 ×$m —$msg"; fi
 done
-[ "$GATE_OK" = 1 ] || echo "  🔴 깨진 팔은 «부하를 못 걸었다» 는 뜻이지 «느리다» 는 뜻이 아니다. ACCOUNTS 를 올려 다시 볼 것."
+[ "$GATE_OK" = 1 ] || echo "  🔴 깨진 팔 중 dropped·409·실패요청은 «부하를 못 걸었다» 는 뜻이지 «느리다» 는 뜻이 아니다. 정책적 실패(p99 초과)만 «실제로 느렸다» 는 뜻이다."
 
 # ── 집계 ────────────────────────────────────────────────────────────────────
 echo
@@ -209,7 +234,7 @@ for m in $MULTS; do
     # 🔴 1-based. n 을 0 으로 안 두고 sp[n] 을 쓰면 첫 값이 «빈 문자열» 키로 들어가
     #    (awk 는 미초기화 변수를 "" 로 본다) 중앙값이 조용히 한 칸 어긋난다.
     NR>1 && $1==a && $2>0 {
-      n++; rate=$3; sp50[n]=$4+0; sp99[n]=$6+0; ep50[n]=$8+0; ep99[n]=$10+0; it+=$12
+      n++; rate=$3; sp50[n]=$4+0; sp99[n]=$6+0; ep50[n]=$12+0; ep99[n]=$14+0; it+=$20
     }
     function med(arr,   i,j,t,c) {
       c=n; for(i=1;i<=c;i++) for(j=i+1;j<=c;j++) if(arr[j]<arr[i]) {t=arr[i];arr[i]=arr[j];arr[j]=t}

@@ -67,9 +67,15 @@ def v(name, stat, default=0):
     return m.get(name, {}).get(stat, default)
 row = [
     v("t_report_session", "med"), v("t_report_session", "p(99)"),
+    # 🔴 실패(성공 아닌 응답) 레이턴시는 성공 열에 안 섞는다 — 게이트(bad_status>0)가 걸린
+    #    판에서 「뭐가 느렸길래 실패했나」를 raw.txt 에서 따로 읽을 수 있어야 한다.
+    v("t_report_session_fail", "med"), v("t_report_session_fail", "p(99)"), v("t_report_session_fail", "max"),
     v("t_weekly_summary", "med"), v("t_weekly_summary", "p(99)"),
+    v("t_weekly_summary_fail", "med"), v("t_weekly_summary_fail", "p(99)"), v("t_weekly_summary_fail", "max"),
     v("t_calendar", "med"),       v("t_calendar", "p(99)"),
+    v("t_calendar_fail", "med"), v("t_calendar_fail", "p(99)"), v("t_calendar_fail", "max"),
     v("t_daily", "med"),          v("t_daily", "p(99)"),
+    v("t_daily_fail", "med"), v("t_daily_fail", "p(99)"), v("t_daily_fail", "max"),
     v("iterations", "count"),
     v("bad_status", "count"),
     v("dropped_iterations", "count"),
@@ -87,7 +93,7 @@ run_one(){  # $1=배수  $2=블록
     "$K6" run --quiet -e BASE="$BASE" --summary-trend-stats "avg,med,p(95),p(99),max" \
     --summary-export="$jsonf" "$SCRIPT" > "$log" 2>&1
   if [ ! -s "$jsonf" ]; then
-    echo "x$mult $blk $rate NA NA NA NA NA NA NA NA 0 NA NA"
+    echo "x$mult $blk $rate NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA 0 NA NA"
     return
   fi
   echo "x$mult $blk $rate $(extract_row "$jsonf")"
@@ -95,7 +101,7 @@ run_one(){  # $1=배수  $2=블록
 
 echo
 echo "## [2] 스윕"
-echo "arm block rate s_p50 s_p99 w_p50 w_p99 c_p50 c_p99 d_p50 d_p99 iters bad_status dropped" > "$RAW"
+echo "arm block rate s_p50 s_p99 sf_p50 sf_p99 sf_max w_p50 w_p99 wf_p50 wf_p99 wf_max c_p50 c_p99 cf_p50 cf_p99 cf_max d_p50 d_p99 df_p50 df_p99 df_max iters bad_status dropped" > "$RAW"
 mv_arr=($MULTS); mn=${#mv_arr[@]}
 for ((b=0;b<BLOCKS;b++)); do
   echo "  --- 블록 $b$([ "$b" = 0 ] && echo ' (버림)')"
@@ -105,7 +111,7 @@ for ((b=0;b<BLOCKS;b++)); do
     echo "    $line"
   done
   if [ "$b" = 0 ]; then
-    bad=$(awk 'NR>1 && $2==0 && ($4=="NA" || $12+0==0) {c++} END{print c+0}' "$RAW")
+    bad=$(awk 'NR>1 && $2==0 && ($4=="NA" || $24+0==0) {c++} END{print c+0}' "$RAW")
     if [ "$bad" -gt 0 ]; then
       echo
       echo "  🔴 버림 블록에서 $bad 팔이 표본을 못 만들었다 — 스윕을 계속해 봐야 빈 표가 나온다."
@@ -117,18 +123,40 @@ for ((b=0;b<BLOCKS;b++)); do
 done
 
 # ── 게이트 ──────────────────────────────────────────────────────────────────
+# 정책적 실패(policy failure) — 200 으로 응답은 왔지만 SLO 를 넘긴 경우. 새 임계값을
+# 만들지 않고 docs/decisions/slo-baseline.md §4-2 의 기존 목표(1s, latency-perception.md
+# 의 Nielsen UX 앵커)를 그대로 쓴다 — 이 게이트를 켜는 것 자체가 §4-2 "목표→판정선 승격"
+# 결정(2026-09-04 사용자 confirm)이다.
+POLICY_MS=1000
+median_col() {  # $1=arm(예: x60) $2=컬럼(1-based)
+  awk -v a="$1" -v col="$2" '
+    NR>1 && $1==a && $2>0 { n++; v[n]=$col+0 }
+    function med(arr,   i,j,t,c) {
+      c=n; for(i=1;i<=c;i++) for(j=i+1;j<=c;j++) if(arr[j]<arr[i]) {t=arr[i];arr[i]=arr[j];arr[j]=t}
+      return (c%2) ? arr[int((c+1)/2)] : (arr[c/2]+arr[c/2+1])/2
+    }
+    END{ if(n==0){print "NA"; exit} printf "%.2f", med(v) }
+  ' "$RAW"
+}
 echo
-echo "## [3] 🔴 게이트 — 이 둘 중 하나라도 깨지면 그 팔의 지연은 인용 금지"
+echo "## [3] 🔴 게이트 — 이 셋 중 하나라도 깨지면 그 팔의 지연은 인용 금지"
 GATE_OK=1
 for m in $MULTS; do
-  bs=$(awk -v a="x$m" 'NR>1 && $1==a && $2>0 {s+=$13} END{print s+0}' "$RAW")
-  dr=$(awk -v a="x$m" 'NR>1 && $1==a && $2>0 {s+=$14} END{print s+0}' "$RAW")
+  bs=$(awk -v a="x$m" 'NR>1 && $1==a && $2>0 {s+=$25} END{print s+0}' "$RAW")
+  dr=$(awk -v a="x$m" 'NR>1 && $1==a && $2>0 {s+=$26} END{print s+0}' "$RAW")
   msg=""
   [ "$bs" -gt 0 ] && { msg="$msg bad_status=$bs(401/500 등 정상 아닌 응답)"; GATE_OK=0; }
   [ "$dr" -gt 0 ] && { msg="$msg dropped=$dr(도착률 미달성 → 「가정 피크 ×$m」 진술이 깨진다)"; GATE_OK=0; }
-  if [ -z "$msg" ]; then echo "  ✅ ×$m — bad_status 0 · dropped 0"; else echo "  🔴 ×$m —$msg"; fi
+  for ep_col in "session:5" "weekly:10" "calendar:15" "daily:20"; do
+    epname=${ep_col%%:*}; col=${ep_col##*:}
+    p99=$(median_col "x$m" "$col")
+    if [ "$p99" != "NA" ] && awk -v v="$p99" -v t="$POLICY_MS" 'BEGIN{exit !(v>t)}'; then
+      msg="$msg ${epname}p99=${p99}ms>${POLICY_MS}ms(정책적 실패 — §4-2 목표 초과)"; GATE_OK=0
+    fi
+  done
+  if [ -z "$msg" ]; then echo "  ✅ ×$m — bad_status 0 · dropped 0 · p99 ≤ ${POLICY_MS}ms(4개 엔드포인트)"; else echo "  🔴 ×$m —$msg"; fi
 done
-[ "$GATE_OK" = 1 ] || echo "  🔴 깨진 팔은 «부하를 못 걸었다/데이터가 없다» 는 뜻이지 «느리다» 는 뜻이 아니다."
+[ "$GATE_OK" = 1 ] || echo "  🔴 깨진 팔 중 bad_status·dropped 는 «부하를 못 걸었다/데이터가 없다» 는 뜻이지 «느리다» 는 뜻이 아니다. 정책적 실패(p99 초과)만 «실제로 느렸다» 는 뜻이다."
 
 # ── 집계 ────────────────────────────────────────────────────────────────────
 echo
@@ -144,8 +172,8 @@ for m in $MULTS; do
   awk -v a="x$m" -v mult="$m" '
     NR>1 && $1==a && $2>0 {
       n++; rate=$3
-      sp50[n]=$4+0; sp99[n]=$5+0; wp50[n]=$6+0; wp99[n]=$7+0
-      cp50[n]=$8+0; cp99[n]=$9+0; dp50[n]=$10+0; dp99[n]=$11+0; it+=$12
+      sp50[n]=$4+0; sp99[n]=$5+0; wp50[n]=$9+0; wp99[n]=$10+0
+      cp50[n]=$14+0; cp99[n]=$15+0; dp50[n]=$19+0; dp99[n]=$20+0; it+=$24
     }
     function med(arr,   i,j,t,c) {
       c=n; for(i=1;i<=c;i++) for(j=i+1;j<=c;j++) if(arr[j]<arr[i]) {t=arr[i];arr[i]=arr[j];arr[j]=t}

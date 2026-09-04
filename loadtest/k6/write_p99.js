@@ -57,9 +57,13 @@ const PREFERRED_URL = __ENV.PREFERRED_URL || 'https://www.youtube.com/watch?v=k6
 const UNIT_S   = Number(__ENV.RATE_UNIT_SECONDS || '100');
 const RATE_INT = Math.max(1, Math.round(RATE * UNIT_S));
 
+// 🔴 성공/실패를 한 Trend 에 섞으면 mean 도 percentile 도 거짓말을 한다 — 실패가 섞인 응답은
+//    보통 타임아웃·즉시 에러라 분포 양끝을 잡아당긴다. status 별로 Trend 를 나눈다.
 const T = {
-  start: new Trend('t_session_start', true),   // POST /exercises/sessions
-  end:   new Trend('t_session_end', true),     // PATCH /sessions/{id}/end
+  start_ok:   new Trend('t_session_start_ok', true),    // POST /exercises/sessions, 2xx
+  start_fail: new Trend('t_session_start_fail', true),  // POST /exercises/sessions, 2xx 아님(409 포함)
+  end_ok:     new Trend('t_session_end_ok', true),      // PATCH /sessions/{id}/end, 200
+  end_fail:   new Trend('t_session_end_fail', true),    // PATCH /sessions/{id}/end, 200 아님
 };
 const C = {
   conflict: new Counter('c_conflict_409'),     // 계정 배타가 깨졌거나 앞 판의 세션이 남았다는 뜻
@@ -155,11 +159,11 @@ export default function (data) {
 
   let res = http.post(`${BASE}/exercises/sessions`,
                       JSON.stringify({ exerciseId: EXERCISE_ID }), opt);
-  T.start.add(res.timings.duration);
   // 🔴 **202 다, 200 이 아니다** — 세션은 만들어졌지만 AI 로 가는 분석 요청이 커밋 후 비동기라
   //    컨트롤러가 accepted() 를 준다. 200 만 통과시키면 이 rig 이 전 판을 «실패» 로 세고
   //    종료 요청을 아예 안 보내서 표가 통째로 빈다(2026-08-23 계약 확인으로 발견).
   const started = res.status >= 200 && res.status < 300;
+  (started ? T.start_ok : T.start_fail).add(res.timings.duration);
   check(res, { 'start 2xx': () => started });
   if (!started && res.status !== 409) C.failed.add(1);
 
@@ -181,9 +185,10 @@ export default function (data) {
   }
 
   res = http.patch(`${BASE}/sessions/${sid}/end`, null, opt);
-  T.end.add(res.timings.duration);
-  check(res, { 'end 200': (r) => r.status === 200 });   // 종료는 200 이다(계약 확인 완료)
-  if (res.status !== 200) C.failed.add(1);
+  const ended = res.status === 200;                     // 종료는 200 이다(계약 확인 완료)
+  (ended ? T.end_ok : T.end_fail).add(res.timings.duration);
+  check(res, { 'end 200': () => ended });
+  if (!ended) C.failed.add(1);
 }
 
 // rig(measure_http_write_p99.sh)이 읽을 한 줄. 셸에서 JSON 을 파싱하면 파서 의존이 생기고,
@@ -199,12 +204,18 @@ export function handleSummary(data) {
     __ENV.ARM_LABEL || 'NA',
     __ENV.BLOCK || 'NA',
     RATE,
-    f(m('t_session_start', 'p(50)')), f(m('t_session_start', 'p(95)')),
-    f(m('t_session_start', 'p(99)')), f(m('t_session_start', 'max')),
-    f(m('t_session_end', 'p(50)')),   f(m('t_session_end', 'p(95)')),
-    f(m('t_session_end', 'p(99)')),   f(m('t_session_end', 'max')),
+    f(m('t_session_start_ok', 'p(50)')), f(m('t_session_start_ok', 'p(95)')),
+    f(m('t_session_start_ok', 'p(99)')), f(m('t_session_start_ok', 'max')),
+    // 🔴 실패 레이턴시는 성공과 같은 열에 안 섞는다 — 게이트가 걸린 판(실패>0)에서
+    //    「뭐가 느렸길래 실패했나」를 따로 읽을 수 있어야 한다. 정상 판(실패 0)에서는 전부 NA다.
+    f(m('t_session_start_fail', 'p(50)')), f(m('t_session_start_fail', 'p(95)')),
+    f(m('t_session_start_fail', 'p(99)')), f(m('t_session_start_fail', 'max')),
+    f(m('t_session_end_ok', 'p(50)')),   f(m('t_session_end_ok', 'p(95)')),
+    f(m('t_session_end_ok', 'p(99)')),   f(m('t_session_end_ok', 'max')),
+    f(m('t_session_end_fail', 'p(50)')), f(m('t_session_end_fail', 'p(95)')),
+    f(m('t_session_end_fail', 'p(99)')), f(m('t_session_end_fail', 'max')),
     m('iterations', 'count', 0),
-    // 🔴 이 셋이 게이트다 — 하나라도 0 이 아니면 그 판의 지연 수치는 인용하면 안 된다.
+    // 🔴 이 셋이 게이트다 — 하나라도 0 이 아니면 그 판의 (ok) 지연 수치는 인용하면 안 된다.
     m('c_measured_failed', 'count', 0),         // 측정 두 요청의 실패 건수(setup 은 안 센다)
     m('dropped_iterations', 'count', 0),        // 도착률을 못 냈다 = 「배수」 진술이 깨진다
     m('c_conflict_409', 'count', 0),            // 계정 배타가 깨졌다

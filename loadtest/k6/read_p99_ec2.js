@@ -70,9 +70,11 @@ function phaseAt(elapsedSec) {
   return 'recovery';
 }
 
-// 엔드포인트 4개 × (스파이크 모드면 단계 5개, 아니면 구분 없음 1개) Trend.
-// 스파이크가 아닐 때는 기존 이름(t_report_session 등)을 그대로 써서 從 R14 표 파서
-// (measure_http_read_p99_sweep.sh 의 extract_row)가 안 깨진다.
+// 엔드포인트 4개 × (스파이크 모드면 단계 5개, 아니면 구분 없음 1개) × (성공/실패) Trend.
+// ok 쪽은 기존 이름(t_report_session 등)을 그대로 써서 從 R14 표 파서
+// (measure_http_read_p99_sweep.sh · measure_http_read_spike.sh 의 extract_row)가 안 깨진다.
+// 실패는 `_fail` 접미(스파이크는 `_fail__단계`)로 따로 둔다 — 한 Trend 에 섞으면
+// 401/500 같은 응답이 성공 p50/p99 를 오염시킨다(write_p99.js 와 같은 이유).
 const PHASES = ['baseline', 'rampup', 'spike', 'rampdown', 'recovery'];
 const ENDPOINTS = ['session', 'weekly', 'calendar', 'daily'];
 const METRIC_NAME = { session: 't_report_session', weekly: 't_weekly_summary', calendar: 't_calendar', daily: 't_daily' };
@@ -81,9 +83,17 @@ const T = {};
 for (const ep of ENDPOINTS) {
   if (SPIKE_MULT) {
     T[ep] = {};
-    for (const ph of PHASES) T[ep][ph] = new Trend(`${METRIC_NAME[ep]}__${ph}`, true);
+    for (const ph of PHASES) {
+      T[ep][ph] = {
+        ok:   new Trend(`${METRIC_NAME[ep]}__${ph}`, true),
+        fail: new Trend(`${METRIC_NAME[ep]}_fail__${ph}`, true),
+      };
+    }
   } else {
-    T[ep] = new Trend(METRIC_NAME[ep], true);
+    T[ep] = {
+      ok:   new Trend(METRIC_NAME[ep], true),
+      fail: new Trend(`${METRIC_NAME[ep]}_fail`, true),
+    };
   }
 }
 const badStatus = new Counter('bad_status');   // 🔴 http_req_failed 를 안 쓴다 — setup 요청이 섞인다
@@ -141,12 +151,8 @@ export function setup() {
 }
 
 function record(ep, res, data) {
-  if (SPIKE_MULT) {
-    const elapsed = (Date.now() - data.startMs) / 1000;
-    T[ep][phaseAt(elapsed)].add(res.timings.duration);
-  } else {
-    T[ep].add(res.timings.duration);
-  }
+  const bucket = SPIKE_MULT ? T[ep][phaseAt((Date.now() - data.startMs) / 1000)] : T[ep];
+  (res.status === 200 ? bucket.ok : bucket.fail).add(res.timings.duration);
 }
 
 export default function (data) {
