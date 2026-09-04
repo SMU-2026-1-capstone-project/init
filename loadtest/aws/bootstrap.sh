@@ -36,6 +36,11 @@ DB_NAME=${DB_NAME:-shadowfit}
 #   p6-loader        — python·ghz·페이로드 (부하를 거는 박스. run_all.sh 가 여기서 돈다)
 #   ai-venv          — AI 를 **venv 로** 띄울 준비 (從 R10). 도커·MySQL·Spring 없다 —
 #                      컨테이너로 띄우면 계측 노브가 안 넘어가서다(#399)
+#   app              — Spring 만 **bare jar** 로 기동 (풀 사이징 10~20 재실험 4대 재설계,
+#                      docs/decisions/pool-sizing-10-20-experiment-design.md §10). p6-target 은
+#                      MySQL·AI 가 같은 박스라 2026-08-09 4점 baseline(DB·App 분리·AI 없음)과
+#                      아키텍처가 달라진다 — 이 역할은 그 baseline 조건을 다시 낸다. 도커·MySQL
+#                      없이 systemd 유닛(shadowfit-app) 하나만 띄우고, DB 는 **원격**(DB_HOST)이다
 ROLE=${ROLE:-db}
 
 # p6-target 전용. 값의 근거는 아래 각 자리에 적는다 — 근거 없는 숫자를 .env 에 박지 않는다.
@@ -58,6 +63,11 @@ INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
 AI_PY_VERSION=${AI_PY_VERSION:-3.12}
 AI_PY=${AI_PY:-}                         # 인터프리터를 직접 줄 때 (배포판에 3.12 가 없는 경우)
 
+# app 전용 — DB_HOST 는 필수(원격 DB 박스 사설 IP), 나머지는 없으면 만든다
+DB_HOST=${DB_HOST:-}
+JWT_SECRET=${JWT_SECRET:-}
+APP_POOL_SIZE=${APP_POOL_SIZE:-15}   # 기본 운영값과 맞춘다 — 실제 스윕은 systemd 유닛을 sed 로 갈아 끼운다
+
 # p6-loader 전용
 GHZ_VERSION=${GHZ_VERSION:-0.120.0}
 GHZ_SESSIONS=${GHZ_SESSIONS:-901-1900}   # seed-multi-sessions.sql 과 **같은 범위여야** 한다
@@ -75,8 +85,8 @@ die()  { echo; echo "🔴 부트스트랩 중단 — $*" >&2; exit 1; }
 #    「왜 AI 가 아니라 MySQL 박스지」를 10분 뒤에 알게 되는 자리였다. 역할이 넷이 되면서
 #    그 확률이 올라간다.
 case "$ROLE" in
-  db|p6-target|p6-loader|ai-venv) ;;
-  *) die "모르는 ROLE 이다: '$ROLE' — db · p6-target · p6-loader · ai-venv 중 하나여야 한다" ;;
+  db|p6-target|p6-loader|ai-venv|app) ;;
+  *) die "모르는 ROLE 이다: '$ROLE' — db · p6-target · p6-loader · ai-venv · app 중 하나여야 한다" ;;
 esac
 
 # ── root SSH (다른 박스가 이 박스로 root@ 로 붙는 라운드용, #642) ──────────
@@ -339,6 +349,100 @@ if [ "$ROLE" = "p6-loader" ]; then
 
   ⚠️ nohup 없이 & 만 붙이면 SSH 가 끊길 때 같이 죽는다.
 EOF
+  exit 0
+fi
+
+# ── 순수 Spring bare jar (app) ───────────────────────────────────────────
+#
+# 풀 사이징 10~20 재실험의 4대 재설계(docs/decisions/pool-sizing-10-20-experiment-design.md §10) —
+# 2026-08-09 4점 baseline과 같은 조건(DB·App 분리·AI 없음)을 다시 내려고 만든 역할이다.
+# p6-target 은 MySQL·Spring·AI 를 한 박스에 docker-compose 로 묶어서 이 조건을 못 낸다(§9-1).
+#
+# 🔴 도커를 안 쓴다 — MySQL 은 별도 박스(ROLE=db)이고, 이 박스가 띄우는 건 Spring 프로세스
+#    하나뿐이라 컨테이너로 감쌀 이유가 없다. gRPC 채널(`ManagedChannelBuilder.forAddress`)은
+#    지연 연결이라(빌드 시점엔 안 붙는다) AI 가 없어도 기동에는 지장이 없다 — 실제로 2026-08-09
+#    원판이 이미 이 방식(AI 없이 App bare jar)으로 돌았다.
+if [ "$ROLE" = "app" ]; then
+  : "${DB_HOST:?DB_HOST 미설정 — 별도 DB 박스(ROLE=db)의 사설 IP를 줄 것}"
+
+  step "JDK 21 (bootJar 직접 실행 — build.gradle:13 languageVersion 21)"
+  if command -v dnf >/dev/null 2>&1; then
+    dnf -y install java-21-amazon-corretto-devel >/dev/null || die "JDK 21 설치 실패"
+  elif command -v apt-get >/dev/null 2>&1; then
+    apt-get install -y -qq openjdk-21-jdk-headless >/dev/null || die "JDK 21 설치 실패"
+  fi
+  java -version 2>&1 | head -1 | sed 's/^/  /'
+
+  step "Spring 빌드 (gradle bootJar, 5~15분)"
+  cd "$WORKDIR/backend" || die "$WORKDIR/backend 로 못 들어간다"
+  ./gradlew bootJar -x test --console=plain || die "bootJar 빌드 실패"
+  # 🔴 build/libs/ 에는 실행 가능한 jar 와 `-plain.jar`(의존성 없는 클래스만) 둘이 나온다.
+  #    plain 을 골라 잡으면 기동이 「메인 클래스를 못 찾는다」로 죽는다.
+  JAR=$(find build/libs -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' | head -1)
+  [ -n "$JAR" ] || die "빌드된 jar 를 못 찾았다 (build/libs/*.jar, -plain 제외)"
+  echo "  $WORKDIR/backend/$JAR"
+
+  # 토큰 — p6-target 과 같은 관례(값 자체는 임의 문자열, 부하기와 **같아야만** 한다)
+  [ -n "$INTERNAL_API_TOKEN" ] || INTERNAL_API_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
+  [ -n "$JWT_SECRET" ]         || JWT_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '/+=')
+
+  step "systemd 유닛 — shadowfit-app (풀 스윕은 Environment= 한 줄을 sed 로 갈아 끼운다)"
+  JAVA_BIN=$(command -v java)
+  cat > /etc/systemd/system/shadowfit-app.service <<EOF
+[Unit]
+Description=shadowfit backend (bare jar, pool-sizing 4-box round)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$WORKDIR/backend
+Environment=SPRING_PROFILES_ACTIVE=prod
+Environment=DB_HOST=$DB_HOST
+Environment=DB_USERNAME=shadowfit
+Environment=DB_PASSWORD=$PW
+Environment=JWT_SECRET=$JWT_SECRET
+Environment=INTERNAL_API_TOKEN=$INTERNAL_API_TOKEN
+Environment=AI_SERVER_HOST=127.0.0.1
+Environment=AI_SERVER_GRPC_PORT=8585
+Environment=AI_CHANNEL_POOL_SIZE=1
+Environment=SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=$APP_POOL_SIZE
+ExecStart=$JAVA_BIN -XX:MaxRAMPercentage=75.0 -jar $WORKDIR/backend/$JAR
+Restart=no
+StandardOutput=append:/root/app.log
+StandardError=append:/root/app.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now shadowfit-app || die "shadowfit-app 기동 실패 — journalctl -u shadowfit-app"
+
+  echo -n "  헬스체크 대기(원격 DB 라 최초 기동은 pool 만큼 커넥션을 새로 튼다 — 여유를 둔다)"
+  app_ready=0
+  for _ in $(seq 1 60); do
+    if curl -sf --max-time 3 http://localhost:9090/actuator/health >/dev/null 2>&1; then
+      echo " — 떴다"; app_ready=1; break
+    fi
+    echo -n "."; sleep 5
+  done
+  [ "$app_ready" = "1" ] \
+    || die "백엔드가 5분 안에 안 떴다 — journalctl -u shadowfit-app / /root/app.log 를 볼 것"
+
+  step "App 준비됨"
+  cat <<EOF2
+  포트                : 8080(HTTP) · 6565(gRPC) · 9090(actuator, 이 박스 안에서만)
+  DB_HOST             : $DB_HOST
+  INTERNAL_API_TOKEN  : $INTERNAL_API_TOKEN
+  JWT_SECRET          : $JWT_SECRET
+  풀 크기(현재)       : $APP_POOL_SIZE
+
+  🔴 위 INTERNAL_API_TOKEN 을 부하기(ROLE=p6-loader)의 GHZ_TOKEN 에 그대로 넘긴다 — 다르면
+     전 요청이 401 이다. 풀 값을 바꾸려면:
+       sed -i 's/^Environment=SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=.*/Environment=SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=<값>/' \\
+         /etc/systemd/system/shadowfit-app.service
+       systemctl daemon-reload && systemctl restart shadowfit-app
+     (measure_poolsizing_10_20.sh 의 apply_pool() 이 이 절차를 그대로 SSH 로 대신 한다)
+EOF2
   exit 0
 fi
 
