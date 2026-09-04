@@ -375,7 +375,9 @@ if [ "$ROLE" = "app" ]; then
 
   step "Spring 빌드 (gradle bootJar, 5~15분)"
   cd "$WORKDIR/backend" || die "$WORKDIR/backend 로 못 들어간다"
-  ./gradlew bootJar -x test --console=plain || die "bootJar 빌드 실패"
+  # 🔴 git 에 gradlew 가 100644(실행 비트 없음)로 커밋돼 있다 — `run_q2_blocks.sh` 가
+  #    겪은 것과 같은 종류(2026-09-03 확인). `./gradlew` 대신 `bash gradlew` 로 우회한다.
+  bash gradlew bootJar -x test --console=plain || die "bootJar 빌드 실패"
   # 🔴 build/libs/ 에는 실행 가능한 jar 와 `-plain.jar`(의존성 없는 클래스만) 둘이 나온다.
   #    plain 을 골라 잡으면 기동이 「메인 클래스를 못 찾는다」로 죽는다.
   JAR=$(find build/libs -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' | head -1)
