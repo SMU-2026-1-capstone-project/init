@@ -2,6 +2,7 @@ package com.shadowfit.repository.exercise;
 
 import com.shadowfit.model.exercise.Session;
 import com.shadowfit.model.exercise.Status;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -212,7 +213,14 @@ public interface SessionRepository extends JpaRepository<Session,Long> {
      *
      * <p>반환 형태가 {@code Object[]} 인 이유 — {@code (Status, Long)} 두 칸짜리 결과를 받을
      * 전용 타입을 만들 만큼 쓰이는 곳이 많지 않다. 호출부에서 즉시 맵으로 접는다.
+     *
+     * <p><b>{@code adminDashboardStats} 캐시, TTL 5분({@code CacheConfig}).</b> 전체 기간
+     * {@code GROUP BY} 라 인덱스로 줄일 여지가 없고, 대시보드 비용의 대부분을 차지한다
+     * ({@code admin-page-scope.md} §4-5-2 ③, {@code performance-tactics-availability-tradeoff.md}
+     * §3 택틱A). 파라미터가 없어 캐시 키는 고정 하나(`'all'`)다. 무효화는 TTL 만료만 —
+     * 세션 상태 전이 지점마다 {@code @CacheEvict} 를 배선하지 않는다(근거는 {@code CacheConfig}).
      */
+    @Cacheable(cacheNames = "adminDashboardStats", key = "'all'")
     @Query("SELECT s.status, COUNT(s) FROM Session s GROUP BY s.status")
     List<Object[]> countGroupedByStatus();
 

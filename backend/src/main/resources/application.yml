@@ -108,17 +108,11 @@ spring:
          order_inserts: true
          order_updates: true
 
-  # [1.5] 로컬 캐시 (Caffeine) — feedbackTemplates: 쓰기 경로 없는 카탈로그성 데이터, 1시간은
-  # 히트율 손해 목적이 아니라 미래에 관리자 CRUD 생기고 @CacheEvict 깜빡해도 자동 복구되는 안전판.
-  # exercises: 쓰기 경로 있음(AdminExerciseService.updateThresholds) — @CacheEvict로 무효화,
-  # findByIdCached(읽기 전용)만 캐시 타고 findById(쓰기 경로)는 캐시 미적용 유지.
-  # exerciseReferences: 쓰기 경로(saveReferencePoses, 신규 운동 등록 시만)가 조회 메서드를
-  # 재사용하지 않아 detached 엔티티 함정 없음 — findByExerciseId에 직접 @Cacheable, evict만 병행.
-  cache:
-    type: caffeine
-    cache-names: feedbackTemplates,exercises,exerciseReferences # 시작 시 미리 등록 — 안 하면 Micrometer 가 지연생성 캐시를 못 잡음
-    caffeine:
-      spec: expireAfterWrite=1h,maximumSize=500,recordStats
+  # [1.5] 로컬 캐시 (Caffeine) — 2026-09-04부터 프로퍼티가 아니라 CacheConfig.java(Java @Bean)로
+  # 배선한다. spring.cache.caffeine.spec 은 cache-names 로 등록한 모든 캐시에 spec 하나만 적용해서,
+  # 카탈로그 3종(feedbackTemplates·exercises·exerciseReferences, TTL 1h)과 목적이 다른 관리자
+  # 대시보드 집계 캐시(adminDashboardStats, TTL 5m)를 같이 둘 수 없었다. 캐시별 설명·근거는
+  # CacheConfig.java 참조.
 
 # [2] gRPC 설정 (최상단 레벨)
 grpc:

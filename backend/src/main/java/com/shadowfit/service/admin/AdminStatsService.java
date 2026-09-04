@@ -17,11 +17,11 @@ import java.util.Map;
 /**
  * 관리자 대시보드 집계 ({@code admin-page-scope.md} §3-D).
  *
- * <p><b>지금은 매 요청 실시간 집계다.</b> 사전집계 테이블도 캐시도 두지 않았다 —
- * 셋 중 무엇을 할지는 §2 가 "정합성을 얼마나 포기하느냐"의 문제로 남겨둔 결정이고,
- * <b>재기 전에 고르면 추측이 된다.</b> 이 프로젝트에서 집계는 시간 수치를 낼 수 있는
- * 첫 항목이므로(§2-1 — 집계 비용은 값 분포가 아니라 만진 행 수에 거의 비례해서 합성
- * 데이터 한계에 덜 걸린다), 실시간 판을 먼저 세우고 그 위에서 재는 순서로 간다.
+ * <p>실시간 판으로 시작해 시간 수치를 먼저 잰 뒤(§2-1), 비용의 대부분이 {@link #statusDistribution()}
+ * 하나(b, 전체 기간 {@code GROUP BY} — 인덱스로 줄일 여지가 없다, §4-5-2 ③)로 좁혀진 것을
+ * 확인하고서 그 메서드에만 Caffeine 캐시를 얹었다({@code performance-tactics-availability-tradeoff.md}
+ * §3 택틱A, 2026-09-04 사용자 confirm). 나머지 필드(오늘 시작 세션 수 등)는 "오늘" 기준이라
+ * 캐싱하면 당일 신선도가 깨지고, 애초에 비용도 크지 않아 캐싱 대상에서 뺐다.
  *
  * <p>패키지가 {@code service.admin} 인 것은 이 서비스가 회원·세션 두 도메인에 걸쳐 있어
  * 기존 {@code service.Member}·{@code service.Exercise} 어느 쪽에도 넣기 어색해서다.
@@ -78,6 +78,12 @@ public class AdminStatsService {
      *
      * <p>{@link EnumMap} 이라 순서는 enum 선언 순서(IN_PROGRESS → COMPLETED → CANCELLED →
      * FAILED)로 고정된다. 화면이 매번 같은 순서로 그려진다.
+     *
+     * <p>캐싱은 여기가 아니라 {@link SessionRepository#countGroupedByStatus()} 에 걸려 있다 —
+     * 이 메서드는 {@code private} 이고 같은 클래스의 {@link #getOverview()} 에서 내부 호출되므로
+     * Spring AOP 프록시(self-invocation)를 못 타 {@code @Cacheable} 을 여기 걸면 조용히
+     * 무시된다. 기존 카탈로그 3종 캐시도 서비스가 아니라 레포지토리 메서드에 걸려 있는 것과
+     * 같은 이유·같은 자리.
      */
     private Map<Status, Long> statusDistribution() {
         Map<Status, Long> distribution = new EnumMap<>(Status.class);

@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -57,6 +59,7 @@ class AdminStatsServiceTest {
     @Autowired private ExercisesRepository exercisesRepository;
     @Autowired private com.shadowfit.repository.exercise.CategoryRepository categoryRepository;
     @Autowired private EntityManager em;
+    @Autowired private CacheManager cacheManager;
 
     private LocalDateTime todayStart;
     private Exercise squat;
@@ -67,6 +70,15 @@ class AdminStatsServiceTest {
         memberRepository.deleteAll();
         exercisesRepository.deleteAll();
         sessionRepository.flush();
+
+        // adminDashboardStats 는 CacheConfig.java 설계대로 TTL(5분) 만료 전까지 무효화되지
+        // 않는다 — 운영에서는 의도된 동작이지만, 이 테스트는 @Transactional 롤백으로 DB만
+        // 되돌리고 같은 Spring 컨텍스트(= 같은 CacheManager 싱글턴)를 테스트 간 재사용하므로
+        // 앞 테스트가 채운 캐시가 다음 테스트로 새서 결과가 틀어진다. 매번 직접 비운다.
+        Cache adminDashboardStats = cacheManager.getCache("adminDashboardStats");
+        if (adminDashboardStats != null) {
+            adminDashboardStats.clear();
+        }
 
         todayStart = LocalDate.now().atStartOfDay();
         Category category = categoryRepository.save(Category.builder().name("LOWER").build());
