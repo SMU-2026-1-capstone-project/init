@@ -246,10 +246,11 @@ services:
       # 메모리 한도에서 상한을 유도한다(mediapipe_detector.py:170-179). 여기서 숫자를
       # 강제하면 그 자동유도가 죽는다.
     healthcheck:
-      # AI 서버용 파이썬 방식 헬스체크 적용 (curl 대신)
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      # 워커 0(8000)만 보던 것을 AI_WORKER_COUNT 만큼 전부 확인하도록 확장 (#580).
+      # 워커가 안 죽고 행(hang)에 걸린 경우 이전에는 워커 0만 응답하면 계속 healthy 였다.
+      test: ["CMD", "python", "-c", "import os,urllib.request; [urllib.request.urlopen(f'http://localhost:{8000+i}/health', timeout=2) for i in range(int(os.environ.get('AI_WORKER_COUNT', 3)))]"]
       interval: 10s
-      timeout: 5s
+      timeout: 15s # 워커별 순차 체크(최대 9개 x 2s)를 덮도록 5s에서 상향
       retries: 5
       start_period: 20s # 서버 기동 대기 시간 추가
     networks:
