@@ -81,6 +81,12 @@
 타임아웃 레코드·[`run.log`](run.log) 전체를 확인, **위반 0건**(🔴 출력은 캡션 1줄뿐, 실제 게이트
 경고 없음). 15판 전 수준에서 `timeout_total`이 늘지 않았다.
 
+> 🔴 **정정(2026-09-05)** — 위 Q3 결론은 **RPS·p99에 한정**된다. `pool_sizing_side.tsv`에 이미
+> 수집돼 있던 `hikaricp_connections_acquire_seconds`를 나중에 재분석해보니 **pool=10은 15보다
+> acquire 대기시간이 확실히 나쁘다**(안 겹침) — "10으로 낮춰도 무방하다"고 읽으면 과도하다.
+> 3대 구성 결과와의 비교·재분석은
+> [`../../../docs/decisions/pool-sizing-10-20-topology-comparison.md`](../../../docs/decisions/pool-sizing-10-20-topology-comparison.md) 참조.
+
 ---
 
 ## 3. 한계 · 안 본 것
