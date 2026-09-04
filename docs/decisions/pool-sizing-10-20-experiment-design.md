@@ -1,7 +1,7 @@
 # 커넥션 풀 사이징 재실험 설계 — 10~20 사이 좁히기
 
 작성: 2026-09-04
-상태: ✅ **3대(DB·App 분리) 구성으로 실행 완료 (2026-09-04)** — [결과](../../loadtest/results/pool-sizing-10-20-aws-2026-09-04/README.md). RPS는 10~20 전 구간 평평하지만 HikariCP acquire 대기시간이 10→20 사이 단조 감소(pool=10만 나머지와 안 겹침, 15↔17은 미분별). §8(1차 시도, 4대 중단)·§9(2대 p6-target+p6-loader 재설계, 실행 전 비교가능성 문제로 폐기)·§10(3대 재재설계, 실제 실행)·§11(결과 요약) 참조. `performance-tactics-availability-tradeoff.md`(택틱 B 원 출처 문서)는 이후 다른 세션이 정리한 것으로 보여 현재 워킹트리에 없다 — 이 문서만으로도 실행에는 지장 없음
+상태: ✅ **두 구성 다 실제로 EC2에서 실행 완료됐다 (2026-09-04, 서로 다른 세션)** — 3대(DB·App 분리, §10)와 §9-4가 "비교가능성 문제로 폐기"라 기록한 2대(p6-target+p6-loader, §9)가 같은 날 각각 다른 세션에서 돌았다. 3대 결과: [`pool-sizing-10-20-aws-2026-09-04`](../../loadtest/results/pool-sizing-10-20-aws-2026-09-04/README.md)(§11 — RPS는 10~20 평평하지만 HikariCP acquire 대기시간이 10→20 사이 단조 감소, pool=10만 나머지와 안 겹침). 2대 결과: [`pool-sizing-10-20-manual-2026-09-04`](../../loadtest/results/pool-sizing-10-20-manual-2026-09-04/README.md)(§12 — RPS·p99 둘 다 10~20 평평, pool=10과 pool=15 구분 안 됨, 가용성 게이트 위반 0건). 두 결과 중 어느 쪽이 "맞다"는 이 문서가 판정하지 않는다(§12). 연혁: §8(1차 시도, 4대 중단)·§9(2대 재설계)·§9-4(2대 폐기 기록, 그러나 §12에서 실제로 실행됨)·§10(3대 재재설계, 실제 실행)·§11(3대 결과)·§12(2대 실행 결과). `performance-tactics-availability-tradeoff.md`(택틱 B 원 출처 문서)는 이후 다른 세션이 정리한 것으로 보여 현재 워킹트리에 없다 — 이 문서만으로도 실행에는 지장 없음
 선행: [`commit-count-and-mysql-metrics.md`](./commit-count-and-mysql-metrics.md) §0-1(방법론·라틴 방격 교훈), [`pool-cliff-vs-concurrency.md`](./pool-cliff-vs-concurrency.md)(c 상한 정책), [`slo-baseline.md`](./slo-baseline.md) §5-1(델타 판정 규칙)
 
 ---
