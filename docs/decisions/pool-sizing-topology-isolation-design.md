@@ -1,7 +1,8 @@
 # 풀 사이징 — acquire 대기 절대값 차이의 원인 분리 (3라운드 설계)
 
 작성: 2026-09-05
-상태: 🔲 설계만, 미실행 — 실행 전 §4 확인 필요
+상태: 🟡 **Round C 실행 완료(2026-09-05)** — 인스턴스 패밀리는 원인이 아님으로 판정.
+Round B·A 남음. [결과](../../loadtest/results/pool-sizing-10-20-roundC-2026-09-05/README.md)
 
 선행: [`pool-sizing-10-20-topology-comparison.md`](./pool-sizing-10-20-topology-comparison.md) §4-2(세 후보 가설),
 [`pool-sizing-10-20-experiment-design.md`](./pool-sizing-10-20-experiment-design.md) §10(3대 구성 원안)
@@ -35,11 +36,16 @@ acquire 대기(pool=20 기준) — §11 평균 0.35ms, §12 평균 10.63ms. **�
 
 ## 2. 세 라운드 정의
 
-### Round C — 인스턴스 패밀리만 (§11과 가장 가까움, 가장 싸다)
+### Round C — 인스턴스 패밀리만 (§11과 가장 가까움, 가장 싸다) — ✅ 실행 완료
 
 §10/§11 3대 구성을 **그대로** 재실행하되 DB·App 박스만 `m6i.xlarge`로 바꾼다(§12와 같은 패밀리).
 Loader는 비교 대상이 아니므로 `c7i.xlarge` 유지. **코드 변경 없음** — `bootstrap.sh`·
 `measure_poolsizing_10_20.sh` 그대로, EC2 실행 파라미터(인스턴스 타입)만 바뀐다.
+
+> **결과(2026-09-05)**: [`pool-sizing-10-20-roundC-2026-09-05/README.md`](../../loadtest/results/pool-sizing-10-20-roundC-2026-09-05/README.md) —
+> acquire 대기 평균이 §11(c7i)보다도 낮게 나왔다(pool=20 기준 0.35ms → 0.012ms). §12의 8~18ms대
+> 절대값은 전혀 재현되지 않았다 — **인스턴스 패밀리는 원인이 아니다**로 판정. 남은 후보는
+> DB 동거·AI 동거 둘.
 
 ### Round B — DB 동거만
 
@@ -121,4 +127,5 @@ Prometheus 스크레이프 등으로 최소한의 CPU를 쓰는지)는 실행 �
 - [x] §4-2 Round A 구현 방식 확정 — **도커(운영 이미지), 세션 0개 idle**(2026-09-05). 완전 idle
       유지 여부(헬스체크·스크레이프로 인한 미세 CPU 사용)는 실행 전 코드로 확인 필요(§4-2 잔여 항목)
 - [x] §4-3 실행 방식 확정 — **순차 실행 + 라운드마다 중간 보고, EC2 착수도 라운드마다 별도 승인**(2026-09-05)
-- [ ] EC2 착수 승인(Round C부터, `project_unattended_aws_round_recipe` 절차 그대로)
+- [x] EC2 착수 승인 — Round C 실행 완료(2026-09-05), 인스턴스 3대 terminate 확인 완료
+- [ ] Round B(DB 동거만) EC2 착수 승인 — 다음 순서(§3)
