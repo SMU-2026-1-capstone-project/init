@@ -347,7 +347,8 @@ CARD_A_ORDER=${CARD_A_ORDER:-"A B B A B A A B"}
 TIMEOUT_CARD_A=${TIMEOUT_CARD_A:-3600}
 
 # ── 풀 사이징 재실험 10~20 (docs/decisions/pool-sizing-10-20-experiment-design.md) ──
-# 2대 구성(p6-target+p6-loader) 재사용 — 러너는 부하기에서 돈다. 버림판 1 + 3라운드×5수준.
+# 2대(p6-target+p6-loader, DB_SSH 미설정) 또는 3대(DB·App 분리, DB_SSH 설정) — 러너는
+# 부하기에서 돈다. 버림판 1 + 3라운드×5수준. DB_HOST/DB_SSH 는 아래 TARGET_HOST 옆에서 정의.
 TIMEOUT_POOLSIZING=${TIMEOUT_POOLSIZING:-3600}
 
 # ── 동거 용량 (主 P6) ────────────────────────────────────────────────────
@@ -360,6 +361,11 @@ TARGET_REPO_DIR=${TARGET_REPO_DIR:-/root/init}
 # 대상 호스트가 없으면 **빈 값**이다 — `root@` 만 남은 명령이 도는 것을 막는다.
 TARGET_SSH=${TARGET_SSH:-${TARGET_HOST:+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@$TARGET_HOST}}
 AI_PUBLIC_TOKEN=${AI_PUBLIC_TOKEN:-}
+
+# poolsizing 전용 — DB 가 App 과 다른 박스일 때(3대 구성)만 설정한다. 비어 있으면
+# measure_poolsizing_10_20.sh 가 2대(TARGET_SSH 하나로 DB·App 다 처리) 경로로 동작한다.
+DB_HOST=${DB_HOST:-}
+DB_SSH=${DB_SSH:-${DB_HOST:+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@$DB_HOST}}
 
 CORES_ARMS=${CORES_ARMS:-"A B C"}            # D(관측 스택)를 넣으면 판이 33% 는다
 CORES_LEVELS=${CORES_LEVELS:-"20 40 60 80 90 100 120 160"}  # 2026-08-17 확정 — 설계 §5-3 ⑥.
@@ -1781,12 +1787,20 @@ phase_poolsizing() {
 
   timeout $TIMEOUT_POOLSIZING env \
       TARGET_HOST="$TARGET_HOST" TARGET_SSH="$TARGET_SSH" TARGET_REPO_DIR="$TARGET_REPO_DIR" \
+      DB_SSH="$DB_SSH" \
       GHZ_TOKEN="$GHZ_TOKEN" GHZ_DATA="$GHZ_DATA" GHZ_BIN="$GHZ_BIN" \
       MYSQL_CONTAINER="$CONTAINER" MYSQL_PW="$PW" OUT="$out" \
       bash "$ROOT/loadtest/measure_poolsizing_10_20.sh" > "$out/run.log" 2>&1
   local rc=$?
 
-  $TARGET_SSH "docker logs --tail 2000 shadowfit-backend 2>&1" > "$out/target-backend.log" 2>&1 || true
+  # 3대(DB_SSH 설정)는 App 이 bare jar+systemd 라 journalctl 을, MySQL 로그는 DB 박스에서 건진다.
+  # 2대(DB_SSH 미설정)는 기존대로 App 컨테이너 로그 하나면 된다.
+  if [ -n "$DB_SSH" ]; then
+    $TARGET_SSH "journalctl -u shadowfit-app --no-pager -n 2000 2>&1" > "$out/target-backend.log" 2>&1 || true
+    $DB_SSH "docker logs --tail 2000 $CONTAINER 2>&1" > "$out/db-mysql.log" 2>&1 || true
+  else
+    $TARGET_SSH "docker logs --tail 2000 shadowfit-backend 2>&1" > "$out/target-backend.log" 2>&1 || true
+  fi
 
   if [ $rc -ne 0 ]; then
     note "🔴 풀 사이징 라운드 rc=$rc — run.log 를 볼 것"

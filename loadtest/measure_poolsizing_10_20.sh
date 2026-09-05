@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# HikariCP 풀 사이징 재실험 — 10~20 사이 좁히기 (택틱 B, 2대 구성)
+# HikariCP 풀 사이징 재실험 — 10~20 사이 좁히기 (택틱 B, 2대 또는 3대 구성)
+#
+# 🟢 2026-09-05 — DB_SSH 를 설정하면 3대(DB·App 분리, App bare jar+systemd) 경로로 동작한다.
+#    docs/decisions/pool-sizing-10-20-experiment-design.md §10-2가 이미 이 설계(systemd
+#    Environment= sed 치환 + assert_pool 재사용)를 2026-09-04 EC2 라운드(§11)에서 검증했으나,
+#    그 실행에 쓰인 스크립트 사본은 커밋되지 못했다(동시 세션 git 인덱스 경합으로 2대 버전이
+#    되살아났다, 커밋 a303daf4) — 아래는 §10-2 설계를 그대로 다시 구현한 것이다.
+#    DB_SSH 가 비어 있으면(기본) 기존 2대(docker-compose override) 경로 그대로 동작 — 동작 불변.
 #
 # 설계: docs/decisions/pool-sizing-10-20-experiment-design.md
 # 배경: 2026-09-04 1차 시도(4대: DB·App 분리+Loader+Obs)가 실전에서 막혔다 — 그 스윕이
@@ -35,9 +42,11 @@
 #     (다세션이라는 점은 같지만 생성기가 다르므로 완전한 등가성은 아니다 — 결과 문서에 명시할 것)
 #
 # 필요한 환경변수:
-#   TARGET_HOST   대상(p6-target) 사설 IP — ghz 가 이 주소의 6565 를 친다
+#   TARGET_HOST   대상(App) 사설 IP — ghz 가 이 주소의 6565 를 친다
 #   TARGET_SSH    대상으로 붙는 ssh 명령 전체 (예: "ssh -i k.pem root@10.0.0.5")
-#   TARGET_REPO_DIR  대상의 저장소 경로 (기본 /root/init)
+#   TARGET_REPO_DIR  대상의 저장소 경로 (기본 /root/init) — 2대 경로에서만 쓴다(3대 App 은 bare jar)
+#   DB_SSH        (3대 전용) DB 박스로 붙는 ssh 명령 전체. 비어 있으면 2대 경로(TARGET_SSH 가
+#                 DB·App 둘 다 처리)로 동작 — 기본값, 동작 불변
 #   GHZ_TOKEN     대상 .env 의 INTERNAL_API_TOKEN (부트스트랩이 생성·출력한 값)
 #   GHZ_DATA      부하기의 batch_multi.json 경로 (기본 /root/batch_multi.json)
 #   GHZ_BIN       ghz 바이너리 경로 (기본 /usr/local/bin/ghz)
@@ -48,6 +57,7 @@ set -uo pipefail
 : "${TARGET_HOST:?TARGET_HOST 미설정}" "${TARGET_SSH:?TARGET_SSH 미설정}" "${GHZ_TOKEN:?GHZ_TOKEN 미설정}"
 OUT="${OUT:?OUT 미설정}"
 TARGET_REPO_DIR=${TARGET_REPO_DIR:-/root/init}
+DB_SSH=${DB_SSH:-}
 GHZ_DATA=${GHZ_DATA:-/root/batch_multi.json}
 GHZ_BIN=${GHZ_BIN:-/usr/local/bin/ghz}
 C=${C:-100}
@@ -55,6 +65,8 @@ N=${N:-15000}
 ACTUATOR=${ACTUATOR:-http://127.0.0.1:9090/actuator/prometheus}
 MYSQL_CONTAINER=${MYSQL_CONTAINER:-shadowfit-mysql}
 MYSQL_PW=${MYSQL_PW:?MYSQL_PW 미설정 — 대상 .env 의 MYSQL_ROOT_PASSWORD}
+# MySQL SHOW GLOBAL STATUS 는 DB 가 사는 박스에서 긁는다 — 3대는 DB_SSH, 2대는 TARGET_SSH(같은 박스).
+MYSQL_SSH=${DB_SSH:-$TARGET_SSH}
 
 mkdir -p "$OUT"
 LOG="$OUT/pool_sizing.tsv"
@@ -65,26 +77,41 @@ SIDE_LOG="$OUT/pool_sizing_side.tsv"
 note() { echo "  $*"; }
 die()  { echo "🔴 중단 — $*" >&2; exit 1; }
 
-$TARGET_SSH "test -d $TARGET_REPO_DIR && docker ps >/dev/null 2>&1" \
-  || die "대상 박스에 못 붙거나 $TARGET_REPO_DIR / docker 가 없다"
+if [ -n "$DB_SSH" ]; then
+  note "3대 모드 — App 은 systemd(shadowfit-app), DB 는 별도 박스($DB_SSH)"
+  $TARGET_SSH "systemctl is-active --quiet shadowfit-app" \
+    || die "대상 박스에 shadowfit-app 유닛이 없거나 안 살아있다 (bootstrap.sh ROLE=app 확인)"
+  $DB_SSH "docker ps >/dev/null 2>&1" || die "DB 박스에 못 붙거나 docker 가 없다"
+else
+  $TARGET_SSH "test -d $TARGET_REPO_DIR && docker ps >/dev/null 2>&1" \
+    || die "대상 박스에 못 붙거나 $TARGET_REPO_DIR / docker 가 없다"
+fi
 command -v "$GHZ_BIN" >/dev/null 2>&1 || [ -x "$GHZ_BIN" ] || die "ghz 를 못 찾았다: $GHZ_BIN"
 [ -f "$GHZ_DATA" ] || die "페이로드가 없다: $GHZ_DATA (bootstrap.sh ROLE=p6-loader 가 만든다)"
 
-# ── 풀 사이징 적용 — override 파일을 얹는다 (원본 docker-compose.yml 은 안 건드린다) ──
+# ── 풀 사이징 적용 ──────────────────────────────────────────────────────
+# 3대: App 이 bare jar 라 docker-compose override 를 못 쓴다 — systemd 유닛의 Environment= 한
+#      줄을 sed 로 갈아 끼우고 재기동한다(설계 §10-2). 2대: 기존 docker-compose override 그대로.
 apply_pool() {  # $1 = pool 크기
   local pool=$1
-  # 🔴 heredoc 은 로컬에서 $pool 을 먼저 숫자로 치환한 뒤 원격으로 그대로 보낸다(따옴표
-  #    이스케이프가 필요 없다 — YAML 정수 스칼라는 따옴표 없이도 유효하다. compose 환경변수는
-  #    어차피 문자열로 변환된다). 원격 heredoc 은 <<'YML'(따옴표)로 걸어 원격 bash 가 내용을
-  #    한 번 더 해석하지 않게 한다 — [[project_shell_edit_escape_hazard]]와 같은 함정 회피.
-  $TARGET_SSH "cd $TARGET_REPO_DIR && cat > docker-compose.pool.yml <<'YML'
+  if [ -n "$DB_SSH" ]; then
+    $TARGET_SSH "sed -i 's/^Environment=SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=.*/Environment=SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=$pool/' /etc/systemd/system/shadowfit-app.service \
+      && systemctl daemon-reload && systemctl restart shadowfit-app" \
+      || { echo "🔴 pool=$pool systemd 재기동 실패" >&2; return 1; }
+  else
+    # 🔴 heredoc 은 로컬에서 $pool 을 먼저 숫자로 치환한 뒤 원격으로 그대로 보낸다(따옴표
+    #    이스케이프가 필요 없다 — YAML 정수 스칼라는 따옴표 없이도 유효하다. compose 환경변수는
+    #    어차피 문자열로 변환된다). 원격 heredoc 은 <<'YML'(따옴표)로 걸어 원격 bash 가 내용을
+    #    한 번 더 해석하지 않게 한다 — [[project_shell_edit_escape_hazard]]와 같은 함정 회피.
+    $TARGET_SSH "cd $TARGET_REPO_DIR && cat > docker-compose.pool.yml <<'YML'
 services:
   shadowfit-backend:
     environment:
       SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: $pool
 YML
-    docker compose -f docker-compose.yml -f docker-compose.pool.yml up -d mysql shadowfit-backend" \
-    || { echo "🔴 pool=$pool 구성 명령 실패" >&2; return 1; }
+      docker compose -f docker-compose.yml -f docker-compose.pool.yml up -d mysql shadowfit-backend" \
+      || { echo "🔴 pool=$pool 구성 명령 실패" >&2; return 1; }
+  fi
 
   # health 대기 — 최대 90초. 재기동 직후엔 이전 커넥션이 남아 첫 응답이 502/000 일 수 있다.
   local i
@@ -130,7 +157,7 @@ snap_side() {  # $1=태그 $2=pool $3=국면(pre|post)
     printf "%s\t%s\t%s\t%s\tspring\t_scrape\tFAIL\n" "$tag" "$pool" "$phase" "$now" >> "$SIDE_LOG"
   fi
   vars=$(printf "'%s'," $SIDE_MYSQL_VARS); vars=${vars%,}
-  my=$($TARGET_SSH "docker exec -i -e MYSQL_PWD=$MYSQL_PW $MYSQL_CONTAINER mysql -uroot -N \
+  my=$($MYSQL_SSH "docker exec -i -e MYSQL_PWD=$MYSQL_PW $MYSQL_CONTAINER mysql -uroot -N \
         -e \"SHOW GLOBAL STATUS WHERE Variable_name IN ($vars);\"" 2>/dev/null | tr -d '\r')
   if [ -n "$my" ]; then
     printf '%s\n' "$my" | awk -F'\t' -v t="$tag" -v p="$pool" -v ph="$phase" -v e="$now" \
