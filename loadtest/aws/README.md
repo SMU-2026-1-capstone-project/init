@@ -442,7 +442,6 @@ PHASES="framepath collect" \
 산출물은 `<OUTDIR>/framepath/` — `arms_<tag>.json` · `raw_*.tsv` · `server_*.log` ·
 `run_arms.log` · `ai_venv_conditions.txt`(부트스트랩이 만든 것을 복사한다).
 
-<<<<<<< HEAD
 ### R10-b — 2대 구성 (핸들러 동시성 · 최소 격자)
 
 🟢 **2026-09-02 코드 반영.** R10-a 가 GIL 스위치 간격을 반증하고, 곁다리 프로세스분리 판이
@@ -547,8 +546,6 @@ docker exec -i -e SCALING_WORKERS=1 -w /app shadowfit-ai \
 컨테이너 안 import 경로(`WORKDIR /app`)는 Dockerfile 을 읽고 유도한 것이지 실측이 아니다.
 다음 P6 라운드에서 처음 밟을 때 이 줄이 안 되면 여기부터 고칠 것.
 
-=======
->>>>>>> 27b654d8 (Revert P4/R10-b/bootstrap 6개 커밋 — 다른 경로로 이미 반영됨)
 ## 설정
 
 | 변수 | 기본 | 비고 |
