@@ -1,8 +1,11 @@
 # 풀 사이징 — acquire 대기 절대값 차이의 원인 분리 (3라운드 설계)
 
 작성: 2026-09-05
-상태: 🟡 **Round C 실행 완료(2026-09-05)** — 인스턴스 패밀리는 원인이 아님으로 판정.
-Round B·A 남음. [결과](../../loadtest/results/pool-sizing-10-20-roundC-2026-09-05/README.md)
+갱신: 2026-09-06 — **Round B 실행 완료.** DB 동거만 재현했으나 §12 수준(8~18ms대) 재현 안 됨 —
+pool 별로 §11 과 거의 같은 자릿수(0.37~2.76ms)에 남았다. Round C 보다는 절대값이 한 자릿수
+높지만, "§12 원인"으로 볼 근거는 아니다. [결과](../../loadtest/results/pool-sizing-10-20-roundB-2026-09-06/README.md)
+상태: 🟡 Round C·B 실행 완료(둘 다 "원인 아님"으로 판정) — **Round A(AI 동거)만 남음.**
+Round C 결과: [`pool-sizing-10-20-roundC-2026-09-05/README.md`](../../loadtest/results/pool-sizing-10-20-roundC-2026-09-05/README.md)
 
 선행: [`pool-sizing-10-20-topology-comparison.md`](./pool-sizing-10-20-topology-comparison.md) §4-2(세 후보 가설),
 [`pool-sizing-10-20-experiment-design.md`](./pool-sizing-10-20-experiment-design.md) §10(3대 구성 원안)
@@ -47,12 +50,20 @@ Loader는 비교 대상이 아니므로 `c7i.xlarge` 유지. **코드 변경 없
 > 절대값은 전혀 재현되지 않았다 — **인스턴스 패밀리는 원인이 아니다**로 판정. 남은 후보는
 > DB 동거·AI 동거 둘.
 
-### Round B — DB 동거만
+### Round B — DB 동거만 — ✅ 실행 완료
 
 DB와 App을 **한 박스**에 올리되 AI는 안 띄우고, 인스턴스는 `c7i`(§11과 동일 패밀리) 유지, Loader는 분리.
 `ROLE=db`(MySQL 컨테이너)와 `ROLE=app`(Spring bare jar+systemd, `DB_HOST=127.0.0.1`)을 **한 박스에서
 순서대로** 실행하면 된다 — 신규 ROLE을 만들 필요 없이 기존 두 ROLE을 같은 인스턴스에 두 번 태우는
 방식으로 가능해 보인다(§4-1에서 확인 필요).
+
+> **결과(2026-09-06)**: [`pool-sizing-10-20-roundB-2026-09-06/README.md`](../../loadtest/results/pool-sizing-10-20-roundB-2026-09-06/README.md) —
+> §4-1 방식(기존 두 ROLE을 한 박스에 이어 태우기 + `DB_HOST=TARGET_HOST`로 `DB_SSH` 자동 파생)이
+> 코드 변경 없이 그대로 동작했다. acquire 대기는 pool 별 0.37~2.76ms — **§12(8~18ms대)에 전혀
+> 못 미친다.** pool 별로 4/5에서 §11 보다도 낮고 1개(pool=20)만 근소하게 높아, 판정 기준(§1)으로는
+> **"§11 수준 — 원인 아님"** 에 든다. 다만 Round C(0.01~0.09ms)보다는 한 자릿수 높아 완전히
+> 무관하다고 보기도 애매한 회색 지대 — 자세한 판정 근거는 결과 문서 §3. **남은 후보는 AI 동거
+> (Round A) 하나.**
 
 ### Round A — AI 동거만
 
@@ -128,4 +139,6 @@ Prometheus 스크레이프 등으로 최소한의 CPU를 쓰는지)는 실행 �
       유지 여부(헬스체크·스크레이프로 인한 미세 CPU 사용)는 실행 전 코드로 확인 필요(§4-2 잔여 항목)
 - [x] §4-3 실행 방식 확정 — **순차 실행 + 라운드마다 중간 보고, EC2 착수도 라운드마다 별도 승인**(2026-09-05)
 - [x] EC2 착수 승인 — Round C 실행 완료(2026-09-05), 인스턴스 3대 terminate 확인 완료
-- [ ] Round B(DB 동거만) EC2 착수 승인 — 다음 순서(§3)
+- [x] Round B(DB 동거만) EC2 착수 승인 — 실행 완료(2026-09-06), 인스턴스 2대 terminate 확인 완료.
+      결과: "§11 수준 — 원인 아님" 판정, Round C 보다는 절대값이 높은 회색 지대
+- [ ] Round A(AI 동거만) EC2 착수 승인 — 다음 순서(§3), 남은 마지막 후보
