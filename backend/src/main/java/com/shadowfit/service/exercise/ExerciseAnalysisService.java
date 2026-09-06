@@ -359,7 +359,7 @@ public class ExerciseAnalysisService {
      * [STEP 3: 비동기 gRPC 데이터 전송]
      * DB에서 기준 좌표(Reference)를 조회하여 FastAPI 서버로 전송합니다.
      */
-    @Async
+    @Async("applicationTaskExecutor")
     @Transactional(readOnly = true)
     public void sendAnalysisRequestToFastApi(Long sessionId, VideoRequestDto appDto, String finalUrl, String persona,
                                              String sessionNonce) {

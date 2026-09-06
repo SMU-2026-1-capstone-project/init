@@ -26,7 +26,7 @@ public class PoseDataCleanupService {
 
     private final PoseDataRepository poseDataRepository;
 
-    @Async
+    @Async("applicationTaskExecutor")
     @Transactional
     public void cleanupBySessionIds(List<Long> sessionIds) {
         if (sessionIds == null || sessionIds.isEmpty()) {
