@@ -1,0 +1,35 @@
+# 측정 조건 — Round H(App 배포 방식: bare jar → 컨테이너)
+생성          : 2026-09-06 (13:00~13:09 UTC)
+커밋          : 625e5324a682b8099c8ec0a9f95bac6d1a579407 (origin/feat/be07-pattern-analysis-skeleton HEAD)
+S3 결과       : 없음 — run_all.sh 를 거치지 않고 measure_poolsizing_10_20_H.sh 를 Loader 박스에서
+                직접 실행(원 세션이 대화형으로 직접 오케스트레이션, fork 위임 아님). 산출물은
+                SSH/scp 로 로컬에 직접 회수했다.
+
+# 구성 — §11과 완전히 동일한 3대 토폴로지, App 배포 방식만 컨테이너로
+DB 박스       : c7i.2xlarge · i-0dde8fbfa86093bdc · ROLE=db SEED_MULTI_SESSIONS=1
+                (exercise_sessions 901~1900 · 1000개 확인됨)
+App 박스      : c7i.xlarge · i-0e74a2f081520d08e · ROLE=db 로 부트스트랩(docker·repo·.env만
+                재사용) 후 로컬 mysql 컨테이너 제거, docker-compose.yml 의 shadowfit-backend 를
+                빌드하여 DB_HOST=<DB 박스 사설 IP>로 오버라이드해 원격 DB 를 보게 함
+                (docker compose -f docker-compose.yml -f docker-compose.pool.yml up -d --no-deps
+                shadowfit-backend). AI 는 안 띄움.
+Loader 박스   : c7i.xlarge · i-01fe70505b43ea6e0 · ROLE=p6-loader
+
+측정 스크립트 : loadtest/measure_poolsizing_10_20_H.sh(원본 measure_poolsizing_10_20.sh 를
+                복사해 APP_CONTAINER=1 모드를 추가한 전용 사본 — apply_pool() 에 세 번째 분기:
+                App=컨테이너·DB=원격일 때 docker-compose override + `--no-deps`로 pool 적용).
+                MYSQL_PW=1234(PW 기본값), GHZ_TOKEN=App 박스 .env 의 INTERNAL_API_TOKEN.
+
+부하          : ghz -c 100 -n 15000 닫힌 루프, ExerciseService.SavePoseDataBatch
+판 순서       : 라틴 방격 3라운드×5수준(10·12·15·17·20) + 버림판 1(pool=15)
+
+# 단계
+phase                          status  seconds
+bootstrap(DB·App·Loader 병렬)   OK      -
+docker build shadowfit-backend  OK      ~90초
+poolsizing(discard+15판)        OK      ~370초(13:03:04~13:09:28 UTC)
+
+# 인스턴스 3대 전부 terminate 확인 완료(describe-instances state=terminated),
+# describe-volumes 필터(Project=shadowfit-measure, available/in-use) 결과 0건 — 잔존 볼륨 없음.
+
+⚠️ 절대 소요 시간을 «운영에서 N분» 으로 인용 금지 — 하드웨어 종속(설계 §5)

@@ -1,0 +1,22 @@
+# 측정 조건 — Round I(App 컨테이너, host 네트워킹)
+생성          : 2026-09-06 (KST 오후)
+커밋          : 625e5324a682b8099c8ec0a9f95bac6d1a579407
+구성          : 3대 — DB(ROLE=db, c7i.2xlarge, i-04ae50343c1614e00) ·
+                App(도커, c7i.xlarge, i-0a3c22f260a241f3c, 루트볼륨 30GB) ·
+                Loader(ROLE=p6-loader, c7i.xlarge, i-0216847edffb1ff5d)
+App 컨테이너   : init-shadowfit-backend 이미지, `docker run --network host`(브리지 네트워크 안 씀,
+                docker-compose 미사용 — compose가 network_mode:host와 상위 networks: 를
+                같은 서비스에 동시에 못 가져서 우회), DB_HOST를 DB박스 사설 IP(172.31.13.37)로 직접 지정
+DB            : MySQL 8.0(shadowfit-mysql 컨테이너), DB_USERNAME=shadowfit, 세션 시드
+                exercise_sessions 901~1900 (1000개, member id=1) 수동 시딩 완료
+부하          : ghz -c 100 -n 15000 닫힌 루프, ExerciseService.SavePoseDataBatch
+판 순서        : 라틴 방격 3라운드×5수준(10·12·15·17·20) + 버림판 1(pool=15) — Round H와 동일
+측정 스크립트  : loadtest/measure_poolsizing_10_20_I.sh (Round H 스크립트의 apply_pool
+                APP_CONTAINER 분기를 `docker run --network host`로 교체한 사본)
+전 판 ok=15000/fail=0, 가용성 게이트(timeout_total) 위반 없음.
+
+인스턴스 3대 전부 terminate 확인 완료(describe-instances state=terminated),
+`Project=shadowfit-measure` 태그 볼륨 잔존 없음(describe-volumes 0건).
+
+⚠️ 절대 소요 시간·RPS 를 하드웨어 종속 값으로 취급 — §11·Round C~H와 마찬가지로
+상대 비교(같은 rig·같은 조건에서 pool 간, 그리고 라운드 간 acquire 대기 비교)만 유효하다.
