@@ -1,7 +1,18 @@
 # `applicationTaskExecutor` 큐 길이 — 다른 채널로 잴 방법
 
 작성일: 2026-08-28
-상태: **설계 — 채널 선택 미결정 (사용자 confirm 필요)**
+갱신: 2026-09-07 — **채널 문제가 이미 해결돼 있었다(문서 드리프트).** 이 문서가 다루는 "①JMX
+②디버그 엔드포인트 ③`@Lazy` 제거" 세 후보 중 **③이 이미 다른 목적의 PR(#667, `ca1ae4f2`,
+2026-09-04)로 적용돼 있었다** — `AsyncConfig.java`가 `applicationTaskExecutor`를 non-lazy
+빈으로 직접 정의하도록 고쳐졌고, 회귀 테스트(`ApplicationTaskExecutorMetricsTest`)까지 있다.
+그래서 아래 §2~§5의 "채널을 새로 골라야 한다"는 전제가 **낡았다** — 이미 Micrometer/
+`/actuator/prometheus`로 `executor_queued_tasks{name="applicationTaskExecutor"}` 등이 정상
+관측된다(2026-09-07 실측 확인). 이 채널로 원 실험(H1)을 재측정했고, 결과는
+[`../../loadtest/results/async-pool-2026-09-07/README.md`](../../loadtest/results/async-pool-2026-09-07/README.md) —
+그런데 **큐 길이가 6판 내내 0으로, `@Async`가 이 executor를 아예 안 쓴다는 새 결함이 나왔다.**
+이 문서(①JMX·②디버그 엔드포인트 비교)는 그 새 결함과는 무관해졌고, 참고 자료로만 남긴다.
+상태: **채널 문제 해결됨(#667로 부수 해소, 2026-09-04) · 재측정 완료(2026-09-07) · 아래 채널
+비교 내용은 낡음**
 대상: `applicationTaskExecutor`(Boot 자동 구성 `@Async` 풀)의 큐 길이·워커 수 계측
 연관: [`./async-pool-backpressure-experiment.md`](./async-pool-backpressure-experiment.md)(H1이
 이 계측 부재로 판정 불가로 끝난 원 실험) · 이슈 [#582](https://github.com/Shadowfit/init/issues/582) ·

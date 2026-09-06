@@ -1,0 +1,43 @@
+  풀 계정 20개 로드
+=== 준비 — 빈 상태(부하 없음) 큐 지표 확인 ===
+  q=0.0 active=0.0 poolsize=0.0
+
+=== 판 1 — 팔 A ===
+  [리셋확인] circuitbreakers: {"circuitBreakers":{"aiServer-0":{"failureRate":"-1.0%","slowCallRate":"-1.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":0,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"},"aiServer-1":{"failureRate":"-1.0%","slowCallRate":"-1.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":1,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"},"aiServer-2":{"failureRate":"-1.0%","slowCallRate":"-1.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":1,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"}}}
+  [rep1_A] 세션 15 개 생성 (요청 15, 파일별 분리로 유실 없음)
+  [rep1_A] 폴링 로그 → /e/init/loadtest/results/async-pool-2026-09-07/rep1_A_poll.log
+
+=== 판 2 — 팔 B ===
+  [리셋확인] circuitbreakers: {"circuitBreakers":{"aiServer-0":{"failureRate":"0.0%","slowCallRate":"0.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":5,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"},"aiServer-1":{"failureRate":"0.0%","slowCallRate":"0.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":6,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"},"aiServer-2":{"failureRate":"0.0%","slowCallRate":"0.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":6,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"}}}
+  docker pause shadowfit-ai
+  [rep2_B] 세션 15 개 생성 (요청 15, 파일별 분리로 유실 없음)
+  [rep2_B] 폴링 로그 → /e/init/loadtest/results/async-pool-2026-09-07/rep2_B_poll.log
+  docker unpause shadowfit-ai
+
+=== 판 3 — 팔 B ===
+  [리셋확인] circuitbreakers: {"circuitBreakers":{"aiServer-0":{"failureRate":"-1.0%","slowCallRate":"-1.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":0,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"HALF_OPEN"},"aiServer-1":{"failureRate":"-1.0%","slowCallRate":"-1.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":0,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"HALF_OPEN"},"aiServer-2":{"failureRate":"-1.0%","slowCallRate":"-1.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":0,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"HALF_OPEN"}}}
+  docker pause shadowfit-ai
+  [rep3_B] 세션 15 개 생성 (요청 15, 파일별 분리로 유실 없음)
+  [rep3_B] 폴링 로그 → /e/init/loadtest/results/async-pool-2026-09-07/rep3_B_poll.log
+  docker unpause shadowfit-ai
+
+=== 판 4 — 팔 A ===
+  [리셋확인] circuitbreakers: {"circuitBreakers":{"aiServer-0":{"failureRate":"-1.0%","slowCallRate":"-1.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":1,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"HALF_OPEN"},"aiServer-1":{"failureRate":"-1.0%","slowCallRate":"-1.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":2,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"HALF_OPEN"},"aiServer-2":{"failureRate":"-1.0%","slowCallRate":"-1.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":1,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"HALF_OPEN"}}}
+  [rep4_A] 세션 15 개 생성 (요청 15, 파일별 분리로 유실 없음)
+  [rep4_A] 폴링 로그 → /e/init/loadtest/results/async-pool-2026-09-07/rep4_A_poll.log
+
+=== 판 5 — 팔 A ===
+  [리셋확인] circuitbreakers: {"circuitBreakers":{"aiServer-0":{"failureRate":"0.0%","slowCallRate":"0.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":6,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"},"aiServer-1":{"failureRate":"0.0%","slowCallRate":"0.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":6,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"},"aiServer-2":{"failureRate":"0.0%","slowCallRate":"0.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":7,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"}}}
+  [rep5_A] 세션 15 개 생성 (요청 15, 파일별 분리로 유실 없음)
+  [rep5_A] 폴링 로그 → /e/init/loadtest/results/async-pool-2026-09-07/rep5_A_poll.log
+
+=== 판 6 — 팔 B ===
+  [리셋확인] circuitbreakers: {"circuitBreakers":{"aiServer-0":{"failureRate":"0.0%","slowCallRate":"0.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":10,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"},"aiServer-1":{"failureRate":"0.0%","slowCallRate":"0.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":10,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"},"aiServer-2":{"failureRate":"0.0%","slowCallRate":"0.0%","failureRateThreshold":"50.0%","slowCallRateThreshold":"100.0%","bufferedCalls":10,"failedCalls":0,"slowCalls":0,"slowFailedCalls":0,"notPermittedCalls":0,"state":"CLOSED"}}}
+  docker pause shadowfit-ai
+  [rep6_B] 세션 15 개 생성 (요청 15, 파일별 분리로 유실 없음)
+  [rep6_B] 폴링 로그 → /e/init/loadtest/results/async-pool-2026-09-07/rep6_B_poll.log
+  docker unpause shadowfit-ai
+
+=== 완료 ===
+
+[exited with code 0]

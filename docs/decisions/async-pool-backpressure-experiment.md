@@ -1,6 +1,13 @@
 # `@Async` 풀과 서킷브레이커 — 「AI 가 멈추면 Spring 은 무엇을 쌓는가」
 
 작성일: 2026-08-11
+갱신: 2026-09-07 — **H1 재측정 완료·더 큰 결함 발견.** #667(2026-09-04)이 `applicationTaskExecutor`를
+non-lazy로 고쳐 계측 채널(#582)이 살아났고, 그 채널로 재측정한 결과 **큐는 6판 내내 한 번도 안
+자랐다.** 그런데 이유가 "안전해서"가 아니라 **`@Async sendAnalysisRequestToFastApi`가
+`applicationTaskExecutor`를 아예 안 쓰기 때문**이었다(직접 호출 테스트로 확인 —
+`executor_completed_tasks_total`이 실제 실행 후에도 0, 스레드 이름이 `TaskExecutor-N`으로 코어
+8개 재사용 패턴 없이 계속 올라감). 큐 상한 문제보다 **무제한 스레드 생성**이 실제 리스크로
+새로 열렸다 — 원인 규명·수정은 별도 착수 필요. 상세: [`../../loadtest/results/async-pool-2026-09-07/README.md`](../../loadtest/results/async-pool-2026-09-07/README.md)
 상태: **본 실험 완료 (2026-08-28, 로컬) — 그런데 계획한 방법으로는 답을 못 냈다.** 완화책 채택 여부는 미결정 — 실행은 사용자 confirm 후 진행([[feedback_user_decides_not_claude]]), 결과 해석·다음 행동은 그대로 사용자 몫.
       0-a 가 H1(Boot 기본값)을 바이트코드로 확정했고, 0-b 는 §2 의 «Micrometer 자동 계측» 한 줄을 **반증**했다(`@Lazy` 라 첫 `@Async` 호출 전에는 빈도 지표도 없다). **2026-08-28 본실험이 한 단계 더 나쁜 사실을 확인했다 — 빈이 태어난 뒤에도 Micrometer 가 영영 안 잡는다**(이슈 [#582](https://github.com/Shadowfit/init/issues/582)). 큐 길이(H1)는 그래서 **여전히 미답**이고, 대신 관측 가능했던 서킷브레이커·세션 FAILED 전이(H2·H3)만 실측했다. 결과: [`../../loadtest/results/async-pool-2026-08-28/README.md`](../../loadtest/results/async-pool-2026-08-28/README.md). 경위는 결정 로그
 대상: Spring 축의 미측정 1순위. **FastAPI 실험이 아니다** — AI 정지는 자극이고 관측 대상은 Spring 의 큐다
@@ -307,9 +314,17 @@ ThreadPoolTaskExecutor applicationTaskExecutor(ThreadPoolTaskExecutorBuilder)
 - [x] ~~**착수 여부**~~ — **2026-08-28 착수·완료(로컬).**
 - [x] ~~**0단계만 먼저 할지**~~ — 0-a·0-b 완료.
 - [x] ~~**결과 위치**~~ — `loadtest/results/async-pool-2026-08-28/` 관례대로.
-- [ ] **H1(큐 길이)을 다른 채널로 다시 잴지** — 이슈 [#582](https://github.com/Shadowfit/init/issues/582)의 근본 원인(Micrometer 바인더 vs `@Lazy`)을 코드로 고칠지, 아니면 JMX·임시 디버그 엔드포인트 등 **다른 계측 경로**로 우회할지. 어느 쪽이든 코드 변경이 필요해 새 결정이다.
-- [ ] **rig 의 로깅 경합 버그를 고쳐 재측정할지** — 이번 라운드는 판당 실제 동시 요청 수를 정확히 못 셌다(README §2). 정량적 주장("N=15에서")이 필요하면 재실행 전에 수정 필요.
-- [ ] **완화책 착수 여부** — H1이 안 갈려서 «큐가 진짜 위험한지» 자체가 여전히 불확실. §5(안 할 것)에 있던 항목들(풀 크기 스윕·거절 정책 등)은 그대로 미착수.
+- [x] ~~**H1(큐 길이)을 다른 채널로 다시 잴지**~~ — #667(2026-09-04)이 코드 원인(`@Lazy`)을 이미
+      고쳤다(다른 목적의 PR이었으나 이 이슈도 부수적으로 해소). 2026-09-07 그 채널로 재측정 완료 —
+      결과: [`async-pool-2026-09-07/README.md`](../../loadtest/results/async-pool-2026-09-07/README.md).
+- [x] ~~**rig 의 로깅 경합 버그를 고쳐 재측정할지**~~ — 2026-09-07 재측정 시 파일 분리 방식으로
+      수정, 15/15 유실 없이 잡혔다(정량적 주장 가능해짐).
+- [ ] **`@Async`가 `applicationTaskExecutor`를 안 쓰는 원인 규명·수정** — 2026-09-07 재측정이 새로
+      연 항목. 추정(Spring 기본 실행기 탐색 실패 → 대체 실행기 폴백)만 있고 코드로 확정 안 됨.
+      [[feedback_troubleshooting_to_issues]]대로 이슈 등록 여부·착수는 사용자 결정.
+- [ ] **완화책 착수 여부** — 질문 자체가 바뀌었다: "무제한 큐가 위험한가"가 아니라 "무제한 스레드
+      생성(추정)이 위험한가"이고, 후자가 더 심각할 수 있다. §5(안 할 것)에 있던 항목들(풀 크기
+      스윕·거절 정책 등)은 그대로 미착수 — 원인 규명이 선행돼야 한다.
 
 ---
 
@@ -353,3 +368,16 @@ ThreadPoolTaskExecutor applicationTaskExecutor(ThreadPoolTaskExecutorBuilder)
   미답** — 이번 라운드는 «이 방법으로는 못 잰다»는 것 자체가 산출물이다.
   상세: [`../../loadtest/results/async-pool-2026-08-28/README.md`](../../loadtest/results/async-pool-2026-08-28/README.md).
   완화책 채택 여부는 미결정으로 남긴다.
+- 2026-09-07(**H1 재측정 완료**): #667(2026-09-04, `ca1ae4f2`)이 `applicationTaskExecutor`를
+  non-lazy로 고쳐 계측 채널(#582)이 부수적으로 해소된 것을 확인하고 재측정에 착수했다. 원본
+  rig(병합 안 된 `measure/async-pool-backpressure-r2` 브랜치)를 `git show`로 추출해 재사용하되,
+  로깅 경합 버그(파일 분리로 수정)와 큐 폴러(확인된 지표명 `executor_queued_tasks` 등)를 추가했다.
+  **결과: 6판 전부 큐·활성스레드·풀크기가 0.0에서 안 움직였다** — AI 정지 상태에서도. 직접 호출
+  테스트로 원인을 더 파봤더니 **`@Async`가 `applicationTaskExecutor`를 아예 안 거친다**는 게
+  드러났다(`executor_completed_tasks_total`이 실행 후에도 0 · 로그의 스레드 이름이
+  `TaskExecutor-77`→`92`로 코어 8개 재사용 없이 계속 올라감, 무제한 대체 실행기로 폴백하는
+  패턴). H1은 "틀림"으로 판정하되, 원인이 "무언가가 큐를 막는다"가 아니라 "이 경로가 그 큐를
+  아예 안 쓴다"로 특정됐다 — 무제한 큐보다 **무제한 스레드 생성**이 실제 리스크일 수 있다는,
+  설계 당시엔 없던 새 결함이 열렸다. H2(서킷 5~6초 OPEN)·H3(FAILED 2.7~4.2초 전이)는 원 라운드와
+  정합적으로 재현됐다. 상세: [`../../loadtest/results/async-pool-2026-09-07/README.md`](../../loadtest/results/async-pool-2026-09-07/README.md).
+  원인 규명·이슈 등록·완화책은 미결정으로 남긴다.
