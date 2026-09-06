@@ -1,9 +1,13 @@
 # 커버링 인덱스 쓰기 「처리량」(ms) — 카드 A 후속
 
 작성일: 2026-08-28
+갱신: 2026-09-06(2) — **배치 커밋 후속으로 가설 확인.** `TXN_STMTS=1`(문당 커밋)에서 관찰된
+"+24.4% → ~2%" 축소가 `TXN_STMTS=20`(fsync 비중 20분의 1)에서는 RPS 격차 −9.9%·p99 격차
++194.8%로 다시 벌어졌다 — "fsync가 대가를 덮는다"는 설명이 실제로 검증됐다.
+[결과 §7](../../loadtest/results/card-a-write-throughput-2026-09-06/README.md#7-배치-커밋-후속--가설-확인-2026-09-06-txn_stmts20)
 갱신: 2026-09-06 — **실행 완료.** 논리 카운터의 +24.4%(카드 A)가 실제 처리량에서는 ~2%로
 줄어든다 — fsync가 인덱스의 추가 대가를 덮는다. [결과](../../loadtest/results/card-a-write-throughput-2026-09-06/README.md)
-상태: ✅ **완료** ([[feedback_user_decides_not_claude]] — 채택 여부는 여전히 사용자 결정)
+상태: ✅ **완료(+배치 커밋 후속까지 완료)** ([[feedback_user_decides_not_claude]] — 채택 여부는 여전히 사용자 결정)
 대상: `idx_report_cover`(커버링 인덱스, 81.5MB) — `pose_data` 삽입 경로
 연관: [#205](https://github.com/Shadowfit/init/issues/205) 카드 A ·
 [결과](../../loadtest/results/card-a-write-cost-2026-08-22/README.md) ·
