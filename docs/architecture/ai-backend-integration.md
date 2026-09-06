@@ -1,6 +1,6 @@
 # AI ↔ Backend 결합 현황
 
-마지막 업데이트: **2026-08-08** (이전 2026-05-23 → 2.5개월치 반영, §0 참조)
+마지막 업데이트: **2026-09-06** (§3-2 RPC별 stub 종류 정정 추가 — 이전 대규모 반영은 2026-08-08, §0 참조)
 범위: `ai-server/` (Python, FastAPI + gRPC) ↔ `backend/` (Spring Boot, Java/Kotlin)
 목적: 현재 어떻게 결합돼 있는지 사실만 정리한 스냅샷. 트레이드오프·대안 비교는 [`docs/decisions/ai-backend-coupling.md`](../decisions/ai-backend-coupling.md) 참조.
 
@@ -33,7 +33,7 @@
 | 스키마 공유 | `exercise.proto` 양쪽 저장소에 동일 파일 중복. (`user.proto` 는 아무도 안 써서 2026-08-12 삭제 — #133) |
 | 인증 | 내부 공유 토큰(`INTERNAL_API_TOKEN`) 기반, gRPC metadata `Authorization: Bearer …` |
 | 네트워크 | Docker Compose `shadowfit-net` 브리지, 컨테이너명 DNS |
-| 호출 패턴 | Spring → AI: 비동기(`@Async`, 202 Accepted) / AI → Spring: 콜백 (3회 재시도) |
+| 호출 패턴 | Spring → AI: RPC마다 다르다 — §3-2 참조 / AI → Spring: 콜백 (3회 재시도) |
 | **전달 의미론 (Spring → AI 종료 통보)** | **아웃박스 + 발행기 폴링 = «상한 있는 재시도»**(기본 10회, 초과 시 터미널 `FAILED`). 🔴 **전달 보장이 아니다** — 의도를 DB 에 보존하고 실패를 조회 가능하게 만든다. `effectively exactly-once` 는 *전달이 성공한 건에 한해*, 그리고 AI `StopAnalysis` 가 멱등하다는 전제에서만 성립 (2026-07-29) |
 | **회복탄력성** | 모든 Spring → AI 호출에 **gRPC deadline**(`withDeadlineAfter`) + **Resilience4j 서킷브레이커**(`aiServer`) |
 | **관측성** | **correlation id** 가 HTTP(`X-Request-Id`) → MDC → gRPC 메타데이터(`x-request-id`) → FastAPI `ContextVar` 로 전파. 커스텀 지표 9종 |
@@ -111,6 +111,18 @@ Docker 네트워크는 `shadowfit-net` 브리지 한 개. 외부 노출은 backe
 >
 > ✅ **`user.proto` 는 2026-08-12 에 삭제됐다(#133).** 「지우거나 쓰거나 정하는 게 맞다」는 위 판단을 **지우는 쪽**으로 닫은 것이다. 근거: 전 저장소에서 구현·호출 0건이고 `ai-server` 쪽엔 파일 자체가 없어 한 번도 계약이 된 적이 없다. 그때까지 Java 클래스(`UserProto`·`UserServiceGrpc` 등)가 빌드마다 생성되고 있었고, 그게 다음 사람에게 "닉네임은 gRPC 로 가져오나?" 를 의심하게 만드는 비용이었다.
 
+### 3-2. RPC별 stub 종류 (동기/비동기) — 왜 다른가 🆕 (2026-09-06)
+
+§1의 "gRPC (양방향, 동기 unary RPC)"는 **요청/응답 모양**(스트리밍이 아니라 단건 요청-단건 응답)을 말하는 것이지, **클라이언트가 응답을 어떻게 기다리는가**와는 별개다. `ExerciseAnalysisService`는 비동기 스텁(`getAuthenticatedStub()`, `StreamObserver` 콜백)과 블로킹 스텁 둘 다 갖고 있고, RPC마다 다르게 골라 쓴다.
+
+| RPC | stub | 근거 | 왜 |
+|---|---|---|---|
+| `StartAnalysis` | **비동기** (`StreamObserver`) | `ExerciseAnalysisService.java:214-224,407` | 성공/실패와 무관하게 클라 행동이 같다 — 프론트는 어차피 `/pose` 프레임 전송을 시작한다. 실패는 별도 경로로 보상한다: 서킷 OPEN·gRPC 에러 시 `markAsFailedIfStillInProgress`가 세션을 즉시 `FAILED`로 되돌려 사용자를 풀어준다(`:400,435`) |
+| `ReattachAnalysis` | **동기** (blocking stub) | `ExerciseAnalysisService.java:456-460` 주석 | 응답 자체가 분기 조건이다 — "이어할 수 있는지"에 따라 클라가 프레임을 보낼지 새로 시작할지 정하므로 fire-and-forget이 성립하지 않는다 |
+| `StopAnalysis` | **동기** (blocking stub — 2026-07-29 아웃박스 도입 시 async 스텁에서 전환) | [`../decisions/outbox-reliable-messaging.md`](../decisions/outbox-reliable-messaging.md) §4-2-1 | `OutboxPublisher`가 SENT/RETRY/FAILED 3분류를 판단하려면 결과를 반환값으로 받아야 한다. 발행기는 `@Scheduled` 전용 스레드라 블로킹돼도 요청 처리량에 영향이 없다 |
+
+> 🔴 **정정 — "Spring → AI 호출은 전부 비동기"가 아니다.** 이전 판(§1 옛 서술)의 "Spring → AI: 비동기(`@Async`, 202 Accepted)"는 `StartAnalysis`(세션 시작) 하나만 정확히 설명한다. `@Async`는 **REST 응답을 막지 않는다**는 뜻이지 **그 안에서 나가는 gRPC 호출이 비동기 스텁**이라는 뜻이 아니다 — 실제로 `ReattachAnalysis`는 REST 요청 스레드가 gRPC 응답을 동기로 기다리고, `StopAnalysis`는 아웃박스 발행기 스레드가 동기로 기다린다. §1 "호출 패턴" 행은 이 절을 가리키도록 고쳤다.
+
 핵심 메시지:
 - `AnalyzeRequest`: `exercise_id(int64)`, `session_id(int64)`, `reference_poses(PoseDataRequest[])`
 - `SessionCompleteRequest`: `session_id(int64)`, `total_reps(int32)`, `avg_sync_rate(double)`, `max/min_sync_rate(double)`, `calories_burned(double)`
@@ -186,7 +198,7 @@ AI 컨테이너가 재시작되면 in-memory `SessionState` 가 사라지는데,
 
 | 메커니즘 | 위치 | 동작 |
 |---------|------|------|
-| Spring 비동기 호출 | `@Async sendAnalysisRequestToFastApi` | REST 응답을 막지 않고 gRPC 송신 |
+| Spring 비동기 호출 | `@Async sendAnalysisRequestToFastApi` | REST 응답을 막지 않고 gRPC 송신 (RPC별 stub 동기/비동기 차이는 §3-2) |
 | AI thread-local MediaPipe | `mediapipe_detector` (커밋 `c7657f1`) | 분석기 인스턴스를 thread별로 분리, race 제거 |
 | AI sync 분석 루프 | `pose.py` (커밋 `c7657f1`) | MediaPipe 블로킹을 async 이벤트 루프에서 분리 |
 | AI 콜백 재시도 | `spring_client.report_complete_analysis` | 1초 → 3초 백오프, 최대 3회 |
